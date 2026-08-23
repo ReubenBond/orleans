@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.DeadlockDetection;
+using Orleans.Transactions.Diagnostics;
 
 namespace Orleans.Transactions.State
 {
@@ -59,11 +60,16 @@ namespace Orleans.Transactions.State
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public async Task BreakLocks()
+        public async Task BreakLocks(IReadOnlyCollection<Guid> expectedTransactions)
         {
             await this.queue.Ready();
-            await this.queue.RWLock.AbortExecutingTransactions(exception: null);
-            this.queue.RWLock.Notify();
+            if (await this.queue.RWLock.AbortExecutingTransactions(
+                    expectedTransactions,
+                    exception: null,
+                    TransactionDiagnosticEvents.LockBreakReason.Deadlock))
+            {
+                this.queue.RWLock.Notify();
+            }
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -15,9 +16,8 @@ namespace Orleans.Transactions.DeadlockDetection
         ILocalDeadlockDetector,
         ILifecycleParticipant<ISiloLifecycle>
     {
-        private long currentVersion = 0L;
-
         private readonly LockTracker lockTracker = new LockTracker();
+        private readonly ConcurrentDictionary<long, LockInfo[]> snapshots = new();
 
         private readonly ILogger<DeadlockDetectionLockObserver> logger;
 
@@ -49,10 +49,10 @@ namespace Orleans.Transactions.DeadlockDetection
         public TimeSpan DetectionTimeout => this.options.DeadlockDetectionTimeout;
 
         public void OnResourceRequested(Guid transactionId, ParticipantId resourceId) =>
-            this.lockTracker.TrackWait(resourceId, transactionId, this.currentVersion);
+            this.lockTracker.TrackWait(resourceId, transactionId);
 
         public void OnResourceLocked(Guid transactionId, ParticipantId resourceId) =>
-            this.lockTracker.TrackEnterLock(resourceId, transactionId, this.currentVersion);
+            this.lockTracker.TrackEnterLock(resourceId, transactionId);
 
         public void OnResourceUnlocked(Guid transactionId, ParticipantId resourceId) =>
             this.lockTracker.TrackExitLock(resourceId, transactionId);
@@ -64,8 +64,8 @@ namespace Orleans.Transactions.DeadlockDetection
             try
             {
                 var startTime = this.UtcNow;
-                var localGraph =
-                    new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[] {resource});
+                var (_, locks) = this.lockTracker.CaptureSnapshot();
+                var localGraph = new WaitForGraph(locks).GetConnectedSubGraph(lockedBy, new[] { resource });
                 if (localGraph.DetectCycles(out var cycles))
                 {
                     var tasks = cycles.Select(async c =>
@@ -110,21 +110,29 @@ namespace Orleans.Transactions.DeadlockDetection
             }
         }
 
-        private long IncrementMaxVersion() => Interlocked.Increment(ref this.currentVersion);
-
         public async Task CollectLocks(CollectLocksRequest request)
         {
             long responseMaxVersion;
+            LockInfo[] snapshot;
             if (request.MaxVersion == null)
             {
-                responseMaxVersion = this.IncrementMaxVersion() - 1;
+                (responseMaxVersion, snapshot) = this.lockTracker.CaptureSnapshot();
+                if (!this.snapshots.TryAdd(responseMaxVersion, snapshot))
+                {
+                    throw new InvalidOperationException($"Duplicate deadlock snapshot version {responseMaxVersion}.");
+                }
+
+                this.ExpireSnapshot(responseMaxVersion).Ignore();
             }
             else
             {
                 responseMaxVersion = request.MaxVersion.Value;
+                if (!this.snapshots.TryGetValue(responseMaxVersion, out snapshot!))
+                {
+                    throw new InvalidOperationException($"Deadlock snapshot {responseMaxVersion} is no longer available.");
+                }
             }
 
-            var snapshot = this.lockTracker.GetLocks(responseMaxVersion);
             var wfg = new WaitForGraph(snapshot).GetConnectedSubGraph(request.TransactionIds, Enumerable.Empty<ParticipantId>());
 
             await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
@@ -134,6 +142,14 @@ namespace Orleans.Transactions.DeadlockDetection
                 MaxVersion = responseMaxVersion,
                 SiloAddress = this.Silo
             });
+        }
+
+        private async Task ExpireSnapshot(long version)
+        {
+            var retention = TimeSpan.FromTicks(
+                this.options.DeadlockRequestTimeout.Ticks * (this.options.MaxDeadlockRequests + 1L));
+            await Task.Delay(retention, this.timeProvider, CancellationToken.None);
+            this.snapshots.TryRemove(version, out _);
         }
 
         private DateTime UtcNow => this.timeProvider.GetUtcNow().UtcDateTime;

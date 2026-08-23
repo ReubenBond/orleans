@@ -146,13 +146,6 @@ namespace Orleans.Transactions.State
                     }
                     LogTraceSetLockExpiration(new(group.Deadline));
                 }
-                else
-                {
-                    if (this.transactionalLockObserver != null)
-                    {
-                        group.DeadlockDeadline = now + this.transactionalLockObserver.DetectionTimeout;
-                    }
-                }
 
                 // create a new record for this transaction
                 record = new TransactionRecord<TState>()
@@ -194,12 +187,18 @@ namespace Orleans.Transactions.State
                 if (group.Tasks == null)
                     group.Tasks = new List<Action>();
                 this.transactionalLockObserver?.OnResourceRequested(transactionId, this.queue.Resource);
+                this.ArmDeadlockDetection(DateTime.UtcNow);
                 group.Tasks.Add(completion);
             }
             else
             {
                 // execute task right now
                 this.transactionalLockObserver?.OnResourceLocked(transactionId, this.queue.Resource);
+                if (currentGroup?.Next is not null)
+                {
+                    this.ArmDeadlockDetection(DateTime.UtcNow);
+                }
+
                 completion();
             }
 
@@ -261,19 +260,30 @@ namespace Orleans.Transactions.State
         public Task AbortExecutingTransactions(
             Exception? exception,
             TransactionDiagnosticEvents.LockBreakReason reason = TransactionDiagnosticEvents.LockBreakReason.TransactionAbort)
+            => this.AbortExecutingTransactions(expectedTransactions: null, exception, reason).AsTask();
+
+        public async ValueTask<bool> AbortExecutingTransactions(
+            IReadOnlyCollection<Guid>? expectedTransactions,
+            Exception? exception,
+            TransactionDiagnosticEvents.LockBreakReason reason)
         {
+            if (currentGroup == null
+                || (expectedTransactions is not null
+                    && !currentGroup.Keys.Any(expectedTransactions.Contains)))
+            {
+                return false;
+            }
+
             if (this.logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogInformation("aborting all transactions in {CurrentGroup}",
-                    string.Join(",", this.currentGroup?.Keys ?? Enumerable.Empty<Guid>()));
+                    string.Join(",", this.currentGroup.Keys));
             }
-            if (currentGroup != null)
-            {
-                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception, reason)).ToArray();
-                currentGroup.Reset();
-                return Task.WhenAll(pending);
-            }
-            return Task.CompletedTask;
+
+            Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception, reason)).ToArray();
+            currentGroup.Reset();
+            await Task.WhenAll(pending);
+            return true;
         }
 
         private Task BreakLock(
@@ -379,61 +389,39 @@ namespace Orleans.Transactions.State
                             lockWorker.Notify();
                             storageWorker.Notify();
                         }
-                        else if(currentGroup.DeadlockDeadline.HasValue){
-                            if (this.logger.IsEnabled(LogLevel.Trace))
+                        else if (currentGroup.Deadline is { } lockDeadline && lockDeadline <= now)
+                        {
+                            // the lock group has timed out.
+                            TimeSpan late = now - lockDeadline;
+                            LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds));
+                            foreach (var transactionId in currentGroup.Keys)
                             {
-                                this.logger.LogTrace($"deadlock deadline has value - {this.currentGroup.DeadlockDeadline.Value}, checking it");
+                                TransactionDiagnosticEvents.EmitLockExpired(
+                                    queue.Resource,
+                                    transactionId,
+                                    lockDeadline,
+                                    now,
+                                    TransactionDiagnosticEvents.LockExpirationKind.HeldLock,
+                                    queue.DiagnosticIdentity);
                             }
-                            if (currentGroup.DeadlockDeadline.Value < now)
+                            await AbortExecutingTransactions(
+                                exception: null,
+                                reason: TransactionDiagnosticEvents.LockBreakReason.Expired);
+                            lockWorker.Notify();
+                        }
+                        else if (currentGroup.DeadlockDeadline is { } deadlockDeadline && deadlockDeadline <= now)
+                        {
+                            transactionalLockObserver?.StartDeadlockDetection(queue.Resource, currentGroup.Keys).Ignore();
+                            currentGroup.DeadlockDeadline = null;
+                            if (currentGroup.Deadline is { } deadline)
                             {
-                                this.logger.LogInformation($"deadlock possible for {this.currentGroup} on {this.queue.Resource} (observer: {this.transactionalLockObserver}");
-
-                                transactionalLockObserver?.StartDeadlockDetection(queue.Resource,
-                                    currentGroup.Keys).Ignore();
-                                // clear this so we don't get stuck forever.
-                                currentGroup.DeadlockDeadline = null;
-                                if (currentGroup.Deadline is { } deadline)
-                                {
-                                    this.lockWorker.Notify(deadline);
-                                }
-                            }
-                            else
-                            {
-                                if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("notifying later (lock-work)");
-                                this.lockWorker.Notify(
-                                    this.currentGroup.NextDeadline ?? this.currentGroup.DeadlockDeadline.Value);
-                                if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("done notify later (lock-work)");
+                                this.lockWorker.Notify(deadline);
                             }
                         }
-                        else if (currentGroup.Deadline.HasValue)
+                        else if (currentGroup.NextDeadline is { } nextDeadline)
                         {
-                            if (currentGroup.Deadline.Value < now)
-                            {
-                                // the lock group has timed out.
-                                TimeSpan late = now - currentGroup.Deadline.Value;
-                                LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds));
-                                foreach (var transactionId in currentGroup.Keys)
-                                {
-                                    TransactionDiagnosticEvents.EmitLockExpired(
-                                        queue.Resource,
-                                        transactionId,
-                                        currentGroup.Deadline.Value,
-                                        now,
-                                        TransactionDiagnosticEvents.LockExpirationKind.HeldLock,
-                                        queue.DiagnosticIdentity);
-                                }
-                                await AbortExecutingTransactions(
-                                    exception: null,
-                                    reason: TransactionDiagnosticEvents.LockBreakReason.Expired);
-                                lockWorker.Notify();
-                            }
-                            else
-                            {
-                                LogTraceRecheckLockExpiration(new(currentGroup.Deadline));
-
-                                // check again when the group expires
-                                lockWorker.Notify(currentGroup.NextDeadline ?? currentGroup.Deadline.Value);
-                            }
+                            LogTraceRecheckLockExpiration(new(nextDeadline));
+                            lockWorker.Notify(nextDeadline);
                         }
                         else
                         {
@@ -454,6 +442,7 @@ namespace Orleans.Transactions.State
 
                         if (currentGroup != null)
                         {
+                            currentGroup.DeadlockDeadline = null;
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
@@ -507,6 +496,11 @@ namespace Orleans.Transactions.State
                                 }
                             }
 
+                            if (currentGroup.Next is not null)
+                            {
+                                this.ArmDeadlockDetection(now);
+                            }
+
                             lockWorker.Notify();
                         }
                     }
@@ -521,6 +515,22 @@ namespace Orleans.Transactions.State
 
         private static DateTime AddTimeout(DateTime now, TimeSpan timeout)
             => timeout >= DateTime.MaxValue - now ? DateTime.MaxValue : now + timeout;
+
+        private void ArmDeadlockDetection(DateTime now)
+        {
+            if (this.transactionalLockObserver is null || this.currentGroup is null)
+            {
+                return;
+            }
+
+            var deadline = now + this.transactionalLockObserver.DetectionTimeout;
+            if (this.currentGroup.DeadlockDeadline is not { } currentDeadline || deadline < currentDeadline)
+            {
+                this.currentGroup.DeadlockDeadline = deadline;
+            }
+            this.lockWorker.Notify(this.currentGroup.NextDeadline!.Value);
+        }
+        }
 
         private bool Find(Guid guid, bool isRead, out LockGroup group, [NotNullWhen(true)] out TransactionRecord<TState>? record)
         {

@@ -112,15 +112,29 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public void DoesNotDetectNonCycles()
         {
-            var graph = new WaitForGraph(new []
+            var locks = new []
             {
-                Lock("R3", "T1"),
+                Lock("T1", "R3"),
                 Wait("T1", "R0"),
-                Lock("R0", "T0"),
+                Lock("T0", "R0"),
                 Wait("T0", "R1"),
-                Lock("R1", "T2")
-            });
-            Assert.False(graph.DetectCycles(out var _), "graph should not have a cycle");
+                Lock("T2", "R1")
+            };
+            var graph = new WaitForGraph(locks);
+            var expectedEdges = new[]
+            {
+                "RR0->TT0",
+                "RR1->TT2",
+                "RR3->TT1",
+                "TT0->RR1",
+                "TT1->RR0",
+            };
+
+            Assert.Equal(expectedEdges, graph.ToLockKeys().Select(FormatLock).Order());
+            var connected = graph.GetConnectedSubGraph([Tx("T1")], []);
+            Assert.Equal(expectedEdges, connected.ToLockKeys().Select(FormatLock).Order());
+            Assert.False(graph.DetectCycles(out var cycles), "graph should not have a cycle");
+            Assert.Empty(cycles);
         }
 
         [Fact]

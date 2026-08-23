@@ -5,8 +5,12 @@ namespace Orleans.Transactions.DeadlockDetection
     public class DeadlockDetectionOptions
     {
         /// <summary>
-        /// Start deadlock detection if a transaction is late by this amount.
+        /// Starts deadlock detection after a transaction has waited for a contended lock for this duration.
         /// </summary>
+        /// <remarks>
+        /// Lock expiration remains governed by <see cref="Configuration.TransactionalStateOptions.LockTimeout"/>.
+        /// The earlier deadline is always processed first.
+        /// </remarks>
         public TimeSpan DeadlockDetectionTimeout { get; set; } = DefaultDeadlockDetectionTimeout;
         private static readonly TimeSpan DefaultDeadlockDetectionTimeout = TimeSpan.FromSeconds(5);
 

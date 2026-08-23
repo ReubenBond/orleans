@@ -29,9 +29,9 @@ namespace Orleans.Transactions
             return GetResource(resourceId).Abort(transactionId);
         }
 
-        public Task BreakLocks(string resourceId)
+        public Task BreakLocks(string resourceId, List<Guid> expectedTransactions)
         {
-            return ((IDeadlockBreakableTransactionalResource)GetResource(resourceId)).BreakLocks();
+            return ((IDeadlockBreakableTransactionalResource)GetResource(resourceId)).BreakLocks(expectedTransactions);
         }
 
         public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)

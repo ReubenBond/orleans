@@ -58,9 +58,14 @@ namespace Orleans.Transactions.DeadlockDetection
     {
         public static Task BreakLocks(this IEnumerable<LockInfo> locks)
         {
-            var tasks = locks.Select(l =>
-                l.Resource.Reference.AsReference<IDeadlockResourceExtension>()
-                    .BreakLocks(l.Resource.Name));
+            var tasks = locks
+                .Where(static lockInfo => !lockInfo.IsWait)
+                .GroupBy(static lockInfo => lockInfo.Resource, ParticipantId.Comparer)
+                .Select(group =>
+                    group.Key.Reference.AsReference<IDeadlockResourceExtension>()
+                        .BreakLocks(
+                            group.Key.Name,
+                            group.Select(static lockInfo => lockInfo.TxId).Distinct().ToList()));
             return Task.WhenAll(tasks);
         }
     }

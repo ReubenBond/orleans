@@ -1,8 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Orleans.Transactions.DeadlockDetection
 {
@@ -11,34 +8,42 @@ namespace Orleans.Transactions.DeadlockDetection
     /// </summary>
     internal class LockTracker
     {
-        private readonly ConcurrentDictionary<LockInfo, long> locksAndWaits =
-            new ConcurrentDictionary<LockInfo, long>( LockInfo.EqualityComparer );
+        private readonly object gate = new();
+        private readonly HashSet<LockInfo> locksAndWaits = new(LockInfo.EqualityComparer);
+        private long nextSnapshotVersion;
 
-
-        public void TrackEnterLock(ParticipantId lockedGrain, Guid lockedByTx, long version)
+        public void TrackEnterLock(ParticipantId lockedGrain, Guid lockedByTx)
         {
-            // simplest to track the exit here.
-            this.locksAndWaits.TryRemove(LockInfo.ForWait(lockedGrain, lockedByTx), out _);
-            this.locksAndWaits.TryAdd(LockInfo.ForLock(lockedGrain, lockedByTx), version);
+            lock (this.gate)
+            {
+                this.locksAndWaits.Remove(LockInfo.ForWait(lockedGrain, lockedByTx));
+                this.locksAndWaits.Add(LockInfo.ForLock(lockedGrain, lockedByTx));
+            }
         }
 
         public void TrackExitLock(ParticipantId lockedGrain, Guid lockedByTx)
         {
-            this.locksAndWaits.TryRemove(LockInfo.ForWait(lockedGrain, lockedByTx), out _);
-            this.locksAndWaits.TryRemove(LockInfo.ForLock(lockedGrain, lockedByTx), out _);
+            lock (this.gate)
+            {
+                this.locksAndWaits.Remove(LockInfo.ForWait(lockedGrain, lockedByTx));
+                this.locksAndWaits.Remove(LockInfo.ForLock(lockedGrain, lockedByTx));
+            }
         }
 
-        public void TrackWait(ParticipantId waitingForGrain, Guid waitingTx, long version) =>
-            this.locksAndWaits.TryAdd(LockInfo.ForWait(waitingForGrain, waitingTx), version);
-
-        // Returns a snapshot of the locks we have
-        public ICollection<LockInfo> GetLocks(long? maxVersion = null)
+        public void TrackWait(ParticipantId waitingForGrain, Guid waitingTx)
         {
-            if (maxVersion == null)
-                return this.locksAndWaits.Keys;
+            lock (this.gate)
+            {
+                this.locksAndWaits.Add(LockInfo.ForWait(waitingForGrain, waitingTx));
+            }
+        }
 
-            return this.locksAndWaits.Where(kv => kv.Value <= maxVersion)
-                .Select(kv => kv.Key).ToArray();
+        public (long Version, LockInfo[] Locks) CaptureSnapshot()
+        {
+            lock (this.gate)
+            {
+                return (this.nextSnapshotVersion++, [.. this.locksAndWaits]);
+            }
         }
     }
 }

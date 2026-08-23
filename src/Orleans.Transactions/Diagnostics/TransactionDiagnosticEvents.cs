@@ -262,6 +262,7 @@ internal static class TransactionDiagnosticEvents
         Conflict,
         ValidationFailure,
         Expired,
+        Deadlock,
         TransactionAbort,
         StorageRecovery,
     }

@@ -255,10 +255,10 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        public async Task BreakLocks()
+        public async Task BreakLocks(IReadOnlyCollection<Guid> expectedTransactions)
         {
             LogInformationBreakingLocks(this.logger, context.GrainInstance);
-            await this.tResource.BreakLocks();
+            await this.tResource.BreakLocks(expectedTransactions);
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)

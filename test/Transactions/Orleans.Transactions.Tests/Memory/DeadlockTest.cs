@@ -28,7 +28,7 @@ namespace Orleans.Transactions.Tests.Memory
 
         public void DeadlockDetected(IEnumerable<LockInfo> locks, DateTime analysisStartedAt, bool detectedLocally, int requestsToDetection,
             TimeSpan analysisDuration) =>
-            this.grainFactory.GetGrain<IDeadlockEventCollector>(0).ReportEvent(new DeadlockEvent
+            this.grainFactory.GetGrain<IDeadlockEventCollector>(DeadlockFixture.CollectorKey).ReportEvent(new DeadlockEvent
             {
                 Duration = analysisDuration, Local = detectedLocally, Locks = locks.ToArray(),
                 IsDefinite = false, RequestCount = requestsToDetection, StartTime = analysisStartedAt,
@@ -36,7 +36,7 @@ namespace Orleans.Transactions.Tests.Memory
             }).Ignore();
 
         public void DeadlockNotDetected(DateTime analysisStartedAt, int requestsMade, TimeSpan analysisDuration, bool isDefinite) =>
-            this.grainFactory.GetGrain<IDeadlockEventCollector>(0).ReportEvent(new DeadlockEvent
+            this.grainFactory.GetGrain<IDeadlockEventCollector>(DeadlockFixture.CollectorKey).ReportEvent(new DeadlockEvent
             {
                 Duration = analysisDuration, RequestCount = requestsMade, Deadlocked = false,
                 Local = false, Locks = null, IsDefinite = isDefinite,  StartTime = analysisStartedAt
@@ -45,6 +45,8 @@ namespace Orleans.Transactions.Tests.Memory
 
     public class DeadlockFixture : MemoryTransactionsFixture
     {
+        public static long CollectorKey { get; } = BitConverter.ToInt64(Guid.NewGuid().ToByteArray());
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -74,6 +76,9 @@ namespace Orleans.Transactions.Tests.Memory
         [Fact]
         public async Task DeadlocksAreReported()
         {
+            var collector = this.grainFactory.GetGrain<IDeadlockEventCollector>(DeadlockFixture.CollectorKey);
+            await collector.Clear();
+            var analysisStartedAfter = DateTime.UtcNow;
             var tasks = new Task[]
             {
                 this.Coordinator.RunOrdered(0, 1, 2, 3, 4, 5, 6, 7, 8),
@@ -92,16 +97,31 @@ namespace Orleans.Transactions.Tests.Memory
 
             Assert.True(threw, "bad ordering should throw!");
 
-            var collector = this.grainFactory.GetGrain<IDeadlockEventCollector>(0);
             IList<DeadlockEvent> events = [];
-            for (var attempt = 0; attempt < 50 && events.Count == 0; attempt++)
+            for (var attempt = 0; attempt < 50 && !events.Any(@event => @event.Deadlocked); attempt++)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(100));
-                events = await collector.GetEvents();
+                events = (await collector.GetEvents())
+                    .Where(@event => @event.StartTime >= analysisStartedAfter)
+                    .ToArray();
             }
 
-            Assert.True(events.Count > 0, "should have received at least one event");
-            Assert.True(events[0].Deadlocked, "should be deadlocked");
+            var deadlockEvents = events.Where(@event => @event.Deadlocked).ToArray();
+            Assert.NotEmpty(deadlockEvents);
+            Assert.All(deadlockEvents, deadlockEvent =>
+            {
+                Assert.NotNull(deadlockEvent.Locks);
+                Assert.NotEmpty(deadlockEvent.Locks);
+                Assert.True(deadlockEvent.StartTime >= analysisStartedAfter);
+                Assert.True(deadlockEvent.Duration >= TimeSpan.Zero);
+                Assert.Contains(deadlockEvent.Locks, lockInfo => lockInfo.IsWait);
+                Assert.Contains(deadlockEvent.Locks, lockInfo => !lockInfo.IsWait);
+                Assert.All(deadlockEvent.Locks, lockInfo =>
+                {
+                    Assert.NotEqual(Guid.Empty, lockInfo.TxId);
+                    Assert.False(string.IsNullOrWhiteSpace(lockInfo.Resource.Name));
+                });
+            });
             var dns =new DeadlockNames();
             foreach (var e in events)
             {
