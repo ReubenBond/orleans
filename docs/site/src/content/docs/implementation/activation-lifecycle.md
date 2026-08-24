@@ -1,13 +1,13 @@
 ---
 title: Activation lifecycle and migration
 description: Understand activation creation, activation, collection, deactivation, and migration in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/24/2026
 ms.topic: concept-article
 ---
 
 # Activation lifecycle and migration
 
-A grain identity can outlive every process in the cluster. An activation is the temporary, in-memory realization of that identity on one silo. `ActivationData` is the runtime state machine which owns the grain instance, request queues, scheduler, directory registration, lifecycle, and deactivation reason.
+A grain identity can outlive every process in the cluster. An activation is the temporary, in-memory realization of that identity on one silo. `ActivationData` is the runtime state machine which owns the grain instance, request scheduler, directory registration, lifecycle, and deactivation reason. Its `RequestScheduler` owns pending and running request state and enforces request admission policy.
 
 ```mermaid
 stateDiagram-v2
