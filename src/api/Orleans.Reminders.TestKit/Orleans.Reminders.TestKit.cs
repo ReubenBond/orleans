@@ -57,6 +57,38 @@ namespace Orleans.Reminders.TestKit
         public System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry) { throw null; }
     }
 
+    public partial interface IReminderServiceLifecycleHarness
+    {
+        System.Collections.Generic.IReadOnlyList<Runtime.SiloAddress> ActiveSilos { get; }
+
+        IGrainFactory GrainFactory { get; }
+
+        System.TimeSpan ReminderLoadingWindow { get; }
+
+        System.TimeSpan ReminderRefreshPeriod { get; }
+
+        IReminderTable ReminderTable { get; }
+
+        System.DateTimeOffset UtcNow { get; }
+
+        System.Threading.Tasks.Task AdvanceAsync(System.TimeSpan amount, System.Threading.CancellationToken cancellationToken);
+        int GetLocalStartCount(Runtime.GrainId grainId, string reminderName);
+        int GetLocalStopCount(Runtime.GrainId grainId, string reminderName);
+        System.Collections.Generic.IReadOnlyList<Runtime.SiloAddress> GetOwners(Runtime.GrainId grainId, string reminderName);
+        int GetScheduleChangeCount(Runtime.GrainId grainId, string reminderName);
+        int GetTickCount(Runtime.GrainId grainId, string reminderName);
+        bool IsOwner(Runtime.SiloAddress siloAddress, Runtime.GrainId grainId);
+        System.Threading.Tasks.Task<Runtime.SiloAddress> JoinOneSiloAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task LeaveSiloAsync(Runtime.SiloAddress siloAddress, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task RefreshAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForOwnerCountAsync(Runtime.GrainId grainId, string reminderName, int count, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForScheduleAsync(Runtime.GrainId grainId, string reminderName, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForScheduleChangeCountAsync(Runtime.GrainId grainId, string reminderName, int count, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForStartupReadinessAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForTickCountAsync(Runtime.GrainId grainId, string reminderName, int count, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WaitForTopologyReconciliationAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IReminderServiceTestGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         System.Threading.Tasks.Task<string[]> GetReminderNamesAsync();
@@ -107,6 +139,45 @@ namespace Orleans.Reminders.TestKit
         public ReminderFailureReport WithWindow(System.DateTime now, System.TimeSpan window) { throw null; }
     }
 
+    public abstract partial class ReminderServiceLifecycleTestRunner
+    {
+        protected ReminderServiceLifecycleTestRunner(IReminderServiceLifecycleHarness harness, string providerName, int seed = 0) { }
+
+        protected string ProviderName { get { throw null; } }
+
+        public virtual System.Threading.Tasks.Task ReminderService_CleanupIsIsolated() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_ExactDueRecovery() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_OneSiloJoinLeaveTransfersOwnership() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_RegistrationHasSingleOwner() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_RemovalReachesQuiescence() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_StaleOwnerRegistrationReconciles() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_StartupReadiness() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderService_UpdateDoesNotRestartLocalOwner() { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_CleanupIsIsolated(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_ExactDueRecovery(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_OneSiloJoinLeaveTransfersOwnership(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_RegistrationHasSingleOwner(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_RemovalReachesQuiescence(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_StaleOwnerRegistrationReconciles(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_StartupReadiness(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RunReminderService_UpdateDoesNotRestartLocalOwner(System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
     public abstract partial class ReminderServiceTestRunner
     {
         protected ReminderServiceTestRunner(IGrainFactory grainFactory, IReminderTable reminderTable, string providerName, int seed = 0, System.TimeProvider? reminderTimeProvider = null) { }
@@ -120,6 +191,10 @@ namespace Orleans.Reminders.TestKit
         public virtual System.Threading.Tasks.Task ReminderService_RegisterLookupEnumerateAndUnregister() { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate() { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderService_RegisterLookupEnumerateAndUnregister(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public sealed partial class ReminderTableModelBasedConformanceOptions
@@ -144,6 +219,8 @@ namespace Orleans.Reminders.TestKit
         public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, string providerName, System.Action<string>? output = null) { }
 
         public System.Threading.Tasks.Task RunGeneratedConformanceTests() { throw null; }
+
+        public System.Threading.Tasks.Task RunGeneratedConformanceTests(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public sealed partial class ReminderTableOperation
@@ -222,9 +299,13 @@ namespace Orleans.Reminders.TestKit
 
         public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void EnsurePreconditionsMet() { }
 
         public virtual System.Threading.Tasks.ValueTask InitializeAsync() { throw null; }
+
+        public virtual System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         protected virtual IReminderTable ResolveReminderTable(System.IServiceProvider services) { throw null; }
     }
@@ -256,6 +337,8 @@ namespace Orleans.Reminders.TestKit
         protected System.DateTime Normalize(System.DateTime value) { throw null; }
 
         protected System.Threading.Tasks.Task<ReminderEntry> ReadRequiredAsync(Runtime.GrainId grainId, string reminderName, string guarantee, ReminderEntry? expected = null, string? expectedETag = null) { throw null; }
+
+        protected System.Threading.Tasks.Task<ReminderEntry> ReadRequiredAsync(Runtime.GrainId grainId, string reminderName, string guarantee, System.Threading.CancellationToken cancellationToken, ReminderEntry? expected = null, string? expectedETag = null) { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags() { throw null; }
 
@@ -311,13 +394,71 @@ namespace Orleans.Reminders.TestKit
 
         public virtual System.Threading.Tasks.Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() { throw null; }
 
+        protected System.Threading.Tasks.Task RemoveAsync(Runtime.GrainId grainId, string reminderName, string etag, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         protected System.Threading.Tasks.Task RemoveAsync(Runtime.GrainId grainId, string reminderName, string etag) { throw null; }
 
         protected ReminderFailureReport Report(string guarantee, string operation) { throw null; }
 
         protected ReminderTableData RequireRows(string guarantee, string operation, ReminderTableData? rows) { throw null; }
 
+        public virtual System.Threading.Tasks.Task RunReminderTable_ConcurrentUpserts_ProduceDistinctETags(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_Identity_IsGrainIdAndReminderName(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_Identity_WithSpecialCharacters_RoundTrips(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRow_AfterRemoval_ReturnsNull(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRow_MissingReminder_ReturnsNull(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_FullRange_ReturnsAllReminders(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(int reminderCount, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_RemoveRow_WithCurrentETag_RemovesRow(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_StartAsync_IsIdempotent(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_StopAsync_ThenRestart_ResumesService(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_TestOnlyClearTable_RemovesAllReminders(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_UpsertRow_PersistsScheduleForPointRead(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_UpsertRow_ReplacesETagOnEachWrite(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_UpsertRow_ReturnsNewNonEmptyETag(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public virtual System.Threading.Tasks.Task RunReminderTable_UpsertRow_UpdatesStartAtAndPeriod(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         protected System.Threading.Tasks.Task<string> UpsertAsync(ReminderEntry entry, string guarantee, string? previousETag = null) { throw null; }
+
+        protected System.Threading.Tasks.Task<string> UpsertAsync(ReminderEntry entry, string guarantee, System.Threading.CancellationToken cancellationToken, string? previousETag = null) { throw null; }
     }
 
     [GenerateSerializer]
