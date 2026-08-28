@@ -177,6 +177,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         var fixture = new ReminderServiceLifecycleFixture(clock);
 
         await fixture.DisposeAsync();
+        await fixture.DisposeAsync();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => clock.AdvanceAsync(TimeSpan.Zero, TestContext.Current.CancellationToken));
