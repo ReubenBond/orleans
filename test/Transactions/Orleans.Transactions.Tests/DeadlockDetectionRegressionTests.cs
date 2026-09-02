@@ -57,6 +57,7 @@ public class DeadlockDetectionRegressionTests
             await queue.RWLock.EnterLock(
                 transactionId,
                 DateTime.UtcNow,
+                TimeSpan.Zero,
                 default,
                 isRead: false,
                 exclusiveLock: false,
@@ -64,6 +65,7 @@ public class DeadlockDetectionRegressionTests
             var waitingOperation = queue.RWLock.EnterLock(
                 Guid.NewGuid(),
                 DateTime.UtcNow.AddTicks(1),
+                TimeSpan.Zero,
                 default,
                 isRead: false,
                 exclusiveLock: false,
@@ -141,6 +143,7 @@ public class DeadlockDetectionRegressionTests
                         await queue.RWLock.EnterLock(
                             Guid.NewGuid(),
                             DateTime.UtcNow,
+                            TimeSpan.Zero,
                             default,
                             isRead: false,
                             exclusiveLock: false,
@@ -148,6 +151,7 @@ public class DeadlockDetectionRegressionTests
                         _ = queue.RWLock.EnterLock(
                             Guid.NewGuid(),
                             DateTime.UtcNow.AddTicks(1),
+                            TimeSpan.Zero,
                             default,
                             isRead: false,
                             exclusiveLock: false,
@@ -228,6 +232,7 @@ public class DeadlockDetectionRegressionTests
             await queue.RWLock.EnterLock(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
+                TimeSpan.FromSeconds(10),
                 default,
                 isRead: true,
                 exclusiveLock: false,
@@ -235,6 +240,7 @@ public class DeadlockDetectionRegressionTests
             _ = queue.RWLock.EnterLock(
                 Guid.NewGuid(),
                 DateTime.UtcNow.AddTicks(1),
+                TimeSpan.FromSeconds(10),
                 default,
                 isRead: false,
                 exclusiveLock: false,
@@ -247,6 +253,7 @@ public class DeadlockDetectionRegressionTests
                 await queue.RWLock.EnterLock(
                     Guid.NewGuid(),
                     DateTime.UtcNow.AddTicks(2),
+                    TimeSpan.FromSeconds(10),
                     default,
                     isRead: true,
                     exclusiveLock: false,
@@ -331,6 +338,7 @@ public class DeadlockDetectionRegressionTests
             await queue.RWLock.EnterLock(
                 firstTransaction,
                 DateTime.UtcNow,
+                TimeSpan.FromSeconds(10),
                 default,
                 isRead: false,
                 exclusiveLock: false,
@@ -338,6 +346,7 @@ public class DeadlockDetectionRegressionTests
             var promotedOperation = queue.RWLock.EnterLock(
                 promotedTransaction,
                 DateTime.UtcNow.AddTicks(1),
+                TimeSpan.FromSeconds(10),
                 default,
                 isRead: false,
                 exclusiveLock: false,

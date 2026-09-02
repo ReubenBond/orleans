@@ -529,7 +529,6 @@ namespace Orleans.Transactions.State
             }
             this.lockWorker.Notify(this.currentGroup.NextDeadline!.Value);
         }
-        }
 
         private bool Find(Guid guid, bool isRead, out LockGroup group, [NotNullWhen(true)] out TransactionRecord<TState>? record)
         {

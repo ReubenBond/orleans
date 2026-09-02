@@ -100,7 +100,7 @@ namespace Orleans.Transactions.Tests.Memory
             IList<DeadlockEvent> events = [];
             for (var attempt = 0; attempt < 50 && !events.Any(@event => @event.Deadlocked); attempt++)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
                 events = (await collector.GetEvents())
                     .Where(@event => @event.StartTime >= analysisStartedAfter)
                     .ToArray();
@@ -198,7 +198,7 @@ namespace Orleans.Transactions.Tests.Memory
 
             Assert.True(threw, "bad ordering should throw!");
 
-            await Task.Delay(TimeSpan.FromSeconds(2));
+            await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
             this.testOutput($"Start at {DateTime.UtcNow}");
             await Task.WhenAll(
