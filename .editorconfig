@@ -666,6 +666,10 @@ dotnet_diagnostic.CA1873.severity = warning
 [src/Orleans.Core/**.cs]
 dotnet_diagnostic.CA1873.severity = warning
 
+# CA2008: Do not create tasks without passing a TaskScheduler
+[src/{Orleans.Core,Orleans.Streaming}/**.cs]
+dotnet_diagnostic.CA2008.severity = warning
+
 # CA1001: Types that own disposable fields should be disposable
 # CA2213: Disposable fields should be disposed
 [src/Orleans.Core/**.cs]
@@ -699,7 +703,19 @@ dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 
 # CA1062: Validate arguments of public methods
+[src/Orleans.Serialization/{GeneratedCodeHelpers,ISerializableSerializer,Utilities}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
 [src/{Orleans.BroadcastChannel,Orleans.Clustering.ZooKeeper,Orleans.Hosting.Kubernetes,Orleans.Persistence.Memory,Orleans.Persistence.TestKit,Orleans.Reminders.TestKit,Orleans.Serialization.FSharp,Orleans.Serialization.MessagePack,Orleans.Serialization.NewtonsoftJson,Orleans.Serialization.SystemTextJson,Orleans.Serialization.TestKit,Orleans.Transactions.TestKit.Base,Orleans.Transactions.TestKit.xUnit}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/Orleans.Streaming/{PubSub,Extensions,Providers}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/Orleans.Core/{Configuration,Providers,Core,IDs}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/Orleans.Core.Abstractions/{Utils,Lifecycle}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 [src/Serializers/Orleans.Serialization.Protobuf/**.cs]
@@ -708,7 +724,10 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Azure/{Orleans.Clustering.AzureStorage,Orleans.DurableJobs.AzureStorage,Orleans.GrainDirectory.AzureStorage,Orleans.Journaling.AzureStorage,Orleans.Persistence.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Streaming.AzureStorage,Orleans.Transactions.AzureStorage,Shared}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
-[src/Azure/{Orleans.Clustering.Cosmos,Orleans.Reminders.Cosmos}/**.cs]
+[src/Azure/{Orleans.Clustering.Cosmos,Orleans.Persistence.Cosmos,Orleans.Reminders.Cosmos}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/AWS/Orleans.Journaling.S3/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 [src/Google/**/*.cs]
@@ -717,9 +736,26 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Redis/**/*.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
+[src/Orleans.Serialization/Codecs/{*.cs,**/*.cs}]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/Orleans.Journaling/Formats/Json/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
 # CA1815: Override equals and operator equals on value types
 [src/{Orleans.Core.Abstractions,Orleans.EventSourcing,Orleans.Reminders,Orleans.Serialization.FSharp,Orleans.Serialization.TestKit,Orleans.Streaming,Orleans.Transactions,Orleans.Transactions.TestKit.Base}/**.cs]
 dotnet_diagnostic.CA1815.severity = warning
+
+# CA2214: Do not call overridable methods in constructors
+[src/{Orleans.EventSourcing,Orleans.Serialization.TestKit}/**.cs]
+dotnet_diagnostic.CA2214.severity = warning
+
+[src/{Azure/Orleans.Reminders.AzureStorage,Orleans.Reminders.TestKit}/**.cs]
+dotnet_diagnostic.CA2219.severity = warning
+
+# CA2025: Do not pass IDisposable instances into unawaited tasks
+[src/Orleans.Transactions.TestKit.Base/**.cs]
+dotnet_diagnostic.CA2025.severity = warning
 
 # Production source enforces the correctness baseline. Tests, samples, documentation,
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
@@ -737,6 +773,10 @@ dotnet_diagnostic.CA2246.severity = warning
 dotnet_diagnostic.IDE0035.severity = warning
 dotnet_diagnostic.IDE0043.severity = warning
 
+# Dashboard grain-state serialization reuses one serializer configuration.
+[src/Dashboard/Orleans.Dashboard/**.cs]
+dotnet_diagnostic.CA1869.severity = warning
+
 # Dashboard text handling explicitly distinguishes deterministic identifiers from localized display text.
 [src/Dashboard/Orleans.Dashboard/**/*.cs]
 dotnet_diagnostic.CA1305.severity = warning
@@ -744,6 +784,11 @@ dotnet_diagnostic.CA1307.severity = warning
 
 # Provider-specific globalization enforcement is centralized here.
 [src/{AWS/Orleans.Clustering.DynamoDB,Azure/Orleans.Clustering.AzureStorage}/**.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+
+# Journal identifiers, metadata, and provider storage keys retain their exact persisted representation.
+[src/{Orleans.Journaling,Azure/Orleans.Journaling.AzureStorage,Redis/Orleans.Journaling.Redis,AWS/Orleans.Journaling.S3}/**.cs]
 dotnet_diagnostic.CA1305.severity = warning
 dotnet_diagnostic.CA1307.severity = warning
 

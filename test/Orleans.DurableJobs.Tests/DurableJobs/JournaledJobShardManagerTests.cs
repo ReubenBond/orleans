@@ -21,7 +21,7 @@ namespace Tester.DurableJobs;
 [TestProvider("None")]
 [TestArea("DurableJobs")]
 [TestCategory("BVT"), TestCategory("DurableJobs")]
-public class JournaledJobShardManagerTests
+public partial class JournaledJobShardManagerTests
 {
     [Fact]
     public async Task ReleasedShard_IsClaimedClosedAndReplayedFromJournal()
@@ -111,7 +111,7 @@ public class JournaledJobShardManagerTests
 
         Assert.Null(await storageProvider.CreateStorage(storageId).GetMetadataAsync(cancellationToken));
         Assert.Empty(await ToListAsync(storageProvider.ListAsync(
-            JobShardId.StoragePrefix,
+            new() { Prefix = JobShardId.StoragePrefix },
             cancellationToken), cancellationToken));
     }
 
@@ -567,13 +567,13 @@ public class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);
@@ -598,15 +598,17 @@ public class JournaledJobShardManagerTests
     private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         private readonly VolatileJournalStorageProvider _inner = new();
+        private readonly Func<CancellationToken, ValueTask>? _onAppend;
         private readonly object _appendGate = new();
         private bool _delayAppends;
         private TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _appendCount;
 
-        public CountingJournalStorageProvider(bool delayAppends)
+        public CountingJournalStorageProvider(bool delayAppends, Func<CancellationToken, ValueTask>? onAppend = null)
         {
             _delayAppends = delayAppends;
+            _onAppend = onAppend;
         }
 
         public Task AppendStarted
@@ -643,8 +645,8 @@ public class JournaledJobShardManagerTests
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
-        public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
-            => _inner.ListAsync(prefix, cancellationToken);
+        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+            => _inner.ListAsync(options, cancellationToken);
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {
@@ -659,6 +661,11 @@ public class JournaledJobShardManagerTests
             if (waitTask is not null)
             {
                 await waitTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            if (_onAppend is { } onAppend)
+            {
+                await onAppend(cancellationToken).ConfigureAwait(false);
             }
         }
 
