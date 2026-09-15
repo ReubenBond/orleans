@@ -54,7 +54,7 @@ namespace UnitTests.StreamingTests
         public async Task ReadFromQueue_DoesNotWaitForColdStreamRegistration()
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(_ => registration.Task);
 
@@ -109,7 +109,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_ClearsRegistrationTaskWhenColdStreamRegistrationCompletesSynchronously()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -177,16 +177,18 @@ namespace UnitTests.StreamingTests
             var unregistration = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var unregisteredSubscriptionId = default(GuidId);
             QualifiedStreamId? unregisteredStreamId = null;
+            var unregisteredProducer = default(GrainId);
             var unregistrationCancellationToken = default(CancellationToken);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default!, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
-            pubSub.UnregisterConsumer(Arg.Any<GuidId>(), Arg.Any<QualifiedStreamId>(), Arg.Any<CancellationToken>())
+            pubSub.UnregisterConsumerFromProducer(Arg.Any<GuidId>(), Arg.Any<QualifiedStreamId>(), Arg.Any<GrainId>(), Arg.Any<CancellationToken>())
                 .ReturnsForAnyArgs(call =>
                 {
                     unregisteredSubscriptionId = call.ArgAt<GuidId>(0);
                     unregisteredStreamId = call.ArgAt<QualifiedStreamId>(1);
-                    unregistrationCancellationToken = call.ArgAt<CancellationToken>(2);
+                    unregisteredProducer = call.ArgAt<GrainId>(2);
+                    unregistrationCancellationToken = call.ArgAt<CancellationToken>(3);
                     unregistrationStarted.TrySetResult(true);
                     return unregistration.Task;
                 });
@@ -219,6 +221,7 @@ namespace UnitTests.StreamingTests
 
                 Assert.Equal(subscriptionId, unregisteredSubscriptionId);
                 Assert.Equal(streamId, unregisteredStreamId);
+                Assert.Equal(agent.GrainId, unregisteredProducer);
                 Assert.True(unregistrationCancellationToken.CanBeCanceled);
                 Assert.False(unregistrationCancellationToken.IsCancellationRequested);
                 Assert.False(streamData.Contains(subscriptionId));
@@ -238,7 +241,7 @@ namespace UnitTests.StreamingTests
             }
 
             Assert.True(unregistrationCancellationToken.IsCancellationRequested);
-            await pubSub.Received(1).UnregisterConsumer(subscriptionId, streamId, unregistrationCancellationToken);
+            await pubSub.Received(1).UnregisterConsumerFromProducer(subscriptionId, streamId, agent.GrainId, unregistrationCancellationToken);
         }
 
         [TestSuite("BVT")]
@@ -276,7 +279,7 @@ namespace UnitTests.StreamingTests
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(_ => registration.Task);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
@@ -333,7 +336,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_DoesNotRegisterProducerAfterShutdownStarts()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var agent = CreateAgent(pubSub, queueId);
@@ -354,7 +357,7 @@ namespace UnitTests.StreamingTests
         public async Task ReadFromQueue_CleansInactiveStreamsUsingTimeProvider()
         {
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -387,7 +390,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_DoesNotAcknowledgeBatchedMessagesDuringConsumerDelivery()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -514,7 +517,7 @@ namespace UnitTests.StreamingTests
         }
 
         private static PersistentStreamPullingAgent CreateAgent(
-            IStreamPubSub? pubSub,
+            IStreamPubSubRuntime? pubSub,
             QueueId queueId,
             IQueueAdapterReceiver? receiver = null,
             IQueueAdapterCache? queueAdapterCache = null,
@@ -1267,7 +1270,9 @@ namespace UnitTests.StreamingTests
             public bool ShouldDeliver(StreamId streamId, object item, string? filterData) => false;
         }
 
-        private sealed class RecordingConsumer(StreamHandshakeToken? requestedToken = null) : IStreamConsumerExtension
+        private sealed class RecordingConsumer(
+            StreamHandshakeToken? requestedToken = null,
+            Func<CancellationToken, Task<StreamHandshakeToken?>>? getSequenceToken = null) : IStreamConsumerExtension
         {
             private readonly TaskCompletionSource<bool> releaseDelivery = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -1299,7 +1304,8 @@ namespace UnitTests.StreamingTests
                 return Task.CompletedTask;
             }
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken) => Task.FromResult(requestedToken);
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+                => getSequenceToken?.Invoke(cancellationToken) ?? Task.FromResult(requestedToken);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
@@ -1476,7 +1482,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, retainedToken)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
 
@@ -1518,7 +1524,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, new EventSequenceTokenV2(1))]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RecordingConsumer();
@@ -1596,7 +1602,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var agent = CreateAgent(
-                pubSub: Substitute.For<IStreamPubSub>(),
+                pubSub: Substitute.For<IStreamPubSubRuntime>(),
                 QueueId.GetQueueId("queue", 0u, 0u),
                 queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -1830,7 +1836,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var agent = CreateAgent(
-                pubSub: Substitute.For<IStreamPubSub>(),
+                pubSub: Substitute.For<IStreamPubSubRuntime>(),
                 QueueId.GetQueueId("queue", 0u, 0u),
                 queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -1866,7 +1872,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var agent = CreateAgent(
-                pubSub: Substitute.For<IStreamPubSub>(),
+                pubSub: Substitute.For<IStreamPubSubRuntime>(),
                 QueueId.GetQueueId("queue", 0u, 0u),
                 queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -2055,7 +2061,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(otherStreamId, new EventSequenceTokenV2(1))]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RecordingConsumer(
@@ -2092,7 +2098,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, retainedToken)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RenegotiatingEarliestConsumer();
@@ -2123,7 +2129,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, startToken)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RenegotiatingStartTokenConsumer(startToken);
@@ -2157,7 +2163,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, attemptedToken)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RenegotiatingDeliveryTokenConsumer(acknowledgedToken);
@@ -2193,7 +2199,7 @@ namespace UnitTests.StreamingTests
             ]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSubRuntime>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             var consumer = new RenegotiatingStartTokenConsumer(acknowledgedToken);
@@ -2251,7 +2257,7 @@ namespace UnitTests.StreamingTests
 
         private static async Task<(
             PersistentStreamPullingAgent.ITestAccessor Accessor,
-            IStreamPubSub PubSub,
+            IStreamPubSubRuntime PubSub,
             StreamConsumerCollection StreamData,
             StreamConsumerData ConsumerData,
             UnknownHandshakeConsumer Consumer)> CreateUnknownTokenTest(bool returnDuringInitialHandshake)
@@ -2263,7 +2269,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, token)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
@@ -2295,7 +2301,7 @@ namespace UnitTests.StreamingTests
             queueCache.AddToCache([new TestBatchContainer(streamId, retainedToken)]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
@@ -2333,7 +2339,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
@@ -2373,7 +2379,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new InvalidPositionQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(
@@ -2412,7 +2418,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new InvalidMoveQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(
@@ -2501,7 +2507,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_RefreshesIdleCursorAfterItsTokenMetadataIsPurged()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -2605,7 +2611,7 @@ namespace UnitTests.StreamingTests
         private static async Task VerifyRunConsumerCursorRecoversThroughLegacyCursor(
             bool supportsEarliestAvailable)
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(
                     new HashSet<PubSubSubscriptionState>()));
@@ -2712,7 +2718,7 @@ namespace UnitTests.StreamingTests
             StreamSequenceToken newestToken,
             bool supportsEarliestAvailable)
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -2753,7 +2759,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_AdvancesAfterConsumerAcceptsRetryFollowingHandshakeToken()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -2813,14 +2819,14 @@ namespace UnitTests.StreamingTests
 
         private static async Task<(
             PersistentStreamPullingAgent.ITestAccessor Accessor,
-            IStreamPubSub PubSub,
+            IStreamPubSubRuntime PubSub,
             StreamConsumerCollection StreamData)> CreateInitializedAgentWithStream(
                 QualifiedStreamId streamId,
                 StreamSequenceToken registrationToken,
                 IQueueCache queueCache,
                 StreamPullingAgentOptions options)
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             pubSub.FaultSubscription(Arg.Any<QualifiedStreamId>(), Arg.Any<GuidId>(), Arg.Any<CancellationToken>())
@@ -2896,7 +2902,7 @@ namespace UnitTests.StreamingTests
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var consumerGrainId = GrainId.Create("test", Guid.NewGuid().ToString());
 
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(
                     new HashSet<PubSubSubscriptionState>
@@ -3042,7 +3048,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_PushesEarliestDeliveryProgressTokenToCache()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -3095,7 +3101,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_PushesEarliestDeliveryProgressUsingBaseTokenPosition()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -3150,7 +3156,7 @@ namespace UnitTests.StreamingTests
         [InlineData(true)]
         public async Task Shutdown_PreservesCheckpointForIncompatibleTokens(bool providerTokenFirst)
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -3210,7 +3216,7 @@ namespace UnitTests.StreamingTests
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var registeredStreamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(call => call.ArgAt<QualifiedStreamId>(0).Equals(registeredStreamId)
                     ? Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>())
@@ -3268,16 +3274,18 @@ namespace UnitTests.StreamingTests
             var shutdownTask = testAccessor.Shutdown();
             try
             {
-                // A queued accessor turn observes shutdown after it has started draining registration.
-                await testAccessor.GetPubSubCache().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                Assert.False(shutdownTask.IsCompleted);
-                Assert.False(receiverShutdownStarted.Task.IsCompleted);
+                await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.False(registration.Task.IsCompleted);
+                Assert.True(receiverShutdownStarted.Task.IsCompletedSuccessfully);
                 Assert.Empty(queueCache.DeliveryProgressTokens);
                 Assert.Equal(0, queueCache.DeliveryProgressCallCount);
+                await pubSub.Received(1).UnregisterProducer(
+                    new QualifiedStreamId("provider", streamId), agent.GrainId, Arg.Any<CancellationToken>());
 
                 if (registrationFails)
                 {
                     registration.SetException(new InvalidOperationException("Producer registration failed during shutdown."));
+                    await Assert.ThrowsAsync<InvalidOperationException>(() => registration.Task);
                 }
                 else
                 {
@@ -3288,6 +3296,7 @@ namespace UnitTests.StreamingTests
                             new QualifiedStreamId("provider", streamId),
                             GrainId.Create("consumer", Guid.NewGuid().ToString())),
                     });
+                    await registration.Task;
                 }
             }
             finally
@@ -3310,7 +3319,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_SkipsDeliveryProgressForUnregisteredConsumer()
         {
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
@@ -3467,7 +3476,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache, timeProvider, options);
@@ -3531,7 +3540,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(
@@ -3596,7 +3605,7 @@ namespace UnitTests.StreamingTests
             receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(
                     [new TestBatchContainer(streamId, new EventSequenceTokenV2(12))]));
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
@@ -3641,7 +3650,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new PurgeablePooledQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
@@ -3680,7 +3689,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver: null, queueAdapterCache, timeProvider, options);
@@ -3735,7 +3744,7 @@ namespace UnitTests.StreamingTests
             ]);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver: null, queueAdapterCache, timeProvider, options);
@@ -3807,7 +3816,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new ScriptedQueueCache(maxCacheSize: 3);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(
@@ -3881,7 +3890,7 @@ namespace UnitTests.StreamingTests
         public async Task DeliveryProgress_PendingRegistrationBlocksPeriodicUpdate()
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken).ReturnsForAnyArgs(_ => registration.Task);
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
             var options = new StreamPullingAgentOptions();
@@ -3932,7 +3941,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new ScriptedQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(
@@ -3992,7 +4001,7 @@ namespace UnitTests.StreamingTests
             var queueCache = new ScriptedQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache, timeProvider, options);
