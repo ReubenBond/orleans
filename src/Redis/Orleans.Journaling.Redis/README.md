@@ -78,7 +78,7 @@ closing such a provider records no SDK close call.
 
 ## Redis key layout
 
-Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. The reversible key name is outside the existing SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
+Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
 
 ## Documentation
 
