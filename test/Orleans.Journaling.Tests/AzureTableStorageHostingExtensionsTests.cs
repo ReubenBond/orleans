@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Xunit;
 
@@ -85,6 +86,12 @@ public sealed class AzureTableStorageHostingExtensionsTests
         AssertSingleRegistration<ILifecycleParticipant<ISiloLifecycle>>(builder.Services);
         AssertSingleRegistration<IJournaledStateManager>(builder.Services);
         AssertSingleRegistration<IJournaledStateManagerFactory>(builder.Services);
+        foreach (var serviceType in new[] { typeof(IJournalStorageProvider), typeof(IJournalStorageCatalog), typeof(IJournaledStateManagerFactory) })
+        {
+            Assert.Single(builder.Services, descriptor => descriptor.IsKeyedService
+                && Equals(descriptor.ServiceKey, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+                && descriptor.ServiceType == serviceType);
+        }
 
         using var services = builder.Services.BuildServiceProvider();
         var optionsMonitor = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>();
@@ -108,7 +115,7 @@ public sealed class AzureTableStorageHostingExtensionsTests
     }
 
     private static void AssertSingleRegistration<TService>(IServiceCollection services)
-        => Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+        => Assert.Single(services, descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == typeof(TService));
 
     private sealed class TestSiloBuilder : ISiloBuilder
     {
