@@ -31,6 +31,56 @@ public sealed class AzureTableStorageHostingExtensionsTests
     }
 
     [Fact]
+    public void AddAzureTableJournalStorage_DefaultOptionsComposeUnnamedDelegatesAndConfigureAllExactlyOnce()
+    {
+        var builder = CreateBuilder();
+        var invocations = new List<string>();
+        builder.Services.Configure<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("unnamed-before");
+            options.TableName = "before";
+        });
+        builder.Services.ConfigureAll<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("all");
+            options.CompactionRowCountThreshold += 100;
+        });
+        builder.AddAzureTableJournalStorage(options =>
+        {
+            invocations.Add("default");
+            options.TableName = "default";
+        });
+        builder.Services.Configure<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("unnamed-after");
+            options.TableName = "after";
+        });
+        builder.AddAzureTableJournalStorage("other", options =>
+        {
+            invocations.Add("other");
+            options.TableName = "other";
+        });
+        using var services = builder.Services.BuildServiceProvider();
+
+        var defaultOptions = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+
+        Assert.Equal("after", defaultOptions.TableName);
+        Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD + 100,
+            defaultOptions.CompactionRowCountThreshold);
+        Assert.Equal(["unnamed-before", "all", "default", "unnamed-after"], invocations);
+        var namedOptions = services.GetRequiredService<IOptionsMonitor<AzureTableJournalStorageOptions>>().Get("other");
+        Assert.Equal("other", namedOptions.TableName);
+        Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD + 100,
+            namedOptions.CompactionRowCountThreshold);
+        Assert.NotSame(defaultOptions, namedOptions);
+        Assert.Same(defaultOptions, services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value);
+        Assert.Same(defaultOptions, services.GetJournalStorageOptions<AzureTableJournalStorageOptions>(
+            ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME).Value);
+        Assert.Same(namedOptions, services.GetJournalStorageOptions<AzureTableJournalStorageOptions>("other").Value);
+        Assert.Equal(["unnamed-before", "all", "default", "unnamed-after", "all", "other"], invocations);
+    }
+
+    [Fact]
     public void AddAzureTableJournalStorage_RegistersProviderAliasesInstrumentsAndJournalingServices()
     {
         var builder = CreateBuilder();
