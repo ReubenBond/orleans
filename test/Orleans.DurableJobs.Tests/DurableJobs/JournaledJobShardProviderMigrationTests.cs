@@ -58,15 +58,19 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task ProviderLookup_FailedWriteReadUsesConclusiveDrainHitButNeverReportsIncompleteSearchAsAbsent(bool drainHasShard)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task ProviderLookup_FailedWriteReadUsesConclusiveDrainHitButNeverReportsIncompleteSearchAsAbsent(bool drainHasShard, bool providerCancellation)
     {
         await using var fixture = new ProviderMigrationFixture();
         var id = drainHasShard
             ? await fixture.AddShardAsync("A", fixture.Now.AddYears(10), fixture.Silo)
             : JobShardId.New(fixture.Now.AddYears(10)).ToJournalId();
-        var failure = new IOException("write namespace unavailable");
+        Exception failure = providerCancellation
+            ? new OperationCanceledException("provider-local timeout")
+            : new IOException("write namespace unavailable");
         fixture.B.BeforeMetadataRead = (journalId, _) =>
         {
             fixture.LookupOrder.Enqueue(("B", journalId));
@@ -380,14 +384,18 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ProviderDiscovery_FailedCatalogOrMetadataIsNamedAndHealthyProviderContinuesThenRetries(bool metadataFailure)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ProviderDiscovery_FailedCatalogOrMetadataIsNamedAndHealthyProviderContinuesThenRetries(bool metadataFailure, bool providerCancellation)
     {
         await using var fixture = new ProviderMigrationFixture();
         var oldB = await fixture.AddShardAsync("B", fixture.Now.AddDays(-2));
         var oldA = await fixture.AddShardAsync("A", fixture.Now.AddDays(-1));
-        var failure = new IOException("provider B unavailable");
+        Exception failure = providerCancellation
+            ? new OperationCanceledException("provider-local timeout")
+            : new IOException("provider B unavailable");
         var catalog = new ScriptedCatalog();
         catalog.Ids.Add(oldB);
         fixture.B.ListOverride = catalog.ListAsync;

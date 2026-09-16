@@ -106,7 +106,8 @@ try
     else
     {
         var stored = await manifestBlob.DownloadContentAsync(cancellationToken);
-        var manifest = serializer.Deserialize<MigrationManifest>(stored.Value.Content.ToArray());
+        var manifest = serializer.Deserialize<MigrationManifest>(stored.Value.Content.ToArray())
+            ?? throw new InvalidOperationException("The stored migration manifest is empty.");
         var aBefore = await PrintInventoryAsync(inspector, "jobs-a", cancellationToken);
         Require(aBefore.ShardCount > 0, "A's persisted shards must survive the prepare process.");
         var current = await grain.ScheduleAsync("new-work", DateTimeOffset.UtcNow.AddSeconds(10));

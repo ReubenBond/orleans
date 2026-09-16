@@ -59,7 +59,7 @@ internal sealed partial class DurableJobsStorageInspector(
             LogInventory(logger, providerName, count, owned, poisoned, unrecognized);
             return new(providerName, ReferenceEquals(provider, providers.WriteProvider), count, owned, poisoned, unrecognized, oldest, newest);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogInspectionFailure(logger, exception, providerName);
             throw;

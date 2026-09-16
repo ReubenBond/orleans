@@ -142,7 +142,8 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                     entries.TryAdd(entry.Id, (provider, entry));
                 }
             }
-            catch (Exception exception) when (_providers.Providers.Length > 1 && exception is not OperationCanceledException)
+            catch (Exception exception) when (_providers.Providers.Length > 1
+                && (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested))
             {
                 LogProviderFailure(_logger, exception, provider.Name, "catalog discovery", options.Prefix.Value);
                 continue;
@@ -174,7 +175,8 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             {
                 (shard, claimed) = await TryAssignShardAsync(provider, entry, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
             }
-            catch (Exception exception) when (_providers.Providers.Length > 1 && exception is not OperationCanceledException)
+            catch (Exception exception) when (_providers.Providers.Length > 1
+                && (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested))
             {
                 LogProviderFailure(_logger, exception, provider.Name, "shard assignment", entry.Id.Value);
                 (failedProviders ??= []).Add(provider);
@@ -598,7 +600,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                     return descriptor;
                 }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogProviderFailure(_logger, exception, provider.Name, "shard lookup", storageId.Value);
                 (failures ??= []).Add(new InvalidOperationException(
