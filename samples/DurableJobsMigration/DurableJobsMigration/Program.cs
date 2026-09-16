@@ -60,9 +60,9 @@ builder.UseOrleans(silo =>
         options.MaxConcurrentJobsPerSilo = 4;
         options.ConcurrencySlowStartEnabled = false;
         options.JobStatusPollInterval = TimeSpan.FromMilliseconds(100);
-        // Open tomorrow's shard in the drain phase so its saved handle can cancel
-        // an owned job. Ordinary discovery would leave this future shard unloaded.
-        options.ShardLoadLookaheadPeriod = phase == "prepare" ? TimeSpan.FromMinutes(1) : TimeSpan.FromDays(2);
+        // Load future shards in the drain phase so saved handles can cancel
+        // owned jobs while their executors await the scheduled start window.
+        options.ShardLoadLookaheadPeriod = phase == "prepare" ? TimeSpan.FromSeconds(5) : TimeSpan.FromMinutes(2);
         options.ShardActivationBufferPeriod = options.ShardLoadLookaheadPeriod;
         options.ShouldRetry = (context, _) => context.DequeueCount < 3 ? DateTimeOffset.UtcNow.AddSeconds(5) : null;
     });
@@ -89,15 +89,15 @@ try
         }
 
         var existing = await grain.ScheduleAsync("old-work", DateTimeOffset.UtcNow.AddSeconds(dueDelay));
-        var future = await grain.ScheduleAsync("future-cancel", DateTimeOffset.UtcNow.AddDays(1));
+        var future = await grain.ScheduleAsync("future-cancel", existing.DueTime.AddSeconds(30));
         var manifest = new MigrationManifest(existing, future);
         await manifestBlob.UploadAsync(BinaryData.FromBytes(serializer.SerializeToArray(manifest)),
             overwrite: false, cancellationToken: cancellationToken);
 
         var a = await PrintInventoryAsync(inspector, "jobs-a", cancellationToken);
         var b = await PrintInventoryAsync(inspector, "jobs-b", cancellationToken);
-        Require(a.ShardCount >= 2 && a.NewestShardStartTime > DateTimeOffset.UtcNow.AddHours(23),
-            "Full A inventory must include tomorrow's shard, beyond normal lookahead.");
+        Require(a.ShardCount == 2 && a.NewestShardStartTime > DateTimeOffset.UtcNow.AddSeconds(5),
+            "Full A inventory must include both shards, beyond the prepare host's lookahead.");
         Require(IsEmpty(b), "B must be empty before cutover.");
         Require(!(await run.ReceiptBlob(existing).ExistsAsync(cancellationToken)).Value,
             "A work ran before shutdown; increase Migration:DueDelaySeconds and use a new run.");
@@ -142,7 +142,7 @@ try
         }
 
         Console.WriteLine("VERIFIED: A recovered and retried in its original shard; B ran new work; saved-handle cancellation and complete A/B cleanup succeeded.");
-        Console.WriteLine("This isolated run has no remaining writers. A live inventory alone is not a cluster-wide retirement guarantee.");
+        Console.WriteLine("This isolated run has completed its writer cutover and confirmed empty A/B inventories.");
     }
 }
 finally

@@ -53,8 +53,8 @@ process starts.
 
 1. `prepare` selects A for writes and B for draining, mirroring the first
    deployment stage in which every silo can locate both providers.
-2. It schedules an A job due in 30 seconds and an A job due tomorrow. The latter
-   is outside the prepare host's one-minute discovery lookahead. A complete
+2. It schedules an A job due in 30 seconds and another A job due 30 seconds
+   after that. Both are beyond the prepare host's five-second discovery lookahead. A complete
    inventory must include both; B must be empty.
 3. It saves both unchanged `DurableJob` handles in a separate control Blob using
    Orleans serialization, releases the shards on graceful host shutdown, and
@@ -67,13 +67,14 @@ process starts.
    the retry occurs five seconds later, beyond its original five-second shard
    window, with the **same shard ID**. B independently executes its new work.
 6. The saved future A handle is canceled after discovery loads and owns its
-   shard. This phase deliberately widens discovery and activation to two days
+   shard. This phase deliberately widens discovery and activation to two minutes
    so the future shard is loaded and claimed before cancellation.
 7. Blob receipts prove execution occurred in the drain process, retained the
    original shard IDs, and retried A. The sample also verifies the canceled
-   future job's receipt is absent. The host waits for the total shard count
-   to reach zero in **both** namespaces,
-   including unrecognized entries and empty-shard deletion.
+   future job's receipt is absent. Its executor observes the empty queue at
+   the shard's start window and deletes the journal. The host waits for zero
+   total shards in **both** namespaces before stopping. These bounded future
+   times let the complete storage-draining demonstration finish within three minutes.
 
 Receipts are idempotent writes keyed by job ID. They demonstrate handling
 at-least-once execution: repeated attempts overwrite the same external receipt.
