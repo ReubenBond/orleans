@@ -81,8 +81,8 @@ namespace Orleans.Runtime
 
         private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
         {
-            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
-            // and therefore can be clobbered by torn reads.
+            // Heartbeats advance independently of the version, so delayed gossip or overlapping reads
+            // can contain older timestamps even when the provider preserves the stored maximum.
             if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
                 && previousEntry.IAmAliveTime > entry.IAmAliveTime)
             {

@@ -164,14 +164,19 @@ namespace Orleans.Runtime.MembershipService
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
+        private readonly DeepCopier deepCopier;
+        private readonly string clusterId;
 
         public MembershipTableSystemTarget(
             ILogger<MembershipTableSystemTarget> logger,
             DeepCopier deepCopier,
+            IOptions<ClusterOptions> clusterOptions,
             SystemTargetShared shared)
             : base(CreateId(shared.SiloAddress), shared)
         {
             this.logger = logger;
+            this.deepCopier = deepCopier;
+            this.clusterId = clusterOptions.Value.ClusterId;
             table = new InMemoryMembershipTable(deepCopier);
             LogInformationGrainBasedMembershipTableActivated(logger);
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -199,7 +204,11 @@ namespace Orleans.Runtime.MembershipService
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogInformationDeleteMembershipTableEntries(logger, clusterId);
-            table = null!;
+            if (string.Equals(this.clusterId, clusterId, StringComparison.Ordinal))
+            {
+                table = new InMemoryMembershipTable(deepCopier);
+            }
+
             return Task.CompletedTask;
         }
 

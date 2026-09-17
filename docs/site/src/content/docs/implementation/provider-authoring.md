@@ -49,7 +49,7 @@ The provider builder and options are the control plane. The runtime contract is 
 | Reminder table | <xref:Orleans.IReminderTable> |
 | Persistent streams | <xref:Orleans.Streams.IQueueAdapterFactory> and its adapter components |
 
-Do not let configuration concerns weaken the data-plane contract. For example, a membership provider must preserve conditional updates and ordered versions regardless of whether credentials came from a connection string, a keyed SDK client, or managed identity.
+Each configuration path supplies an implementation of the same data-plane contract. For example, a membership provider preserves atomic conditional updates and monotonic versioning of canonical membership views whether credentials come from a connection string, a keyed SDK client, or managed identity. The [membership contract](cluster-management.md#membership-table) assigns guarantees to the provider, protocol, and snapshot-consumption layers.
 
 ## Validation
 
@@ -97,3 +97,13 @@ Contract tests should cover more than successful round trips:
 - rolling-upgrade compatibility of stored or transmitted data.
 
 Use [TestingHost architecture](testing.md) to understand which runtime services a test cluster substitutes. Provider tests which depend on a real backend should state those preconditions and should not treat an emulator's weaker consistency as proof of the production contract.
+
+### Membership provider conformance
+
+`Microsoft.Orleans.Clustering.TestKit` supplies reusable behavioral tests for <xref:Orleans.IMembershipTable>. Its deterministic scenarios exercise exact version increments, independent row and table ETag conflicts, coherent reads, competing writers, forward status transitions, independently monotonic liveness timestamps, and dead-row cleanup. Its Accordant model generates operation histories and compares each result and resulting view with the expected committed state.
+
+Integrate the kit in the provider's test project and use the same provider configuration as its existing integration tests. Allocate isolated test cluster identities and create independent provider handles over the same backing data to exercise cross-instance coordination. Keep resource ownership and teardown in the test fixture; cluster deletion is administrative cleanup of that fixture's data.
+
+Run both the deterministic and generated suites. Generated histories explore combinations of state transitions and stale observations; explicit concurrency cases challenge the storage transaction boundary. Keep failure output, including the provider, generated sequence, expected state, and observed result, to reproduce a failed history. For paginated backends, also run provider-specific cases which force page boundaries during a concurrent versioned write.
+
+The suite uses legal membership-protocol inputs: forward status transitions, fresh generations for restarted silos, and the next version computed from the observed table version. It then introduces conflicting tokens, delayed liveness writes, and competing operations to verify the provider's guarantees. Treat a conformance failure as a provider defect or an explicitly diagnosed fixture failure, and fix it at that boundary.

@@ -34,13 +34,19 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
             DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), clusterOptions);
         }
+
+        // Persisted fields and suspect votes exceed DynamoDB's 1 MiB query page at this count.
+        protected override int ConformanceConcurrencyRowCount => 4096;
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {

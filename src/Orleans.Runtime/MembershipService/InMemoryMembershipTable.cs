@@ -50,7 +50,7 @@ namespace Orleans.Runtime.MembershipService
             if (!tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
             return true;
         }
@@ -61,8 +61,14 @@ namespace Orleans.Runtime.MembershipService
             if (data == null) return false;
             if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
+            var updated = entry.Copy();
+            if (data.Item1.IAmAliveTime > updated.IAmAliveTime)
+            {
+                updated.IAmAliveTime = data.Item1.IAmAliveTime;
+            }
+
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                updated, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
             return true;
         }
@@ -70,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
         public void UpdateIAmAlive(MembershipEntry entry)
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
-            if (data == null) return;
+            if (data == null || data.Item1.IAmAliveTime >= entry.IAmAliveTime) return;
 
             data.Item1.IAmAliveTime = entry.IAmAliveTime;
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
@@ -88,17 +94,25 @@ namespace Orleans.Runtime.MembershipService
             var removedEntries = new List<SiloAddress>();
             foreach (var (key, (value, _)) in siloTable)
             {
-                if (value.Status != SiloStatus.Active
+                if (value.Status == SiloStatus.Dead
                     && value.EffectiveUpdateTime < beforeDate)
                 {
                     removedEntries.Add(key);
                 }
             }
 
+            if (removedEntries.Count == 0)
+            {
+                return;
+            }
+
+            var nextVersion = tableVersion.Next();
             foreach (var removedEntry in removedEntries)
             {
                 siloTable.Remove(removedEntry);
             }
+
+            tableVersion = new TableVersion(nextVersion.Version, NewETag());
         }
     }
 }

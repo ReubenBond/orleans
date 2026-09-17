@@ -40,7 +40,7 @@ BEGIN
     -- is not needed nor is it checked.
     UPDATE OrleansMembershipTable as d
     SET
-        IAmAliveTime = i_am_alive_time
+        IAmAliveTime = GREATEST(d.IAmAliveTime, i_am_alive_time)
     WHERE
         d.DeploymentId = deployment_id AND deployment_id IS NOT NULL
         AND d.Address = address_arg AND address_arg IS NOT NULL
@@ -84,7 +84,9 @@ BEGIN
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
 
         RETURN QUERY SELECT RowCountVar;
     EXCEPTION
@@ -123,6 +125,16 @@ DECLARE
 BEGIN
 
     BEGIN
+        UPDATE OrleansMembershipVersionTable
+        SET
+            Timestamp = now(),
+            Version = Version + 1
+        WHERE
+            DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
+            AND Version = VersionArg AND VersionArg IS NOT NULL AND Version < 2147483647;
+
+        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
+
         INSERT INTO OrleansMembershipTable
         (
             DeploymentId,
@@ -147,24 +159,16 @@ BEGIN
             ProxyPortArg,
             StartTimeArg,
             IAmAliveTimeArg
+        WHERE RowCountVar > 0
         ON CONFLICT (DeploymentId, Address, Port, Generation) DO
             NOTHING;
 
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        UPDATE OrleansMembershipVersionTable
-        SET
-            Timestamp = now(),
-            Version = Version + 1
-        WHERE
-            DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
-            AND Version = VersionArg AND VersionArg IS NOT NULL
-            AND RowCountVar > 0;
-
-        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
-
-        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
 
 
         RETURN QUERY SELECT RowCountVar;
@@ -219,7 +223,7 @@ BEGIN
         Version = Version + 1
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
-        AND Version = VersionArg AND VersionArg IS NOT NULL;
+        AND Version = VersionArg AND VersionArg IS NOT NULL AND Version < 2147483647;
 
 
     GET DIAGNOSTICS RowCountVar = ROW_COUNT;
@@ -228,7 +232,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
-        IAmAliveTime = IAmAliveTimeArg
+        IAmAliveTime = GREATEST(IAmAliveTime, IAmAliveTimeArg)
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
         AND Address = AddressArg AND AddressArg IS NOT NULL
@@ -239,7 +243,9 @@ BEGIN
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
 
 
         RETURN QUERY SELECT RowCountVar;
@@ -345,13 +351,47 @@ VALUES
         AND ProxyPort > 0;
 ');
 
+CREATE FUNCTION cleanup_defunct_silo_entry(
+    DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE,
+    AddressArg OrleansMembershipTable.Address%TYPE,
+    PortArg OrleansMembershipTable.Port%TYPE,
+    GenerationArg OrleansMembershipTable.Generation%TYPE,
+    VersionArg OrleansMembershipVersionTable.Version%TYPE,
+    IAmAliveTimeArg OrleansMembershipTable.IAmAliveTime%TYPE,
+    StartTimeArg OrleansMembershipTable.StartTime%TYPE,
+    SuspectTimesArg OrleansMembershipTable.SuspectTimes%TYPE)
+RETURNS TABLE(row_count integer) AS
+$func$
+DECLARE
+    RowCountVar int := 0;
+BEGIN
+    BEGIN
+        UPDATE OrleansMembershipVersionTable
+        SET Timestamp = now(), Version = Version + 1
+        WHERE DeploymentId = DeploymentIdArg AND Version = VersionArg AND Version < 2147483647;
+        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
+
+        DELETE FROM OrleansMembershipTable
+        WHERE DeploymentId = DeploymentIdArg AND Status = 6
+            AND Address = AddressArg AND Port = PortArg AND Generation = GenerationArg
+            AND IAmAliveTime = IAmAliveTimeArg AND StartTime = StartTimeArg
+            AND COALESCE(SuspectTimes, '') = COALESCE(SuspectTimesArg, '')
+            AND RowCountVar > 0;
+        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
+        RETURN QUERY SELECT RowCountVar;
+    EXCEPTION WHEN assert_failure THEN
+        RETURN QUERY SELECT RowCountVar;
+    END;
+END
+$func$ LANGUAGE plpgsql;
+
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'CleanupDefunctSiloEntriesKey',
-    'DELETE FROM OrleansMembershipTable
-    WHERE DeploymentId = @DeploymentId
-        AND @DeploymentId IS NOT NULL
-        AND IAmAliveTime < @IAmAliveTime
-        AND Status != 3;
-');
+    'SELECT * FROM cleanup_defunct_silo_entry(@DeploymentId, @Address, @Port, @Generation,
+        @Version, @IAmAliveTime, @StartTime, @SuspectTimes);'
+);

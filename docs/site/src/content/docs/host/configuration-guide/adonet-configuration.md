@@ -36,6 +36,19 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the 
 - [MySQL/MariaDB](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/MySQL-Clustering.sql)
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
+The clustering queries implement the [canonical membership view contract](../../implementation/cluster-management.md#membership-table): row changes and the next version commit atomically, reads pair rows with their committed version, and liveness writes retain the maximum timestamp.
+
+Existing databases receive these query changes through the matching membership-consistency migration:
+
+- [SQL Server](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Migrations/SQLServer-Clustering-MembershipConsistency.sql)
+- [PostgreSQL](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Migrations/PostgreSQL-Clustering-MembershipConsistency.sql)
+- [MySQL/MariaDB](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Migrations/MySQL-Clustering-MembershipConsistency.sql)
+- [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Migrations/Oracle-Clustering-MembershipConsistency.sql)
+
+Stop every silo sharing these database membership queries, apply the migration after earlier schema migrations, deploy the updated provider to every silo, and then restart. Providers cache `OrleansQuery` text, the cleanup queries use updated parameters, and MySQL routine replacement uses nontransactional DDL, so this upgrade requires a quiesced cluster.
+
+The migration updates stored queries and routines while preserving the table layout. Updating the application package alone leaves the database's existing `OrleansQuery` entries and routines in use. Grant runtime credentials permission to execute the membership cleanup routines added for MySQL, PostgreSQL, and Oracle, and the MySQL `UpdateMembershipKey` routine. Deployment credentials need permission to manage routines and update `OrleansQuery`. Validate the resulting schema with the membership conformance suite against the same database engine and driver used in production.
+
 ## Persistence
 
 - [SQL Server](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql)

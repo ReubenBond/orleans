@@ -16,7 +16,8 @@ namespace Orleans.Runtime
         ClusterMembershipSnapshot CurrentSnapshot { get; }
 
         /// <summary>
-        /// Gets an enumerable collection of membership updates.
+        /// Gets the current local snapshot followed by snapshots with strictly increasing canonical membership
+        /// view versions. A consumer can skip intermediate versions; each snapshot contains a complete view.
         /// </summary>
         /// <value>The membership updates.</value>
         IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }

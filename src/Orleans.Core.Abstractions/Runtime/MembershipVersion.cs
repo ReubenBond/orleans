@@ -8,7 +8,8 @@ using System.Text.Json.Serialization;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Identifies the version of a cluster membership configuration.
+    /// Identifies a canonical membership view within a cluster. Published versions progress monotonically,
+    /// and a consumer can skip intermediate versions between observations.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(MembershipVersionConverter))]

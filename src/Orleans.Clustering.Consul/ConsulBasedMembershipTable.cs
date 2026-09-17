@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Consul;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
 
@@ -19,6 +20,7 @@ namespace Orleans.Runtime.Membership
     public partial class ConsulBasedMembershipTable : IMembershipTable
     {
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
+        private static readonly QueryOptions ConsistentRead = new() { Consistency = ConsistencyMode.Consistent };
         private readonly ILogger _logger;
         private readonly IConsulClient _consulClient;
         private readonly ConsulClusteringOptions clusteringSiloTableOptions;
@@ -48,20 +50,20 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Initializes the Consul based membership table.
         /// </summary>
-        /// <param name="tryInitTableVersion">Will be ignored: Consul does not support the extended Membership Protocol TableVersion</param>
+        /// <param name="tryInitTableVersion">Whether to create the initial table version if it does not exist.</param>
         /// <returns></returns>
-        /// <remarks>
-        /// Consul Membership Provider does not support the extended Membership Protocol,
-        /// therefore there is no MembershipTable to Initialize
-        /// </remarks>
         [Obsolete("Use InitializeMembershipTableAsync instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.CompletedTask;
+            if (tryInitTableVersion)
+            {
+                await _consulClient.KV.Txn(
+                    new List<KVTxnOp> { GetVersionRowUpdate(NotFoundTableVersion) }, cancellationToken);
+            }
         }
 
         /// <inheritdoc />
@@ -94,7 +96,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="kvRootFolder">The optional root folder containing Orleans keys.</param>
         /// <param name="logger">The logger.</param>
-        /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> when no version key is available.</param>
+        /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> to use the cluster's default version key.</param>
         /// <returns>The cluster membership entries and table version.</returns>
         [Obsolete("Use ReadAllAsync instead.")]
         public static Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey) =>
@@ -107,13 +109,13 @@ namespace Orleans.Runtime.Membership
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="kvRootFolder">The optional root folder containing Orleans keys.</param>
         /// <param name="logger">The logger.</param>
-        /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> when no version key is available.</param>
+        /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> to use the cluster's default version key.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         /// <returns>The cluster membership entries and table version.</returns>
         public static async Task<MembershipTableData> ReadAllAsync(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder), cancellationToken);
+            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder) + "/", ConsistentRead, cancellationToken);
             if (deploymentKVAddresses.Response == null)
             {
                 LogDebugCouldNotFindSiloRegistrations(logger, clusterId);
@@ -130,7 +132,7 @@ namespace Orleans.Runtime.Membership
                     return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
                 }).ToArray();
 
-            var tableVersion = GetTableVersion(versionKey, deploymentKVAddresses);
+            var tableVersion = GetTableVersion(versionKey ?? ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder), deploymentKVAddresses);
 
             return AssembleMembershipTableData(tableVersion, allSiloRegistrations);
         }
@@ -150,8 +152,10 @@ namespace Orleans.Runtime.Membership
                 var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
                 var rowInsert = new KVTxnOp(insertKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = insertKV.Value };
                 var versionUpdate = this.GetVersionRowUpdate(tableVersion);
+                var heartbeat = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
+                var heartbeatInsert = new KVTxnOp(heartbeat.Key, KVTxnVerb.CAS) { Index = 0, Value = heartbeat.Value };
 
-                var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate }, cancellationToken);
+                var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate, heartbeatInsert }, cancellationToken);
                 if (!responses.Response.Success)
                 {
                     LogDebugConsulMembershipProviderFailedToInsertRow(entry.SiloAddress);
@@ -178,20 +182,37 @@ namespace Orleans.Runtime.Membership
             //Update Silo Liveness
             try
             {
-                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
-                var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
-
-                var rowUpdate = new KVTxnOp(updateKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = updateKV.Value };
-                var versionUpdate = this.GetVersionRowUpdate(tableVersion);
-
-                var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowUpdate, versionUpdate }, cancellationToken);
-                if (!responses.Response.Success)
+                while (true)
                 {
-                    LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
-                    return false;
-                }
+                    var (existing, currentVersion) = await GetConsulSiloRegistration(entry.SiloAddress, cancellationToken);
+                    if (existing is null || existing.LastIndex != ulong.Parse(etag, CultureInfo.InvariantCulture)
+                        || currentVersion.VersionEtag != tableVersion.VersionEtag)
+                    {
+                        LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
+                        return false;
+                    }
 
-                return true;
+                    var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
+                    var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
+                    var heartbeatKey = ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(updateKV.Key);
+                    var currentHeartbeat = (await _consulClient.KV.Get(heartbeatKey, ConsistentRead, cancellationToken)).Response;
+                    var heartbeatTime = currentHeartbeat is null
+                        ? existing.IAmAliveTime
+                        : JsonConvert.DeserializeObject<DateTime>(Encoding.UTF8.GetString(currentHeartbeat.Value));
+                    var heartbeat = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(clusterId, kvRootFolder, entry.SiloAddress,
+                        new DateTime(Math.Max(entry.IAmAliveTime.Ticks, heartbeatTime.Ticks), DateTimeKind.Utc));
+                    var operations = new List<KVTxnOp>
+                    {
+                        new(updateKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = updateKV.Value },
+                        GetVersionRowUpdate(tableVersion),
+                        new(heartbeat.Key, KVTxnVerb.CAS) { Index = currentHeartbeat?.ModifyIndex ?? 0, Value = heartbeat.Value }
+                    };
+
+                    if ((await _consulClient.KV.Txn(operations, cancellationToken)).Response.Success)
+                    {
+                        return true;
+                    }
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -209,7 +230,21 @@ namespace Orleans.Runtime.Membership
         {
             cancellationToken.ThrowIfCancellationRequested();
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
-            await _consulClient.KV.Put(iAmAliveKV, cancellationToken);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = (await _consulClient.KV.Get(iAmAliveKV.Key, ConsistentRead, cancellationToken)).Response;
+                if (current is not null && JsonConvert.DeserializeObject<DateTime>(Encoding.UTF8.GetString(current.Value)) >= entry.IAmAliveTime)
+                {
+                    return;
+                }
+
+                iAmAliveKV.ModifyIndex = current?.ModifyIndex ?? 0;
+                if ((await _consulClient.KV.CAS(iAmAliveKV, cancellationToken)).Response)
+                {
+                    return;
+                }
+            }
         }
 
         /// <inheritdoc />
@@ -220,7 +255,7 @@ namespace Orleans.Runtime.Membership
         public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder), cancellationToken);
+            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, this.kvRootFolder) + "/", cancellationToken);
         }
 
         private static TableVersion GetTableVersion(string? versionKey, QueryResult<KVPair[]> entries)
@@ -229,12 +264,7 @@ namespace Orleans.Runtime.Membership
             var tableVersionEntry = entries?.Response?.FirstOrDefault(kv => kv.Key.Equals(versionKey ?? string.Empty, StringComparison.OrdinalIgnoreCase));
             if (tableVersionEntry != null)
             {
-                var versionNumber = 0;
-                if (tableVersionEntry.Value is byte[] versionData && versionData.Length > 0)
-                {
-                    int.TryParse(Encoding.UTF8.GetString(tableVersionEntry.Value), out versionNumber);
-                }
-
+                var versionNumber = int.Parse(Encoding.UTF8.GetString(tableVersionEntry.Value), CultureInfo.InvariantCulture);
                 tableVersion = new TableVersion(versionNumber, tableVersionEntry.ModifyIndex.ToString(CultureInfo.InvariantCulture));
             }
             else
@@ -247,7 +277,7 @@ namespace Orleans.Runtime.Membership
 
         private KVTxnOp GetVersionRowUpdate(TableVersion version)
         {
-            ulong.TryParse(version.VersionEtag, out var index);
+            var index = ulong.Parse(version.VersionEtag, CultureInfo.InvariantCulture);
             var versionBytes = Encoding.UTF8.GetBytes(version.Version.ToString(CultureInfo.InvariantCulture));
             return new KVTxnOp(this.versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
         }
@@ -256,14 +286,14 @@ namespace Orleans.Runtime.Membership
         {
             var deploymentKey = ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder);
             var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
-            var entries = await _consulClient.KV.List(deploymentKey, cancellationToken);
+            var entries = await _consulClient.KV.List(deploymentKey + "/", ConsistentRead, cancellationToken);
             if (entries.Response == null) return (null, NotFoundTableVersion);
 
-            var siloKV = entries.Response.Single(KV => KV.Key.Equals(siloKey, StringComparison.OrdinalIgnoreCase));
+            var siloKV = entries.Response.SingleOrDefault(KV => KV.Key.Equals(siloKey, StringComparison.OrdinalIgnoreCase));
             var iAmAliveKV = entries.Response.SingleOrDefault(KV => KV.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKey), StringComparison.OrdinalIgnoreCase));
             var tableVersion = GetTableVersion(versionKey: versionKey, entries: entries);
 
-            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
+            var siloRegistration = siloKV is null ? null : ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
 
             return (siloRegistration, tableVersion);
         }
@@ -285,34 +315,46 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder), cancellationToken);
-            if (allKVs.Response == null)
+            while (true)
             {
-                LogDebugCouldNotFindSiloRegistrationsForCleanup(this.clusterId);
-                return;
-            }
-
-            var allRegistrations =
-                allKVs.Response
-                .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase)
-                    && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
-                .Select(siloKV =>
+                cancellationToken.ThrowIfCancellationRequested();
+                var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder) + "/", ConsistentRead, cancellationToken);
+                if (allKVs.Response == null)
                 {
-                    var iAmAliveKV = allKVs.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
-                    return new
-                    {
-                        RegistrationKey = siloKV.Key,
-                        Registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV)
-                    };
-                }).ToArray();
-
-            foreach (var entry in allRegistrations)
-            {
-                if (entry.Registration.IAmAliveTime < beforeDate && entry.Registration.Status != SiloStatus.Active)
-                {
-                    await _consulClient.KV.DeleteTree(entry.RegistrationKey, cancellationToken);
+                    LogDebugCouldNotFindSiloRegistrationsForCleanup(this.clusterId);
+                    return;
                 }
+
+                var selected = allKVs.Response
+                    .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase)
+                        && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
+                    .Select(siloKV =>
+                    {
+                        var heartbeat = allKVs.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
+                        return new
+                        {
+                            RegistrationKey = siloKV.Key,
+                            Heartbeat = heartbeat,
+                            Registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, heartbeat)
+                        };
+                    })
+                    .FirstOrDefault(entry => entry.Registration.Status == SiloStatus.Dead
+                        && Math.Max(entry.Registration.IAmAliveTime.Ticks, entry.Registration.StartTime.Ticks) < beforeDate.UtcDateTime.Ticks
+                        && entry.Registration.SuspectingSilos?.Any(vote => vote.Time >= beforeDate.UtcDateTime) != true
+                        && entry.Heartbeat is not null);
+
+                if (selected is null || selected.Heartbeat is not { } selectedHeartbeat)
+                {
+                    return;
+                }
+
+                var next = GetTableVersion(versionKey, allKVs).Next();
+                await _consulClient.KV.Txn(new List<KVTxnOp>
+                {
+                    GetVersionRowUpdate(next),
+                    new(selected.RegistrationKey, KVTxnVerb.DeleteCAS) { Index = selected.Registration.LastIndex },
+                    new(selectedHeartbeat.Key, KVTxnVerb.DeleteCAS) { Index = selectedHeartbeat.ModifyIndex }
+                }, cancellationToken);
             }
         }
 

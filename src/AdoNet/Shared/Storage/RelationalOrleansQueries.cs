@@ -294,17 +294,39 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// deletes all membership entries for inactive silos where the IAmAliveTime is before the beforeDate parameter
-        /// and the silo status is <seealso cref="SiloStatus.Dead"/>.
+        /// Removes eligible dead rows and advances the membership version atomically for each removal.
         /// </summary>
         /// <param name="beforeDate"></param>
         /// <param name="deploymentId"></param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
+        internal async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
         {
-            return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime }, cancellationToken);
+            while (true)
+            {
+                var table = await MembershipReadAllAsync(deploymentId, cancellationToken);
+                var selected = table.Members.FirstOrDefault(row => row.Item1.Status == SiloStatus.Dead
+                    && Math.Max(row.Item1.StartTime.Ticks, row.Item1.IAmAliveTime.Ticks) < beforeDate.UtcDateTime.Ticks
+                    && row.Item1.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true);
+                if (selected is null)
+                {
+                    return;
+                }
+
+                var next = table.Version.Next();
+                var entry = selected.Item1;
+                // Compare captured storage timestamps so a sub-millisecond cutoff is never rounded by SQL.
+                await ReadAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
+                    new DbStoredQueries.Columns(command)
+                    {
+                        DeploymentId = deploymentId,
+                        SiloAddress = entry.SiloAddress,
+                        IAmAliveTime = entry.IAmAliveTime,
+                        StartTime = entry.StartTime,
+                        SuspectTimes = entry.SuspectTimes,
+                        Version = next.VersionEtag
+                    }, result => result.First(), cancellationToken);
+            }
         }
 
         /// <summary>
@@ -394,7 +416,7 @@ namespace Orleans.Tests.SqlUtils
             var membershipEntries = new List<Tuple<MembershipEntry, string>>();
             if (retList[0].Item1 != null)
             {
-                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, string.Empty)));
+                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, tableVersionEtag.ToString(System.Globalization.CultureInfo.InvariantCulture))));
             }
             return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
         }

@@ -6,6 +6,7 @@ using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Tester.Cassandra.Utility;
+using UnitTests.MembershipTests;
 using Xunit;
 
 namespace Tester.Cassandra.Clustering;
@@ -13,12 +14,12 @@ namespace Tester.Cassandra.Clustering;
 /// <summary>
 /// Tests for Orleans membership table operations using Apache Cassandra as the backing store.
 /// </summary>
-[TestCategory("Cassandra"), TestCategory("Clustering")]
+[TestCategory("Cassandra"), TestCategory("Clustering"), TestCategory("Functional")]
 [Collection("Cassandra")]
 [TestSuite("Functional")]
 [TestProvider("Cassandra")]
 [TestArea("Membership")]
-public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
+public sealed partial class CassandraClusteringTableTests : MembershipTableConformanceTestsBase, IClassFixture<CassandraContainer>, IAsyncDisposable
 {
     private readonly CassandraContainer _cassandraContainer;
     private readonly ITestOutputHelper _testOutputHelper;
@@ -369,12 +370,31 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     public async Task MembershipTable_UpdateIAmAlive(bool cassandraTtl)
     {
         var testCancellationToken = TestContext.Current.CancellationToken;
+        if (cassandraTtl)
+        {
+            Assert.False(new CassandraClusteringOptions().UseCassandraTtl);
+            var sessionCalls = 0;
+            await using var services = CreateMembershipServices("ttl-rejection", $"Cluster_{Guid.NewGuid():N}", () =>
+            {
+                sessionCalls++;
+                throw new InvalidOperationException("Configured TTL must be rejected before opening a session.");
+            }, cassandraTtl: true);
+            var rejectedTable = services.GetRequiredService<CassandraClusteringTable>();
+            var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
+                () => rejectedTable.InitializeMembershipTableAsync(true, testCancellationToken));
+            Assert.Contains("TTL", exception.Message);
+            Assert.Equal(0, sessionCalls);
+            return;
+        }
 
-        // Drop the membership table before starting because the TTL behavior depends on the table creation
         ISession ttlSession = await CreateSession(testCancellationToken);
-        await ttlSession.ExecuteAsync(new SimpleStatement("DROP TABLE IF EXISTS membership;"));
 
+        var serviceId = $"Service_{Guid.NewGuid():N}";
+        var clusterId = $"Cluster_{Guid.NewGuid():N}";
+        var clusterIdentifier = $"{serviceId}-{clusterId}";
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            serviceId,
+            clusterId,
             testCancellationToken,
             cassandraTtl: cassandraTtl);
 
@@ -382,6 +402,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         var newTableVersion = tableData.Version.Next();
         var newEntry = CreateMembershipEntryForTest();
+        newEntry.Status = SiloStatus.Dead;
         var ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, testCancellationToken);
         Assert.True(ok);
         MembershipEntry originalMembershipEntry = (await membershipTable.ReadAllAsync(testCancellationToken))
@@ -389,11 +410,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             .Item1;
         Assert.Null(originalMembershipEntry.SuspectTimes);
 
-        // Validate initial TTL values
-        var initialTtlValues = new Dictionary<string, int>();
-        await ValidateTtlValues(initial: true);
+        await ValidateTtlValues();
 
-        var amAliveTime = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
+        var amAliveTime = GetUtcNowWithSecondsResolution().AddSeconds(5);
 
         // This mimics the arguments MembershipOracle.OnIAmAliveUpdateInTableTimer passes in
         var entry = new MembershipEntry
@@ -409,11 +428,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             .First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress))
             .Item1;
 
-        // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
-        // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
-        Assert.True(
-            (amAliveTime - updatedMember.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2),
-            $"Expected time around {amAliveTime} but got {updatedMember.IAmAliveTime} that is off by {(amAliveTime - updatedMember.IAmAliveTime).Duration()}");
+        Assert.Equal(amAliveTime, updatedMember.IAmAliveTime);
         Assert.Equal(newTableVersion.Version, tableData.Version.Version);
 
         // Validate the rest of the data is still the same after the update
@@ -425,34 +440,21 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Null(updatedMember.SuspectTimes);
         Assert.Equal(originalMembershipEntry.StartTime, updatedMember.StartTime);
 
-        // Validate the TTL values are greater than the initial values read after the delay
-        await ValidateTtlValues(initial: false);
-
-        // Validate data automatically expires when using Cassandra TTL, and is still present if not
-        // The Cassandra TTL is set to 20 seconds for this testing
-        using var timeoutCts = new CancellationTokenSource(delay: TimeSpan.FromSeconds(30));
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
-            timeoutCts.Token,
-            testCancellationToken);
-        if (cassandraTtl)
-        {
-            await ValidateDataIsDeleted(cts.Token, timeoutCts.Token);
-        }
-        else
-        {
-            await ValidateDataIsNotDeleted(cts.Token, timeoutCts.Token);
-        }
+        await ValidateTtlValues();
+        var beforeCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
+        await membershipTable.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(amAliveTime.AddSeconds(1)), testCancellationToken);
+        var afterCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
+        Assert.Empty(afterCleanup.Members);
+        Assert.Equal(beforeCleanup.Version.Version + 1, afterCleanup.Version.Version);
+        Assert.NotEmpty(afterCleanup.Version.VersionEtag);
+        Assert.NotEqual(beforeCleanup.Version.VersionEtag, afterCleanup.Version.VersionEtag);
+        await membershipTable.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(amAliveTime.AddSeconds(1)), testCancellationToken);
+        Assert.Equal(afterCleanup.Version, (await membershipTable.ReadAllAsync(testCancellationToken)).Version);
 
         return;
 
-        async Task ValidateTtlValues(bool initial)
+        async Task ValidateTtlValues()
         {
-            if (cassandraTtl && initial)
-            {
-                // When actually using the TTL, wait 5 seconds so the TTL values will be less than 20
-                await Task.Delay(TimeSpan.FromSeconds(5), testCancellationToken);
-            }
-
             // Cassandra columns that are part of the primary key are not available with the TTL command
             // See https://issues.apache.org/jira/browse/CASSANDRA-9312
             Row ttlResult = (await ttlSession.ExecuteAsync(new SimpleStatement(
@@ -467,7 +469,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                         TTL (start_time) as starttime_ttl,
                         TTL (i_am_alive_time) as iamalivetime_ttl
                     FROM membership
-                    """)))
+                    WHERE partition_key = ?
+                      AND address = ?
+                      AND port = ?
+                      AND generation = ?
+                    """,
+                    clusterIdentifier,
+                    newEntry.SiloAddress.Endpoint.Address.ToString(),
+                    newEntry.SiloAddress.Endpoint.Port,
+                    newEntry.SiloAddress.Generation)))
                 .First();
 
             object versionTtl = ttlResult["version_tll"];
@@ -479,123 +489,14 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             object startTimeTtl = ttlResult["starttime_ttl"];
             object iAmAliveTtl = ttlResult["iamalivetime_ttl"];
 
-            if (cassandraTtl)
-            {
-                // TTLs should be non-null, and if not the initial TTL check, should be greater
-                Assert.True(int.TryParse(versionTtl.ToString(), out int versionInt));
-                Assert.True(int.TryParse(siloNameTtl.ToString(), out int siloNameInt));
-                Assert.True(int.TryParse(hostNameTtl.ToString(), out int hostNameInt));
-                Assert.True(int.TryParse(statusTtl.ToString(), out int statusInt));
-                Assert.True(int.TryParse(proxyPortTtl.ToString(), out int proxyPortInt));
-                Assert.True(int.TryParse(startTimeTtl.ToString(), out int startTimeInt));
-                Assert.True(int.TryParse(iAmAliveTtl.ToString(), out int iAmAliveInt));
-                if (initial)
-                {
-                    Assert.True(versionInt > 0);
-                    Assert.True(siloNameInt > 0);
-                    Assert.True(hostNameInt > 0);
-                    Assert.True(statusInt > 0);
-                    Assert.True(proxyPortInt > 0);
-                    Assert.True(startTimeInt > 0);
-                    Assert.True(iAmAliveInt > 0);
-
-                    initialTtlValues["version_tll"] = versionInt;
-                    initialTtlValues["siloname_ttl"] = siloNameInt;
-                    initialTtlValues["hostname_ttl"] = hostNameInt;
-                    initialTtlValues["status_ttl"] = statusInt;
-                    initialTtlValues["proxyport_ttl"] = proxyPortInt;
-                    initialTtlValues["starttime_ttl"] = startTimeInt;
-                    initialTtlValues["iamalivetime_ttl"] = iAmAliveInt;
-                }
-                else
-                {
-                    Assert.True(versionInt > initialTtlValues["version_tll"]);
-                    Assert.True(siloNameInt > initialTtlValues["siloname_ttl"]);
-                    Assert.True(hostNameInt > initialTtlValues["hostname_ttl"]);
-                    Assert.True(statusInt > initialTtlValues["status_ttl"]);
-                    Assert.True(proxyPortInt > initialTtlValues["proxyport_ttl"]);
-                    Assert.True(startTimeInt > initialTtlValues["starttime_ttl"]);
-                    Assert.True(iAmAliveInt > initialTtlValues["iamalivetime_ttl"]);
-                }
-
-                // suspect times will always be null because we're not actually filing it out in the test
-                Assert.Null(suspectTimesTtl);
-            }
-            else
-            {
-                // TTLs should always be null when Cassandra TTL is disabled (default_time_to_live is 0)
-                Assert.Null(versionTtl);
-                Assert.Null(siloNameTtl);
-                Assert.Null(hostNameTtl);
-                Assert.Null(statusTtl);
-                Assert.Null(proxyPortTtl);
-                Assert.Null(suspectTimesTtl);
-                Assert.Null(startTimeTtl);
-                Assert.Null(iAmAliveTtl);
-            }
-        }
-
-        async Task ValidateDataIsDeleted(
-            CancellationToken cancellationToken,
-            CancellationToken timeoutToken)
-        {
-            while (true)
-            {
-                testCancellationToken.ThrowIfCancellationRequested();
-                if (timeoutToken.IsCancellationRequested)
-                {
-                    throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
-                }
-
-                tableData = await membershipTable.ReadAllAsync(testCancellationToken);
-                if (tableData.Members.Count == 0)
-                {
-                    // Success!
-                    return;
-                }
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-                }
-                catch (OperationCanceledException) when (
-                    timeoutToken.IsCancellationRequested
-                    && !testCancellationToken.IsCancellationRequested)
-                {
-                    throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
-                }
-            }
-        }
-
-        async Task ValidateDataIsNotDeleted(
-            CancellationToken cancellationToken,
-            CancellationToken timeoutToken)
-        {
-            while (true)
-            {
-                testCancellationToken.ThrowIfCancellationRequested();
-                if (timeoutToken.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                tableData = await membershipTable.ReadAllAsync(testCancellationToken);
-                if (tableData.Members.Count == 0)
-                {
-                    throw new Exception("Cassandra data was unexpectedly deleted when not using a TTL");
-                }
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-                }
-                catch (OperationCanceledException) when (
-                    timeoutToken.IsCancellationRequested
-                    && !testCancellationToken.IsCancellationRequested)
-                {
-                    return;
-                }
-            }
+            Assert.Null(versionTtl);
+            Assert.Null(siloNameTtl);
+            Assert.Null(hostNameTtl);
+            Assert.Null(statusTtl);
+            Assert.Null(proxyPortTtl);
+            Assert.Null(suspectTimesTtl);
+            Assert.Null(startTimeTtl);
+            Assert.Null(iAmAliveTtl);
         }
     }
 
@@ -642,8 +543,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         Assert.Equal(3, data.Members.Count);
 
-        // Every status other than Active should get cleared out if old
-        foreach (var siloStatus in Enum.GetValues<SiloStatus>())
+        // Compaction retains every non-Dead row in the versioned view.
+        foreach (var siloStatus in Enum.GetValues<SiloStatus>().Where(status => status != SiloStatus.None))
         {
             var oldEntry = CreateMembershipEntryForTest();
             oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
@@ -657,12 +558,27 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             newTableVersion = table.Version.Next();
         }
 
+        var beforeCleanup = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var expected = beforeCleanup.Members.Where(row => row.Item1.Status != SiloStatus.Dead)
+            .OrderBy(row => row.Item1.SiloAddress).ToList();
         await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), TestContext.Current.CancellationToken);
 
         data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
-        Assert.Equal(2, data.Members.Count);
+        Assert.Equal(expected.Count, data.Members.Count);
+        Assert.InRange(data.Version.Version - beforeCleanup.Version.Version, 1, beforeCleanup.Members.Count - expected.Count);
+        Assert.NotEmpty(data.Version.VersionEtag);
+        Assert.NotEqual(beforeCleanup.Version.VersionEtag, data.Version.VersionEtag);
+        Assert.Equal(
+            expected.Select(row => row.Item1.ToFullString()),
+            data.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => row.Item1.ToFullString()));
+        await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), TestContext.Current.CancellationToken);
+        var repeated = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(data.Version, repeated.Version);
+        Assert.Equal(
+            data.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => (row.Item1.ToFullString(), row.Item2)),
+            repeated.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => (row.Item1.ToFullString(), row.Item2)));
     }
 
     // Utility methods
@@ -703,26 +619,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         CancellationToken cancellationToken,
         bool cassandraTtl = false)
     {
-        var services = new ServiceCollection()
-            .AddSingleton<CassandraClusteringTable>()
-            .AddSingleton<CassandraGatewayListProvider>()
-            .Configure<ClusterOptions>(o => { o.ServiceId = serviceId; o.ClusterId = clusterId; })
-            .Configure<CassandraClusteringOptions>(o =>
-            {
-                o.ConfigureClient(async _ => await CreateSession(cancellationToken));
-                o.UseCassandraTtl = cassandraTtl;
-            })
-            .Configure<ClusterMembershipOptions>(o =>
-            {
-                if (cassandraTtl)
-                {
-                    // Shorten the Cassandra TTL period so we can more easily check that rows are automatically deleted
-                    o.DefunctSiloExpiration = TimeSpan.FromSeconds(20);
-                }
-            })
-            .Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(15))
-            .BuildServiceProvider();
+        var services = CreateMembershipServices(serviceId, clusterId, () => CreateSession(cancellationToken), cassandraTtl);
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
+        _legacyMembershipHandles.Add((membershipTable, clusterId, services));
         await membershipTable.InitializeMembershipTableAsync(true, cancellationToken);
 
         IGatewayListProvider gatewayProvider = services.GetRequiredService<CassandraGatewayListProvider>();
@@ -730,6 +629,23 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         return (membershipTable, gatewayProvider);
     }
+
+    private static ServiceProvider CreateMembershipServices(
+        string serviceId,
+        string clusterId,
+        Func<Task<ISession>> createSession,
+        bool cassandraTtl)
+        => new ServiceCollection()
+            .AddSingleton<CassandraClusteringTable>()
+            .AddSingleton<CassandraGatewayListProvider>()
+            .Configure<ClusterOptions>(o => { o.ServiceId = serviceId; o.ClusterId = clusterId; })
+            .Configure<CassandraClusteringOptions>(o =>
+            {
+                o.ConfigureClient(_ => createSession());
+                o.UseCassandraTtl = cassandraTtl;
+            })
+            .Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(15))
+            .BuildServiceProvider();
 
     private async Task<ISession> CreateSession(CancellationToken cancellationToken)
     {

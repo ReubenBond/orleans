@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Membership
     /// Every Orleans deployment has a node   /UniqueDeploymentId
     /// Every Silo's state is saved in        /UniqueDeploymentId/IP:Port@Gen
     /// Every Silo's IAmAlive is saved in     /UniqueDeploymentId/IP:Port@Gen/IAmAlive
-    /// IAmAlive is saved in a separate node because its updates are unconditional.
+    /// IAmAlive is saved in a separate node so its compare-and-set updates do not change the membership row's version.
     /// 
     /// a node's ZK version is its ETag:
     /// the table version is the version of /UniqueDeploymentId
@@ -133,23 +133,29 @@ namespace Orleans.Runtime.Membership
         {
             return UsingZookeeper(async zk =>
             {
-                var getRowTask = GetRow(zk, siloAddress, cancellationToken);
-                var getTableNodeTask = zk.getDataAsync("/");//get the current table version
-
-                List<Tuple<MembershipEntry, string>> rows = new List<Tuple<MembershipEntry, string>>(1);
-                try
+                while (true)
                 {
-                    await Task.WhenAll(getRowTask, getTableNodeTask);
-                    rows.Add(await getRowTask);
-                }
-                catch (KeeperException.NoNodeException)
-                {
-                    //that's ok because orleans expects an empty list in case of a missing row
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.sync("/");
+                    var before = await zk.getDataAsync("/");
+                    var rows = new List<Tuple<MembershipEntry, string>>(1);
+                    try
+                    {
+                        rows.Add(await GetRow(zk, siloAddress, cancellationToken));
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        // A missing row is represented by an empty membership view.
+                    }
 
-                var tableVersion = ConvertToTableVersion((await getTableNodeTask).Stat);
-                return new MembershipTableData(rows, tableVersion);
-            }, this.deploymentConnectionString, this.watcher, cancellationToken, true);
+                    var after = await zk.getDataAsync("/");
+                    if (before.Stat.getVersion() == after.Stat.getVersion()
+                        && before.Stat.getCversion() == after.Stat.getCversion())
+                    {
+                        return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
+                    }
+                }
+            }, this.deploymentConnectionString, this.watcher, cancellationToken);
         }
 
         /// <summary>
@@ -172,17 +178,30 @@ namespace Orleans.Runtime.Membership
         {
             return UsingZookeeper(async zk =>
             {
-                var childrenResult = await zk.getChildrenAsync("/");//get all the child nodes (without the data)
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.sync("/");
+                    var before = await zk.getChildrenAsync("/");
+                    Tuple<MembershipEntry, string>[] rows;
+                    try
+                    {
+                        rows = await Task.WhenAll(before.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child), cancellationToken)));
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        // Cleanup can compact a dead row while the children are being read.
+                        continue;
+                    }
 
-                var childrenTasks = //get the data from each child node
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child), cancellationToken)).ToList();
-
-                var childrenTaskResults = await Task.WhenAll(childrenTasks);
-
-                var tableVersion = ConvertToTableVersion(childrenResult.Stat);//this is the current table version
-
-                return new MembershipTableData(childrenTaskResults.ToList(), tableVersion);
-            }, deploymentConnectionString, watcher, cancellationToken, true);
+                    var after = await zk.getDataAsync("/");
+                    if (before.Stat.getVersion() == after.Stat.getVersion()
+                        && before.Stat.getCversion() == after.Stat.getCversion())
+                    {
+                        return new MembershipTableData(rows.ToList(), ConvertToTableVersion(after.Stat));
+                    }
+                }
+            }, deploymentConnectionString, watcher, cancellationToken);
         }
 
         /// <summary>
@@ -261,15 +280,41 @@ namespace Orleans.Runtime.Membership
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
-            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
-
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
             int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
-            return TryTransaction(t => t
-                .setData("/", null, expectedTableVersion)//increments the version of node "/"
-                .setData(rowPath, newRowData, expectedRowVersion)//increments the version of node "/IP:Port@Gen"
-                .setData(rowIAmAlivePath, newRowIAmAliveData), cancellationToken);
+            return UsingZookeeper(async zk =>
+            {
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        if ((await zk.getDataAsync("/")).Stat.getVersion() != expectedTableVersion
+                            || (await zk.getDataAsync(rowPath)).Stat.getVersion() != expectedRowVersion)
+                        {
+                            return false;
+                        }
+
+                        var heartbeat = await zk.getDataAsync(rowIAmAlivePath);
+                        var time = new DateTime(Math.Max(entry.IAmAliveTime.Ticks, Deserialize<DateTime>(heartbeat.Data).Ticks), DateTimeKind.Utc);
+                        await zk.transaction()
+                            .setData("/", null, expectedTableVersion)
+                            .setData(rowPath, newRowData, expectedRowVersion)
+                            .setData(rowIAmAlivePath, Serialize(time), heartbeat.Stat.getVersion())
+                            .commitAsync();
+                        return true;
+                    }
+                    catch (KeeperException.BadVersionException)
+                    {
+                        // Retry heartbeat races, but recheck the caller's row and table versions.
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        return false;
+                    }
+                }
+            }, this.deploymentConnectionString, this.watcher, cancellationToken);
         }
 
         /// <summary>
@@ -294,10 +339,41 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(entry);
             cancellationToken.ThrowIfCancellationRequested();
 
+            return UsingZookeeper(
+                zk => UpdateIAmAliveCoreAsync(entry, path => zk.getDataAsync(path), zk.setDataAsync, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<bool> UpdateIAmAliveCoreAsync(
+            MembershipEntry entry,
+            Func<string, Task<DataResult>> getData,
+            Func<string, byte[], int, Task<Stat>> setData,
+            CancellationToken cancellationToken)
+        {
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
-            //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher, cancellationToken);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var heartbeat = await getData(rowIAmAlivePath);
+                    if (Deserialize<DateTime>(heartbeat.Data) >= entry.IAmAliveTime)
+                    {
+                        return true;
+                    }
+
+                    await setData(rowIAmAlivePath, Serialize(entry.IAmAliveTime), heartbeat.Stat.getVersion());
+                    return true;
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    return true;
+                }
+                catch (KeeperException.BadVersionException)
+                {
+                    // Preserve the maximum when another heartbeat or status update wins the race.
+                }
+            }
         }
 
         /// <summary>
@@ -444,25 +520,50 @@ namespace Orleans.Runtime.Membership
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            return UsingZookeeper(async zk =>
+            while (true)
             {
-                var childrenResult = await zk.getChildrenAsync("/");
-                var rows = await Task.WhenAll(
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child), cancellationToken)));
-
-                foreach (var (entry, _) in rows)
+                var table = await ReadAllAsync(cancellationToken);
+                var selected = table.Members.FirstOrDefault(row => row.Item1.Status == SiloStatus.Dead
+                    && Math.Max(row.Item1.IAmAliveTime.Ticks, row.Item1.StartTime.Ticks) < beforeDate.UtcDateTime.Ticks
+                    && row.Item1.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true);
+                if (selected is null)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.Ticks)
-                    {
-                        await DeleteRecursive(zk, ConvertToRowPath(entry.SiloAddress), cancellationToken);
-                    }
+                    return;
                 }
 
-                return true;
-            }, this.deploymentConnectionString, this.watcher, cancellationToken);
+                var next = table.Version.Next();
+                var (entry, etag) = selected;
+                await UsingZookeeper(async zk =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var heartbeatPath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+                        var heartbeat = await zk.getDataAsync(heartbeatPath);
+                        if (Deserialize<DateTime>(heartbeat.Data) >= beforeDate.UtcDateTime)
+                        {
+                            return false;
+                        }
+
+                        await zk.transaction()
+                            .setData("/", null, int.Parse(next.VersionEtag, CultureInfo.InvariantCulture))
+                            .delete(heartbeatPath, heartbeat.Stat.getVersion())
+                            .delete(ConvertToRowPath(entry.SiloAddress), int.Parse(etag, CultureInfo.InvariantCulture))
+                            .commitAsync();
+                        return true;
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        return false;
+                    }
+                    catch (KeeperException.BadVersionException)
+                    {
+                        return false;
+                    }
+                }, this.deploymentConnectionString, this.watcher, cancellationToken);
+            }
         }
 
         [LoggerMessage(

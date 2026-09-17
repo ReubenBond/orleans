@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -17,8 +18,8 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
     private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IMembershipTable.InitializeMembershipTableAsync)} is called to initialize this instance before use.";
     private readonly ClusterOptions _clusterOptions;
     private readonly CassandraClusteringOptions _options;
-    private readonly int? _ttlSeconds;
     private readonly IServiceProvider _serviceProvider;
+    private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private ISession? _session;
     private bool _ownsSession;
     private OrleansQueries? _queries;
@@ -34,7 +35,6 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         _options = options.Value;
         _identifier = $"{_clusterOptions.ServiceId}-{_clusterOptions.ClusterId}";
         _serviceProvider = serviceProvider;
-        _ttlSeconds = _options.GetCassandraTtlSeconds(clusterMembershipOptions.Value);
     }
 
     private OrleansQueries Queries => _queries ?? throw new InvalidOperationException(NotInitializedMessage);
@@ -44,22 +44,41 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var ownsSession = _options.OwnsSession;
-        var creation = _options.CreateSessionAsync(_serviceProvider);
-        ISession session;
+        await _initializationLock.WaitAsync(cancellationToken);
         try
         {
-            session = await OrleansQueries.AwaitAsync(creation, cancellationToken);
+            await InitializeMembershipTableCoreAsync(tryInitTableVersion, cancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        finally
         {
-            if (ownsSession)
-            {
-                DisposeAbandonedSessionAsync(creation).Ignore();
-            }
+            _initializationLock.Release();
+        }
+    }
 
-            throw;
+    private async Task InitializeMembershipTableCoreAsync(bool tryInitTableVersion, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _options.Validate();
+        var session = _session;
+        var ownsSession = _ownsSession;
+        var isNewSession = session is null;
+        if (session is null)
+        {
+            ownsSession = _options.OwnsSession;
+            var creation = _options.CreateSessionAsync(_serviceProvider);
+            try
+            {
+                session = await OrleansQueries.AwaitAsync(creation, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (ownsSession)
+                {
+                    DisposeAbandonedSessionAsync(creation).Ignore();
+                }
+
+                throw;
+            }
         }
 
         if (session is null)
@@ -70,22 +89,26 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         var initialized = false;
         try
         {
-            var queries = await OrleansQueries.CreateInstance(session);
-            await queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds, cancellationToken);
+            var queries = isNewSession ? await OrleansQueries.CreateInstance(session) : Queries;
+            await queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, cancellationToken);
 
             if (tryInitTableVersion)
             {
                 await queries.EnsureClusterVersionExistsAsync(_options.InitializeRetryMaxDelay, _identifier, cancellationToken);
             }
 
-            _session = session;
-            _ownsSession = ownsSession;
-            _queries = queries;
+            if (isNewSession)
+            {
+                _session = session;
+                _ownsSession = ownsSession;
+                _queries = queries;
+            }
+
             initialized = true;
         }
         finally
         {
-            if (!initialized && ownsSession)
+            if (!initialized && isNewSession && ownsSession)
             {
                 session.Cluster.Dispose();
             }
@@ -100,6 +123,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public void Dispose()
     {
+        _initializationLock.Dispose();
         var session = Interlocked.Exchange(ref _session, null);
         _queries = null;
         if (_ownsSession)
@@ -129,23 +153,9 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
-        // Prevent duplicate rows
         cancellationToken.ThrowIfCancellationRequested();
-        var existingRow = await ReadRowAsync(entry.SiloAddress, cancellationToken);
-        if (existingRow is not null)
-        {
-            if (existingRow.Version.Version >= tableVersion.Version)
-            {
-                return false;
-            }
-
-            if (existingRow.Members.Any(m => m.Item1.SiloAddress.Equals(entry.SiloAddress)))
-            {
-                return false;
-            }
-        }
-
-        var query = await Queries.ExecuteAsync(await Queries.InsertMembership(_identifier, entry, tableVersion.Version - 1, cancellationToken), cancellationToken);
+        var query = await Queries.ExecuteAsync(await Queries.InsertMembership(
+            _identifier, entry, int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture), cancellationToken), cancellationToken);
         return (bool)query.First()["[applied]"];
     }
 
@@ -155,8 +165,28 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(_identifier, entry, tableVersion.Version - 1, cancellationToken), cancellationToken);
-        return (bool)query.First()["[applied]"];
+        if (!string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        while (true)
+        {
+            var current = await ReadRowAsync(entry.SiloAddress, cancellationToken);
+            if (current.Members.Count == 0 || current.Version.VersionEtag != tableVersion.VersionEtag)
+            {
+                return false;
+            }
+
+            var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(
+                _identifier, entry, current.Version.Version, current.Members[0].Item1.IAmAliveTime, cancellationToken), cancellationToken);
+            if ((bool)query.First()["[applied]"])
+            {
+                return true;
+            }
+
+            // Only heartbeat races can be retried with the caller's original table version.
+        }
     }
 
     private static MembershipEntry? GetMembershipEntry(Row row)
@@ -203,13 +233,13 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
             var entry = GetMembershipEntry(row);
             if (entry != null)
             {
-                entries.Add(new Tuple<MembershipEntry, string>(entry, string.Empty));
+                entries.Add(new Tuple<MembershipEntry, string>(entry, version.Value.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
         if (version.HasValue)
         {
-            return new MembershipTableData(entries, new TableVersion(version.Value, version.Value.ToString()));
+            return new MembershipTableData(entries, new TableVersion(version.Value, version.Value.ToString(CultureInfo.InvariantCulture)));
         }
         else
         {
@@ -222,7 +252,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
             }
 
             var tableVersion = (int)result["version"];
-            return new MembershipTableData([], new TableVersion(tableVersion, tableVersion.ToString()));
+            return new MembershipTableData([], new TableVersion(tableVersion, tableVersion.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
@@ -231,8 +261,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return await GetMembershipTableData(await Queries.ExecuteAsync(await Queries.MembershipReadAll(_identifier, cancellationToken), cancellationToken), cancellationToken);
+        return await ReadConsistentAsync(null, cancellationToken);
     }
 
     [Obsolete("Use ReadRowAsync instead.")]
@@ -240,8 +269,33 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return await GetMembershipTableData(await Queries.ExecuteAsync(await Queries.MembershipReadRow(_identifier, key, cancellationToken), cancellationToken), cancellationToken);
+        return await ReadConsistentAsync(key, cancellationToken);
+    }
+
+    private async Task<MembershipTableData> ReadConsistentAsync(SiloAddress? key, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var before = await ReadVersionAsync(cancellationToken);
+            var statement = key is null
+                ? await Queries.MembershipReadAll(_identifier, cancellationToken)
+                : await Queries.MembershipReadRow(_identifier, key, cancellationToken);
+            var result = await GetMembershipTableData(await Queries.ExecuteAsync(statement, cancellationToken), cancellationToken);
+            var after = await ReadVersionAsync(cancellationToken);
+            // Cassandra paging does not retain a snapshot. Fence the entire enumeration, not just the first page.
+            if (before == after && result.Version.Version == after)
+            {
+                return result;
+            }
+        }
+    }
+
+    private async Task<int> ReadVersionAsync(CancellationToken cancellationToken)
+    {
+        var rows = await Queries.ExecuteAsync(await Queries.MembershipReadVersion(_identifier, cancellationToken), cancellationToken);
+        var row = await OrleansQueries.ReadFirstRowAsync(rows, cancellationToken);
+        return row is null ? 0 : (int)row["version"];
     }
 
     [Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -249,24 +303,22 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (_ttlSeconds.HasValue)
+        while (true)
         {
-            // User has opted in to Cassandra TTL behavior for membership table rows, which means the entire row's data
-            // has to be written back so each cell's TTL can be updated
-            MembershipTableData existingRow = await ReadRowAsync(entry.SiloAddress, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = await ReadRowAsync(entry.SiloAddress, cancellationToken);
+            if (current.Members.Count == 0 || current.Members[0].Item1.IAmAliveTime >= entry.IAmAliveTime)
+            {
+                return;
+            }
 
-            await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTimeWithTtL(
-                clusterIdentifier: _identifier,
-                // The MembershipEntry given to this method by Orleans only contains the SiloAddress and new IAmAliveTime
-                iAmAliveEntry: entry,
-                existingEntry: existingRow.Members[0].Item1,
-                existingVersion: existingRow.Version,
-                cancellationToken: cancellationToken), cancellationToken);
-        }
-        else
-        {
-            await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry, cancellationToken), cancellationToken);
+            var existing = current.Members[0].Item1;
+            var statement = await Queries.UpdateIAmAliveTime(_identifier, entry, existing.IAmAliveTime, existing.Status, cancellationToken);
+            var result = await Queries.ExecuteAsync(statement, cancellationToken);
+            if ((bool)result.First()["[applied]"])
+            {
+                return;
+            }
         }
     }
 
@@ -275,21 +327,19 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var rows = await Queries.ExecuteAsync(await Queries.MembershipReadAll(_identifier, cancellationToken), cancellationToken);
-
-        await foreach (var row in OrleansQueries.ReadRowsAsync(rows, cancellationToken))
+        while (true)
         {
-            var e = GetMembershipEntry(row);
-            if (e is null)
+            var table = await ReadAllAsync(cancellationToken);
+            var selected = table.Members.FirstOrDefault(row => row.Item1.Status == SiloStatus.Dead
+                && Math.Max(row.Item1.IAmAliveTime.Ticks, row.Item1.StartTime.Ticks) < beforeDate.UtcDateTime.Ticks
+                && row.Item1.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true);
+            if (selected is null)
             {
-                continue;
+                return;
             }
 
-            if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
-            {
-                await Queries.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, e, cancellationToken), cancellationToken);
-            }
+            var next = table.Version.Next();
+            await Queries.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, selected.Item1, next, cancellationToken), cancellationToken);
         }
     }
 }

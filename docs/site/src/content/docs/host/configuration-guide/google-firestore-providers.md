@@ -34,7 +34,7 @@ The configuration uses:
 
 Keep `ClusterId` and `ServiceId` stable for the lifetime of a deployment. Use different values when deployments must not share membership, grain locations, reminders, or state.
 
-The clustering provider reads membership rows and the table version in a [serializable Firestore transaction](https://cloud.google.com/firestore/docs/transaction-data-contention#serializable_isolation). Topology-changing membership inserts and updates atomically write the changed silo row and monotonically advance the version row, so a read can't combine rows from one topology version with the version from another.
+The clustering provider reads membership rows and their canonical membership view version in a [serializable Firestore transaction](https://cloud.google.com/firestore/docs/transaction-data-contention#serializable_isolation). Each successful versioned insert or update atomically writes the changed silo row and increments the version by one. Readers receive the matching rows and version from a single committed state. Liveness timestamps advance independently, with both liveness and versioned writes retaining the maximum timestamp. See the [membership contract](../../implementation/cluster-management.md#membership-table).
 
 <xref:Orleans.Hosting.FirestoreGrainDirectoryExtensions.UseFirestoreGrainDirectoryAsDefault*> replaces the built-in directory for every grain type which doesn't explicitly select another directory. External directories add a Firestore request to directory operations, so benchmark activation-heavy workloads before using one as the default.
 

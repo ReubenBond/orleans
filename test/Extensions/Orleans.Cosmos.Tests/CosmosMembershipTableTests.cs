@@ -4,6 +4,9 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Configuration;
+using Microsoft.Azure.Cosmos;
+using Orleans.Clustering.TestKit;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -26,8 +29,6 @@ namespace Tester.Cosmos.Clustering;
 [TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
-    private const string CosmosEmulatorTransactionalBatchConditionSkipReason = "The Cosmos DB emulator does not enforce the transactional batch ETag conditions required by this test.";
-
     public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
     {
     }
@@ -46,11 +47,44 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// including database/container names and consistency levels.
     /// </summary>
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
+        => CreateMembershipTable(logger, _clusterOptions);
+
+    protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
     {
         CosmosTestUtils.CheckCosmosStorage();
         var options = new CosmosClusteringOptions();
         options.ConfigureTestDefaults();
-        return new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
+        options.CleanResourcesOnInitialization = false;
+        return new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), clusterOptions);
+    }
+
+    // The SDK's default query page contains at most 100 items.
+    protected override int ConformanceConcurrencyRowCount => 101;
+
+    protected override MembershipTableTestHandle CreateConformanceHandle(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+    {
+        CosmosTestUtils.CheckCosmosStorage();
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        options.CleanResourcesOnInitialization = false;
+        var createClient = options.CreateClient;
+        var clients = new List<CosmosClient>();
+        options.ConfigureCosmosClient(async services =>
+        {
+            var client = await createClient(services);
+            clients.Add(client);
+            return client;
+        });
+        var table = new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), clusterOptions);
+        return new MembershipTableTestHandle(table, () =>
+        {
+            foreach (var client in clients)
+            {
+                client.Dispose();
+            }
+
+            return ValueTask.CompletedTask;
+        });
     }
 
     /// <summary>
@@ -101,8 +135,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_ReadRow_Insert_Read();
     }
 
@@ -115,8 +147,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRow()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRow();
     }
 
@@ -128,8 +158,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRowInParallel()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRowInParallel();
     }
 

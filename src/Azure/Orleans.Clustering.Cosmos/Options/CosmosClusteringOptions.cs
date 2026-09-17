@@ -3,6 +3,10 @@ namespace Orleans.Clustering.Cosmos;
 /// <summary>
 /// Options for configuring Azure Cosmos DB clustering.
 /// </summary>
+/// <remarks>
+/// Membership initialization requires an account with one writable region and session consistency
+/// or stronger. Initialization validates the account metadata before accessing membership resources.
+/// </remarks>
 public class CosmosClusteringOptions : CosmosOptions
 {
     private const string ORLEANS_CLUSTER_CONTAINER = "OrleansCluster";

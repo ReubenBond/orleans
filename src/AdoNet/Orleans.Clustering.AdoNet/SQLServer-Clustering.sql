@@ -37,7 +37,7 @@ SELECT
 	SET NOCOUNT ON;
 	UPDATE OrleansMembershipTable
 	SET
-		IAmAliveTime = @IAmAliveTime
+		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Address = @Address AND @Address IS NOT NULL
@@ -84,6 +84,17 @@ SELECT
 	'SET XACT_ABORT, NOCOUNT ON;
 	DECLARE @ROWCOUNT AS INT;
 	BEGIN TRANSACTION;
+
+	UPDATE OrleansMembershipVersionTable
+	SET
+		Timestamp = GETUTCDATE(),
+		Version = Version + 1
+	WHERE
+		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647;
+
+	SET @ROWCOUNT = @@ROWCOUNT;
+
 	INSERT INTO OrleansMembershipTable
 	(
 		DeploymentId,
@@ -108,7 +119,7 @@ SELECT
 		@ProxyPort,
 		@StartTime,
 		@IAmAliveTime
-	WHERE NOT EXISTS
+	WHERE @ROWCOUNT > 0 AND NOT EXISTS
 	(
 		SELECT 1
 		FROM
@@ -120,15 +131,6 @@ SELECT
 			AND Generation = @Generation AND @Generation IS NOT NULL
 	);
 
-	UPDATE OrleansMembershipVersionTable
-	SET
-		Timestamp = GETUTCDATE(),
-		Version = Version + 1
-	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Version = @Version AND @Version IS NOT NULL
-		AND @@ROWCOUNT > 0;
-	
 	SET @ROWCOUNT = @@ROWCOUNT;
 	
 	IF @ROWCOUNT = 0
@@ -148,6 +150,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
 	'UpdateMembershipKey',
 	'SET XACT_ABORT, NOCOUNT ON;
+	DECLARE @ROWCOUNT AS INT;
 	BEGIN TRANSACTION;
 	
 	UPDATE OrleansMembershipVersionTable
@@ -156,13 +159,13 @@ SELECT
 		Version = Version + 1
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Version = @Version AND @Version IS NOT NULL;
+		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647;
 	
 	UPDATE OrleansMembershipTable
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
-		IAmAliveTime = @IAmAliveTime
+		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Address = @Address AND @Address IS NOT NULL
@@ -170,8 +173,12 @@ SELECT
 		AND Generation = @Generation AND @Generation IS NOT NULL
 		AND @@ROWCOUNT > 0;
 	
-	SELECT @@ROWCOUNT;
-	COMMIT TRANSACTION;
+	SET @ROWCOUNT = @@ROWCOUNT;
+	IF @ROWCOUNT = 0
+		ROLLBACK TRANSACTION;
+	ELSE
+		COMMIT TRANSACTION;
+	SELECT @ROWCOUNT;
 	'
 WHERE NOT EXISTS 
 ( 
@@ -218,9 +225,9 @@ SELECT
 		m.IAmAliveTime,
 		v.Version
 	FROM
-		OrleansMembershipVersionTable v
+		OrleansMembershipVersionTable v WITH(HOLDLOCK)
 		-- This ensures the version table will returned even if there is no matching membership row.
-		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+		LEFT OUTER JOIN OrleansMembershipTable m WITH(HOLDLOCK) ON v.DeploymentId = m.DeploymentId
 		AND Address = @Address AND @Address IS NOT NULL
 		AND Port = @Port AND @Port IS NOT NULL
 		AND Generation = @Generation AND @Generation IS NOT NULL
@@ -251,7 +258,7 @@ SELECT
 		m.IAmAliveTime,
 		v.Version
 	FROM
-		OrleansMembershipVersionTable v LEFT OUTER JOIN OrleansMembershipTable m
+		OrleansMembershipVersionTable v WITH(HOLDLOCK) LEFT OUTER JOIN OrleansMembershipTable m WITH(HOLDLOCK)
 		ON v.DeploymentId = m.DeploymentId
 	WHERE
 		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
@@ -281,11 +288,28 @@ WHERE NOT EXISTS
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
     'CleanupDefunctSiloEntriesKey',
-    'DELETE FROM OrleansMembershipTable
+    'SET XACT_ABORT, NOCOUNT ON;
+    DECLARE @ROWCOUNT INT;
+    BEGIN TRANSACTION;
+    UPDATE OrleansMembershipVersionTable
+    SET Timestamp = GETUTCDATE(), Version = Version + 1
+    WHERE DeploymentId = @DeploymentId AND Version = @Version AND Version < 2147483647;
+
+    DELETE FROM OrleansMembershipTable
     WHERE DeploymentId = @DeploymentId
         AND @DeploymentId IS NOT NULL
-        AND IAmAliveTime < @IAmAliveTime
-        AND Status != 3;
+        AND IAmAliveTime = @IAmAliveTime
+        AND StartTime = @StartTime
+        AND Status = 6
+        AND Address = @Address AND Port = @Port AND Generation = @Generation
+        AND COALESCE(SuspectTimes, '''') = COALESCE(@SuspectTimes, '''')
+        AND @@ROWCOUNT > 0;
+    SET @ROWCOUNT = @@ROWCOUNT;
+    IF @ROWCOUNT = 0
+        ROLLBACK TRANSACTION;
+    ELSE
+        COMMIT TRANSACTION;
+    SELECT @ROWCOUNT;
     '
 WHERE NOT EXISTS 
 ( 

@@ -24,7 +24,6 @@ internal sealed class OrleansQueries
     private PreparedStatement? _membershipReadAllPreparedStatement;
     private PreparedStatement? _membershipReadVersionPreparedStatement;
     private PreparedStatement? _updateIAmAlivePreparedStatement;
-    private PreparedStatement? _updateIAmAliveWithTtlPreparedStatement;
     private PreparedStatement? _deleteMembershipEntryPreparedStatement;
     private PreparedStatement? _updateMembershipPreparedStatement;
     private PreparedStatement? _membershipReadRowPreparedStatement;
@@ -37,20 +36,21 @@ internal sealed class OrleansQueries
 
     private OrleansQueries(ISession session)
     {
-        MembershipReadConsistencyLevel = ConsistencyLevel.Quorum;
+        // Serial reads complete outstanding Paxos rounds before exposing membership data.
+        MembershipReadConsistencyLevel = ConsistencyLevel.Serial;
         MembershipWriteConsistencyLevel = ConsistencyLevel.Quorum;
 
         Session = session;
     }
 
-    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, int? ttl, CancellationToken cancellationToken = default)
+    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!await DoesTableAlreadyExistAsync(cancellationToken))
         {
             try
             {
-                await MakeTableAsync(ttl, cancellationToken);
+                await MakeTableAsync(cancellationToken);
             }
             catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
             {
@@ -60,7 +60,7 @@ internal sealed class OrleansQueries
 
                 if (!await DoesTableAlreadyExistAsync(cancellationToken))
                 {
-                    await MakeTableAsync(ttl, cancellationToken);
+                    await MakeTableAsync(cancellationToken);
                 }
             }
         }
@@ -121,9 +121,9 @@ internal sealed class OrleansQueries
         }
     }
 
-    private async Task MakeTableAsync(int? ttlSeconds, CancellationToken cancellationToken)
+    private async Task MakeTableAsync(CancellationToken cancellationToken)
     {
-        await ExecuteAsync(EnsureTableExists(ttlSeconds), cancellationToken);
+        await ExecuteAsync(EnsureTableExists(), cancellationToken);
         await ExecuteAsync(EnsureIndexExists, cancellationToken);
     }
 
@@ -142,12 +142,10 @@ internal sealed class OrleansQueries
             .SetConsistencyLevel(consistencyLevel);
 
     /// <remarks>
-    /// In Cassandra, a table-level <c>default_time_to_live</c> of <c>0</c> is treated as <c>disabled</c>.
-    /// <para/>
-    /// See https://docs.datastax.com/en/cql-oss/3.3/cql/cql_reference/cqlCreateTable.html#tabProp__cqlTableDefaultTTL
+    /// Membership rows and their static version persist until an explicit, versioned deletion.
     /// </remarks>
-    public IStatement EnsureTableExists(int? defaultTimeToLiveSeconds) => new SimpleStatement(
-        $$"""
+    public IStatement EnsureTableExists() => new SimpleStatement(
+        """
           CREATE TABLE IF NOT EXISTS membership
           (
               partition_key ascii,
@@ -166,7 +164,7 @@ internal sealed class OrleansQueries
               PRIMARY KEY(partition_key, address, port, generation)
           )
           WITH compression = { 'class' : 'LZ4Compressor', 'enabled' : true }
-            AND default_time_to_live = {{defaultTimeToLiveSeconds.GetValueOrDefault(0)}};
+            AND default_time_to_live = 0;
           """);
 
     public IStatement EnsureIndexExists => new SimpleStatement("""
@@ -176,22 +174,29 @@ internal sealed class OrleansQueries
     public async ValueTask<IStatement> InsertMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, CancellationToken cancellationToken = default)
     {
         _insertMembershipPreparedStatement ??= await PrepareStatementAsync("""
+           BEGIN BATCH
+           UPDATE membership USING TTL 0
+           SET version = :new_version
+           WHERE partition_key = :partition_key
+           IF version = :expected_version;
            UPDATE membership
+           USING TTL 0
            SET
-             version = :new_version,
              status = :status,
              start_time = :start_time,
              silo_name = :silo_name,
              host_name = :host_name,
              proxy_port = :proxy_port,
+             suspect_times = :suspect_times,
              i_am_alive_time = :i_am_alive_time
            WHERE
              partition_key = :partition_key
              AND address = :address
              AND port = :port
-             AND generation = :generation
+                AND generation = :generation
            IF
-             version = :expected_version;
+             start_time = null;
+           APPLY BATCH;
            """, MembershipWriteConsistencyLevel, cancellationToken);
         return _insertMembershipPreparedStatement.Bind(new
         {
@@ -203,11 +208,12 @@ internal sealed class OrleansQueries
             host_name = membershipEntry.HostName,
             status = (int)membershipEntry.Status,
             proxy_port = membershipEntry.ProxyPort,
+            suspect_times = GetSuspectTimesString(membershipEntry),
             start_time = membershipEntry.StartTime,
             i_am_alive_time = membershipEntry.IAmAliveTime,
-            new_version = version + 1,
+            new_version = checked(version + 1),
             expected_version = version
-        });
+        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
     public async ValueTask<IStatement> InsertMembershipVersion(string clusterIdentifier, CancellationToken cancellationToken = default)
@@ -221,9 +227,10 @@ internal sealed class OrleansQueries
             	:partition_key,
             	0
             )
-            IF NOT EXISTS;
+            IF NOT EXISTS
+            USING TTL 0;
             """, MembershipWriteConsistencyLevel, cancellationToken);
-        return _insertMembershipVersionPreparedStatement.Bind(clusterIdentifier);
+        return _insertMembershipVersionPreparedStatement.Bind(clusterIdentifier).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
     public async ValueTask<IStatement> DeleteMembershipTableEntries(string clusterIdentifier, CancellationToken cancellationToken = default)
@@ -235,19 +242,21 @@ internal sealed class OrleansQueries
         return _deleteMembershipTablePreparedStatement.Bind(clusterIdentifier);
     }
 
-    public async ValueTask<IStatement> UpdateIAmAliveTime(string clusterIdentifier, MembershipEntry membershipEntry, CancellationToken cancellationToken = default)
+    public async ValueTask<IStatement> UpdateIAmAliveTime(string clusterIdentifier, MembershipEntry membershipEntry, DateTime previousTime, SiloStatus status, CancellationToken cancellationToken = default)
     {
         _updateIAmAlivePreparedStatement ??= await PrepareStatementAsync("""
              UPDATE membership
+             USING TTL 0
              SET
                 i_am_alive_time = :i_am_alive_time
              WHERE
                 partition_key = :partition_key
                 AND address = :address
                 AND port = :port
-                AND generation = :generation;
+                AND generation = :generation
+             IF i_am_alive_time = :previous_time AND status = :status AND start_time != null;
              """,
-            ConsistencyLevel.Any, cancellationToken);
+            MembershipWriteConsistencyLevel, cancellationToken);
 
         return _updateIAmAlivePreparedStatement.Bind(new
         {
@@ -255,122 +264,89 @@ internal sealed class OrleansQueries
             i_am_alive_time = membershipEntry.IAmAliveTime,
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
-            generation = membershipEntry.SiloAddress.Generation
-        });
+            generation = membershipEntry.SiloAddress.Generation,
+            previous_time = previousTime,
+            status = (int)status
+        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
-    /// <remarks>
-    /// When the user has opted in to Cassandra TTL behavior, the entire membership row needs to be read and written
-    /// back so that each cell is updated with the table's default TTL.
-    /// <para/>
-    /// Cassandra TTLs are cell-based, not row-based, which is why all the data needs to be re-inserted in order to
-    /// update the TTLs for all cells in the row.
-    /// <para/>
-    /// https://docs.datastax.com/en/cql-oss/3.x/cql/cql_reference/cqlInsert.html
-    /// </remarks>
-    public async ValueTask<IStatement> UpdateIAmAliveTimeWithTtL(
-        string clusterIdentifier,
-        MembershipEntry iAmAliveEntry,
-        MembershipEntry existingEntry,
-        TableVersion existingVersion,
-        CancellationToken cancellationToken = default)
-    {
-        _updateIAmAliveWithTtlPreparedStatement ??= await PrepareStatementAsync(
-            """
-            UPDATE membership
-            SET
-                version = :same_version,
-                silo_name = :silo_name,
-                host_name = :host_name,
-                status = :status,
-                proxy_port = :proxy_port,
-                suspect_times = :suspect_times,
-                start_time = :start_time,
-                i_am_alive_time = :i_am_alive_time
-            WHERE
-                partition_key = :partition_key
-                AND address = :address
-                AND port = :port
-                AND generation = :generation
-            IF
-            	version = :expected_version;
-            """,
-            // This is ignored because we're creating a LWT
-            MembershipWriteConsistencyLevel, cancellationToken);
-
-        BoundStatement updateIAmAliveTimeWithTtL = _updateIAmAliveWithTtlPreparedStatement.Bind(new
-        {
-            partition_key = clusterIdentifier,
-            // The same version still needs to be written, to update its cell-level TTL
-            same_version = existingVersion.Version,
-            address = existingEntry.SiloAddress.Endpoint.Address.ToString(),
-            port = existingEntry.SiloAddress.Endpoint.Port,
-            generation = existingEntry.SiloAddress.Generation,
-            silo_name = existingEntry.SiloName,
-            host_name = existingEntry.HostName,
-            status = (int)existingEntry.Status,
-            proxy_port = existingEntry.ProxyPort,
-            suspect_times = GetSuspectTimesString(existingEntry),
-            start_time = existingEntry.StartTime,
-            i_am_alive_time = iAmAliveEntry.IAmAliveTime,
-            // But we still check that the version was the same during the update so we don't stomp on another update
-            expected_version = existingVersion.Version,
-        });
-
-        // To improve performance, we allow IAmAlive updates to be LocalSerial
-        updateIAmAliveTimeWithTtL.SetSerialConsistencyLevel(ConsistencyLevel.LocalSerial);
-        return updateIAmAliveTimeWithTtL;
-    }
-
-    public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry, CancellationToken cancellationToken = default)
+    public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry, TableVersion nextVersion, CancellationToken cancellationToken = default)
     {
         _deleteMembershipEntryPreparedStatement ??= await PrepareStatementAsync("""
+            BEGIN BATCH
+            UPDATE membership USING TTL 0
+            SET version = :new_version
+            WHERE partition_key = :partition_key
+            IF version = :expected_version;
             DELETE FROM
             	membership
             WHERE
             	partition_key = :partition_key
             	AND address = :address
             	AND port = :port
-            	AND generation = :generation;
+                AND generation = :generation
+            IF status = :status
+                AND i_am_alive_time = :i_am_alive_time
+                AND start_time = :start_time;
+            APPLY BATCH;
             """, MembershipWriteConsistencyLevel, cancellationToken);
         return _deleteMembershipEntryPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
-            generation = membershipEntry.SiloAddress.Generation
-        });
+            generation = membershipEntry.SiloAddress.Generation,
+            new_version = nextVersion.Version,
+            expected_version = int.Parse(nextVersion.VersionEtag, System.Globalization.CultureInfo.InvariantCulture),
+            status = (int)SiloStatus.Dead,
+            i_am_alive_time = membershipEntry.IAmAliveTime,
+            start_time = membershipEntry.StartTime
+        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
-    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, CancellationToken cancellationToken = default)
+    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, DateTime previousTime, CancellationToken cancellationToken = default)
     {
         _updateMembershipPreparedStatement ??= await PrepareStatementAsync("""
-            UPDATE membership
+            BEGIN BATCH
+            UPDATE membership USING TTL 0
+            SET version = :new_version
+            WHERE partition_key = :partition_key
+            IF version = :expected_version;
+            UPDATE membership USING TTL 0
             SET
-            	version = :new_version,
             	status = :status,
             	suspect_times = :suspect_times,
-            	i_am_alive_time = :i_am_alive_time
+                i_am_alive_time = :i_am_alive_time,
+                silo_name = :silo_name,
+                host_name = :host_name,
+                proxy_port = :proxy_port,
+                start_time = :start_time
             WHERE
             	partition_key = :partition_key
             	AND address = :address
             	AND port = :port
             	AND generation = :generation
             IF
-            	version = :expected_version;
+                i_am_alive_time = :previous_time AND start_time != null;
+            APPLY BATCH;
             """, MembershipWriteConsistencyLevel, cancellationToken);
         return _updateMembershipPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
-            new_version = version + 1,
+            new_version = checked(version + 1),
             expected_version = version,
             status = (int)membershipEntry.Status,
             suspect_times = GetSuspectTimesString(membershipEntry),
-            i_am_alive_time = membershipEntry.IAmAliveTime,
+            i_am_alive_time = new DateTime(Math.Max(membershipEntry.IAmAliveTime.Ticks, previousTime.Ticks), DateTimeKind.Utc),
+            silo_name = membershipEntry.SiloName,
+            host_name = membershipEntry.HostName,
+            proxy_port = membershipEntry.ProxyPort,
+            start_time = membershipEntry.StartTime,
+            previous_time = previousTime,
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
             generation = membershipEntry.SiloAddress.Generation
-        });
+        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
     public async ValueTask<IStatement> MembershipReadVersion(string clusterIdentifier, CancellationToken cancellationToken = default)
@@ -381,7 +357,8 @@ internal sealed class OrleansQueries
                 FROM
                 	membership
                 WHERE
-                	partition_key = :partition_key;
+                    partition_key = :partition_key
+                LIMIT 1;
                 """,
             MembershipReadConsistencyLevel, cancellationToken);
         return _membershipReadVersionPreparedStatement.Bind(clusterIdentifier);

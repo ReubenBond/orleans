@@ -34,8 +34,9 @@ namespace Orleans.Clustering.Redis
         public Func<ClusterOptions, RedisKey> CreateRedisKey { get; set; } = DefaultCreateRedisKey;
 
         /// <summary>
-        /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
-        /// Setting a value different from null will cause entries to be deleted after some period of time.
+        /// Gets or sets the legacy entry expiry option. This must be <see langword="null"/>.
+        /// Expiring the membership table would remove live members and reset its version, so a non-null value is rejected.
+        /// Use explicit membership table deletion to clean up ephemeral environments.
         /// </summary>
         public TimeSpan? EntryExpiry { get; set; } = null;
 

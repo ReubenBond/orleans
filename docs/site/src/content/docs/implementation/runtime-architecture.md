@@ -68,15 +68,15 @@ Unlike a grain, a system target:
 
 ## Consistency boundaries
 
-Orleans does not implement one global transaction across these subsystems. Each boundary has a narrower contract:
+Each layer supplies guarantees which the layers above use to implement their own protocols:
 
-- The membership table serializes membership updates into monotonically ordered views.
+- The membership table atomically commits each mutation with the next **canonical membership view** version. Within a cluster, a version uniquely identifies its versioned membership state. Readers can skip intermediate versions while progressing forward; see the [membership contract](cluster-management.md#membership-table).
 - The directory coordinates a grain identity with an activation address and repairs stale registrations.
 - The activation scheduler serializes synchronous work items for one activation.
 - Messaging correlates a request with a response but cannot infer whether a timed-out request executed.
 - Persistence and streams define their own durability and acknowledgement points.
 
-Understanding those boundaries is essential when extending the runtime. A custom directory changes location consistency, not membership. A placement director chooses where a new activation starts, not how calls are scheduled. A stream adapter defines queue acknowledgement, not grain-call exactly-once semantics.
+Understanding those boundaries is essential when extending the runtime. A custom directory builds location consistency on the membership contract. A placement director selects a host from the eligible members. A stream adapter supplies the acknowledgement semantics used by stream delivery.
 
 ## Public extension surfaces
 

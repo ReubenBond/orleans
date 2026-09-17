@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Clustering.TestKit;
 
 namespace UnitTests.MembershipTests
 {
@@ -23,7 +24,8 @@ namespace UnitTests.MembershipTests
     }
 
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
+    [TestCategory("Functional")]
+    public abstract class MembershipTableTestsBase : MembershipTableConformanceTestsBase, IDisposable, IClassFixture<ConnectionStringFixture>
     {
         private static readonly string hostName = Dns.GetHostName();
         private readonly ILogger logger;
@@ -91,7 +93,32 @@ namespace UnitTests.MembershipTests
 
         protected abstract IGatewayListProvider CreateGatewayListProvider(ILogger logger);
         protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
+        protected abstract IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions);
         protected abstract Task<string> GetConnectionString();
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => new(GetType().Name, (serviceId, clusterId, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(CreateConformanceHandle(
+                    logger,
+                    Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId })));
+            });
+
+        protected virtual MembershipTableTestHandle CreateConformanceHandle(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
+            var table = CreateMembershipTable(logger, clusterOptions);
+            return new MembershipTableTestHandle(table, () =>
+            {
+                if (table is IAsyncDisposable asyncDisposable)
+                {
+                    return asyncDisposable.DisposeAsync();
+                }
+
+                (table as IDisposable)?.Dispose();
+                return ValueTask.CompletedTask;
+            });
+        }
 
         protected virtual string? GetAdoInvariant()
         {
@@ -145,7 +172,7 @@ namespace UnitTests.MembershipTests
             Assert.Equal(0, data.Version.Version);
         }
 
-        protected async Task MembershipTable_InsertRow(bool extendedProtocol = true)
+        protected async Task MembershipTable_InsertRow()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var membershipEntry = CreateMembershipEntryForTest();
@@ -161,13 +188,12 @@ namespace UnitTests.MembershipTests
 
             data = await membershipTable.ReadAllAsync(cancellationToken);
 
-            if (extendedProtocol)
-                Assert.Equal(1, data.Version.Version);
+            Assert.Equal(1, data.Version.Version);
 
             Assert.Single(data.Members);
         }
 
-        protected async Task MembershipTable_ReadRow_Insert_Read(bool extendedProtocol = true)
+        protected async Task MembershipTable_ReadRow_Insert_Read()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
@@ -186,16 +212,12 @@ namespace UnitTests.MembershipTests
             ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
             Assert.False(ok, "InsertRow should have failed - same entry, old table version");
 
-            if (extendedProtocol)
-            {
-                ok = await membershipTable.InsertRowAsync(CreateMembershipEntryForTest(), newTableVersion, cancellationToken);
-                Assert.False(ok, "InsertRow should have failed - new entry, old table version");
-            }
+            ok = await membershipTable.InsertRowAsync(CreateMembershipEntryForTest(), newTableVersion, cancellationToken);
+            Assert.False(ok, "InsertRow should have failed - new entry, old table version");
 
             data = await membershipTable.ReadAllAsync(cancellationToken);
 
-            if (extendedProtocol)
-                Assert.Equal(1, data.Version.Version);
+            Assert.Equal(1, data.Version.Version);
 
             TableVersion nextTableVersion = data.Version.Next();
 
@@ -207,18 +229,14 @@ namespace UnitTests.MembershipTests
             Assert.Single(data.Members);
 
             data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, cancellationToken);
-            if (extendedProtocol)
-                Assert.Equal(newTableVersion.Version, data.Version.Version);
+            Assert.Equal(newTableVersion.Version, data.Version.Version);
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
-            if (extendedProtocol)
-            {
-                Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
-                Assert.Equal(newTableVersion.Version, data.Version.Version);
-            }
+            Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
+            Assert.Equal(newTableVersion.Version, data.Version.Version);
             var membershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
             logger.LogInformation("Membership.ReadRow returned MembershipEntry ETag={ETag} Entry={Entry}", eTag, membershipEntry);
@@ -227,7 +245,7 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(membershipEntry);
         }
 
-        protected async Task MembershipTable_ReadAll_Insert_ReadAll(bool extendedProtocol = true)
+        protected async Task MembershipTable_ReadAll_Insert_ReadAll()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
@@ -248,11 +266,8 @@ namespace UnitTests.MembershipTests
             Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
 
-            if (extendedProtocol)
-            {
-                Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
-                Assert.Equal(newTableVersion.Version, data.Version.Version);
-            }
+            Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
+            Assert.Equal(newTableVersion.Version, data.Version.Version);
 
             var membershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
@@ -262,7 +277,7 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(membershipEntry);
         }
 
-        protected async Task MembershipTable_UpdateRow(bool extendedProtocol = true)
+        protected async Task MembershipTable_UpdateRow()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var tableData = await membershipTable.ReadAllAsync(cancellationToken);
@@ -295,17 +310,14 @@ namespace UnitTests.MembershipTests
 
                 Assert.NotNull(etagBefore);
 
-                if (extendedProtocol)
-                {
-                    logger.LogInformation(
-                        "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
-                        siloEntry,
-                        etagBefore,
-                        tableVersion?.ToString() ?? "null");
-                    ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion!, cancellationToken);
-                    Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
-                    tableData = await membershipTable.ReadAllAsync(cancellationToken);
-                }
+                logger.LogInformation(
+                    "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
+                    siloEntry,
+                    etagBefore,
+                    tableVersion?.ToString() ?? "null");
+                ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion!, cancellationToken);
+                Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
+                tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
                 tableVersion = tableData.Version.Next();
 
@@ -336,18 +348,15 @@ namespace UnitTests.MembershipTests
 
                 var etagAfter = tuple.Item2;
 
-                if (extendedProtocol)
-                {
-                    logger.LogInformation(
-                        "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
-                        siloEntry,
-                        etagAfter,
-                        tableVersion?.ToString() ?? "null");
+                logger.LogInformation(
+                    "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
+                    siloEntry,
+                    etagAfter,
+                    tableVersion?.ToString() ?? "null");
 
-                    ok = await membershipTable.UpdateRowAsync(siloEntry, etagAfter, tableVersion!, cancellationToken);
+                ok = await membershipTable.UpdateRowAsync(siloEntry, etagAfter, tableVersion!, cancellationToken);
 
-                    Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
-                }
+                Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
                 tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
@@ -357,14 +366,13 @@ namespace UnitTests.MembershipTests
 
                 Assert.Equal(etagBefore, etagAfter);
                 Assert.NotNull(tableData.Version);
-                if (extendedProtocol)
-                    Assert.Equal(tableVersion!.Version, tableData.Version.Version);
+                Assert.Equal(tableVersion!.Version, tableData.Version.Version);
 
                 Assert.Equal(i, tableData.Members.Count);
             }
         }
 
-        protected async Task MembershipTable_UpdateRowInParallel(bool extendedProtocol = true)
+        protected async Task MembershipTable_UpdateRowInParallel()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var tableData = await membershipTable.ReadAllAsync(cancellationToken);
@@ -404,13 +412,12 @@ namespace UnitTests.MembershipTests
             tableData = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(tableData.Version);
 
-            if (extendedProtocol)
-                Assert.Equal(20, tableData.Version.Version);
+            Assert.Equal(20, tableData.Version.Version);
 
             Assert.Single(tableData.Members);
         }
 
-        protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
+        protected async Task MembershipTable_UpdateIAmAlive()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             MembershipTableData tableData = await membershipTable.ReadAllAsync(cancellationToken);
@@ -440,7 +447,7 @@ namespace UnitTests.MembershipTests
             Assert.Equal(newTableVersion.Version, tableData.Version.Version);
         }
 
-        protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
+        protected async Task MembershipTable_CleanupDefunctSiloEntries()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
@@ -481,8 +488,8 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal(3, data.Members.Count);
 
-            // Every status other than Active should get cleared out if old
-            foreach (var siloStatus in Enum.GetValues<SiloStatus>())
+            // Compaction retains every non-Dead row in the versioned view.
+            foreach (var siloStatus in Enum.GetValues<SiloStatus>().Where(status => status != SiloStatus.None))
             {
                 var oldEntry = CreateMembershipEntryForTest();
                 oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
@@ -496,12 +503,27 @@ namespace UnitTests.MembershipTests
                 newTableVersion = table.Version.Next();
             }
 
+            var beforeCleanup = await membershipTable.ReadAllAsync(cancellationToken);
+            var expected = beforeCleanup.Members.Where(row => row.Item1.Status != SiloStatus.Dead)
+                .OrderBy(row => row.Item1.SiloAddress).ToList();
             await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), cancellationToken);
 
             data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(2, data.Members.Count);
+            Assert.Equal(expected.Count, data.Members.Count);
+            Assert.InRange(data.Version.Version - beforeCleanup.Version.Version, 1, beforeCleanup.Members.Count - expected.Count);
+            Assert.NotEmpty(data.Version.VersionEtag);
+            Assert.NotEqual(beforeCleanup.Version.VersionEtag, data.Version.VersionEtag);
+            Assert.Equal(
+                expected.Select(row => row.Item1.ToFullString()),
+                data.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => row.Item1.ToFullString()));
+            await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), cancellationToken);
+            var repeated = await membershipTable.ReadAllAsync(cancellationToken);
+            Assert.Equal(data.Version, repeated.Version);
+            Assert.Equal(
+                data.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => (row.Item1.ToFullString(), row.Item2)),
+                repeated.Members.OrderBy(row => row.Item1.SiloAddress).Select(row => (row.Item1.ToFullString(), row.Item2)));
         }
 
         // Utility methods

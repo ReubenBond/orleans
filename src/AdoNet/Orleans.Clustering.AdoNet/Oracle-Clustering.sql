@@ -36,6 +36,13 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
   rowcount NUMBER;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
+    UPDATE OrleansMembershipVersionTable
+    SET Timestamp = sys_extract_utc(systimestamp),
+        Version = Version + 1
+    WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+      AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL AND Version < 2147483647;
+    rowcount := SQL%ROWCOUNT;
+
     INSERT INTO OrleansMembershipTable
     (
       DeploymentId,
@@ -60,7 +67,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       PARAM_PROXYPORT,
       PARAM_STARTTIME,
       PARAM_IAMALIVETIME
-    FROM DUAL WHERE NOT EXISTS
+    FROM DUAL WHERE rowcount > 0 AND NOT EXISTS
     (
       SELECT 1 FROM OrleansMembershipTable WHERE
         DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
@@ -68,14 +75,6 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
         AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
         AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
     );
-    rowcount :=	SQL%ROWCOUNT;
-    UPDATE OrleansMembershipVersionTable
-    SET Timestamp = sys_extract_utc(systimestamp),
-        Version = Version + 1
-    WHERE
-  		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-    	AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL
-      AND rowcount > 0;
     rowcount :=	SQL%ROWCOUNT;
     IF rowcount = 0 THEN
       ROLLBACK;
@@ -104,20 +103,24 @@ CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
         Version = Version + 1
     WHERE
 		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-		AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
+		AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL AND Version < 2147483647;
     rowcount := SQL%ROWCOUNT;
     UPDATE OrleansMembershipTable
       SET
         Status = PARAM_STATUS,
         SuspectTimes = PARAM_SUSPECTTIMES,
-        IAmAliveTime = PARAM_IAMALIVETIME
+        IAmAliveTime = GREATEST(IAmAliveTime, PARAM_IAMALIVETIME)
       WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
         AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
         AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
         AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
         AND rowcount > 0;
     rowcount := SQL%ROWCOUNT;
-    COMMIT;
+    IF rowcount = 0 THEN
+      ROLLBACK;
+    ELSE
+      COMMIT;
+    END IF;
     RETURN(rowcount);
   END;
 /
@@ -151,7 +154,7 @@ PRAGMA AUTONOMOUS_TRANSACTION;
 BEGIN
     UPDATE OrleansMembershipTable
         SET
-            IAmAliveTime = PARAM_IAMALIVE
+            IAmAliveTime = GREATEST(IAmAliveTime, PARAM_IAMALIVE)
         WHERE
             DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
             AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
@@ -238,17 +241,41 @@ VALUES
 ');
 /
 
+CREATE OR REPLACE FUNCTION CleanupDefunctSiloEntry(
+    PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
+    PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_VERSION IN NUMBER,
+    PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STARTTIME IN TIMESTAMP, PARAM_SUSPECTTIMES IN VARCHAR2)
+RETURN NUMBER IS
+    rowcount NUMBER;
+    PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+    UPDATE OrleansMembershipVersionTable
+    SET Timestamp = sys_extract_utc(systimestamp), Version = Version + 1
+    WHERE DeploymentId = PARAM_DEPLOYMENTID AND Version = PARAM_VERSION AND Version < 2147483647;
+    rowcount := SQL%ROWCOUNT;
+
+    DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = PARAM_DEPLOYMENTID AND Status = 6
+        AND Address = PARAM_ADDRESS AND Port = PARAM_PORT AND Generation = PARAM_GENERATION
+        AND IAmAliveTime = PARAM_IAMALIVETIME AND StartTime = PARAM_STARTTIME
+        AND (SuspectTimes = PARAM_SUSPECTTIMES OR (SuspectTimes IS NULL AND PARAM_SUSPECTTIMES IS NULL))
+        AND rowcount > 0;
+    rowcount := SQL%ROWCOUNT;
+    IF rowcount = 0 THEN
+        ROLLBACK;
+    ELSE
+        COMMIT;
+    END IF;
+    RETURN(rowcount);
+END;
+/
+
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'CleanupDefunctSiloEntriesKey','
-  BEGIN
-    DELETE FROM OrleansMembershipTable
-      WHERE DeploymentId = :DeploymentId
-        AND :DeploymentId IS NOT NULL
-        AND IAmAliveTime < :IAmAliveTime
-        AND Status != 3;
-  END;
+    SELECT CleanupDefunctSiloEntry(:DeploymentId, :Address, :Port, :Generation,
+        :Version, :IAmAliveTime, :StartTime, :SuspectTimes) FROM DUAL
 ');
 /
 

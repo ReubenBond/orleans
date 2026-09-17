@@ -54,7 +54,7 @@ Don't use a shared production `ClusterId` for staging. During blue-green deploym
 
 ## Choose a clustering provider
 
-The clustering provider is a coordination dependency used for membership and gateway discovery. It isn't a repository of grain activation state and doesn't replace a grain storage provider.
+The clustering provider coordinates canonical membership views and gateway discovery. Higher-level runtime services rely on its [atomic membership and versioning guarantees](../implementation/cluster-management.md#membership-table).
 
 Choose a provider already operated reliably in the target environment:
 
@@ -74,6 +74,20 @@ Evaluate:
 - Authentication, transport encryption, network isolation, and least privilege.
 - Retention and cleanup of old membership rows.
 - Operational ownership, backup requirements, and regional recovery behavior.
+
+Use one shared coordination domain for every silo in a cluster. Verify that the backend's selected consistency level, transaction scope, replica routing, and failover behavior preserve the membership contract. Run the [provider conformance suite](../implementation/provider-authoring.md#membership-provider-conformance) against that deployment configuration, including independent provider instances. A backend's replicated or geographically distributed modes can have different guarantees from its single-writer transaction path.
+
+| Provider | Membership coordination requirement |
+| --- | --- |
+| Azure Table Storage | Atomic entity-group transactions within the cluster partition. Set `MaxBulkUpdateRows` to at least `4` to accommodate a membership row and the provider's version/fence records. |
+| Cosmos DB | A single-write-region account supporting Session consistency or stronger. Initialization validates account metadata and rejects unsupported configurations. The provider carries session tokens through version reads and every page of membership data to establish a coherent view. |
+| DynamoDB | Every membership reader and writer uses the same table and regional endpoint. Membership transactions and strongly consistent reads coordinate within that region. |
+| Cassandra | Lightweight transactions with serial reads and quorum commits. All membership cells use `TTL 0`; set `UseCassandraTtl` to `false` and use versioned cleanup for retention. |
+| Redis | A persistent membership key, with `EntryExpiry` set to `null`. |
+| Consul | Leader-backed consistent reads and atomic transactions within the cluster's key prefix. |
+| ZooKeeper | Synchronized reads and atomic operations through a writable connection. |
+
+Cosmos DB account validation runs during provider initialization. Grant the runtime identity access to account metadata and preserve these topology and consistency settings for the cluster's lifetime. Coordinate account reconfiguration with cluster shutdown and startup so initialization validates the new settings.
 
 ## Network policy
 

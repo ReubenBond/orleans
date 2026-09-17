@@ -32,6 +32,9 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     }
 
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
+        => CreateMembershipTable(logger, _clusterOptions);
+
+    protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
     {
         var options = new FirestoreOptions
         {
@@ -39,8 +42,11 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
-        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
+        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(options), clusterOptions);
     }
+
+    // RunQuery streams a document per response message.
+    protected override int ConformanceConcurrencyRowCount => 17;
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
     {

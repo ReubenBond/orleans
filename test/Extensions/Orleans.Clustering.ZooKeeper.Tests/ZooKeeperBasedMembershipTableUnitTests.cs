@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using org.apache.zookeeper;
+using org.apache.zookeeper.data;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Membership;
@@ -176,6 +179,120 @@ namespace UnitTests.MembershipTests
         }
 
         [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task UpdateIAmAlive_CompactedHeartbeat_CompletesWithoutCreatingRowsOrChangingVersion(bool duringWrite)
+        {
+            var entry = CreateMembershipEntry();
+            entry.IAmAliveTime = DateTime.UnixEpoch.AddDays(1);
+            var path = "/" + entry.SiloAddress.ToParsableString() + "/IAmAlive";
+            var readCalls = 0;
+            var writeCalls = 0;
+            var nodes = new Dictionary<string, byte[]>
+            {
+                ["/"] = ZooKeeperBasedMembershipTable.Serialize(42)
+            };
+            if (duringWrite)
+            {
+                nodes[path] = ZooKeeperBasedMembershipTable.Serialize(DateTime.UnixEpoch);
+            }
+
+            var result = await ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(
+                entry,
+                actualPath =>
+                {
+                    readCalls++;
+                    Assert.Equal(path, actualPath);
+                    return nodes.TryGetValue(actualPath, out var stored)
+                        ? Task.FromResult(CreateHeartbeatResult(ZooKeeperBasedMembershipTable.Deserialize<DateTime>(stored), 7))
+                        : Task.FromException<DataResult>(new KeeperException.NoNodeException(path));
+                },
+                (actualPath, data, version) =>
+                {
+                    writeCalls++;
+                    Assert.Equal(path, actualPath);
+                    Assert.Equal(7, version);
+                    Assert.Equal(entry.IAmAliveTime, ZooKeeperBasedMembershipTable.Deserialize<DateTime>(data));
+                    nodes.Remove(path);
+                    nodes["/"] = ZooKeeperBasedMembershipTable.Serialize(43);
+                    return Task.FromException<Stat>(new KeeperException.NoNodeException(path));
+                },
+                TestContext.Current.CancellationToken);
+
+            Assert.True(result);
+            var remaining = Assert.Single(nodes);
+            Assert.Equal("/", remaining.Key);
+            Assert.Equal(duringWrite ? 43 : 42, ZooKeeperBasedMembershipTable.Deserialize<int>(remaining.Value));
+            Assert.Equal(1, readCalls);
+            Assert.Equal(duringWrite ? 1 : 0, writeCalls);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task UpdateIAmAlive_InfrastructureFailure_PropagatesSameException(bool duringWrite, bool permissions)
+        {
+            var entry = CreateMembershipEntry();
+            entry.IAmAliveTime = DateTime.UnixEpoch.AddDays(1);
+            var path = "/" + entry.SiloAddress.ToParsableString() + "/IAmAlive";
+            Exception failure = permissions
+                ? new KeeperException.NoAuthException()
+                : new KeeperException.ConnectionLossException();
+            var readCalls = 0;
+            var writeCalls = 0;
+
+            var actual = await Record.ExceptionAsync(() => ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(
+                entry,
+                actualPath =>
+                {
+                    readCalls++;
+                    Assert.Equal(path, actualPath);
+                    return duringWrite
+                        ? Task.FromResult(CreateHeartbeatResult(DateTime.UnixEpoch, 7))
+                        : Task.FromException<DataResult>(failure);
+                },
+                (actualPath, _, version) =>
+                {
+                    writeCalls++;
+                    Assert.Equal(path, actualPath);
+                    Assert.Equal(7, version);
+                    return Task.FromException<Stat>(failure);
+                },
+                TestContext.Current.CancellationToken));
+
+            Assert.Same(failure, actual);
+            Assert.Equal(1, readCalls);
+            Assert.Equal(duringWrite ? 1 : 0, writeCalls);
+        }
+
+        [Fact]
+        public async Task UpdateIAmAlive_BadVersionThenCompaction_CompletesWithoutRetryingMissingNode()
+        {
+            var entry = CreateMembershipEntry();
+            entry.IAmAliveTime = DateTime.UnixEpoch.AddDays(1);
+            var path = "/" + entry.SiloAddress.ToParsableString() + "/IAmAlive";
+            var reads = 0;
+            var writes = 0;
+
+            Assert.True(await ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(
+                entry,
+                _ => ++reads == 1
+                    ? Task.FromResult(CreateHeartbeatResult(DateTime.UnixEpoch, 7))
+                    : Task.FromException<DataResult>(new KeeperException.NoNodeException(path)),
+                (_, _, _) =>
+                {
+                    writes++;
+                    return Task.FromException<Stat>(new KeeperException.BadVersionException(path));
+                },
+                TestContext.Current.CancellationToken));
+
+            Assert.Equal(2, reads);
+            Assert.Equal(1, writes);
+        }
+
+        [Theory]
         [InlineData(nameof(IMembershipTable.InitializeMembershipTableAsync))]
         [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntriesAsync))]
         [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync))]
@@ -246,6 +363,14 @@ namespace UnitTests.MembershipTests
             Assert.Equal("/127.0.0.1:11111@12345/IAmAlive", result);
             Assert.Equal(InvokePrivatePathMethod("ConvertToRowPath", address) + "/IAmAlive", result);
         }
+
+        private static DataResult CreateHeartbeatResult(DateTime time, int version) =>
+            Assert.IsType<DataResult>(Activator.CreateInstance(
+                typeof(DataResult),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: [ZooKeeperBasedMembershipTable.Serialize(time), new Stat(0, 0, 0, 0, version, 0, 0, 0, 0, 0, 0)],
+                culture: null));
 
         private static ZooKeeperBasedMembershipTable CreateSut(
             string connectionString = "sentinel.invalid:2181",

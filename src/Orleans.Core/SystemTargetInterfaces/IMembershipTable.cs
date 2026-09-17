@@ -12,14 +12,39 @@ using Orleans.Runtime;
 namespace Orleans
 {
     /// <summary>
-    /// Interface for Membership Table.
+    /// Stores canonical membership views using atomic, optimistic concurrency control.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Within a cluster, each successful insert or versioned row update commits the row and the next table version
+    /// atomically. The membership protocol supplies <see cref="TableVersion.Next"/>, using the table ETag from its
+    /// read, and advances each silo identity through its lifecycle toward <see cref="SiloStatus.Dead"/>.
+    /// Providers validate the table ETag and, for updates, the row ETag in the same atomic operation.
+    /// A conditional failure leaves both the rows and the table version unchanged.
+    /// </para>
+    /// <para>
+    /// A table version uniquely identifies a canonical membership view throughout the cluster. Reads return the
+    /// versioned fields and their matching version from one committed state, including when the backend paginates
+    /// results. Readers can observe version N followed by N + 2: each committed change still increments the version
+    /// by exactly one. ETags are opaque concurrency tokens, distinct from the ordered integer version.
+    /// A provider can use a table-wide concurrency token for its rows. Callers read and reevaluate the current
+    /// view to obtain the row and table tokens for an update.
+    /// </para>
+    /// <para>
+    /// <see cref="MembershipEntry.IAmAliveTime"/> advances independently of the table version. Both heartbeat and
+    /// versioned row updates retain the maximum of the stored and supplied timestamps. Heartbeats may change the
+    /// row ETag. Canonical view equality concerns versioned membership fields; heartbeat values and row ETags
+    /// can differ at the same table version. The complete row set belongs to the canonical view, including
+    /// retained dead rows. Cleanup commits each nonempty deletion batch with the next table version atomically.
+    /// Removed identities remain terminal; the protocol uses a new <see cref="SiloAddress"/> generation for a restarted silo.
+    /// </para>
+    /// <para>
     /// Providers can implement the cancellation-aware Async methods to cancel their underlying operations.
     /// The default implementations cancel the caller's wait while the tokenless operation completes,
     /// and observe any exception from that operation.
     /// Cancellation-aware RPC methods retain the existing operation aliases and serialized application arguments.
     /// Cancellation is propagated separately from those arguments.
+    /// </para>
     /// </remarks>
     public interface IMembershipTable
     {
@@ -50,6 +75,9 @@ namespace Orleans
         /// </summary>
         /// <param name="clusterId">The identifier of the cluster whose entries are deleted.</param>
         /// <returns>A task representing the deletion operation.</returns>
+        /// <exception cref="ArgumentException">
+        /// The provider is scoped to a different cluster. Rejecting the identifier preserves all stored data.
+        /// </exception>
         [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
         Task DeleteMembershipTableEntries(string clusterId);
 
@@ -68,8 +96,15 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Delete all dead silo entries older than <paramref name="beforeDate"/>
+        /// Compacts dead silo entries whose last known update precedes <paramref name="beforeDate"/>.
         /// </summary>
+        /// <remarks>
+        /// Preserves every non-dead entry. Each nonempty atomic deletion batch advances the table version
+        /// by exactly one and replaces its ETag. A call can commit multiple batches; empty cleanup and failed
+        /// conditional batches preserve the stored rows and version. The last known update includes startup,
+        /// liveness, and suspect-vote timestamps so a recent death declaration remains available to readers.
+        /// A removed silo identity remains terminal and the membership protocol uses a new generation on restart.
+        /// </remarks>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>
         [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
@@ -90,13 +125,12 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Atomically reads the Membership Table information about a given silo.
-        /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
-        /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
+        /// Atomically reads a silo's versioned membership fields and the matching canonical membership view version.
+        /// The returned entry also includes its independently updated liveness timestamp.
+        /// An absent silo returns an empty membership result with the matching table version.
         /// </summary>
         /// <param name="key">The address of the silo whose membership information needs to be read.</param>
-        /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
-        /// TableVersion, read atomically.</returns>
+        /// <returns>The membership row, if present, and its canonical membership view version.</returns>
         [Obsolete("Use ReadRowAsync instead.")]
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
@@ -115,12 +149,10 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Atomically reads the full content of the Membership Table.
-        /// The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the 
-        /// TableVersion for this table. The MembershipEntries and the TableVersion have to be read atomically.
+        /// Reads the full canonical membership view: all versioned membership fields and their matching table
+        /// version from one committed view. Entries also include their independently updated liveness timestamps.
         /// </summary>
-        /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
-        /// TableVersion, all read atomically.</returns>
+        /// <returns>The membership rows and their matching canonical membership view version.</returns>
         [Obsolete("Use ReadAllAsync instead.")]
         Task<MembershipTableData> ReadAll();
 
@@ -173,7 +205,8 @@ namespace Orleans
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
-        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 
+        /// 1) The versioned fields of the MembershipEntry for this silo will be replaced by the supplied fields,
+        ///    and IAmAliveTime will retain the maximum of its stored and supplied values.
         /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
@@ -207,15 +240,15 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive column and not change other columns.
-        /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
-        /// With regards to eTags update:
-        /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
-        /// With regards to TableVersion:
-        /// this operation should not change the TableVersion of the table. It should leave it untouched.
-        /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
+        /// Advances the silo's IAmAliveTime to the maximum of the stored and supplied timestamps.
         /// </summary>
+        /// <remarks>
+        /// Atomically preserves the versioned membership fields and the table version, including its ETag.
+        /// The row ETag may change. Repeated or delayed timestamps leave the stored time at its maximum.
+        /// The provider coordinates this operation with versioned row updates so both paths preserve that maximum.
+        /// A delayed report for a removed silo preserves the row's absence and the table version.
+        /// Infrastructure failures are surfaced to the caller.
+        /// </remarks>
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>
         [Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -250,7 +283,8 @@ namespace Orleans
     public sealed class TableVersion : ISpanFormattable, IEquatable<TableVersion>
     {
         /// <summary>
-        /// The version part of this TableVersion. Monotonically increasing number.
+        /// Gets the canonical membership view version, incremented by exactly one for each successful
+        /// atomic membership mutation within a cluster, including dead-row compaction.
         /// </summary>
         [Id(0)]
         public int Version { get; }
@@ -276,7 +310,8 @@ namespace Orleans
         /// Creates the next membership table version while retaining the current entity tag for concurrency validation.
         /// </summary>
         /// <returns>The next membership table version.</returns>
-        public TableVersion Next() => new(Version + 1, VersionEtag);
+        /// <exception cref="OverflowException">The membership table version has reached <see cref="int.MaxValue"/>.</exception>
+        public TableVersion Next() => new(checked(Version + 1), VersionEtag);
 
         /// <inheritdoc />
         public override string ToString() => $"<{Version}, {VersionEtag}>";
@@ -312,8 +347,11 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Represents an atomic snapshot of membership entries and the membership table version.
+    /// Represents data from a canonical membership view, with independently updated liveness observations.
     /// </summary>
+    /// <remarks>
+    /// A full-table read contains the complete view; a point read contains the requested row from that view.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public sealed class MembershipTableData
@@ -457,7 +495,8 @@ namespace Orleans
         public SiloAddress SiloAddress { get; set; } = default!;
 
         /// <summary>
-        /// The silo status. Managed by the Membership Protocol.
+        /// Gets or sets the silo status. The membership protocol advances each silo identity through its
+        /// lifecycle toward the terminal <see cref="SiloStatus.Dead"/> status.
         /// </summary>
         [Id(1)]
         public SiloStatus Status { get; set; }
@@ -512,7 +551,9 @@ namespace Orleans
         public DateTime StartTime { get; set; }
 
         /// <summary>
-        /// the last time this silo reported that it is alive. For diagnostics and troubleshooting only.
+        /// Gets or sets the latest reported liveness timestamp, used for diagnostics and startup recovery.
+        /// Providers retain the maximum stored value across heartbeat and versioned row updates.
+        /// This timestamp advances independently of the canonical membership view version.
         /// </summary>
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }

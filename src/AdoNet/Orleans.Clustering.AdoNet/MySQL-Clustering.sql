@@ -35,7 +35,7 @@ VALUES
     -- is not needed nor is it checked.
     UPDATE OrleansMembershipTable
     SET
-        IAmAliveTime = @IAmAliveTime
+        IAmAliveTime = GREATEST(IAmAliveTime, @IAmAliveTime)
     WHERE
         DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
         AND Address = @Address AND @Address IS NOT NULL
@@ -89,7 +89,19 @@ CREATE PROCEDURE InsertMembershipKey(
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
     START TRANSACTION;
+
+    UPDATE OrleansMembershipVersionTable
+    SET Version = Version + 1
+    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
+        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647;
+    SET _ROWCOUNT = ROW_COUNT();
+
     INSERT INTO OrleansMembershipTable
     (
         DeploymentId,
@@ -114,7 +126,7 @@ BEGIN
         _ProxyPort,
         _StartTime,
         _IAmAliveTime) AS TMP
-    WHERE NOT EXISTS
+    WHERE _ROWCOUNT > 0 AND NOT EXISTS
     (
     SELECT 1
     FROM
@@ -126,18 +138,95 @@ BEGIN
         AND Generation = _Generation AND _Generation IS NOT NULL
     );
 
-    UPDATE OrleansMembershipVersionTable
-    SET
-        Version = Version + 1
-    WHERE
-        DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
-        AND Version = _Version AND _Version IS NOT NULL
-        AND ROW_COUNT() > 0;
-
     SET _ROWCOUNT = ROW_COUNT();
 
     IF _ROWCOUNT = 0
     THEN
+        ROLLBACK;
+    ELSE
+        COMMIT;
+    END IF;
+    SELECT _ROWCOUNT;
+END$$
+
+CREATE PROCEDURE UpdateMembershipKey(
+    IN _DeploymentId NVARCHAR(150),
+    IN _Address VARCHAR(45),
+    IN _Port INT,
+    IN _Generation INT,
+    IN _Version INT,
+    IN _Status INT,
+    IN _SuspectTimes VARCHAR(8000),
+    IN _IAmAliveTime DATETIME
+)
+BEGIN
+    DECLARE _ROWCOUNT INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    START TRANSACTION;
+
+    UPDATE OrleansMembershipVersionTable
+    SET Version = Version + 1
+    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
+        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647;
+    SET _ROWCOUNT = ROW_COUNT();
+
+    UPDATE OrleansMembershipTable
+    SET Status = _Status,
+        SuspectTimes = _SuspectTimes,
+        IAmAliveTime = GREATEST(IAmAliveTime, _IAmAliveTime)
+    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
+        AND Address = _Address AND _Address IS NOT NULL
+        AND Port = _Port AND _Port IS NOT NULL
+        AND Generation = _Generation AND _Generation IS NOT NULL
+        AND _ROWCOUNT > 0;
+    IF _ROWCOUNT > 0 THEN
+        SELECT COUNT(*) INTO _ROWCOUNT FROM OrleansMembershipTable
+        WHERE DeploymentId = _DeploymentId AND Address = _Address
+            AND Port = _Port AND Generation = _Generation;
+    END IF;
+
+    IF _ROWCOUNT = 0 THEN
+        ROLLBACK;
+    ELSE
+        COMMIT;
+    END IF;
+    SELECT _ROWCOUNT;
+END$$
+
+CREATE PROCEDURE CleanupDefunctSiloEntriesKey(
+    IN _DeploymentId NVARCHAR(150),
+    IN _Address VARCHAR(45),
+    IN _Port INT,
+    IN _Generation INT,
+    IN _Version INT,
+    IN _IAmAliveTime DATETIME,
+    IN _StartTime DATETIME,
+    IN _SuspectTimes VARCHAR(8000))
+BEGIN
+    DECLARE _ROWCOUNT INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    START TRANSACTION;
+    UPDATE OrleansMembershipVersionTable
+    SET Version = Version + 1
+    WHERE DeploymentId = _DeploymentId AND Version = _Version AND Version < 2147483647;
+    SET _ROWCOUNT = ROW_COUNT();
+
+    DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = _DeploymentId AND Status = 6
+        AND Address = _Address AND Port = _Port AND Generation = _Generation
+        AND IAmAliveTime = _IAmAliveTime AND StartTime = _StartTime
+        AND COALESCE(SuspectTimes, '') = COALESCE(_SuspectTimes, '')
+        AND _ROWCOUNT > 0;
+    SET _ROWCOUNT = ROW_COUNT();
+    IF _ROWCOUNT = 0 THEN
         ROLLBACK;
     ELSE
         COMMIT;
@@ -151,29 +240,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateMembershipKey','
-    START TRANSACTION;
-
-    UPDATE OrleansMembershipVersionTable
-    SET
-        Version = Version + 1
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Version = @Version AND @Version IS NOT NULL;
-
-    UPDATE OrleansMembershipTable
-    SET
-        Status = @Status,
-        SuspectTimes = @SuspectTimes,
-        IAmAliveTime = @IAmAliveTime
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Address = @Address AND @Address IS NOT NULL
-        AND Port = @Port AND @Port IS NOT NULL
-        AND Generation = @Generation AND @Generation IS NOT NULL
-        AND ROW_COUNT() > 0;
-
-    SELECT ROW_COUNT();
-    COMMIT;
+    CALL UpdateMembershipKey(@DeploymentId, @Address, @Port, @Generation,
+        @Version, @Status, @SuspectTimes, @IAmAliveTime);
 ');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -258,9 +326,6 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'CleanupDefunctSiloEntriesKey','
-    DELETE FROM OrleansMembershipTable
-    WHERE DeploymentId = @DeploymentId
-        AND @DeploymentId IS NOT NULL
-        AND IAmAliveTime < @IAmAliveTime
-        AND Status !=3;
+    CALL CleanupDefunctSiloEntriesKey(@DeploymentId, @Address, @Port, @Generation,
+        @Version, @IAmAliveTime, @StartTime, @SuspectTimes);
 ');

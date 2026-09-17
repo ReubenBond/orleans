@@ -40,11 +40,11 @@ Under the cluster prefix, the provider maintains:
 
 | Key | Purpose |
 | --- | --- |
-| `version` | The integer membership table version. Consul's `ModifyIndex` for this key is the compare-and-set ETag. |
+| `version` | The integer canonical membership view version. Consul's `ModifyIndex` for this key is the compare-and-set ETag. |
 | `<silo-address>` | The silo registration, including its host name, gateway port, start time, status, silo name, and failure-detector votes. |
 | `<silo-address>/iamalive` | The silo's periodic `IAmAlive` timestamp. |
 
-Membership-row changes and the corresponding version change use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) with compare-and-set operations. An `IAmAlive` update writes only its separate timestamp key and doesn't advance the table version. This value supports diagnostics and startup recovery; it isn't the direct heartbeat used to detect a failed silo. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
+Membership-row changes and the next canonical membership view version commit together in a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) with compare-and-set operations. Liveness updates retain the maximum timestamp in the separate `iamalive` key while preserving the view version. This value supports diagnostics and startup recovery. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
 
 Orleans clients list the cluster prefix and select active registrations with a nonzero gateway port. If a client discovers no gateways, inspect the exact prefix used by the client and silos, then compare registration status, gateway ports, and advertised-address reachability.
 

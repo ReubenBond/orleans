@@ -47,13 +47,16 @@ namespace UnitTests.MembershipTests
         /// table that uses ZooKeeper's hierarchical namespace for storage.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
 
             var typedLogger = this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>();
             Assert.NotNull(typedLogger);
-            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), this._clusterOptions);
+            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), clusterOptions);
         }
 
         /// <summary>

@@ -33,6 +33,23 @@ Before changing packages, record the following compatibility contract:
 
 See [Upgrade deployment and rollback](migration/deployment-and-rollback.md) before choosing a deployment strategy.
 
+## Membership provider consistency update
+
+**Release note for the next release:** Membership providers enforce [monotonic versioning of canonical membership views](implementation/cluster-management.md), retain the maximum liveness timestamp across both write paths, and atomically advance the version when compacting sufficiently old `Dead` rows. Coordinate the provider upgrade with its backing store configuration:
+
+| Provider | Upgrade action |
+| --- | --- |
+| Azure Table Storage | Set `MaxBulkUpdateRows` to at least `4` so each cleanup transaction can include a row deletion and its version/fence records. |
+| ADO.NET | Stop every silo sharing the membership queries, apply the matching [membership-consistency SQL migration](host/configuration-guide/adonet-configuration.md#clustering), deploy the updated provider everywhere, then restart. Providers cache queries, and the updated cleanup parameters require matching database queries and provider code. |
+| Cassandra | Set `UseCassandraTtl` to `false`; initialization rejects automatic membership TTL. Every membership cell, including retained dead rows and the static version, uses `TTL 0`. Cells written by an older TTL-enabled provider retain their old expiration. Use a fresh `ClusterId` for the upgraded cluster, or complete a coordinated data migration which clears every membership-cell and version TTL before restarting with updated providers. |
+| Redis | Set `EntryExpiry` to `null`. Initialization makes the membership key persistent with `PERSIST`; grant that command to the provider identity. Preserve cluster-wide membership data until explicit administrative teardown. |
+| Cosmos DB | Use a single-write-region account supporting Session consistency or stronger. Initialization reads account metadata and rejects unsupported settings; grant the provider identity metadata access and preserve these settings while the cluster runs. |
+| DynamoDB | Configure every membership reader and writer to use the same table and regional endpoint. |
+| Consul | Provide leader access for consistent reads and read/write access to the cluster's version, registration, and `iamalive` keys. |
+| ZooKeeper | Use connections which support synchronized reads and writes. |
+
+Use a quiesced upgrade for a cluster whose older writers can overwrite liveness timestamps, compact rows without versioning, or expire membership data. Start every silo with the corrected provider before relying on the strengthened storage guarantees. Validate the exact storage configuration with the [membership conformance suite](implementation/provider-authoring.md#membership-provider-conformance).
+
 ## Activation metric schema update
 
 **Release note for the next release:** Activation lifecycle counters, latency histograms, and population gauges now include `grain_type`, using the canonical `GrainId.Type.ToString()` identity. `orleans-grains` migrates from the `type` key containing a CLR implementation name to `grain_type` containing that canonical identity. Explicitly named grains and constructed generic grains can therefore have different values as well as a different key.

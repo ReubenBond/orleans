@@ -20,6 +20,7 @@ namespace Orleans.Clustering.Redis
         private readonly ClusterOptions _clusterOptions;
         private readonly JsonSerializerSettings _jsonSerializerSettings;
         private readonly RedisKey _clusterKey;
+        private readonly SemaphoreSlim _initializationLock = new(1, 1);
         private IConnectionMultiplexer _muxer = null!;
         private IDatabase _db = null!;
         private bool _muxerIsShared;
@@ -40,6 +41,13 @@ namespace Orleans.Clustering.Redis
         public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(clusterId, _clusterOptions.ClusterId, StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"Cluster id {clusterId} does not match RedisMembershipTable value of '{_clusterOptions.ClusterId}'.",
+                    nameof(clusterId));
+            }
+
             await AwaitAsync(_db.KeyDeleteAsync(_clusterKey), cancellationToken);
         }
 
@@ -48,46 +56,69 @@ namespace Orleans.Clustering.Redis
 
         public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var creation = _redisOptions.CreateMultiplexer(_redisOptions);
-            IConnectionMultiplexer muxer;
-            bool isShared;
+            await _initializationLock.WaitAsync(cancellationToken);
             try
             {
-                (muxer, isShared) = await AwaitAsync(creation, cancellationToken);
+                await InitializeMembershipTableCoreAsync(tryInitTableVersion, cancellationToken);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            finally
             {
-                // The tokenless factory can still return an owned connection after the caller stops waiting.
-                DisposeAbandonedMultiplexerAsync(creation).Ignore();
-                throw;
+                _initializationLock.Release();
+            }
+        }
+
+        private async Task InitializeMembershipTableCoreAsync(bool tryInitTableVersion, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_redisOptions.EntryExpiry is not null)
+            {
+                throw new OrleansConfigurationException("Redis membership entries cannot expire: expiration can remove live members and reset the table version. Use membership cleanup or explicitly delete the cluster's entries instead.");
+            }
+
+            var muxer = _muxer;
+            var isShared = _muxerIsShared;
+            var isNewConnection = muxer is null;
+            if (muxer is null)
+            {
+                var creation = _redisOptions.CreateMultiplexer(_redisOptions);
+                try
+                {
+                    (muxer, isShared) = await AwaitAsync(creation, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // The tokenless factory can still return an owned connection after the caller stops waiting.
+                    DisposeAbandonedMultiplexerAsync(creation).Ignore();
+                    throw;
+                }
             }
 
             var initialized = false;
             try
             {
-                var db = muxer.GetDatabase();
+                var db = isNewConnection ? muxer.GetDatabase() : _db;
                 if (tryInitTableVersion)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     await AwaitAsync(db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists), cancellationToken);
 
-                    if (_redisOptions.EntryExpiry is { } expiry)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        await AwaitAsync(db.KeyExpireAsync(_clusterKey, expiry), cancellationToken);
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await AwaitAsync(db.KeyPersistAsync(_clusterKey), cancellationToken);
                 }
 
-                _muxer = muxer;
-                _muxerIsShared = isShared;
-                _db = db;
+                if (isNewConnection)
+                {
+                    _muxer = muxer;
+                    _muxerIsShared = isShared;
+                    _db = db;
+                }
+
                 IsInitialized = true;
                 initialized = true;
             }
             finally
             {
-                if (!initialized && !isShared)
+                if (!initialized && isNewConnection && !isShared)
                 {
                     await muxer.DisposeAsync().ConfigureAwait(false);
                 }
@@ -108,53 +139,50 @@ namespace Orleans.Clustering.Redis
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true, cancellationToken) == UpsertResult.Success;
+            return await UpsertRowInternal(entry, tableVersion, allowInsertOnly: true, cancellationToken);
         }
 
-        private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
+        private async Task<bool> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var tx = _db.CreateTransaction();
             var rowKey = entry.SiloAddress.ToString();
-
-            if (updateTableVersion)
+            var updatedEntry = Deserialize(Serialize(entry));
+            while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                var tx = _db.CreateTransaction();
+                var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, tableVersion.VersionEtag));
+                if (allowInsertOnly)
+                {
+                    tx.AddCondition(Condition.HashNotExists(_clusterKey, rowKey));
+                }
+                else
+                {
+                    var current = await AwaitAsync(_db.HashGetAsync(_clusterKey, rowKey), cancellationToken);
+                    if (!current.HasValue)
+                    {
+                        return false;
+                    }
+
+                    var existingEntry = Deserialize(current.ToString());
+                    updatedEntry.IAmAliveTime = new DateTime(Math.Max(entry.IAmAliveTime.Ticks, existingEntry.IAmAliveTime.Ticks), DateTimeKind.Utc);
+                    tx.AddCondition(Condition.HashEqual(_clusterKey, rowKey, current));
+                }
+
                 tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
+                tx.HashSetAsync(_clusterKey, rowKey, Serialize(updatedEntry)).Ignore();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
+                {
+                    return true;
+                }
+
+                if (allowInsertOnly || !versionCondition.WasSatisfied)
+                {
+                    return false;
+                }
+
+                // A heartbeat changed the row without changing the table version. Merge it and retry.
             }
-
-            var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, SerializeVersion(Predeccessor(tableVersion))));
-
-            ConditionResult? insertCondition;
-            if (allowInsertOnly)
-            {
-                insertCondition = tx.AddCondition(Condition.HashNotExists(_clusterKey, rowKey));
-            }
-            else
-            {
-                insertCondition = null;
-            }
-
-            tx.HashSetAsync(_clusterKey, rowKey, Serialize(entry)).Ignore();
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var success = await AwaitAsync(tx.ExecuteAsync(), cancellationToken);
-
-            if (success)
-            {
-                return UpsertResult.Success;
-            }
-
-            if (!versionCondition.WasSatisfied)
-            {
-                return UpsertResult.Conflict;
-            }
-
-            if (insertCondition is not null && !insertCondition.WasSatisfied)
-            {
-                return UpsertResult.Conflict;
-            }
-
-            return UpsertResult.Failure;
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -230,39 +258,31 @@ namespace Orleans.Clustering.Redis
 
         public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var key = entry.SiloAddress.ToString();
-            var tx = _db.CreateTransaction();
-            var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
-            tableVersionRowTask.Ignore();
-            var entryRowTask = tx.HashGetAsync(_clusterKey, key);
-            entryRowTask.Ignore();
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
+            while (true)
             {
-                throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = await AwaitAsync(_db.HashGetAsync(_clusterKey, key), cancellationToken);
+                if (!current.HasValue)
+                {
+                    return;
+                }
 
-            var entryRow = await AwaitAsync(entryRowTask, cancellationToken);
-            if (!TryGetValueString(entryRow, out var entryRowValue))
-            {
-                throw new RedisClusteringException($"Could not find a value for the key {key}");
-            }
+                var existingEntry = Deserialize(current.ToString());
+                if (existingEntry.IAmAliveTime >= entry.IAmAliveTime)
+                {
+                    return;
+                }
 
-            TableVersion tableVersion = GetTableVersionFromRow(await AwaitAsync(tableVersionRowTask, cancellationToken)).Next();
-            var existingEntry = Deserialize(entryRowValue);
-
-            // Update only the IAmAliveTime property.
-            existingEntry.IAmAliveTime = entry.IAmAliveTime;
-
-            var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false, cancellationToken);
-            if (result == UpsertResult.Conflict)
-            {
-                throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} due to conflict");
-            }
-            else if (result != UpsertResult.Success)
-            {
-                throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} for an unknown reason");
+                existingEntry.IAmAliveTime = entry.IAmAliveTime;
+                var tx = _db.CreateTransaction();
+                tx.AddCondition(Condition.HashEqual(_clusterKey, key, current));
+                tx.HashSetAsync(_clusterKey, key, Serialize(existingEntry)).Ignore();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
+                {
+                    return;
+                }
             }
         }
 
@@ -271,7 +291,10 @@ namespace Orleans.Clustering.Redis
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false, cancellationToken) == UpsertResult.Success;
+            cancellationToken.ThrowIfCancellationRequested();
+            // Reads use the table version as the row etag, so both must describe the same view.
+            return string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal)
+                && await UpsertRowInternal(entry, tableVersion, allowInsertOnly: false, cancellationToken);
         }
 
         [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
@@ -279,15 +302,42 @@ namespace Orleans.Clustering.Redis
 
         public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            var entries = await ReadAllAsync(cancellationToken);
-            foreach (var (entry, _) in entries.Members)
+            while (true)
             {
-                if (entry.Status != SiloStatus.Active
-                    && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                cancellationToken.ThrowIfCancellationRequested();
+                var rows = await AwaitAsync(_db.HashGetAllAsync(_clusterKey), cancellationToken);
+                var version = GetTableVersionFromRow(rows.SingleOrDefault(row => row.Name == TableVersionKey).Value);
+                HashEntry? candidate = null;
+                foreach (var row in rows)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await AwaitAsync(_db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString()), cancellationToken);
+                    if (row.Name == TableVersionKey)
+                    {
+                        continue;
+                    }
+
+                    var entry = Deserialize(row.Value.ToString());
+                    if (entry.Status == SiloStatus.Dead
+                        && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.UtcDateTime.Ticks
+                        && entry.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true)
+                    {
+                        candidate = row;
+                        break;
+                    }
                 }
+
+                if (candidate is not { } selected)
+                {
+                    return;
+                }
+
+                var next = version.Next();
+                var tx = _db.CreateTransaction();
+                tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, version.VersionEtag));
+                tx.AddCondition(Condition.HashEqual(_clusterKey, selected.Name, selected.Value));
+                tx.HashDeleteAsync(_clusterKey, selected.Name).Ignore();
+                tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(next)).Ignore();
+                cancellationToken.ThrowIfCancellationRequested();
+                await AwaitAsync(tx.ExecuteAsync(), cancellationToken);
             }
         }
 
@@ -300,6 +350,7 @@ namespace Orleans.Clustering.Redis
 
         public void Dispose()
         {
+            _initializationLock.Dispose();
             var muxer = _muxer;
             if (muxer is null)
             {
@@ -310,6 +361,7 @@ namespace Orleans.Clustering.Redis
             _muxer = null!;
             _db = null!;
             _muxerIsShared = false;
+            IsInitialized = false;
 
             if (!muxerIsShared)
             {
@@ -319,6 +371,7 @@ namespace Orleans.Clustering.Redis
 
         public async ValueTask DisposeAsync()
         {
+            _initializationLock.Dispose();
             var muxer = _muxer;
             if (muxer is null)
             {
@@ -329,18 +382,12 @@ namespace Orleans.Clustering.Redis
             _muxer = null!;
             _db = null!;
             _muxerIsShared = false;
+            IsInitialized = false;
 
             if (!muxerIsShared)
             {
                 await muxer.DisposeAsync().ConfigureAwait(false);
             }
-        }
-
-        private enum UpsertResult
-        {
-            Success = 1,
-            Failure = 2,
-            Conflict = 3,
         }
 
         private static string SerializeVersion(TableVersion tableVersion) => tableVersion.Version.ToString(CultureInfo.InvariantCulture);
@@ -355,9 +402,6 @@ namespace Orleans.Clustering.Redis
             var version = int.Parse(versionString);
             return new TableVersion(version, versionString);
         }
-
-        private static TableVersion Predeccessor(TableVersion tableVersion) => new TableVersion(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
-
 
         private string Serialize(MembershipEntry value)
         {

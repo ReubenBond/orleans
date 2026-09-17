@@ -12,10 +12,22 @@ namespace Orleans.TestingHost.InProcess;
 /// <summary>
 /// An in-memory implementation of <see cref="IMembershipTable"/> for testing purposes.
 /// </summary>
-internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTable, IGatewayListProvider
+internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListProvider
 {
-    private readonly Table _table = new();
-    private readonly string _clusterId = clusterId;
+    private readonly Table _table;
+    private readonly string _clusterId;
+
+    public InProcessMembershipTable(string clusterId) : this(clusterId, new Table())
+    {
+    }
+
+    private InProcessMembershipTable(string clusterId, Table table)
+    {
+        _clusterId = clusterId;
+        _table = table;
+    }
+
+    internal InProcessMembershipTable CreateClient() => new(_clusterId, _table);
 
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;
@@ -193,7 +205,13 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                     return false;
                 }
 
-                _table[entry.SiloAddress] = (entry.Copy(), _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                var updated = entry.Copy();
+                if (data.Entry.IAmAliveTime > updated.IAmAliveTime)
+                {
+                    updated.IAmAliveTime = data.Entry.IAmAliveTime;
+                }
+
+                _table[entry.SiloAddress] = (updated, _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
                 _tableVersion = new TableVersion(version.Version, NewETag());
                 return true;
             }
@@ -203,7 +221,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         {
             lock (_lock)
             {
-                if (!_table.TryGetValue(entry.SiloAddress, out var data))
+                if (!_table.TryGetValue(entry.SiloAddress, out var data) || data.Entry.IAmAliveTime >= entry.IAmAliveTime)
                 {
                     return;
                 }
@@ -217,15 +235,21 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         {
             lock (_lock)
             {
-                var entries = _table.Values.ToList();
-                foreach (var (entry, _) in entries)
+                var entries = _table.Values
+                    .Where(row => row.Entry.Status == SiloStatus.Dead && row.Entry.EffectiveUpdateTime < beforeDate)
+                    .Select(row => row.Entry.SiloAddress).ToList();
+                if (entries.Count == 0)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
-                    {
-                        _table.Remove(entry.SiloAddress, out _);
-                    }
+                    return;
                 }
+
+                var nextVersion = _tableVersion.Next();
+                foreach (var address in entries)
+                {
+                    _table.Remove(address);
+                }
+
+                _tableVersion = new TableVersion(nextVersion.Version, NewETag());
             }
         }
 

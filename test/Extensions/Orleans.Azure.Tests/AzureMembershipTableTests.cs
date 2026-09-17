@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
@@ -50,12 +51,18 @@ namespace Tester.AzureUtils
         /// and table names suitable for unit testing.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             TestUtils.CheckForAzureStorage();
             var options = new AzureStorageClusteringOptions();
             options.ConfigureTestDefaults();
-            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this._clusterOptions);
+            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), clusterOptions);
         }
+
+        // Azure Table Storage returns at most 1,000 entities per response page.
+        protected override int ConformanceConcurrencyRowCount => 1001;
 
         /// <summary>
         /// Creates an Azure-based gateway list provider for client connections.

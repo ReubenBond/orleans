@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.Redis;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Xunit;
 using UnitTests.MembershipTests;
@@ -34,17 +35,20 @@ namespace Tester.Redis.Clustering
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
+            membershipTable = (RedisMembershipTable)CreateMembershipTable(logger, _clusterOptions);
+            return membershipTable;
+        }
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
             TestUtils.CheckForRedis();
 
-            membershipTable = new RedisMembershipTable(
+            return new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions()
                 {
-                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
-                    EntryExpiry = TimeSpan.FromHours(1)
+                    ConfigurationOptions = ConfigurationOptions.Parse(connectionString)
                 }),
-                this._clusterOptions);
-
-            return membershipTable;
+                clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -96,7 +100,7 @@ namespace Tester.Redis.Clustering
         [Fact]
         public async Task UpdateRowInParallel()
         {
-            await MembershipTable_UpdateRowInParallel(false);
+            await MembershipTable_UpdateRowInParallel();
         }
 
         [Fact]
@@ -108,7 +112,7 @@ namespace Tester.Redis.Clustering
         [Fact]
         public async Task CleanupDefunctSiloEntries()
         {
-            await MembershipTable_CleanupDefunctSiloEntries(false);
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }
