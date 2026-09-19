@@ -146,7 +146,7 @@ namespace Orleans.Runtime.Membership
 
         /// <inheritdoc />
         /// <remarks>
-        /// Membership rows are read sequentially on an operation-owned connection.
+        /// Membership and heartbeat requests are pipelined on an operation-owned connection.
         /// Table and child-version checks fence the complete snapshot.
         /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
@@ -183,36 +183,36 @@ namespace Orleans.Runtime.Membership
                     addresses = [siloAddress];
                 }
 
-                var rows = new List<Tuple<MembershipEntry, string>>();
-                KeeperException.NoNodeException? missingRow = null;
-                // ZooKeeperNetEx can falsely reset connections while processing pipelined responses.
-                // Keep application row reads sequential on this operation-owned connection.
-                foreach (var address in addresses)
+                var pendingRows = Task.WhenAll(addresses.Select(address => GetRow(zk, address, siloAddress is not null, cancellationToken)));
+                Tuple<MembershipEntry, string>?[] rows;
+                try
                 {
-                    try
+                    rows = await pendingRows;
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    // Observe every parallel read: a removed row must not hide another request's failure.
+                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(exception => exception is not KeeperException.NoNodeException);
+                    if (failure is not null)
                     {
-                        if (await GetRow(zk, address, siloAddress is not null, cancellationToken) is { } row)
-                        {
-                            rows.Add(row);
-                        }
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
                     }
-                    catch (KeeperException.NoNodeException exception)
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var current = await zk.GetData("/");
+                    if (SameVersion(before, current.Stat))
                     {
-                        // A removed row must not hide another row's native failure.
-                        missingRow ??= exception;
+                        throw;
                     }
+
+                    continue;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var after = await zk.GetData("/");
                 if (SameVersion(before, after.Stat))
                 {
-                    if (missingRow is not null)
-                    {
-                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(missingRow).Throw();
-                    }
-
-                    return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
+                    return new MembershipTableData(rows.OfType<Tuple<MembershipEntry, string>>().ToList(), ConvertToTableVersion(after.Stat));
                 }
             }
         }
@@ -400,18 +400,38 @@ namespace Orleans.Runtime.Membership
             string rowPath = ConvertToRowPath(siloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
 
-            DataResult row;
+            var rowRead = zk.GetData(rowPath);
+            var heartbeatRead = cancellationToken.IsCancellationRequested
+                ? Task.FromCanceled<DataResult>(cancellationToken)
+                : zk.GetData(rowIAmAlivePath);
+            var pendingReads = Task.WhenAll(rowRead, heartbeatRead);
+            DataResult[] results;
             try
             {
-                row = await zk.GetData(rowPath);
+                results = await pendingReads;
             }
-            catch (KeeperException.NoNodeException) when (allowMissing)
+            catch (KeeperException.NoNodeException)
             {
-                return null;
+                // Join both requests before classifying an absent row or releasing its client.
+                var failure = pendingReads.Exception!.InnerExceptions.FirstOrDefault(exception => exception is not KeeperException.NoNodeException);
+                if (failure is not null)
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                }
+
+                if (rowRead.IsCanceled) await rowRead;
+                if (heartbeatRead.IsCanceled) await heartbeatRead;
+                if (allowMissing && rowRead.IsFaulted)
+                {
+                    return null;
+                }
+
+                throw;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            var heartbeat = await zk.GetData(rowIAmAlivePath);
+            var row = results[0];
+            var heartbeat = results[1];
             MembershipEntry me = Deserialize<MembershipEntry>(row.Data);
             me.IAmAliveTime = Deserialize<DateTime>(heartbeat.Data);
 

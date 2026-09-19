@@ -363,7 +363,10 @@ namespace UnitTests.MembershipTests
             Assert.Empty(result.Members);
             Assert.Equal(17, result.Version.Version);
             Assert.Equal("17", result.Version.VersionEtag);
-            Assert.Equal(["sync /", "read /", "read /127.0.0.1:11111@12345", "read /"], fake.Calls);
+            Assert.Equal(
+                ["sync /", "read /", "read /127.0.0.1:11111@12345",
+                    "read /127.0.0.1:11111@12345/IAmAlive", "read /"],
+                fake.Calls);
         }
 
         [Theory]
@@ -406,36 +409,38 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task ReadAll_CompletesEachRowBeforeRequestingTheNext()
+        public async Task ReadAll_DispatchesMemberAndHeartbeatPairsBeforeAwaitingResponses()
         {
             var (fake, first) = await CreateNativeTable();
             var second = CreateTimedEntry(12346);
             Assert.True(await Insert(fake, second, 1));
             fake.Calls.Clear();
-            var heartbeatStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var releaseHeartbeat = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var rowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseRow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             fake.BeforeRead = async path =>
             {
-                if (path == ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress))
+                if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
                 {
-                    heartbeatStarted.TrySetResult();
-                    await releaseHeartbeat.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    rowStarted.TrySetResult();
+                    await releaseRow.Task.WaitAsync(TestContext.Current.CancellationToken);
                 }
             };
 
             var read = Read(fake);
             try
             {
-                await heartbeatStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                await rowStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(
                     new[] { "sync /", "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress),
-                        "read " + ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress) },
+                        "read " + ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress),
+                        "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress),
+                        "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress) },
                     fake.Calls);
                 Assert.False(read.IsCompleted);
             }
             finally
             {
-                releaseHeartbeat.TrySetResult();
+                releaseRow.TrySetResult();
                 await read;
             }
 
@@ -448,6 +453,123 @@ namespace UnitTests.MembershipTests
                     "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress),
                     "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress), "read /" },
                 fake.Calls);
+        }
+
+        [Theory]
+        [InlineData("missing")]
+        [InlineData("authorization")]
+        [InlineData("cancellation")]
+        public async Task Read_MissingPointRow_AwaitsItsHeartbeatAndPreservesOtherFailures(string heartbeatOutcome)
+        {
+            var fake = new ZooKeeperNativeFake();
+            fake.Nodes["/"] = new([], 17);
+            var address = CreateSiloAddress();
+            var releaseHeartbeat = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var authorizationFailure = new KeeperException.NoAuthException();
+            using var nativeCancellation = new CancellationTokenSource();
+            nativeCancellation.Cancel();
+            fake.BeforeRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.HeartbeatPath(address))
+                {
+                    await releaseHeartbeat.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    if (heartbeatOutcome == "authorization")
+                    {
+                        throw authorizationFailure;
+                    }
+
+                    if (heartbeatOutcome == "cancellation")
+                    {
+                        await Task.FromCanceled(nativeCancellation.Token);
+                    }
+                }
+            };
+
+            var read = Read(fake, address);
+            var completion = Record.ExceptionAsync(() => read);
+            try
+            {
+                Assert.Contains("read " + ZooKeeperNativeFake.HeartbeatPath(address), fake.Calls);
+                Assert.False(read.IsCompleted);
+            }
+            finally
+            {
+                releaseHeartbeat.TrySetResult();
+                await completion;
+            }
+
+            var failure = await completion;
+            if (heartbeatOutcome == "authorization")
+            {
+                Assert.Same(authorizationFailure, failure);
+            }
+            else if (heartbeatOutcome == "cancellation")
+            {
+                Assert.Equal(nativeCancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(failure).CancellationToken);
+            }
+            else
+            {
+                Assert.Null(failure);
+                var result = await read;
+                Assert.Empty(result.Members);
+                Assert.Equal(17, result.Version.Version);
+                Assert.Equal("17", result.Version.VersionEtag);
+            }
+        }
+
+        [Fact]
+        public async Task Read_CanceledMember_IsNotHiddenByMissingHeartbeat()
+        {
+            var fake = new ZooKeeperNativeFake();
+            fake.Nodes["/"] = new([], 17);
+            var address = CreateSiloAddress();
+            using var nativeCancellation = new CancellationTokenSource();
+            nativeCancellation.Cancel();
+            fake.BeforeRead = path => path == ZooKeeperNativeFake.RowPath(address)
+                ? Task.FromCanceled(nativeCancellation.Token)
+                : Task.CompletedTask;
+
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Read(fake, address));
+
+            Assert.Equal(nativeCancellation.Token, failure.CancellationToken);
+            Assert.Equal(
+                new[] { "sync /", "read /", "read " + ZooKeeperNativeFake.RowPath(address),
+                    "read " + ZooKeeperNativeFake.HeartbeatPath(address) },
+                fake.Calls);
+        }
+
+        [Fact]
+        public async Task Read_CancellationBeforeHeartbeat_AwaitsTheStartedMemberRequest()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            using var cancellation = new CancellationTokenSource();
+            var releaseMember = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fake.BeforeRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(entry.SiloAddress))
+                {
+                    cancellation.Cancel();
+                    await releaseMember.Task.WaitAsync(TestContext.Current.CancellationToken);
+                }
+            };
+
+            var read = ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, entry.SiloAddress, cancellation.Token);
+            var completion = Record.ExceptionAsync(() => read);
+            try
+            {
+                Assert.False(read.IsCompleted);
+                Assert.Equal(
+                    new[] { "sync /", "read /", "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress) },
+                    fake.Calls);
+            }
+            finally
+            {
+                releaseMember.TrySetResult();
+                await completion;
+            }
+
+            Assert.Equal(cancellation.Token,
+                Assert.IsAssignableFrom<OperationCanceledException>(await completion).CancellationToken);
         }
 
         [Fact]
