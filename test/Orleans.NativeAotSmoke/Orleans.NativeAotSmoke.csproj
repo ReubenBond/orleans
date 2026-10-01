@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj"
+    <RuntimeHostConfigurationOption Include="Orleans.Serialization.UseGeneratedSerializerContexts" Value="true" Trim="true"
+                                    Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Factories'" />
                       Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'GrainReferences' or '$(NativeAotSmokeScenario)' == 'Silo'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj"
                       Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'Silo'" />
