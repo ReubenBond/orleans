@@ -59,6 +59,17 @@ internal static class SourceGeneratorOptionsParser
             result.HotReload = hotReload;
         }
 
+        if (globalOptions.TryGetValue("build_property.orleansvalidaterpcresponsefactories", out var validateResponses)
+            && bool.TryParse(validateResponses, out var validateResponseFactories))
+        {
+            result.ValidateRpcResponseFactories = validateResponseFactories;
+        }
+        else if (globalOptions.TryGetValue("build_property.publishaot", out var publishAot)
+            && bool.TryParse(publishAot, out var isAot))
+        {
+            result.ValidateRpcResponseFactories = isAot;
+        }
+
         return result;
     }
 
@@ -69,6 +80,7 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
     public GenerateFieldIds GenerateFieldIds { get; set; }
     public bool GenerateCompatibilityInvokers { get; set; }
     public bool AttachDebugger { get; set; }
+    public bool ValidateRpcResponseFactories { get; set; }
 
     /// <summary>
     /// Enables hot-reload-safe code generation.
@@ -79,6 +91,7 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
         => GenerateFieldIds == other.GenerateFieldIds
             && GenerateCompatibilityInvokers == other.GenerateCompatibilityInvokers
             && AttachDebugger == other.AttachDebugger
+            && ValidateRpcResponseFactories == other.ValidateRpcResponseFactories
             && HotReload == other.HotReload;
 
     public override readonly bool Equals(object obj) => obj is SourceGeneratorOptions other && Equals(other);
@@ -90,6 +103,7 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
             var hash = (int)GenerateFieldIds;
             hash = hash * 31 + (GenerateCompatibilityInvokers ? 1 : 0);
             hash = hash * 31 + (AttachDebugger ? 1 : 0);
+            hash = hash * 31 + (ValidateRpcResponseFactories ? 1 : 0);
             hash = hash * 31 + (HotReload switch { true => 1, false => 2, null => 0 });
             return hash;
         }
