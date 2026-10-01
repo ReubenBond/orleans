@@ -62,6 +62,14 @@ Field headers carry an ID and wire type, so readers can consume fields in a diff
 
 Reference tracking is scoped to a writer/reader session and preserves repeated references and cycles within one payload. Applications own identity and request deduplication across calls and retries. A deep copier uses a corresponding session so a copied graph has the same aliasing relationships as the serialized graph.
 
+### Serialization constructor initialization
+
+For <xref:System.Runtime.Serialization.ISerializable> reference types, deserialization allocates an uninitialized object and records it in the reader session before reading its fields. The serialization constructor initializes that same object, so references read from the payload resolve to the final instance, including cycles. `OnDeserializing` runs before constructor initialization; `OnDeserialized` and <xref:System.Runtime.Serialization.IDeserializationCallback.OnDeserialization*> run afterward.
+
+On runtimes with dynamic code support, Orleans caches emitted constructor delegates. Under NativeAOT, the base <xref:System.Exception> serialization constructor uses a statically bound accessor, including the fallback for exception subtypes which inherit the base serialization contract. Runtime-selected serialization constructors use reflection to initialize the existing object. Preserve public and non-public constructors on those types so native compilation retains the constructor metadata and implementation. Constructor failures propagate the original exception.
+
+Statically closed value-type constructor delegates update the caller's `ref` value, including mutations performed before a constructor throws. Runtime-created generic value-type serializers and attributed callback delegates have additional runtime code-generation requirements. Native constructor support is one boundary of serializer initialization; native application support also depends on type manifests, codec factories, and callback paths used by the application.
+
 ## RPC generation
 
 Grain-reference construction resolves the generated proxy from the registered type manifest and invokes its `(GrainReferenceShared, IdSpan)` constructor. The activator caches the constructor delegate and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. JIT runtimes use an emitted constructor delegate; NativeAOT uses a cached reflection constructor invoker. Generated `AddInterfaceProxy` registrations preserve the public proxy constructor during trimming.
