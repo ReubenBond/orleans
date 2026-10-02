@@ -387,8 +387,8 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
-            config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
+            config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404), typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
+            config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404), typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.Proxy_IMyGrain));
             config.AddInterface(typeof(global::IMyGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
