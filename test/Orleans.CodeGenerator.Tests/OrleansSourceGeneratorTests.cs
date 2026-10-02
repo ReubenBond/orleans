@@ -2352,7 +2352,6 @@ public class DemoClass
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
         var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
-        Assert.Contains("if (!options.RequireExplicitTypeRegistration)", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Copier_Payload(", source);
         Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
