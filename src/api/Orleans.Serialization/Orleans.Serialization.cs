@@ -3447,6 +3447,8 @@ namespace Orleans.Serialization.Configuration
 
         public void AddInterfaceProxy(System.Type type) { }
 
+        public void AddRawResponseReader<TResult>(System.Func<Serializers.ICodecProvider, Invocation.IRawResponseReader> factory) { }
+
         public void AddSerializationContract(System.Type type, System.Type contractType, SerializationType targetType, SerializationType? surrogateType = null) { }
 
         public void AddSerializer(System.Type type, System.Type targetType) { }
@@ -3603,10 +3605,28 @@ namespace Orleans.Serialization.Invocation
             where T : class, IInvokable, new() { }
     }
 
+    public partial interface IRawResponseReader
+    {
+        bool IsSupported { get; }
+
+        Response ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field);
+    }
+
+    public partial interface IRawResponseWriter
+    {
+        void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte>;
+    }
+
     public partial interface IResponseCompletionSource
     {
         void Complete();
         void Complete(Response value);
+    }
+
+    public partial interface IResponseInvokable
+    {
+        System.Threading.Tasks.ValueTask<Response> InvokeAndCopy(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier);
     }
 
     public partial interface ITargetHolder
@@ -3738,7 +3758,13 @@ namespace Orleans.Serialization.Invocation
     {
         public static Response<T> Get<T>() { throw null; }
 
+        public static TResponse GetGenerated<TResponse>()
+            where TResponse : Response, new() { throw null; }
+
         public static void Return<T>(Response<T> obj) { }
+
+        public static void ReturnGenerated<TResponse>(TResponse response)
+            where TResponse : Response, new() { }
     }
 
     [UseActivator]
@@ -3820,6 +3846,8 @@ namespace Orleans.Serialization.Serializers
         public Cloning.IDeepCopier? TryGetDeepCopier(System.Type fieldType) { throw null; }
 
         public Cloning.IDeepCopier<T>? TryGetDeepCopier<T>() { throw null; }
+
+        public bool TryGetRawResponseReader(System.Type resultType, out Invocation.IRawResponseReader? reader) { throw null; }
     }
 
     public sealed partial class ConcreteTypeSerializer<TField, TBaseCodec> : Codecs.IFieldCodec<TField>, Codecs.IFieldCodec where TField : class where TBaseCodec : IBaseCodec<TField>
