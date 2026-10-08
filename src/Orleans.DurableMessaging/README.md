@@ -148,6 +148,12 @@ current attempt and phase before applying repeated-send semantics. A caught or r
 scope violation retains its original cause and prevents a successful completion commit.
 An action-time failure ends the inbox operation and requests a fresh activation.
 
+Cancellation of a job attempt before handler staging leaves the committed inbox and
+owner available for another attempt on the same activation. Attempt retirement drains
+started preparations and releases their batches before completion. Once the action
+starts staging, failures retain terminal handling; an admitted journal write continues
+through its actual outcome independently of attempt cancellation.
+
 A `JournaledStatePostCommitException` reports failed hook work after storage
 acknowledgement. The inbox acknowledges the completed operation's immutable acceptance,
 ownership repair, or owner-clear facts before surfacing that exception. It remains
