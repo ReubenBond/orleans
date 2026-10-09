@@ -1,7 +1,7 @@
 # Microsoft Orleans Durable Messaging
 
 This intermediate project supplies durable command identities, subjects, envelopes, handler contracts,
-and journaled inbox processing.
+and journaled inbox and outbox processing.
 
 `DurableEnvelope` carries an application-supplied `HierarchicalKey MessageId`, `SenderId`, `ReceiverId`,
 ordinal `Subject`, and a non-null, garbage-collected `byte[] Payload`. Struct assignment shares the array;
@@ -50,3 +50,32 @@ persistence and are reported after acknowledgement.
 Reusable non-interleaving timer turns carry immutable owner and operation snapshots. Stop closes
 admission and drains actual operations before full deletion or scope disposal. Actual storage failures
 retain their first cause; a fresh activation restores the persisted outcome.
+
+The outbox uses six owner-bound standard durable collections and the existing sequence state.
+The final journal capture hook confirms the provider-returned physical wakeup before capture;
+the sequence state associates each message cohort with that exact generation and job handle.
+Storage acknowledgement releases only the captured cohort for delivery. Messages staged during
+storage await remain pending for a later write. Healthy ownership is reused across bursts and
+retires at the configured idle deadline.
+
+Outgoing delivery candidates keep ordinary envelope references through RPC or loopback delivery
+and the journaled accounting write. Payload lifetime follows GC reachability; ordinary RPC
+serialization and deep copying isolate the receiver's bytes. Remote batches keep their durable-attempt
+token across timer turns; shutdown drains actual delivery and write outcomes before disposing that token source.
+
+Specialized test-only composition exercises this outbox with actual Journaling and DurableJobs.
+Ordinary receiver fixtures retain their isolated journaled collaborator. Public hosting, provider
+cutover examples, package publishing, documentation-site integration and samples belong to the
+final consumer layer. This intermediate project remains non-packable.
+
+Outgoing state uses the exact application-supplied `HierarchicalKey` as its message identity,
+attempt key, and dead-letter key. A retry reconstructs the same command key. New workflow steps
+and fan-out recipients use distinct deterministic child keys, with fixed-depth identities built
+from stable application facts.
+
+Each pending key denotes one immutable intent: sender, destination, ordinal subject, and opaque
+body bytes remain stable after publication. Equivalent repeated staging compares the durable
+intent and preserves its original payload array. A conflicting destination, subject, or body fails
+before replacement, capture, or scheduling.
+After removal, the same command can be staged again; receiver completion supplies deduplication
+within its configured retention horizon.
