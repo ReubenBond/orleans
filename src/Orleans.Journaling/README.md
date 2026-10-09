@@ -15,17 +15,12 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `VolatileJournalStorageOptions.MaxAppendsBeforeSnapshot` (default 100) and
 `MaxBytesBeforeSnapshot` (default 1,048,576 bytes). The named-provider overload
 configures each provider independently. Both values must be positive.
-Providers capture the configured limits when constructed.
 
 Reaching either threshold requests a snapshot before the next journal write.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies
 over more updates; smaller limits reduce retained history and replay work.
-Counters belong to each journal and are shared by handles for the same journal
-within one provider.
-Retained memory includes the latest snapshot, appended encoded bytes up to and
-including the crossing append, and provider bookkeeping.
 
 ## Persistence hooks
 
@@ -131,7 +126,7 @@ Recovery reads the selected provider's physical namespace using the existing
 journal identity. Changing the selection for a grain type with existing journals
 requires a deliberate data migration or cutover strategy, including rollback.
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. Nonempty journals require stored format metadata; recovery fails explicitly when the format key is absent. New empty journals use the configured write format.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -351,7 +346,7 @@ Each record contains the state id as element 0 and the durable operation payload
 
 Inside the operation payload array, element 0 is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
+Existing data is read using its required stored format metadata and migrated to the configured write format by the next snapshot write.
 
 ## Catalog enumeration
 
