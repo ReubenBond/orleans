@@ -22,16 +22,19 @@ internal abstract partial class GrainTimer : IGrainTimer
     private readonly bool _interleave;
     private readonly bool _keepAlive;
     private readonly TimerTickInvoker _invoker;
-    private bool _changed;
-    private bool _firing;
-    private bool _queued;
-    private bool _pendingTick;
-    private bool _scheduled;
-    private bool _disposed;
+    private TimerState _state;
     private long _scheduledAt;
-    private TimeSpan _scheduledDueTime;
+    // The current arm until admission, then the next delay. Change replaces it in either phase.
     private TimeSpan _dueTime;
     private TimeSpan _period;
+
+    private enum TimerState : byte
+    {
+        Idle,
+        Queued,
+        Running,
+        Disposed
+    }
 
     public GrainTimer(TimerRegistry shared, IGrainContext grainContext, bool interleave, bool keepAlive)
     {
@@ -49,16 +52,13 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     protected IGrainContext GrainContext => _grainContext;
 
-    // Called with _cts locked. There is at most one queued invocation and one active callback.
-    private bool ChangeTimer(TimeSpan dueTime)
+    // Called with _cts locked, after Change or callback completion.
+    private bool ScheduleNextTick()
     {
-        _pendingTick = dueTime == TimeSpan.Zero;
-        _scheduled = dueTime != TimeSpan.Zero && dueTime != Timeout.InfiniteTimeSpan;
-        if (_scheduled)
+        Debug.Assert(_state is TimerState.Idle or TimerState.Queued);
+        if (_dueTime != TimeSpan.Zero && _dueTime != Timeout.InfiniteTimeSpan)
         {
             _scheduledAt = _shared.TimeProvider.GetTimestamp();
-            // Match the millisecond resolution used by System.Threading.Timer.
-            _scheduledDueTime = TimeSpan.FromMilliseconds((long)dueTime.TotalMilliseconds);
             if (_timer is null)
             {
                 using (new ExecutionContextSuppressor())
@@ -67,15 +67,15 @@ internal abstract partial class GrainTimer : IGrainTimer
                 }
             }
 
-            _timer.Change(dueTime, Timeout.InfiniteTimeSpan);
+            _timer.Change(_dueTime, Timeout.InfiniteTimeSpan);
         }
         else
         {
             // Disarm an existing delayed timer, but never create one for an immediate or infinite arm.
             _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            if (_pendingTick && !_queued)
+            if (_dueTime == TimeSpan.Zero && _state == TimerState.Idle)
             {
-                _queued = true;
+                _state = TimerState.Queued;
                 return true;
             }
         }
@@ -103,31 +103,31 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             // A callback from a previous physical arm can arrive after Change or Dispose. Only the
             // current elapsed deadline is eligible, and changing to zero/infinite invalidates it.
-            if (!_scheduled)
+            if (_state is TimerState.Running or TimerState.Disposed
+                || _dueTime == TimeSpan.Zero || _dueTime == Timeout.InfiniteTimeSpan)
             {
                 return;
             }
 
-            // An armed physical deadline belongs to a live timer awaiting callback admission.
-            Debug.Assert(!_disposed && !_firing && _timer is not null);
-            var elapsed = _shared.TimeProvider.GetElapsedTime(_scheduledAt);
-            if (elapsed < _scheduledDueTime)
+            Debug.Assert(_timer is not null);
+            // Match System.Threading.Timer's millisecond resolution.
+            var remaining = TimeSpan.FromMilliseconds((long)_dueTime.TotalMilliseconds)
+                - _shared.TimeProvider.GetElapsedTime(_scheduledAt);
+            if (remaining > TimeSpan.Zero)
             {
                 // Physical timers can fire before this higher-resolution deadline. Preserve the
                 // one-shot arm, rounding up so a sub-millisecond remainder stays asynchronous.
-                var remaining = _scheduledDueTime - elapsed;
                 _timer!.Change(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), Timeout.InfiniteTimeSpan);
                 return;
             }
 
-            _scheduled = false;
-            _pendingTick = true;
-            if (_queued)
+            _dueTime = TimeSpan.Zero;
+            if (_state == TimerState.Queued)
             {
                 return;
             }
 
-            _queued = true;
+            _state = TimerState.Queued;
         }
 
         QueueTickOnActivation();
@@ -161,8 +161,14 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             lock (_cts)
             {
-                _queued = false;
-                _pendingTick = false;
+                if (_state != TimerState.Disposed)
+                {
+                    _state = TimerState.Idle;
+                    if (_dueTime == TimeSpan.Zero)
+                    {
+                        _dueTime = Timeout.InfiniteTimeSpan;
+                    }
+                }
             }
 
             try
@@ -182,17 +188,19 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            _queued = false;
-            if (!_pendingTick)
+            Debug.Assert(_state is TimerState.Queued or TimerState.Disposed);
+            if (_state == TimerState.Disposed || _dueTime != TimeSpan.Zero)
             {
-                // A changed schedule or disposal invalidated this tick. Drain the activation
-                // message while preserving the replacement schedule and callback diagnostics.
+                // Drain a disposed or invalidated message, preserving disposal and the new schedule.
+                if (_state == TimerState.Queued)
+                {
+                    _state = TimerState.Idle;
+                }
                 return new(Response.Completed);
             }
 
-            _pendingTick = false;
-            _firing = true;
-            _changed = false;
+            _state = TimerState.Running;
+            _dueTime = _period;
         }
 
         try
@@ -231,15 +239,14 @@ internal abstract partial class GrainTimer : IGrainTimer
         bool queueTick;
         lock (_cts)
         {
-            // Release the active callback before admitting another immediate tick. A Change while
-            // the callback was running is coalesced, with the last change winning.
-            _firing = false;
-            if (_disposed)
+            if (_state == TimerState.Disposed)
             {
                 return;
             }
 
-            queueTick = ChangeTimer(_changed ? _dueTime : _period);
+            Debug.Assert(_state == TimerState.Running);
+            _state = TimerState.Idle;
+            queueTick = ScheduleNextTick();
         }
 
         if (queueTick)
@@ -285,20 +292,19 @@ internal abstract partial class GrainTimer : IGrainTimer
         var queueTick = false;
         lock (_cts)
         {
-            if (_disposed)
+            if (_state == TimerState.Disposed)
             {
                 return;
             }
 
-            _changed = true;
             _dueTime = dueTime;
             _period = period;
 
             // Changes during an active callback take effect after completion. A queued message can
             // instead be coalesced or invalidated now, without admitting a second invocation.
-            if (!_firing)
+            if (_state != TimerState.Running)
             {
-                queueTick = ChangeTimer(dueTime);
+                queueTick = ScheduleNextTick();
             }
         }
 
@@ -327,16 +333,13 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            if (_disposed)
+            if (_state == TimerState.Disposed)
             {
                 return;
             }
 
             // Publish disposal before cancellation, whose registrations can reenter Change/Dispose.
-            _disposed = true;
-            _scheduled = false;
-            // Admission shares this lock, so queued ticks drain even while cancellation is pending.
-            _pendingTick = false;
+            _state = TimerState.Disposed;
             _timer?.Dispose();
             _timer = null;
         }
