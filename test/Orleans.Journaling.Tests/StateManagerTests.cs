@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 using Orleans.Storage;
+using NSubstitute;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -28,8 +28,6 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public partial class StateManagerTests : JournalingTestBase
 {
-    private static readonly IJournalMetadata BinaryMetadata = new JournalMetadata(OrleansBinaryJournalFormat.JournalFormatKey);
-
     /// <summary>
     /// Tests the registration and basic operation of multiple states.
     /// Verifies that different types of durable collections can be registered
@@ -74,50 +72,13 @@ public partial class StateManagerTests : JournalingTestBase
         Assert.True(storage.StreamingReadCalled);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task StateManager_Recovery_UsesConfiguredFormatWithoutStoredMetadata(bool hasMetadata)
-    {
-        var bytes = CreatePersistedStringValueBytes("value", "recovered");
-        var storage = new RawReadStorage(bytes, hasMetadata ? JournalMetadata.Empty : null, omitFormatMetadata: true);
-        await using var manager = CreateTestSystem(storage).Manager;
-        var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
-        var value = new DurableValue<string>("value", manager, codec);
-
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal("recovered", value.Value);
-        Assert.Equal(new[] { "recovered" }, codec.AppliedValues);
-        Assert.Equal(bytes, storage.Bytes);
-        Assert.Equal(0, storage.WriteCount);
-    }
-
-    [Fact]
-    public async Task StateManager_EmptyJournalWithoutMetadataUsesConfiguredFormat()
-    {
-        var storage = new RawReadStorage([], omitFormatMetadata: true);
-        var format = new TrackingJournalFormat(SessionPool);
-        await using var manager = CreateTestSystem(storage, journalFormat: format).Manager;
-        var value = new DurableValue<string>("value", manager, CreateValueCodec<string>());
-
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        value.Value = "written";
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(0, format.ReadCount);
-        Assert.NotEmpty(format.Writers);
-        Assert.Equal(1, storage.WriteCount);
-        Assert.Equal("written", ReplayValueCommands(storage.Bytes).Value);
-    }
-
     [Fact]
     public async Task StateManager_Initialize_ThrowsWhenCompletedReadLeavesData()
     {
-        var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
+        var storage = new VolatileJournalStorage();
         using (var data = CreateBuffer([1, 2, 3]))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage, journalFormat: new NonConsumingJournalFormat());
@@ -180,7 +141,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
-        var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
+        var storage = new VolatileJournalStorage();
         using var segment = new OrleansBinaryJournalBufferWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
@@ -190,7 +151,7 @@ public partial class StateManagerTests : JournalingTestBase
 
         using var data = segment.GetBuffer();
         var originalBytes = data.ToArray();
-        await storage.AppendAsync(data, CancellationToken.None);
+        await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
@@ -209,7 +170,7 @@ public partial class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage { IsCompactionRequested = true };
         using (var data = CreateBuffer(physicalBytes))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
         var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload, SessionPool);
@@ -295,7 +256,7 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_BinaryAppend_StoresFixedWidthBinaryEntries()
+    public async Task StateManager_BinaryAppend_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -341,7 +302,7 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_BinarySnapshot_StoresFixedWidthBinaryEntries()
+    public async Task StateManager_BinarySnapshot_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -979,7 +940,7 @@ public partial class StateManagerTests : JournalingTestBase
             AppendDirectorySet(segment, "existing", recoveredStreamId);
             CreateValueCodec<int>().WriteSet(42, segment.CreateJournalStreamWriter(recoveredStreamId));
             using var committed = segment.GetBuffer();
-            await storage.AppendAsync(committed, CancellationToken.None);
+            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage);
@@ -1010,7 +971,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
 
             using var committed = segment.GetBuffer();
-            await storage.AppendAsync(committed, CancellationToken.None);
+            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage);
@@ -1647,9 +1608,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -1701,6 +1662,7 @@ public partial class StateManagerTests : JournalingTestBase
             value >>= 7;
             result++;
         }
+
         return result;
     }
 
@@ -2000,9 +1962,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _appendCount) == 1)
@@ -2033,9 +1995,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public async ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
@@ -2165,7 +2127,7 @@ public partial class StateManagerTests : JournalingTestBase
                         ReadConsumeCount++;
                     }
 
-                    consumer.Read(concatenated, metadata: BinaryMetadata, complete: true);
+                    consumer.Read(concatenated, metadata: null, complete: true);
                 }
                 else
                 {
@@ -2175,7 +2137,7 @@ public partial class StateManagerTests : JournalingTestBase
                 return;
             }
 
-            consumer.Read(GetSegments(), metadata: BinaryMetadata, complete: true);
+            consumer.Read(GetSegments(), metadata: null, complete: true);
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
             {
@@ -2192,7 +2154,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Exception? exceptionToThrow;
@@ -2239,7 +2201,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _activeAppends);
@@ -2314,44 +2276,21 @@ public partial class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class RawReadStorage(byte[] bytes, IJournalMetadata? metadata = null, bool omitFormatMetadata = false) : IJournalStorage
+    private sealed class RawReadStorage(byte[] bytes) : IJournalStorage
     {
-        public byte[] Bytes { get; private set; } = bytes.ToArray();
-
-        public int WriteCount { get; private set; }
-
         public bool IsCompactionRequested => false;
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            if (omitFormatMetadata)
-            {
-                using var buffer = new ArcBufferWriter();
-                buffer.Write(Bytes);
-                consumer.Read(new JournalBufferReader(buffer.Reader, isCompleted: true), metadata);
-            }
-            else
-            {
-                consumer.Read(Bytes, metadata: BinaryMetadata, complete: true);
-            }
+            consumer.Read(bytes, metadata: null, complete: true);
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
-        {
-            WriteCount++;
-            Bytes = value.ToArray();
-            return default;
-        }
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
-        {
-            WriteCount++;
-            Bytes = [.. Bytes, .. value.ToArray()];
-            return default;
-        }
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2447,10 +2386,10 @@ public partial class StateManagerTests : JournalingTestBase
                 }
             }
 
-            consumer.Read(snapshot, metadata: BinaryMetadata, complete: true);
+            consumer.Read(snapshot, metadata: null, complete: true);
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
@@ -2464,7 +2403,7 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var appendBytes = value.ToArray();
@@ -2495,9 +2434,9 @@ public partial class StateManagerTests : JournalingTestBase
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
             => ValueTask.FromException(Exception);
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2512,7 +2451,7 @@ public partial class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
-            consumer.Read(GetChunks(), metadata: BinaryMetadata, complete: true);
+            consumer.Read(GetChunks(), metadata: null, complete: true);
             return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetChunks()
@@ -2527,9 +2466,9 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2548,14 +2487,14 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();
             ReplaceBytesAfterYield = value.ToArray();
         }
 
-        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();

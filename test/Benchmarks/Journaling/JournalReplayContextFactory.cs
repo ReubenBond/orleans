@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling;
-using Orleans.Serialization.Buffers;
 
 namespace Benchmarks.Journaling;
 
@@ -59,9 +58,9 @@ internal static class JournalReplayContextFactory
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) => default;
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }

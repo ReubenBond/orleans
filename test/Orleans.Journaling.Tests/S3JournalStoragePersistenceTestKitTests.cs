@@ -1,12 +1,12 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Text;
-using Amazon.Runtime;
-using Amazon.S3.Model;
-using Amazon.S3;
+using System.Text.Json;
 using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Docker.DotNet;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
@@ -353,7 +353,7 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(
                 new JournalStorageEnvelope<T> { RecordExists = true, State = grainState.State });
-            await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
             var metadata = await storage.GetMetadataAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The S3 journal storage record was not visible after a successful write.");
             grainState.ETag = metadata.ETag;
@@ -395,7 +395,7 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(
                 new JournalStorageEnvelope<T> { RecordExists = false, State = CreateDefaultState<T>() });
-            await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
             var metadata = await storage.GetMetadataAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The S3 journal storage tombstone was not visible after a successful clear.");
             grainState.State = CreateDefaultState<T>();
