@@ -63,7 +63,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         await fixture.RunRegisteredTimerAtAsync(0);
-        { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope(fixture.NextMessageId()));
         await fixture.CommitAsync();
         Assert.Same(fixture.ArmState(0), fixture.ArmState(1));
         Assert.Equal(["LocalPumpTimerState"], fixture.TimerRegistrationNames);
@@ -226,7 +226,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             (await fixture.ExecuteJobAsync(job, "first", TestContext.Current.CancellationToken)).RescheduleTime);
         Assert.Same(job, fixture.Job.Value);
         clock.Advance(TimeSpan.FromMilliseconds(99));
-        { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope(fixture.NextMessageId()));
         await fixture.CommitAsync();
         await fixture.RunRegisteredTimerAtAsync(1);
         Assert.Equal(2, fixture.DeliveryCount);
@@ -276,7 +276,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
-        { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope(fixture.NextMessageId()));
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
         Assert.Equal(2, fixture.ProxyAcquisitionCount);
@@ -1475,7 +1475,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture();
 
-        { var newEnvelope = fixture.CreateEquivalentEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
         await fixture.CommitAsync();
 
         Assert.Equal(1, fixture.Manager.WriteCompletedCount);
@@ -1490,7 +1490,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         using var fixture = new OutboxFixture(hasDurableMessage: false);
 
         await fixture.SendAsync(fixture.Envelope);
-        { var newEnvelope = fixture.CreateEquivalentEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
 
         Assert.Equal(1, fixture.Outbox.Count);
         Assert.Single(fixture.Messages);
@@ -1872,7 +1872,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var jobs = new RecordingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs, durableJobId: "owner:1");
         var handle = fixture.Job.Value;
-        { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope(fixture.NextMessageId()));
         await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
         Assert.Same(handle, fixture.Job.Value);
@@ -1960,7 +1960,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             Assert.Equal(2, fixture.GetOutboxDepth());
             Assert.Equal(2, fixture.PendingMessageCount);
             Assert.Equal(2, fixture.Messages.Count);
-            { var newEnvelope = fixture.CreateEquivalentEnvelope(); await fixture.SendAsync(newEnvelope); }
+            await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
             await Assert.ThrowsAsync<InvalidOperationException>(() => { var newEnvelope = fixture.CreateConflictingEnvelope(); return fixture.SendAsync(newEnvelope); });
             await fixture.SendAsync(afterCapture);
             Assert.Equal(3, fixture.Outbox.Count);
