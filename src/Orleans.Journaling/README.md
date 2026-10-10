@@ -242,13 +242,6 @@ for captured-buffer ownership, cancellation, shutdown, and storage lifetime cont
 
 ## Custom state and standalone ownership
 
-Register `IDurableDictionaryValueLifecycle<TValue>` for dictionary values with explicitly owned
-resources. Live mutations acquire independent owners before encoding; replay transfers decoded
-owners. Reads borrow the stored value. Replacement, removal, clear, reset, journal deletion, and
-dictionary disposal release stored owners. The activation scope disposes DI-created dictionaries;
-callers arrange disposal of manually constructed components. Lifecycle implementations retain
-atomically and release synchronously without throwing.
-
 Register a grain-facing state component contract and its implementation with
 `services.AddStateMachine<TState, TImplementation>()` on `IServiceCollection`. Both type arguments
 are reference types, and the implementation implements both `TState` and `IStateMachine`.
