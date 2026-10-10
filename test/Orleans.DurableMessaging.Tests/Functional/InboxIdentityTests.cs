@@ -4,7 +4,6 @@ using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;
@@ -17,27 +16,24 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
 {
-    private static readonly FieldInfo References = typeof(ArcBufferPage)
-        .GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
     [Fact]
     public async Task PendingCommand_NewSenderCoalescesAndPreservesOriginalEnvelope()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var key = HierarchicalKey.Create("tenant", "orders", "1042", "reserve");
-        using var original = Create(rig, key, "inventory.reserve.v1", "original");
-        using var repeated = original with
+        var original = Create(rig, key, "inventory.reserve.v1", "original");
+        var repeated = original with
         {
             SenderId = GrainId.Create("forwarder", "second"),
-            Payload = original.Payload.Slice(0)
+            Payload = original.Payload
         };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await WaitAsync(handler.Entered.Task);
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
-        ArcBufferPage storedPage = null!;
-        await OnTurnAsync(rig.Context, () => storedPage = Assert.IsType<ArcBufferPage>(Assert.Single(rig.Pending).Value.Payload.First));
+        byte[] storedPayload = null!;
+        await OnTurnAsync(rig.Context, () => storedPayload = Assert.Single(rig.Pending).Value.Payload);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, repeated)).Status);
         await OnTurnAsync(rig.Context, () =>
         {
@@ -45,7 +41,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             Assert.True(inbox.TryGetMessage(key, out var stored));
             Assert.Equal(original.SenderId, stored.SenderId);
             Assert.Equal(original.Subject, stored.Subject);
-            Assert.Same(storedPage, stored.Payload.First);
+            Assert.Same(storedPayload, stored.Payload);
             Assert.Equal(original.Payload.ToArray(), stored.Payload.ToArray());
             Assert.Single(rig.Pending);
             Assert.Empty(rig.Processed);
@@ -68,29 +64,28 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var key = HierarchicalKey.Create("tenant", "orders", "1043", "reserve");
-        using var original = Create(rig, key, "inventory.reserve.v1", "original");
+        var original = Create(rig, key, "inventory.reserve.v1", "original");
         var conflictingSubject = difference switch
         {
             "subject" => "inventory.release.v1",
             "subject-case" => "Inventory.reserve.v1",
             _ => original.Subject
         };
-        using var replacement = Create(rig, key, conflictingSubject, "different-parameters",
+        var replacement = Create(rig, key, conflictingSubject, "different-parameters",
             GrainId.Create("forwarder", "other"));
-        using var conflict = difference == "body" ? replacement.Retain() : original with
+        var conflict = difference == "body" ? replacement : original with
         {
             SenderId = replacement.SenderId,
             Subject = conflictingSubject,
-            Payload = original.Payload.Slice(0)
+            Payload = original.Payload
         };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await WaitAsync(handler.Entered.Task);
         var writes = Writes(rig);
         var job = rig.Grain.GetSnapshotForTest().InboxJob;
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
-        var pins = Pins(conflict.Payload.First);
-        ArcBufferPage storedPage = null!;
-        await OnTurnAsync(rig.Context, () => storedPage = Assert.IsType<ArcBufferPage>(Assert.Single(rig.Pending).Value.Payload.First));
+        byte[] storedPayload = null!;
+        await OnTurnAsync(rig.Context, () => storedPayload = Assert.Single(rig.Pending).Value.Payload);
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(rig, conflict));
         Assert.Contains(key.ToString(), failure.Message, StringComparison.Ordinal);
         Assert.Contains("different command", failure.Message, StringComparison.Ordinal);
@@ -98,7 +93,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         {
             Assert.Equal(original.SenderId, Assert.Single(rig.Pending).Value.SenderId);
             Assert.Equal(original.Subject, Assert.Single(rig.Pending).Value.Subject);
-            Assert.Same(storedPage, Assert.Single(rig.Pending).Value.Payload.First);
+            Assert.Same(storedPayload, Assert.Single(rig.Pending).Value.Payload);
             Assert.Equal(original.Payload.ToArray(), Assert.Single(rig.Pending).Value.Payload.ToArray());
             Assert.Empty(rig.Processed);
             Assert.Empty(rig.Grain.GetSnapshotForTest().Effects);
@@ -106,10 +101,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         });
         Assert.Equal(writes, Writes(rig));
-        Assert.Equal(pins, Pins(conflict.Payload.First));
         Assert.Equal(scheduled, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
-        using var retainedConflict = conflict.Retain();
-        Assert.Equal(conflict.Payload.ToArray(), retainedConflict.Payload.ToArray());
         await OnTurnAsync(rig.Context, async () =>
         {
             rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy";
@@ -131,8 +123,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var key = HierarchicalKey.Create("tenant", "orders", "1044", "reserve");
-        using var original = Create(rig, key, "inventory.reserve.v1", "original");
-        using var repeated = Create(rig, key, "completely.changed.subject.v2", "different-body",
+        var original = Create(rig, key, "inventory.reserve.v1", "original");
+        var repeated = Create(rig, key, "completely.changed.subject.v2", "different-body",
             GrainId.Create("forwarder", "new-owner"));
         handler.Release.TrySetResult();
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
@@ -167,7 +159,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var keys = new[] { parent, parent.CreateChildKey("reserve"), parent.CreateChildKey("release") };
         for (var index = 0; index < keys.Length; index++)
         {
-            using var command = Create(rig, keys[index], "inventory.command.v1", $"command-{index}");
+            var command = Create(rig, keys[index], "inventory.command.v1", $"command-{index}");
             Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, command)).Status);
             await Fixture.WaitForEffectCountAsync(rig.Receiver, index + 1);
             Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, command)).Status);
@@ -190,8 +182,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         firstHandler.Release.TrySetResult();
         secondHandler.Release.TrySetResult();
         var key = HierarchicalKey.Create("tenant", "orders", "1049", "reserve");
-        using var one = Create(first, key, "inventory.reserve.v1", "first-receiver");
-        using var two = Create(second, key, "inventory.reserve.v1", "second-receiver");
+        var one = Create(first, key, "inventory.reserve.v1", "first-receiver");
+        var two = Create(second, key, "inventory.reserve.v1", "second-receiver");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(first.Receiver, one)).Status);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(second.Receiver, two)).Status);
         var firstOutcome = await Fixture.WaitForEffectCountAsync(first.Receiver, 1);
@@ -213,7 +205,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         using var handler = rig.Handler;
         using var timers = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var key = HierarchicalKey.Create("tenant", "orders", "1046", "reserve");
-        using var original = Create(rig, key, "inventory.reserve.v1", "original");
+        var original = Create(rig, key, "inventory.reserve.v1", "original");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await WaitAsync(handler.Entered.Task);
         var timer = Assert.Single(timers.Events.Select(static item => item.Payload).OfType<GrainTimerEvents.Created>(),
@@ -240,12 +232,12 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         await WaitAsync(recoveredHandler.Entered.Task);
         var recovered = CreateRig(rig.Receiver, recoveredContext, recoveredHandler);
         Assert.NotSame(rig.Context, recovered.Context);
-        using var repeated = original with
+        var repeated = original with
         {
             SenderId = GrainId.Create("forwarder", "after-replay"),
-            Payload = original.Payload.Slice(0)
+            Payload = original.Payload
         };
-        using var conflict = Create(recovered, key, "inventory.reserve.v1", "changed",
+        var conflict = Create(recovered, key, "inventory.reserve.v1", "changed",
             GrainId.Create("forwarder", "after-replay"));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(recovered, repeated)).Status);
         await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(recovered, conflict));
@@ -265,8 +257,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var receiver = NewGrain();
         var key = HierarchicalKey.Create("tenant", "orders", "1048", "invalid-command");
         var body = new DurableTestMessage(key, 611, "poison", ThrowDuringPreparation: true);
-        using var original = CreateEnvelope(receiver, body);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original.Value)).Status);
+        var original = CreateEnvelope(receiver, body);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
         var deadLetter = Assert.Single((await Fixture.WaitForDeadLetterCountAsync(receiver, 1)).InboxDeadLetters);
         Assert.Equal(key, deadLetter.MessageId);
         var old = Fixture.GetGrainContext(receiver);
@@ -274,11 +266,11 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         await WaitAsync(old.Deactivated);
         var recovered = await receiver.GetSnapshotAsync();
         Assert.Equal(key, Assert.Single(recovered.InboxDeadLetters).MessageId);
-        using var duplicate = original.Value with
+        var duplicate = original with
         {
             SenderId = GrainId.Create("forwarder", "deadletter"),
             Subject = "another.subject.v1",
-            Payload = original.Value.Payload.Slice(0)
+            Payload = original.Payload
         };
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, duplicate)).Status);
         Assert.True(await receiver.RemoveInboxDeadLetterAsync(key));
@@ -293,19 +285,19 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public async Task MissingSubject_RejectsBeforeSchedulingOrRetainingPayload(string? subject)
+    public async Task MissingSubject_RejectsBeforeSchedulingOrStaging(string? subject)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var key = HierarchicalKey.Create("tenant", "invalid-subject", "command");
-        using var envelope = Create(rig, key, "valid.subject.v1", "missing-subject");
+        var envelope = Create(rig, key, "valid.subject.v1", "missing-subject");
         var invalid = envelope with { Subject = subject! };
         var writes = Writes(rig);
-        var pins = Pins(envelope.Payload.First);
-        await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, invalid));
+
+await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, invalid));
         Assert.Equal(writes, Writes(rig));
-        Assert.Equal(pins, Pins(envelope.Payload.First));
-        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
+
+Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
         Assert.Empty(rig.Pending);
         Assert.Empty(rig.Processed);
         Assert.False(handler.Entered.Task.IsCompleted);
@@ -318,7 +310,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
     [InlineData("key-depth")]
     [InlineData("subject-bytes")]
     [InlineData("subject-utf8")]
-    public async Task OversizedMetadata_RejectsBeforeSchedulingPersistenceOrPayloadRetention(string field)
+    public async Task OversizedMetadata_RejectsBeforeSchedulingOrPersistence(string field)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
@@ -335,19 +327,19 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             "subject-utf8" => new string('\u00e9', 129),
             _ => "inventory.reserve.v1"
         };
-        using var envelope = Create(rig, key, subject, "oversized");
+        var envelope = Create(rig, key, subject, "oversized");
         var writes = Writes(rig);
         var bytes = envelope.Payload.ToArray();
-        var pins = Pins(envelope.Payload.First);
-        await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, envelope));
+
+await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, envelope));
         Assert.Equal(writes, Writes(rig));
         Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
         Assert.Empty(rig.Pending);
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Grain.GetSnapshotForTest().Effects);
         Assert.Equal(bytes, envelope.Payload.ToArray());
-        Assert.Equal(pins, Pins(envelope.Payload.First));
-        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+
+Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         Assert.False(handler.Entered.Task.IsCompleted);
     }
 
@@ -377,7 +369,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             "subject-space" => " ",
             _ => "inventory.reserve.v1"
         };
-        using var envelope = Create(rig, key, subject, "maximum");
+        var envelope = Create(rig, key, subject, "maximum");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, envelope)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
@@ -392,8 +384,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         using var handler = rig.Handler;
         handler.Release.TrySetResult();
         var key = HierarchicalKey.Create("tenant", "orders", "1047", "reserve");
-        using var original = Create(rig, key, "inventory.reserve.v1", "original");
-        using var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
+        var original = Create(rig, key, "inventory.reserve.v1", "original");
+        var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
             GrainId.Create("forwarder", "new"));
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
@@ -431,9 +423,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             subject, new DurableTestMessage(key, 610, value), key);
 
     private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(rig.Context.GrainId));
-    private static int Pins(ArcBufferPage? page) => (int)References.GetValue(Assert.IsType<ArcBufferPage>(page))!;
 
-    private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
+private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
     {
         var started = new TaskCompletionSource<Task<DeliveryResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Context.Scheduler.QueueAction(() =>

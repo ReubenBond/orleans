@@ -27,8 +27,8 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("capacity-test-sender", Guid.NewGuid().ToString("N"));
-        using var poison = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 31, "poison", ThrowDuringPreparation: true));
-        using var rejected = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 32, "accepted-after-capacity"));
+        var poison = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 31, "poison", ThrowDuringPreparation: true));
+        var rejected = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 32, "accepted-after-capacity"));
         const string processedInstrument = "orleans-durable-messaging-inbox-messages-processed";
         var firstRetryAcknowledged = fixture.Metrics.WaitForCountAsync(processedInstrument, 1, "retry");
         using var timers = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);

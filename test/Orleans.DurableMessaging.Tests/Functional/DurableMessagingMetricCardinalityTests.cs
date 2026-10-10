@@ -25,7 +25,7 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-metric-pending");
         var turn = receiver.HoldPumpTurnAsync("hold-metric-pending", deactivate: false);
         await hold.WaitUntilEnteredAsync();
-        using var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"));
+        var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"));
         Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery()).Status);
         var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
         var pending = Fixture.GetSnapshot(receiver);
@@ -47,7 +47,7 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         Assert.Equal(0, processed.InboxCount);
         Assert.Equal(1, processed.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(processed.Effects).Count);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         var receipts = probe.Read("inbox-messages-received");
         Assert.Equal(2, receipts.Length);
         Assert.All(receipts, receipt => receipt.AssertCounter(grainType, "duplicate"));
@@ -58,7 +58,7 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
             var started = new TaskCompletionSource<Task<DeliveryResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
             context.Scheduler.QueueAction(() =>
             {
-                try { started.SetResult(extension.DeliverAsync(envelope.Value, TestContext.Current.CancellationToken).AsTask()); }
+                try { started.SetResult(extension.DeliverAsync(envelope, TestContext.Current.CancellationToken).AsTask()); }
                 catch (Exception exception) { started.SetException(exception); }
             });
             return started.Task.Unwrap();
@@ -85,14 +85,14 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         {
             var unknown = $"unknown/{Guid.NewGuid():N}";
             routes.Add(unknown);
-            using var rejected = CreateEnvelope(missingHandler, NewMessage(index, "unknown"), unknown);
-            Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(missingHandler, rejected.Value)).Status);
-            Assert.Equal(unknown, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), rejected.Value).Route);
+            var rejected = CreateEnvelope(missingHandler, NewMessage(index, "unknown"), unknown);
+            Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(missingHandler, rejected)).Status);
+            Assert.Equal(unknown, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), rejected).Route);
             var valid = $"messages/cardinality/{Guid.NewGuid():N}";
             routes.Add(valid);
-            using var accepted = CreateEnvelope(receiver, NewMessage(index, "accepted"), valid);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, accepted.Value)).Status);
-            Assert.Equal(valid, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), accepted.Value).Route);
+            var accepted = CreateEnvelope(receiver, NewMessage(index, "accepted"), valid);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, accepted)).Status);
+            Assert.Equal(valid, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), accepted).Route);
             await Fixture.WaitForEffectCountAsync(receiver, index + 1);
         }
 

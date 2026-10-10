@@ -36,8 +36,8 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         Fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILoggerFactory>().AddProvider(logs);
         using var handler = new CancelingHandler(throws);
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
-        using var envelope = CreateEnvelope(receiver, NewMessage(310, "cancellation"), "cancel-cleanup");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(310, "cancellation"), "cancel-cleanup");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         IOException? firstFailure = null;
@@ -45,9 +45,9 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         if (terminalFailure)
         {
             Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
-            using var failingInput = CreateEnvelope(receiver, NewMessage(311, "capture-failure"));
+            var failingInput = CreateEnvelope(receiver, NewMessage(311, "capture-failure"));
             var delivery = await OnTurnAsync(context, () =>
-                ((IDurableInboxExtension)extension).DeliverAsync(failingInput.Value, TestContext.Current.CancellationToken).AsTask());
+                ((IDurableInboxExtension)extension).DeliverAsync(failingInput, TestContext.Current.CancellationToken).AsTask());
             firstFailure = await Assert.ThrowsAsync<IOException>(() => delivery);
         }
         Task stopping = null!;
@@ -95,7 +95,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
         Assert.Empty(recovered.Effects);
         Assert.Equal(0, recovered.OutboxCount);
-        Assert.Equal(envelope.Value.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
+        Assert.Equal(envelope.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
     }
 
     private sealed class CancelingHandler(bool throws) : IInboxHandler, IDisposable

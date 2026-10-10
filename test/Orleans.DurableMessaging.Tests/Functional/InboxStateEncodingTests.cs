@@ -23,8 +23,8 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         var extension = context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/complete-codec-fault");
-        using var envelope = CreateEnvelope(receiver, NewMessage(204, "complete-codec-fault"), "messages/complete-codec-fault");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(204, "complete-codec-fault"), "messages/complete-codec-fault");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
@@ -70,8 +70,8 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         faulting.NextFailure = failure;
         faulting.FailOnSnapshot = snapshot;
         if (snapshot) Fixture.Storage.RequestSnapshot(journal);
-        using var envelope = CreateEnvelope(receiver, NewMessage(203, "codec"));
-        await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
+        var envelope = CreateEnvelope(receiver, NewMessage(203, "codec"));
+        await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope));
         Assert.Same(failure, await grain.DeactivationFailure.Task);
         Assert.Equal(snapshot, faulting.FailedSnapshot);
         Assert.Empty(outbox.Messages);
@@ -85,7 +85,7 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         Assert.Equal(0, recovered.InboxCount);
         Assert.Empty(recovered.Effects);
         Assert.Equal(0, recovered.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 }

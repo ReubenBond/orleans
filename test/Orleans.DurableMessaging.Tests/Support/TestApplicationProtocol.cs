@@ -1,6 +1,6 @@
+using System.Buffers;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
@@ -30,20 +30,20 @@ internal static class TestApplicationProtocol
             Payload = Encode(sessions, new TestApplicationMessage(route, body))
         };
 
-    public static ArcBuffer Encode<T>(SerializerSessionPool sessions, T value)
+    public static byte[] Encode<T>(SerializerSessionPool sessions, T value)
     {
-        using var output = new ArcBufferWriter();
+        var output = new ArrayBufferWriter<byte>();
         using var session = sessions.GetSession();
         var writer = Writer.Create(output, session);
         sessions.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
         writer.Commit();
-        return output.PeekSlice(output.Length);
+        return output.WrittenSpan.ToArray();
     }
 
-    public static T Decode<T>(SerializerSessionPool sessions, ArcBuffer payload)
+    public static T Decode<T>(SerializerSessionPool sessions, byte[] payload)
     {
         using var session = sessions.GetSession();
-        var reader = Reader.Create(payload.AsReadOnlySequence(), session);
+        var reader = Reader.Create(payload, session);
         var field = reader.ReadFieldHeader();
         return sessions.CodecProvider.GetCodec<T>().ReadValue(ref reader, field)!;
     }

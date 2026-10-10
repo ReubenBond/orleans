@@ -24,11 +24,11 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var sink = NewGrain();
         var logicalId = TestApplicationProtocol.NewMessageId();
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
 
-        var result = await DeliverAsync(receiver, envelope.Value);
+        var result = await DeliverAsync(receiver, envelope);
         var receiverState = await Fixture.WaitForEffectCountAsync(receiver, 1);
         var output = Fixture.GetStagedOutput(receiver);
 
@@ -50,7 +50,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.Equal(1, recovered.OutboxCount);
         Assert.Equal(outgoing.MessageId, Assert.Single(Fixture.GetStagedOutput(receiver)).MessageId);
 
-        var duplicate = await DeliverAsync(receiver, envelope.Value);
+        var duplicate = await DeliverAsync(receiver, envelope);
         Assert.Equal(DeliveryStatus.Duplicate, duplicate.Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         Assert.Single(Fixture.GetStagedOutput(receiver));
@@ -61,11 +61,11 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         var sink = NewGrain();
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
-        var accepted = await DeliverAsync(receiver, envelope.Value);
+        var accepted = await DeliverAsync(receiver, envelope);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
@@ -73,7 +73,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.Equal(0, state.InboxCount);
         Assert.Equal(0, state.OutboxCount);
         var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Equal(envelope.Value.MessageId, deadLetter.MessageId);
+        Assert.Equal(envelope.MessageId, deadLetter.MessageId);
         Assert.Equal(1, deadLetter.AttemptCount);
         Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
@@ -82,7 +82,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.NotEqual(state.ActivationId, recovered.ActivationId);
         Assert.Empty(recovered.Effects);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
-        Assert.Equal(envelope.Value.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
+        Assert.Equal(envelope.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
     }
 
     [Fact]
@@ -92,8 +92,8 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         _ = await receiver.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
-        using var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-commit") with { CommitDuringHandling = true });
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-commit") with { CommitDuringHandling = true });
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal("premature-commit", Assert.Single(completed.Effects).Value);
@@ -110,8 +110,8 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-failure");
-        using var envelope = CreateEnvelope(receiver, NewMessage(78, "completion-failure"), "messages/completion-failure");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(78, "completion-failure"), "messages/completion-failure");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
@@ -136,8 +136,8 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failure-accounting");
-        using var envelope = CreateEnvelope(receiver, NewMessage(79, "failure-accounting") with { ThrowDuringPreparation = true }, "messages/failure-accounting");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(79, "failure-accounting") with { ThrowDuringPreparation = true }, "messages/failure-accounting");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));

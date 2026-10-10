@@ -52,7 +52,7 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         await grain.SetValueAsync(41);
         var journal = JournalId.FromGrainId(grain.GetGrainId());
         using var handler = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
-        using var envelope = CreateEnvelope(grain);
+        var envelope = CreateEnvelope(grain);
         Assert.Equal(DeliveryStatus.Accepted, (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
         await handler.WaitUntilEnteredAsync();
         Assert.Equal(41, first.Value!.Value);
@@ -83,7 +83,7 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         Assert.Equal(42, await grain.GetValueAsync());
         Assert.Equal(0, first.Inbox.Count);
         Assert.Single(GetProcessed(first.Context));
-        using var output = Assert.Single(first.Outbox.Messages).Retain();
+        var output = Assert.Single(first.Outbox.Messages);
         var scheduled = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(BootstrapOutboxServices.JobName, grain.GetGrainId()));
         var owner = first.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle").Value;
         Assert.Equal(scheduled.Id, owner!.Id);

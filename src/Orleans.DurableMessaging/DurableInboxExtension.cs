@@ -191,19 +191,8 @@ internal sealed partial class DurableInboxExtension :
         DurableEnvelopeValidation.Validate(envelope);
 
         EnsureMetricsActive();
-        // Direct calls borrow the caller's envelope. Pin before the first suspension,
-        // then transfer this admission owner to the actual operation, not its caller wait.
-        var admission = envelope.Retain();
-        try
-        {
-            await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        }
-        catch
-        {
-            admission.Dispose();
-            throw;
-        }
-        var delivery = DeliverUnderGateAsync(admission);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        var delivery = DeliverUnderGateAsync(envelope);
         _activeDelivery = delivery;
         delivery.Ignore();
         return await delivery.WaitAsync(cancellationToken).ConfigureAwait(true);
@@ -281,8 +270,7 @@ internal sealed partial class DurableInboxExtension :
         }
         finally
         {
-            try { envelope.Dispose(); }
-            finally { _gate.Release(); }
+            _gate.Release();
         }
     }
 
@@ -1116,39 +1104,32 @@ internal sealed partial class DurableInboxExtension :
 
         var now = _timeProvider.GetUtcNow();
         var pending = new List<DurableEnvelope>(Math.Min(_inboxDict.Count, _batchSize));
-        try
+        foreach (var pair in _inboxDict)
         {
-            foreach (var pair in _inboxDict)
+            if (!_provisionalAcceptances.Contains(pair.Key)
+                && (!_messageStates.TryGetValue(pair.Key, out var state) || state.NextAttemptAt is null || state.NextAttemptAt <= now))
             {
-                if (!_provisionalAcceptances.Contains(pair.Key)
-                    && (!_messageStates.TryGetValue(pair.Key, out var state) || state.NextAttemptAt is null || state.NextAttemptAt <= now))
+                pending.Add(pair.Value);
+                if (pending.Count == _batchSize)
                 {
-                    pending.Add(pair.Value.Retain());
-                    if (pending.Count == _batchSize)
-                    {
-                        break;
-                    }
+                    break;
                 }
-            }
-            foreach (var envelope in pending)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ValidateOwner(owner);
-                var start = Stopwatch.GetTimestamp();
-                var operation = new HandlerWrite(owner, envelope, cancellationToken);
-                await SubmitAsync(operation).ConfigureAwait(true);
-                if (operation.Skipped)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-                var status = operation.DeadLetter ? "dead_lettered" : operation.Error is null ? "success" : "retry";
-                _instruments.OnInboxMessageProcessed(_grainType, status);
-                _instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _grainType);
             }
         }
-        finally
+        foreach (var envelope in pending)
         {
-            foreach (var envelope in pending) envelope.Dispose();
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateOwner(owner);
+            var start = Stopwatch.GetTimestamp();
+            var operation = new HandlerWrite(owner, envelope, cancellationToken);
+            await SubmitAsync(operation).ConfigureAwait(true);
+            if (operation.Skipped)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            var status = operation.DeadLetter ? "dead_lettered" : operation.Error is null ? "success" : "retry";
+            _instruments.OnInboxMessageProcessed(_grainType, status);
+            _instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _grainType);
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
