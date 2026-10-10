@@ -71,7 +71,7 @@ public sealed class TypedMessageHelperTests
         var serializer = services.GetRequiredService<Serializer<string>>();
         var subject = SubjectAtLimit(multibyte);
         var messageType = new DurableMessageType<string>(subject, serializer);
-        using var envelope = DirectEnvelope(serializer, subject, "boundary reserve €42");
+        var envelope = DirectEnvelope(serializer, subject, "boundary reserve €42");
 
         Assert.Equal(256, Encoding.UTF8.GetByteCount(subject));
         Assert.Equal(subject, messageType.Subject);
@@ -88,13 +88,13 @@ public sealed class TypedMessageHelperTests
         using var receivingServices = CreateServices();
         var sendingSerializer = sendingServices.GetRequiredService<Serializer<string>>();
         var receivingSerializer = receivingServices.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(sendingSerializer, Subject, body);
+        var envelope = DirectEnvelope(sendingSerializer, Subject, body);
         var expectedWire = sendingSerializer.SerializeToArray(body);
         var messageType = new DurableMessageType<string>(Subject, receivingSerializer);
 
         Assert.Equal(body, messageType.Decode(envelope));
         Assert.Equal(Subject, messageType.Subject);
-        Assert.Equal(expectedWire, envelope.Payload.ToArray());
+        Assert.Equal(expectedWire, envelope.Payload);
         Assert.Equal(body, receivingSerializer.Deserialize(envelope.Payload));
     }
 
@@ -109,7 +109,7 @@ public sealed class TypedMessageHelperTests
         var sentinel = new InvalidDataException("read must not run");
         probe.ReadFailure = sentinel;
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = DirectEnvelope(direct, wrongSubject, "reserve €42");
+        var envelope = DirectEnvelope(direct, wrongSubject, "reserve €42");
         var expectedWire = direct.SerializeToArray("reserve €42");
 
         var exception = Assert.Throws<ArgumentException>(() => messageType.Decode(envelope));
@@ -117,7 +117,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal("envelope", exception.ParamName);
         Assert.NotSame(sentinel, exception);
         Assert.Equal(0, probe.ReadCount);
-        Assert.Equal(expectedWire, envelope.Payload.ToArray());
+        Assert.Equal(expectedWire, envelope.Payload);
         Assert.Equal("reserve €42", direct.Deserialize(envelope.Payload));
     }
 
@@ -126,7 +126,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, null!);
+        var envelope = DirectEnvelope(serializer, Subject, null!);
         var expectedWire = serializer.SerializeToArray(null);
         var messageType = new DurableMessageType<string>(Subject, serializer);
         Assert.Null(serializer.Deserialize(envelope.Payload));
@@ -135,7 +135,7 @@ public sealed class TypedMessageHelperTests
 
         Assert.Equal("envelope", exception.ParamName);
         Assert.Equal(Subject, messageType.Subject);
-        Assert.Equal(expectedWire, envelope.Payload.ToArray());
+        Assert.Equal(expectedWire, envelope.Payload);
         Assert.Null(serializer.Deserialize(envelope.Payload));
     }
 
@@ -189,7 +189,7 @@ public sealed class TypedMessageHelperTests
         Assert.Same(services, services.AddDurableMessageType<string>(subject));
         using var provider = services.BuildServiceProvider();
         var descriptor = provider.GetRequiredKeyedService<DurableMessageType<string>>(subject);
-        using var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), subject, "registered boundary");
+        var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), subject, "registered boundary");
 
         Assert.Equal(256, Encoding.UTF8.GetByteCount(subject));
         Assert.Equal(subject, descriptor.Subject);
@@ -218,7 +218,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(Subject, messageType.Subject);
         Assert.Same(messageType, provider.GetRequiredKeyedService<DurableMessageType<string>>(Subject));
         Assert.Same(messageType, scope.ServiceProvider.GetRequiredKeyedService<DurableMessageType<string>>(Subject));
-        using var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "keyed reserve");
+        var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "keyed reserve");
         Assert.Equal("keyed reserve", messageType.Decode(envelope));
     }
 
@@ -288,7 +288,7 @@ public sealed class TypedMessageHelperTests
         using var provider = services.BuildServiceProvider();
         var original = provider.GetRequiredKeyedService<DurableMessageType<string>>(Subject);
         Assert.Equal(Subject, original.Subject);
-        using var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "original binding");
+        var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "original binding");
         Assert.Equal("original binding", original.Decode(envelope));
         Assert.Null(provider.GetKeyedService<DurableMessageType<int>>(Subject));
     }
@@ -306,8 +306,8 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(Subject, lower.Subject);
         Assert.Equal("Orders.Reserve", upper.Subject);
         Assert.NotSame(lower, upper);
-        using var lowerEnvelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "lower");
-        using var upperEnvelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), "Orders.Reserve", "upper");
+        var lowerEnvelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "lower");
+        var upperEnvelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), "Orders.Reserve", "upper");
         Assert.Equal("lower", lower.Decode(lowerEnvelope));
         Assert.Equal("upper", upper.Decode(upperEnvelope));
         Assert.Throws<ArgumentException>(() => lower.Decode(upperEnvelope));
@@ -336,21 +336,13 @@ public sealed class TypedMessageHelperTests
             _ => MessageKey
         };
         DurableEnvelope? result = null;
-        try
+        var exception = Assert.Throws<ArgumentException>(() =>
         {
-            var exception = Assert.Throws<ArgumentException>(() =>
-            {
-                result = messageType.Create(key, sender, receiver, "must not encode");
-            });
-            Assert.Equal("envelope", exception.ParamName);
-            Assert.Null(result);
-            Assert.Equal(0, probe.WriteCount);
-        }
-        finally
-        {
-            // Also release an unexpected owner if a validation mutation succeeds.
-            result?.Dispose();
-        }
+            result = messageType.Create(key, sender, receiver, "must not encode");
+        });
+        Assert.Equal("envelope", exception.ParamName);
+        Assert.Null(result);
+        Assert.Equal(0, probe.WriteCount);
     }
 
     [Fact]
@@ -360,10 +352,10 @@ public sealed class TypedMessageHelperTests
         var serializer = services.GetRequiredService<Serializer<string>>();
         var messageType = new DurableMessageType<string>(Subject, serializer);
         var key = HierarchicalKey.Create("orders", "42", "reserve");
-        using var first = messageType.Create(key, Sender, Receiver, "reserve first");
+        var first = messageType.Create(key, Sender, Receiver, "reserve first");
         var otherReceiver = GrainId.Create("receiver", "other-warehouse");
         var otherSender = GrainId.Create("sender", "other-owner");
-        using var second = messageType.Create(key, otherSender, otherReceiver, "reserve second");
+        var second = messageType.Create(key, otherSender, otherReceiver, "reserve second");
 
         AssertEnvelopeIdentity(first, key, Sender, Receiver, Subject);
         AssertEnvelopeIdentity(second, key, otherSender, otherReceiver, Subject);
@@ -392,7 +384,7 @@ public sealed class TypedMessageHelperTests
             _ => throw new ArgumentOutOfRangeException(nameof(variation))
         };
 
-        using var envelope = messageType.Create(key, Sender, Receiver, "admitted boundary");
+        var envelope = messageType.Create(key, Sender, Receiver, "admitted boundary");
 
         Assert.Equal(1, probe.WriteCount);
         AssertEnvelopeIdentity(envelope, key, Sender, Receiver, Subject);
@@ -449,7 +441,7 @@ public sealed class TypedMessageHelperTests
     }
 
     [Fact]
-    public void DurableMessageType_CreatePreservesIndependentSlicesAcrossPoolReuseAndNeighborDisposal()
+    public void DurableMessageType_CreateAllocatesIndependentArraysAcrossSubsequentCalls()
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<byte[]>>();
@@ -459,90 +451,77 @@ public sealed class TypedMessageHelperTests
         var lastBody = new byte[] { 42, 0, 128, 255, 19, 21 };
         var largeWire = serializer.SerializeToArray(largeBody);
         var lastWire = serializer.SerializeToArray(lastBody);
-        DurableEnvelope? first = null;
-        DurableEnvelope? large = null;
-        DurableEnvelope? last = null;
-        try
-        {
-            first = messageType.Create(MessageKey, Sender, Receiver, firstBody);
-            large = messageType.Create(MessageKey, Sender, Receiver, largeBody);
-            // Public span enumeration proves actual segmentation, not an assumed
-            // PageCount API or a guessed relationship between body size and capacity.
-            Assert.True(CountSegments(large.Value.Payload) > 1);
-            Assert.True(largeBody.Length > ArcBufferWriter.MinimumPageSize);
-            Assert.Equal(serializer.SerializeToArray(firstBody), first.Value.Payload.ToArray());
-            first.Value.Dispose();
-            first = null;
+        var first = messageType.Create(MessageKey, Sender, Receiver, firstBody);
+        var repeated = messageType.Create(MessageKey, Sender, Receiver, firstBody);
+        var large = messageType.Create(MessageKey, Sender, Receiver, largeBody);
+        var last = messageType.Create(MessageKey, Sender, Receiver, lastBody);
 
-            last = messageType.Create(MessageKey, Sender, Receiver, lastBody);
-            Assert.NotEqual(large.Value.Payload, last.Value.Payload);
-
-            Assert.Equal(largeWire, large.Value.Payload.ToArray());
-            Assert.Equal(lastWire, last.Value.Payload.ToArray());
-            Assert.Equal(largeBody, serializer.Deserialize(large.Value.Payload));
-            Assert.Equal(lastBody, serializer.Deserialize(last.Value.Payload));
-            AssertEnvelopeIdentity(large.Value, MessageKey, Sender, Receiver, Subject);
-            AssertEnvelopeIdentity(last.Value, MessageKey, Sender, Receiver, Subject);
-        }
-        finally
-        {
-            first?.Dispose();
-            large?.Dispose();
-            last?.Dispose();
-        }
+        Assert.NotNull(first.Payload);
+        Assert.NotSame(firstBody, first.Payload);
+        Assert.NotSame(first.Payload, repeated.Payload);
+        Assert.NotSame(first.Payload, large.Payload);
+        Assert.NotSame(large.Payload, last.Payload);
+        Assert.Equal(serializer.SerializeToArray(firstBody), first.Payload);
+        Assert.Equal(first.Payload, repeated.Payload);
+        firstBody[0] = 99;
+        Assert.Equal(new byte[] { 9, 8, 7, 255 }, serializer.Deserialize(first.Payload));
+        Assert.Equal(new byte[] { 9, 8, 7, 255 }, serializer.Deserialize(repeated.Payload));
+        Assert.Equal(largeWire, large.Payload);
+        Assert.Equal(lastWire, last.Payload);
+        Assert.Equal(largeBody, serializer.Deserialize(large.Payload));
+        Assert.Equal(lastBody, serializer.Deserialize(last.Payload));
+        AssertEnvelopeIdentity(large, MessageKey, Sender, Receiver, Subject);
+        AssertEnvelopeIdentity(last, MessageKey, Sender, Receiver, Subject);
     }
 
     [Fact]
-    public void DurableMessageType_CreateResetsCommittedPartialOutputAfterCodecFailure()
+    public void DurableMessageType_EncodingFailurePreservesOutstandingBytesAndPristineRetry()
     {
         using var services = CreateServices();
         var pristine = services.GetRequiredService<Serializer<string>>();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        using var outstanding = messageType.Create(MessageKey, Sender, Receiver, "outstanding € order");
+        var outstanding = messageType.Create(MessageKey, Sender, Receiver, "outstanding € order");
         var outstandingWire = pristine.SerializeToArray("outstanding € order");
         var sentinel = new InvalidDataException("committed partial codec failure");
         probe.NextWriteFailure = sentinel;
         DurableEnvelope? failedResult = null;
-        try
+        var exception = Assert.Throws<InvalidDataException>(() =>
         {
-            var exception = Assert.Throws<InvalidDataException>(() =>
-            {
-                failedResult = messageType.Create(MessageKey, Sender, Receiver, "failing preparation");
-            });
-            Assert.Same(sentinel, exception);
-            Assert.Null(failedResult);
-            Assert.Equal(2, probe.WriteCount);
-            Assert.Equal(1, probe.CommittedFailureCount);
-            Assert.Equal((byte)0x7e, probe.CommittedFailureByte);
+            failedResult = messageType.Create(MessageKey, Sender, Receiver, "failing preparation");
+        });
+        Assert.Same(sentinel, exception);
+        Assert.Null(failedResult);
+        Assert.Equal(2, probe.WriteCount);
+        Assert.Equal(1, probe.CommittedFailureCount);
+        Assert.Equal((byte)0x7e, probe.CommittedFailureByte);
 
-            using var recovered = messageType.Create(MessageKey, Sender, Receiver, "recovered 東京 reserve");
-            Assert.Equal(3, probe.WriteCount);
-            Assert.Equal(pristine.SerializeToArray("recovered 東京 reserve"), recovered.Payload.ToArray());
-            Assert.Equal("recovered 東京 reserve", pristine.Deserialize(recovered.Payload));
-            Assert.Equal(outstandingWire, outstanding.Payload.ToArray());
-            Assert.Equal("outstanding € order", pristine.Deserialize(outstanding.Payload));
-            AssertEnvelopeIdentity(recovered, MessageKey, Sender, Receiver, Subject);
-        }
-        finally
-        {
-            failedResult?.Dispose();
-        }
+        var recovered = messageType.Create(MessageKey, Sender, Receiver, "recovered 東京 reserve");
+        Assert.Equal(3, probe.WriteCount);
+        Assert.Equal(pristine.SerializeToArray("recovered 東京 reserve"), recovered.Payload);
+        Assert.Equal("recovered 東京 reserve", pristine.Deserialize(recovered.Payload));
+        Assert.Equal(outstandingWire, outstanding.Payload);
+        Assert.Equal("outstanding € order", pristine.Deserialize(outstanding.Payload));
+        Assert.NotSame(outstanding.Payload, recovered.Payload);
+        AssertEnvelopeIdentity(recovered, MessageKey, Sender, Receiver, Subject);
     }
 
     [Fact]
-    public void DurableMessageType_CreateRetainedEnvelopeSurvivesOriginalOwnerReleaseAndSubsequentCreate()
+    public void DurableMessageType_EnvelopeCopySharesStableArrayAcrossSubsequentCreate()
     {
         using var services = CreateServices();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
         var original = messageType.Create(MessageKey, Sender, Receiver, "surviving reserve");
-        using var surviving = original.Retain();
-        original.Dispose();
-        using var subsequent = messageType.Create(MessageKey.CreateChildKey("next"), Sender, Receiver, "new reserve");
+        var surviving = original;
+        Assert.Same(original.Payload, surviving.Payload);
+        var expected = original.Payload.ToArray();
+        original = default;
+        var subsequent = messageType.Create(MessageKey.CreateChildKey("next"), Sender, Receiver, "new reserve");
 
         Assert.Equal(2, probe.WriteCount);
-        Assert.NotEqual(surviving.Payload, subsequent.Payload);
+        Assert.NotSame(surviving.Payload, subsequent.Payload);
+        Assert.Equal(expected, surviving.Payload);
         Assert.Equal(MessageKey, surviving.MessageId);
         Assert.Equal(MessageKey.CreateChildKey("next"), subsequent.MessageId);
         Assert.Equal("surviving reserve", services.GetRequiredService<Serializer<string>>().Deserialize(surviving.Payload));
@@ -561,13 +540,13 @@ public sealed class TypedMessageHelperTests
 
         Assert.Equal("body", exception.ParamName);
         Assert.Equal(0, probe.WriteCount);
-        using var control = messageType.Create(MessageKey, Sender, Receiver, "nonnull recovery");
+        var control = messageType.Create(MessageKey, Sender, Receiver, "nonnull recovery");
         Assert.Equal(1, probe.WriteCount);
         Assert.Equal("nonnull recovery", services.GetRequiredService<Serializer<string>>().Deserialize(control.Payload));
     }
 
     [Fact]
-    public void DurableMessageType_CreateDoesNotConsumeResourceBodyAndRetainOwnsIndependentPin()
+    public void DurableMessageType_CreateLeavesResourceBodyAndDecodedValueApplicationOwned()
     {
         using var services = CreateServices();
         var codec = new ResourceCodec();
@@ -575,12 +554,12 @@ public sealed class TypedMessageHelperTests
         var type = new DurableMessageType<OwnedResource>(Subject, serializer);
         using var body = new OwnedResource("resource €42");
         var original = type.Create(MessageKey, Sender, Receiver, body);
-        using var retained = original.Retain();
-        original.Dispose();
+        var retained = original;
+        Assert.Same(original.Payload, retained.Payload);
 
         Assert.Equal(0, body.DisposeCount);
         Assert.Equal(MessageKey, retained.MessageId);
-        Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray(body.Name), retained.Payload.ToArray());
+        Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray(body.Name), retained.Payload);
         using var decoded = type.Decode(retained);
         Assert.NotSame(body, decoded);
         Assert.Same(codec.LastDecoded, decoded);
@@ -674,7 +653,7 @@ public sealed class TypedMessageHelperTests
                 });
             }
         });
-        using var envelope = DirectEnvelope(serializer, Subject, "original delegate €42");
+        var envelope = DirectEnvelope(serializer, Subject, "original delegate €42");
         var context = new CountingInboxHandlerContext(envelope);
         await dispatcher.HandleAsync(context, CancellationToken.None);
 
@@ -709,9 +688,9 @@ public sealed class TypedMessageHelperTests
             integerValues.Add(body);
             return ValueTask.CompletedTask;
         });
-        using var lowerEnvelope = DirectEnvelope(strings, Subject, "lower €42");
-        using var upperEnvelope = DirectEnvelope(strings, "Orders.Reserve", "upper 東京");
-        using var integerEnvelope = DirectEnvelope(integers, "orders.quantity", 42_017);
+        var lowerEnvelope = DirectEnvelope(strings, Subject, "lower €42");
+        var upperEnvelope = DirectEnvelope(strings, "Orders.Reserve", "upper 東京");
+        var integerEnvelope = DirectEnvelope(integers, "orders.quantity", 42_017);
         var lowerContext = new CountingInboxHandlerContext(lowerEnvelope);
         var upperContext = new CountingInboxHandlerContext(upperEnvelope);
         var integerContext = new CountingInboxHandlerContext(integerEnvelope);
@@ -749,7 +728,7 @@ public sealed class TypedMessageHelperTests
             values.Add(body);
             return ValueTask.CompletedTask;
         });
-        using var envelope = DirectEnvelope(direct, firstAttempt == "unknown" ? "orders.unknown" : Subject, "first");
+        var envelope = DirectEnvelope(direct, firstAttempt == "unknown" ? "orders.unknown" : Subject, "first");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         if (firstAttempt == "canceled")
@@ -774,7 +753,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(0, context.CompletionCount);
         Assert.Throws<InvalidOperationException>(() =>
             dispatcher.Register(new DurableMessageType<string>("orders.later", direct), (_, _, _) => ValueTask.CompletedTask));
-        using var subsequentEnvelope = DirectEnvelope(direct, Subject, "still registered");
+        var subsequentEnvelope = DirectEnvelope(direct, Subject, "still registered");
         var subsequentContext = new CountingInboxHandlerContext(subsequentEnvelope);
         await dispatcher.HandleAsync(subsequentContext, CancellationToken.None);
         Assert.Equal(firstAttempt == "success" ? new[] { "first", "still registered" } : new[] { "still registered" }, values);
@@ -796,7 +775,7 @@ public sealed class TypedMessageHelperTests
             return ValueTask.CompletedTask;
         });
         var direct = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(direct, "orders.unknown", "valid reserve €42");
+        var envelope = DirectEnvelope(direct, "orders.unknown", "valid reserve €42");
         var context = new CountingInboxHandlerContext(envelope);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -814,7 +793,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var wire = serializer.SerializeToArray("nonempty truncated €42");
-        using var envelope = WireEnvelope(Subject, wire[..^1]);
+        var envelope = WireEnvelope(Subject, wire[..^1]);
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var calls = 0;
@@ -831,7 +810,7 @@ public sealed class TypedMessageHelperTests
             async () => await dispatcher.HandleAsync(context, CancellationToken.None));
 
         Assert.Equal(Subject, envelope.Subject);
-        Assert.Equal(wire[..^1], envelope.Payload.ToArray());
+        Assert.Equal(wire[..^1], envelope.Payload);
         Assert.Equal(0, calls);
         Assert.Equal(0, context.CompletionCount);
     }
@@ -841,7 +820,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "context €42");
+        var envelope = DirectEnvelope(serializer, Subject, "context €42");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var dispatcher = new DurableInboxDispatcher();
@@ -874,7 +853,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "synchronous reserve");
+        var envelope = DirectEnvelope(serializer, Subject, "synchronous reserve");
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var calls = 0;
@@ -900,7 +879,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "faulted task reserve");
+        var envelope = DirectEnvelope(serializer, Subject, "faulted task reserve");
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var sentinel = new InvalidDataException("synchronous faulted ValueTask");
@@ -929,7 +908,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "throwing delegate reserve");
+        var envelope = DirectEnvelope(serializer, Subject, "throwing delegate reserve");
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var sentinel = new InvalidDataException("delegate throws before returning");
@@ -956,7 +935,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "deferred €42");
+        var envelope = DirectEnvelope(serializer, Subject, "deferred €42");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1000,7 +979,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "deferred fault €42");
+        var envelope = DirectEnvelope(serializer, Subject, "deferred fault €42");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1044,7 +1023,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "explicit completion");
+        var envelope = DirectEnvelope(serializer, Subject, "explicit completion");
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var calls = 0;
@@ -1077,7 +1056,7 @@ public sealed class TypedMessageHelperTests
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         probe.ReadFailure = new InvalidDataException("canceled attempts must not decode");
         var direct = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(direct, unknownSubject ? "orders.unknown" : Subject, "valid canceled reserve");
+        var envelope = DirectEnvelope(direct, unknownSubject ? "orders.unknown" : Subject, "valid canceled reserve");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -1108,7 +1087,6 @@ public sealed class TypedMessageHelperTests
         var serializer = new Serializer<OwnedResource>(codec, sessions);
         using var original = new OwnedResource("owned reserve €42");
         var envelope = DirectEnvelope(serializer, Subject, original);
-        var ownsEnvelope = true;
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         OwnedResource? captured = null;
@@ -1132,10 +1110,7 @@ public sealed class TypedMessageHelperTests
             Assert.Equal(0, context.CompletionCount);
             Assert.Equal(0, original.DisposeCount);
             Assert.Equal(0, decoded.DisposeCount);
-            // End the payload lifetime after dispatch, before the application's
-            // resource lifetime. The context's copy was only borrowed.
-            envelope.Dispose();
-            ownsEnvelope = false;
+            envelope = default;
             Assert.Equal("owned reserve €42", decoded.Name);
             Assert.Equal(0, decoded.DisposeCount);
             decoded.Dispose();
@@ -1144,11 +1119,6 @@ public sealed class TypedMessageHelperTests
         }
         finally
         {
-            if (ownsEnvelope)
-            {
-                envelope.Dispose();
-            }
-
             if (codec.LastDecoded is { DisposeCount: 0 } resource)
             {
                 resource.Dispose();
@@ -1161,7 +1131,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, null!);
+        var envelope = DirectEnvelope(serializer, Subject, null!);
         var expectedWire = serializer.SerializeToArray(null);
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
@@ -1180,7 +1150,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal("envelope", exception.ParamName);
         Assert.Equal(0, calls);
         Assert.Equal(0, context.CompletionCount);
-        Assert.Equal(expectedWire, envelope.Payload.ToArray());
+        Assert.Equal(expectedWire, envelope.Payload);
         Assert.Null(serializer.Deserialize(envelope.Payload));
     }
 
@@ -1192,7 +1162,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = DirectEnvelope(serializer, Subject, "synchronous");
+        var envelope = DirectEnvelope(serializer, Subject, "synchronous");
         var context = new CountingInboxHandlerContext(envelope);
         var dispatcher = new DurableInboxDispatcher();
         var calls = 0;
@@ -1234,7 +1204,7 @@ public sealed class TypedMessageHelperTests
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
-        using var envelope = DirectEnvelope(serializer, Subject, "failure");
+        var envelope = DirectEnvelope(serializer, Subject, "failure");
         var context = new CountingInboxHandlerContext(envelope);
         var sentinel = new IOException("synchronous handler failed");
         var dispatcher = new DurableInboxDispatcher().Register(
@@ -1257,7 +1227,7 @@ public sealed class TypedMessageHelperTests
         using var cancellation = new CancellationTokenSource();
         if (cancelDuringDecode) probe.OnRead = cancellation.Cancel;
         else cancellation.Cancel();
-        using var envelope = DirectEnvelope(direct, Subject, "cancellation");
+        var envelope = DirectEnvelope(direct, Subject, "cancellation");
         var context = new CountingInboxHandlerContext(envelope);
         var calls = 0;
         var dispatcher = new DurableInboxDispatcher().Register(
@@ -1301,8 +1271,8 @@ public sealed class TypedMessageHelperTests
 
         Assert.Throws<InvalidOperationException>(() => configured.Register(
             new DurableMessageType<string>("stock.late.v1", serializer), (_, _) => { }));
-        using var first = DirectEnvelope(serializer, synchronous.Subject, "sync");
-        using var second = DirectEnvelope(serializer, asynchronous.Subject, "async");
+        var first = DirectEnvelope(serializer, synchronous.Subject, "sync");
+        var second = DirectEnvelope(serializer, asynchronous.Subject, "async");
         var firstContext = new CountingInboxHandlerContext(first);
         var secondContext = new CountingInboxHandlerContext(second);
         await registered.HandleAsync(firstContext, CancellationToken.None);
@@ -1324,7 +1294,7 @@ public sealed class TypedMessageHelperTests
         var replacementCalls = 0;
         var dispatcher = new DurableInboxDispatcher().Register(type, (_, _) => originalCalls++);
         Assert.Throws<InvalidOperationException>(() => dispatcher.Register(type, (_, _) => replacementCalls++));
-        using var envelope = DirectEnvelope(serializer, Subject, "original");
+        var envelope = DirectEnvelope(serializer, Subject, "original");
         var context = new CountingInboxHandlerContext(envelope);
 
         await dispatcher.HandleAsync(context, CancellationToken.None);
@@ -1342,7 +1312,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "stateful €42");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "stateful €42");
         var context = new CountingInboxHandlerContext(envelope);
         var state = new HandlerState { Complete = complete };
         Action<string, HandlerState, IInboxHandlerContext> handler = ObserveState;
@@ -1376,8 +1346,8 @@ public sealed class TypedMessageHelperTests
         Assert.Null(sync.Target);
         Assert.Null(asyncHandler.Target);
         var dispatcher = new DurableInboxDispatcher().Register(syncType, syncState, sync).Register(asyncType, argument, asyncHandler);
-        using var syncEnvelope = syncType.Create(MessageKey, Sender, Receiver, "lower");
-        using var asyncEnvelope = asyncType.Create(MessageKey, Sender, Receiver, "upper");
+        var syncEnvelope = syncType.Create(MessageKey, Sender, Receiver, "lower");
+        var asyncEnvelope = asyncType.Create(MessageKey, Sender, Receiver, "upper");
         var syncContext = new CountingInboxHandlerContext(syncEnvelope);
         var asyncContext = new CountingInboxHandlerContext(asyncEnvelope);
         using var cancellation = new CancellationTokenSource();
@@ -1407,7 +1377,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "struct state");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "struct state");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var observation = new HandlerState { Complete = true };
@@ -1448,7 +1418,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "deferred state");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "deferred state");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1500,7 +1470,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "sentinel");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "sentinel");
         var context = new CountingInboxHandlerContext(envelope);
         var sentinel = new IOException("stateful sync sentinel");
         var state = new HandlerState();
@@ -1538,7 +1508,7 @@ public sealed class TypedMessageHelperTests
         using var cancellation = new CancellationTokenSource();
         if (duringDecode) probe.OnRead = cancellation.Cancel;
         else cancellation.Cancel();
-        using var envelope = DirectEnvelope(direct, Subject, "canceled state");
+        var envelope = DirectEnvelope(direct, Subject, "canceled state");
         var context = new CountingInboxHandlerContext(envelope);
         var state = new HandlerState { Complete = true };
         var type = new DurableMessageType<string>(Subject, serializer);
@@ -1566,7 +1536,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "completed despite cancel");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "completed despite cancel");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var state = new HandlerState { Complete = true, CancelOnInvoke = cancellation };
@@ -1602,7 +1572,7 @@ public sealed class TypedMessageHelperTests
         var sentinel = new InvalidDataException("malformed stateful payload");
         if (variation == "codec-failure") probe.ReadFailure = sentinel;
         var wire = direct.SerializeToArray("nonempty truncated €42");
-        using var envelope = variation == "malformed"
+        var envelope = variation == "malformed"
             ? WireEnvelope(Subject, wire[..^1])
             : DirectEnvelope(direct, variation == "unknown" ? "Orders.Reserve" : Subject,
                 variation == "null" ? null! : "payload");
@@ -1620,7 +1590,7 @@ public sealed class TypedMessageHelperTests
         else if (variation == "malformed")
         {
             Assert.Throws<IndexOutOfRangeException>(() => dispatcher.HandleAsync(context, CancellationToken.None));
-            Assert.Equal(wire[..^1], envelope.Payload.ToArray());
+            Assert.Equal(wire[..^1], envelope.Payload);
         }
         else
             Assert.Equal("envelope", Assert.Throws<ArgumentException>(() =>
@@ -1649,7 +1619,7 @@ public sealed class TypedMessageHelperTests
                 replacement, ObserveNumberState));
         else
             Assert.Throws<InvalidOperationException>(() => dispatcher.Register(type, replacement, ObserveAsyncState));
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "original state");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "original state");
         var context = new CountingInboxHandlerContext(envelope);
 
         await dispatcher.HandleAsync(context, CancellationToken.None);
@@ -1686,7 +1656,7 @@ public sealed class TypedMessageHelperTests
                 (Action<string, HandlerState, IInboxHandlerContext>)null!)).ParamName);
             Assert.Same(dispatcher, dispatcher.Register(type, state, ObserveState));
         }
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "positive control");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "positive control");
         var context = new CountingInboxHandlerContext(envelope);
         Assert.True(dispatcher.HandleAsync(context, CancellationToken.None).IsCompletedSuccessfully);
         Assert.Equal("positive control", state.Body);
@@ -1702,7 +1672,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = type.Create(MessageKey, Sender, Receiver, "allocation control");
+        var envelope = type.Create(MessageKey, Sender, Receiver, "allocation control");
         var context = new CountingInboxHandlerContext(envelope);
         var baselineState = new HandlerState();
         var structState = new HandlerState();
@@ -1832,8 +1802,8 @@ public sealed class TypedMessageHelperTests
         Assert.Throws<InvalidOperationException>(() => configured.Register(
             new DurableMessageType<string>("stock.late.v1", services.GetRequiredService<Serializer<string>>()),
             (_, _, _) => ValueTask.CompletedTask));
-        using var reservation = DirectEnvelope(services.GetRequiredService<Serializer<string>>(), Subject, "reserve");
-        using var restock = DirectEnvelope(services.GetRequiredService<Serializer<int>>(), number.Subject, 5);
+        var reservation = DirectEnvelope(services.GetRequiredService<Serializer<string>>(), Subject, "reserve");
+        var restock = DirectEnvelope(services.GetRequiredService<Serializer<int>>(), number.Subject, 5);
         var reservationContext = new CountingInboxHandlerContext(reservation);
         var restockContext = new CountingInboxHandlerContext(restock);
         await handler.HandleAsync(reservationContext, CancellationToken.None);
@@ -1853,7 +1823,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var envelope = DirectEnvelope(serializer, Subject, "prepare");
+        var envelope = DirectEnvelope(serializer, Subject, "prepare");
         var context = new CountingInboxHandlerContext(envelope);
         using var cancellation = new CancellationTokenSource();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1937,9 +1907,9 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(serializer.SerializeToArray(body), createdByFactory.SerializeToArray(body));
         var first = provider.GetRequiredKeyedService<DurableMessageType<T>>(Subject);
         var second = provider.GetRequiredKeyedService<DurableMessageType<T>>("orders.cancel");
-        using var envelope = first.Create(MessageKey, Sender, Receiver, body);
-        using var other = second.Create(MessageKey, Sender, Receiver, body);
-        Assert.Equal(serializer.SerializeToArray(body), envelope.Payload.ToArray());
+        var envelope = first.Create(MessageKey, Sender, Receiver, body);
+        var other = second.Create(MessageKey, Sender, Receiver, body);
+        Assert.Equal(serializer.SerializeToArray(body), envelope.Payload);
         Assert.Equal(body, first.Decode(envelope));
         Assert.Equal(body, second.Decode(other));
         AssertEnvelopeIdentity(envelope, MessageKey, Sender, Receiver, Subject);
@@ -1975,10 +1945,10 @@ public sealed class TypedMessageHelperTests
         Assert.Same(custom, scope.ServiceProvider.GetRequiredService<Serializer<T>>());
         var first = provider.GetRequiredKeyedService<DurableMessageType<T>>(Subject);
         var second = provider.GetRequiredKeyedService<DurableMessageType<T>>("orders.cancel");
-        using var envelope = first.Create(MessageKey, Sender, Receiver, body);
-        using var other = second.Create(MessageKey, Sender, Receiver, body);
+        var envelope = first.Create(MessageKey, Sender, Receiver, body);
+        var other = second.Create(MessageKey, Sender, Receiver, body);
         Assert.Equal(2, probe.WriteCount);
-        Assert.Equal(codecServices.GetRequiredService<Serializer<T>>().SerializeToArray(body), envelope.Payload.ToArray());
+        Assert.Equal(codecServices.GetRequiredService<Serializer<T>>().SerializeToArray(body), envelope.Payload);
         Assert.Equal(body, first.Decode(envelope));
         Assert.Equal(body, second.Decode(other));
         Assert.Equal(2, probe.ReadCount);
@@ -2065,22 +2035,13 @@ public sealed class TypedMessageHelperTests
         return (new Serializer<T>(probe, sessions), probe);
     }
 
-    private static DurableEnvelope DirectEnvelope<T>(Serializer<T> serializer, string subject, [AllowNull] T body)
-    {
-        using var writer = new ArcBufferWriter();
-        serializer.Serialize(body, writer);
-        // ConsumeSlice pins a new owner before the temporary writer is released.
-        return Envelope(subject, writer.ConsumeSlice(writer.Length));
-    }
+    private static DurableEnvelope DirectEnvelope<T>(Serializer<T> serializer, string subject, [AllowNull] T body) =>
+        Envelope(subject, serializer.SerializeToArray(body));
 
-    private static DurableEnvelope WireEnvelope(string subject, byte[] wire)
-    {
-        using var writer = new ArcBufferWriter();
-        writer.Write(wire);
-        return Envelope(subject, writer.ConsumeSlice(writer.Length));
-    }
+    private static DurableEnvelope WireEnvelope(string subject, byte[] wire) =>
+        Envelope(subject, wire);
 
-    private static DurableEnvelope Envelope(string subject, ArcBuffer payload) => new()
+    private static DurableEnvelope Envelope(string subject, byte[] payload) => new()
     {
         MessageId = HierarchicalKey.Create("orders", "42", "reserve"),
         SenderId = Sender,
@@ -2106,8 +2067,8 @@ public sealed class TypedMessageHelperTests
         var messageType = new DurableMessageType<T>(Subject, sending);
         var key = MessageKey;
         var expectedWire = sending.SerializeToArray(body);
-        using var envelope = messageType.Create(key, Sender, Receiver, body);
-        Assert.Equal(expectedWire, envelope.Payload.ToArray());
+        var envelope = messageType.Create(key, Sender, Receiver, body);
+        Assert.Equal(expectedWire, envelope.Payload);
         Assert.Equal(body, receiving.Deserialize(envelope.Payload));
         AssertEnvelopeIdentity(envelope, key, Sender, Receiver, Subject);
     }
@@ -2121,21 +2082,8 @@ public sealed class TypedMessageHelperTests
         }
     }
 
-    private static int CountSegments(ArcBuffer buffer)
-    {
-        var result = 0;
-        foreach (var segment in buffer)
-        {
-            Assert.False(segment.IsEmpty);
-            result++;
-        }
-
-        return result;
-    }
-
     private sealed class CountingInboxHandlerContext(DurableEnvelope envelope) : IInboxHandlerContext
     {
-        // Borrowed struct copy. Only the test's original envelope is disposed.
         public DurableEnvelope Envelope { get; } = envelope;
         public int CompletionCount { get; private set; }
         public void Complete() => CompletionCount++;

@@ -28,7 +28,7 @@ public sealed class TypedOutboxExtensionsTests
     {
         using var services = CreateServices();
         var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         var enumerations = 0;
         IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
         {
@@ -59,7 +59,7 @@ public sealed class TypedOutboxExtensionsTests
         var sessions = services.GetRequiredService<SerializerSessionPool>();
         var codec = new FailingCodec(sessions.CodecProvider.GetCodec<string>());
         var type = new DurableMessageType<string>(Subject, new Serializer<string>(codec, sessions));
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         var sentinel = new InvalidDataException("later preparation failed");
         IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
         {
@@ -87,7 +87,7 @@ public sealed class TypedOutboxExtensionsTests
     public void SendBatch_RejectsNullArgumentsBeforeEncodingOrStaging(string variation)
     {
         using var services = CreateServices();
-        using var actual = new RetainingOutbox(Owner);
+        var actual = new StoringOutbox(Owner);
         var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
         IDurableOutbox outbox = actual;
         IEnumerable<(HierarchicalKey, GrainId, string)> messages = [(CommandId, Destination, "body")];
@@ -107,7 +107,7 @@ public sealed class TypedOutboxExtensionsTests
     public void SendBatch_EmptyBatchStagesNothing()
     {
         using var services = CreateServices();
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
 
         outbox.Send(type, []);
@@ -119,7 +119,7 @@ public sealed class TypedOutboxExtensionsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SendBatch_RawFailureReleasesLocalOwnerAndPreservesRetainedPayload(bool retainBeforeFailure)
+    public void SendBatch_RawFailurePreservesPublishedArrayAndOriginalError(bool storeBeforeFailure)
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<byte[]>>();
@@ -127,7 +127,7 @@ public sealed class TypedOutboxExtensionsTests
         var body = new byte[3_145_728];
         body[body.Length / 2] = 17;
         var sentinel = new IOException("raw staging failed");
-        using var outbox = new RetainingOutbox(Owner) { Failure = sentinel, RetainBeforeFailure = retainBeforeFailure };
+        var outbox = new StoringOutbox(Owner) { Failure = sentinel, StoreBeforeFailure = storeBeforeFailure };
         (HierarchicalKey, GrainId, byte[])[] messages =
         [
             (CommandId, Destination, body),
@@ -136,13 +136,17 @@ public sealed class TypedOutboxExtensionsTests
 
         Assert.Same(sentinel, Assert.Throws<IOException>(() => outbox.Send(type, messages)));
         Assert.Equal(1, outbox.RawSendCalls);
-        if (retainBeforeFailure)
+        var published = outbox.LastPublished!.Value;
+        Assert.Same(published.Payload, outbox.WireSeen);
+        Assert.Equal(serializer.SerializeToArray(body), published.Payload);
+        Assert.Equal(body, serializer.Deserialize(published.Payload));
+        if (storeBeforeFailure)
         {
-            Assert.Equal(body, serializer.Deserialize(Assert.Single(outbox.Messages).Payload));
-            outbox.ReleaseMessages();
+            Assert.Same(published.Payload, Assert.Single(outbox.Messages).Payload);
+            outbox.ClearMessages();
         }
         Assert.Empty(outbox.Messages);
-        Assert.Throws<InvalidOperationException>(() => outbox.InteriorBorrowed!.Value.ToArray());
+        Assert.Equal(body, serializer.Deserialize(published.Payload));
     }
 
     [Theory]
@@ -153,7 +157,7 @@ public sealed class TypedOutboxExtensionsTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         IAddressable reference = new AddressableDestination(Destination);
 
         if (addressable) outbox.Send(type, CommandId, reference, "typed reserve € / 東京");
@@ -166,10 +170,10 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(Owner, staged.SenderId);
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.Equal(Subject, staged.Subject);
-        Assert.Equal(serializer.SerializeToArray("typed reserve € / 東京"), staged.Payload.ToArray());
+        Assert.Equal(serializer.SerializeToArray("typed reserve € / 東京"), staged.Payload);
         Assert.Equal("typed reserve € / 東京", serializer.Deserialize(staged.Payload));
         Assert.True(outbox.TryGetMessage(CommandId, out var found));
-        Assert.Equal(staged.Payload, found.Payload);
+        Assert.Same(staged.Payload, found.Payload);
     }
 
     [Theory]
@@ -180,10 +184,10 @@ public sealed class TypedOutboxExtensionsTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var type = new DurableMessageType<string>(Subject, serializer);
-        using var received = new DurableMessageType<string>("orders.reserve", serializer)
+        var received = new DurableMessageType<string>("orders.reserve", serializer)
             .Create(CommandId, ReceivedSender, Owner, "incoming reserve");
         var context = new CountingContext(received);
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         IAddressable reference = new AddressableDestination(Destination);
 
         if (addressable) outbox.SendReply(type, context, reference, "approved €42");
@@ -198,7 +202,7 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.NotEqual(ReceivedSender, staged.ReceiverId);
         Assert.Equal(Subject, staged.Subject);
-        Assert.Equal(serializer.SerializeToArray("approved €42"), staged.Payload.ToArray());
+        Assert.Equal(serializer.SerializeToArray("approved €42"), staged.Payload);
         Assert.Equal("approved €42", serializer.Deserialize(staged.Payload));
         Assert.Equal(1, outbox.RawSendCalls);
         Assert.Equal(0, context.CompletionCount);
@@ -226,7 +230,7 @@ public sealed class TypedOutboxExtensionsTests
             _ => throw new ArgumentOutOfRangeException(nameof(variation))
         };
         var context = Context(key);
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
 
         Invoke(outbox, type, context, key, Destination, "boundary result", reply: true, addressable: addressable);
 
@@ -236,7 +240,7 @@ public sealed class TypedOutboxExtensionsTests
         else Assert.Equal(1024, System.Text.Encoding.UTF8.GetByteCount(staged.MessageId.ToString()));
         Assert.Equal(Owner, staged.SenderId);
         Assert.Equal(Destination, staged.ReceiverId);
-        Assert.Equal(serializer.SerializeToArray("boundary result"), staged.Payload.ToArray());
+        Assert.Equal(serializer.SerializeToArray("boundary result"), staged.Payload);
         Assert.Equal(1, outbox.RawSendCalls);
         Assert.Equal(0, context.CompletionCount);
     }
@@ -246,41 +250,44 @@ public sealed class TypedOutboxExtensionsTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void TypedSend_ReleasesLocalOwnerWhileRawSendRetainedPinSurvives(bool reply, bool addressable)
+    public void TypedSend_StoresPublishedArrayAndPreservesBytesAfterRemoval(bool reply, bool addressable)
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<byte[]>>();
         var type = new DurableMessageType<byte[]>(Subject, serializer);
         var body = Enumerable.Range(0, 3_145_728).Select(i => (byte)(i * 31 + 7)).ToArray();
         var wire = serializer.SerializeToArray(body);
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         var context = Context();
 
         Invoke(outbox, type, context, CommandId, Destination, body, reply, addressable);
 
         var staged = Assert.Single(outbox.Messages);
-        var borrowed = outbox.LastBorrowed!.Value;
-        Assert.Equal(wire, staged.Payload.ToArray());
+        var published = outbox.LastPublished!.Value;
+        Assert.Equal(wire, staged.Payload);
         Assert.Equal(body, serializer.Deserialize(staged.Payload));
-        Assert.Equal(body, serializer.Deserialize(borrowed.Payload));
+        Assert.Same(published.Payload, staged.Payload);
+        Assert.Same(published.Payload, outbox.WireSeen);
+        Assert.NotSame(body, published.Payload);
+        Assert.Equal(body, serializer.Deserialize(published.Payload));
         Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, staged.MessageId);
         Assert.Equal(Owner, staged.SenderId);
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.Equal(0, context.CompletionCount);
-        // The first and last pages may be shared with other pooled creates.
-        // An interior consumed page belongs only to this multi-page payload:
-        // neither the pooled writer nor a concurrent neighboring slice pins it.
-        var interior = outbox.InteriorBorrowed!.Value;
-        var page = Assert.IsType<ArcBufferPage>(interior.First);
-        Assert.NotNull(page.Next);
-        var version = page.Version;
-        outbox.ReleaseMessages();
+        outbox.ClearMessages();
 
-        Assert.NotEqual(version, page.Version);
-        Assert.Throws<InvalidOperationException>(() => interior.ToArray());
         Assert.Empty(outbox.Messages);
         Assert.Equal(0, outbox.Count);
+        Assert.Equal(wire, published.Payload);
+        Assert.Equal(body, serializer.Deserialize(published.Payload));
         Assert.Equal(1, outbox.RawSendCalls);
+        Invoke(outbox, type, context, CommandId, Destination, body, reply, addressable);
+        var subsequent = Assert.Single(outbox.Messages);
+        Assert.NotSame(published.Payload, subsequent.Payload);
+        Assert.Equal(wire, subsequent.Payload);
+        Assert.Equal(wire, published.Payload);
+        Assert.Equal(2, outbox.RawSendCalls);
+        Assert.Equal(0, context.CompletionCount);
     }
 
     [Theory]
@@ -292,14 +299,14 @@ public sealed class TypedOutboxExtensionsTests
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
     [InlineData(true, true, true)]
-    public void TypedSend_RawSendFailurePreservesExactExceptionAndReleasesLocalOwner(bool reply, bool addressable, bool retainBeforeFailure)
+    public void TypedSend_RawSendFailurePreservesExactExceptionAndPublishedArray(bool reply, bool addressable, bool storeBeforeFailure)
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<byte[]>>();
         var type = new DurableMessageType<byte[]>(Subject, serializer);
         var body = Enumerable.Range(0, 3_145_728).Select(i => (byte)(i * 17 + 3)).ToArray();
         var sentinel = new IOException("rawSend sentinel");
-        using var outbox = new RetainingOutbox(Owner) { Failure = sentinel, RetainBeforeFailure = retainBeforeFailure };
+        var outbox = new StoringOutbox(Owner) { Failure = sentinel, StoreBeforeFailure = storeBeforeFailure };
         var context = Context();
 
         var exception = Assert.Throws<IOException>(() =>
@@ -308,17 +315,20 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Same(sentinel, exception);
         Assert.Equal(1, outbox.RawSendCalls);
         Assert.Equal(serializer.SerializeToArray(body), outbox.WireSeen);
-        var borrowed = outbox.LastBorrowed!.Value;
-        Assert.Equal(Owner, borrowed.SenderId);
-        Assert.Equal(Destination, borrowed.ReceiverId);
-        if (retainBeforeFailure)
+        var published = outbox.LastPublished!.Value;
+        Assert.Equal(Owner, published.SenderId);
+        Assert.Equal(Destination, published.ReceiverId);
+        Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, published.MessageId);
+        Assert.Equal(Subject, published.Subject);
+        Assert.Same(outbox.WireSeen, published.Payload);
+        if (storeBeforeFailure)
         {
-            var independent = Assert.Single(outbox.Messages);
-            Assert.Equal(body, serializer.Deserialize(independent.Payload));
-            outbox.ReleaseMessages();
+            var stored = Assert.Single(outbox.Messages);
+            Assert.Same(published.Payload, stored.Payload);
+            Assert.Equal(body, serializer.Deserialize(stored.Payload));
+            outbox.ClearMessages();
         }
-        var interior = outbox.InteriorBorrowed!.Value;
-        Assert.Throws<InvalidOperationException>(() => interior.ToArray());
+        Assert.Equal(body, serializer.Deserialize(published.Payload));
         Assert.Empty(outbox.Messages);
         Assert.Equal(0, outbox.Count);
         Assert.Equal(0, context.CompletionCount);
@@ -336,7 +346,7 @@ public sealed class TypedOutboxExtensionsTests
         var sessions = services.GetRequiredService<SerializerSessionPool>();
         var codec = new FailingCodec(sessions.CodecProvider.GetCodec<string>());
         var type = new DurableMessageType<string>(Subject, new Serializer<string>(codec, sessions));
-        using var outbox = new RetainingOutbox(Owner);
+        var outbox = new StoringOutbox(Owner);
         var context = Context();
         var sentinel = new InvalidDataException("committed encoder sentinel");
         codec.NextFailure = sentinel;
@@ -348,12 +358,12 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(1, codec.Writes);
         Assert.Equal(1, codec.CommittedFailures);
         Assert.Equal(0, outbox.RawSendCalls);
-        Assert.Null(outbox.LastBorrowed);
+        Assert.Null(outbox.LastPublished);
         Assert.Empty(outbox.Messages);
         Assert.Equal(0, context.CompletionCount);
         Invoke(outbox, type, context, CommandId, Destination, "recovered €42", reply, addressable);
         var staged = Assert.Single(outbox.Messages);
-        Assert.Equal(direct.SerializeToArray("recovered €42"), staged.Payload.ToArray());
+        Assert.Equal(direct.SerializeToArray("recovered €42"), staged.Payload);
         Assert.Equal("recovered €42", direct.Deserialize(staged.Payload));
         Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, staged.MessageId);
         Assert.Equal(2, codec.Writes);
@@ -387,7 +397,7 @@ public sealed class TypedOutboxExtensionsTests
         var sessions = services.GetRequiredService<SerializerSessionPool>();
         var codec = new FailingCodec(sessions.CodecProvider.GetCodec<string>());
         var type = new DurableMessageType<string>(Subject, new Serializer<string>(codec, sessions));
-        using var realOutbox = new RetainingOutbox(variation == "sender" ? default : Owner);
+        var realOutbox = new StoringOutbox(variation == "sender" ? default : Owner);
         IDurableOutbox outbox = variation == "outbox" ? null! : realOutbox;
         var key = variation switch
         {
@@ -433,19 +443,19 @@ public sealed class TypedOutboxExtensionsTests
         }
         Assert.Equal(0, codec.Writes);
         Assert.Equal(0, realOutbox.RawSendCalls);
-        Assert.Null(realOutbox.LastBorrowed);
+        Assert.Null(realOutbox.LastPublished);
         Assert.Empty(realOutbox.Messages);
         Assert.Equal(0, realOutbox.Count);
         if (context is not null) Assert.Equal(0, context.CompletionCount);
         // Positive control: same codec still encodes and stages after rejection.
-        using var positive = new RetainingOutbox(Owner);
+        var positive = new StoringOutbox(Owner);
         Invoke(positive,
             new DurableMessageType<string>(Subject, new Serializer<string>(codec, sessions)),
             Context(), CommandId, Destination, "valid control", reply, addressable);
         Assert.Equal(1, codec.Writes);
         Assert.Equal(1, positive.RawSendCalls);
         var staged = Assert.Single(positive.Messages);
-        Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray("valid control"), staged.Payload.ToArray());
+        Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray("valid control"), staged.Payload);
         Assert.Equal(Owner, staged.SenderId);
         Assert.Equal(Destination, staged.ReceiverId);
     }
@@ -459,7 +469,7 @@ public sealed class TypedOutboxExtensionsTests
         SenderId = ReceivedSender,
         ReceiverId = Owner,
         Subject = "orders.reserve",
-        Payload = default
+        Payload = Array.Empty<byte>()
     });
 
     private static void Invoke<T>(IDurableOutbox outbox, DurableMessageType<T> type, CountingContext context,
@@ -493,37 +503,29 @@ public sealed class TypedOutboxExtensionsTests
         public void Fail(string reason) => throw new InvalidOperationException("Unexpected dead letter.");
     }
 
-    private sealed class RetainingOutbox(GrainId senderId) : IDurableOutbox, IDisposable
+    private sealed class StoringOutbox(GrainId senderId) : IDurableOutbox
     {
         private readonly List<DurableEnvelope> _messages = [];
         public GrainId SenderId { get; } = senderId;
         public int Count => _messages.Count;
         public IEnumerable<DurableEnvelope> Messages => _messages;
         public int RawSendCalls { get; private set; }
-        public DurableEnvelope? LastBorrowed { get; private set; }
-        public ArcBuffer? InteriorBorrowed { get; private set; }
+        public DurableEnvelope? LastPublished { get; private set; }
         public byte[]? WireSeen { get; private set; }
         public Exception? Failure { get; set; }
-        public bool RetainBeforeFailure { get; set; }
+        public bool StoreBeforeFailure { get; set; }
 
         public void Send(DurableEnvelope envelope)
         {
             RawSendCalls++;
-            LastBorrowed = envelope; // Borrowed only. Never disposed by this fake.
-            WireSeen = envelope.Payload.ToArray(); // Serialization must be complete on entry.
-            if (envelope.Payload.Length > 2_097_152)
-            {
-                // Borrow an interior page without acquiring another owner.
-                var first = Assert.IsType<ArcBufferPage>(envelope.Payload.First);
-                InteriorBorrowed = envelope.Payload.UnsafeSlice(
-                    first.Length - envelope.Payload.Offset, 1);
-            }
+            LastPublished = envelope;
+            WireSeen = envelope.Payload;
             if (Failure is { } failure)
             {
-                if (RetainBeforeFailure) _messages.Add(envelope.Retain());
+                if (StoreBeforeFailure) _messages.Add(envelope);
                 throw failure;
             }
-            _messages.Add(envelope.Retain()); // Independent durable-state owner.
+            _messages.Add(envelope);
         }
 
         public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
@@ -538,12 +540,7 @@ public sealed class TypedOutboxExtensionsTests
             return false;
         }
 
-        public void ReleaseMessages()
-        {
-            foreach (var envelope in _messages) envelope.Dispose();
-            _messages.Clear();
-        }
-        public void Dispose() => ReleaseMessages();
+        public void ClearMessages() => _messages.Clear();
     }
 
     private sealed class FailingCodec(IFieldCodec<string> inner) : IFieldCodec<string>

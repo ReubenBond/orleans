@@ -23,7 +23,6 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     private static readonly GrainId Sender = GrainId.Create("order", "42");
     private static readonly GrainId Receiver = GrainId.Create("inventory", "widget");
     private static readonly HierarchicalKey Command = HierarchicalKey.Create("orders", "42", "reserve");
-    private readonly List<DurableEnvelope> _owned = [];
     private readonly IDurableOutbox _outbox = Substitute.For<IDurableOutbox>();
     private (List<DurableEnvelope> Output, List<string> Events) _activeAttempt;
 
@@ -32,7 +31,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         _outbox.SenderId.Returns(Receiver);
         _outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            _activeAttempt.Output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
+            _activeAttempt.Output.Add(call.Arg<DurableEnvelope>());
             _activeAttempt.Events.Add("send");
         });
     }
@@ -49,12 +48,6 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         await grain.OnActivateAsync(TestContext.Current.CancellationToken);
         inbox.Received(1).RegisterHandler(handler);
         return (grain, handler);
-    }
-
-    private DurableEnvelope Own(DurableEnvelope envelope)
-    {
-        _owned.Add(envelope);
-        return envelope;
     }
 
     [Fact]
@@ -169,12 +162,12 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         ];
         foreach (var outcome in outcomes)
         {
-            using var reservation = Type<ReservationResult>().Create(Command, Sender, Receiver, outcome);
+            var reservation = Type<ReservationResult>().Create(Command, Sender, Receiver, outcome);
             var reservationCopy = ReadBody<ReservationResult>(reservation);
             Assert.Equal(outcome.GetType(), reservationCopy.GetType());
             Assert.Equal(outcome, reservationCopy);
 
-            using var order = Type<OrderOutcome>().Create(Command, Sender, Receiver, outcome);
+            var order = Type<OrderOutcome>().Create(Command, Sender, Receiver, outcome);
             var orderCopy = ReadBody<OrderOutcome>(order);
             Assert.Equal(outcome.GetType(), orderCopy.GetType());
             Assert.Equal(outcome, orderCopy);
@@ -327,7 +320,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     }
 
     [Fact]
-    public async Task Payment_PreparationAwaitKeepsBorrowedInputAndStagesOwnedReplyBeforeReturn()
+    public async Task Payment_PreparationAwaitPreservesInputBytesAndStagesReplyBeforeReturn()
     {
         var results = new TestDictionary<HierarchicalKey, PaymentResult>();
         var gateway = Substitute.For<IIdempotentPaymentGateway>();
@@ -336,6 +329,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var prepared = new TaskCompletionSource<PaymentResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         gateway.ChargeAsync(Command.ToString(), request, Arg.Any<CancellationToken>()).Returns(prepared.Task);
         var attempt = CreateContext(request, Command);
+        var inputBytes = attempt.Context.Envelope.Payload.ToArray();
         var (_, handler) = await RegisterAsync(inbox => new PaymentGrain(inbox, _outbox,
             Type<ChargePayment>(), Type<PaymentResult>(), gateway, results));
 
@@ -345,11 +339,14 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Empty(attempt.Output);
         Assert.Empty(attempt.Events);
         Assert.Equal(request, ReadBody<ChargePayment>(attempt.Context.Envelope));
+        Assert.Equal(inputBytes, attempt.Context.Envelope.Payload);
         prepared.SetResult(outcome);
         await handling;
         Assert.Equal(new[] { "send", "complete" }, attempt.Events);
         Assert.Equal(outcome, ReadBody<PaymentResult>(Assert.Single(attempt.Output)));
         Assert.Equal(outcome, results[Command]);
+        Assert.Equal(inputBytes, attempt.Context.Envelope.Payload);
+        Assert.NotSame(attempt.Context.Envelope.Payload, Assert.Single(attempt.Output).Payload);
     }
 
     [Theory]
@@ -439,7 +436,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var acknowledgement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            outputs.Add(Own(call.Arg<DurableEnvelope>().Retain()));
+            outputs.Add(call.Arg<DurableEnvelope>());
             events.Add("send");
         });
         state.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(_ =>
@@ -511,7 +508,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), context);
         var output = new List<DurableEnvelope>();
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
-            output.Add(Own(call.Arg<DurableEnvelope>().Retain())));
+            output.Add(call.Arg<DurableEnvelope>()));
         var id = Guid.NewGuid();
         GrainId[] recipients =
         [
@@ -571,9 +568,9 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             if (output.TryGetValue(envelope.MessageId, out var existing))
             {
                 Assert.Equal(existing.ReceiverId, envelope.ReceiverId);
-                Assert.Equal(existing.Payload.ToArray(), envelope.Payload.ToArray());
+                Assert.Equal(existing.Payload, envelope.Payload);
             }
-            else output.Add(envelope.MessageId, Own(envelope.Retain()));
+            else output.Add(envelope.MessageId, envelope);
         });
         var id = Guid.NewGuid();
         GrainId[] recipients = [GrainId.Create("notification", "alice"), GrainId.Create("notification", "bob")];
@@ -616,7 +613,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private (IInboxHandlerContext Context, List<DurableEnvelope> Output, List<string> Events) CreateContext<T>(T body, HierarchicalKey key)
     {
-        var envelope = Own(Type<T>().Create(key, Sender, Receiver, body));
+        var envelope = Type<T>().Create(key, Sender, Receiver, body);
         var context = Substitute.For<IInboxHandlerContext>();
         var output = new List<DurableEnvelope>();
         var events = new List<string>();
@@ -632,11 +629,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private T ReadBody<T>(DurableEnvelope envelope) => Type<T>().Decode(envelope);
 
-    public void Dispose()
-    {
-        foreach (var envelope in _owned) envelope.Dispose();
-        _services.Dispose();
-    }
+    public void Dispose() => _services.Dispose();
 
     private sealed class TestDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>
         where TKey : notnull;

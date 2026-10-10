@@ -4,7 +4,6 @@ using NSubstitute;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Documentation;
@@ -19,15 +18,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     private static readonly GrainId Receiver = GrainId.Create("notification", "snippet");
     private static readonly HierarchicalKey Command = HierarchicalKey.Create("notifications", "42");
     private Serializer Serializer => _services.GetRequiredService<Serializer>();
-    private readonly List<DurableEnvelope> _owned = [];
 
     private DurableMessageType<T> Type<T>() => new(typeof(T).Name, _services.GetRequiredService<Serializer<T>>());
-
-    private DurableEnvelope Own(DurableEnvelope envelope)
-    {
-        _owned.Add(envelope);
-        return envelope;
-    }
 
     [Fact]
     public async Task NotificationReply_DerivesResultIdentityFromApplicationCommand()
@@ -139,8 +131,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationHandling_UnexpectedSubjectPreservesBusinessState()
     {
         var attempt = await CreateAsync(new Notify("prepared"));
-        var unexpected = Own(Type<NotificationReceived>().Create(
-            Command, Sender, Receiver, new NotificationReceived("receipt", Command)));
+        var unexpected = Type<NotificationReceived>().Create(
+            Command, Sender, Receiver, new NotificationReceived("receipt", Command));
         attempt.Context.Envelope.Returns(unexpected);
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -193,7 +185,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var events = new List<string>();
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
+            output.Add(call.Arg<DurableEnvelope>());
             events.Add("send");
         });
         state.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(_ =>
@@ -236,28 +228,35 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     }
 
     [Fact]
-    public void Envelope_RetainOwnsIndependentPinAndSerializationDoesNotConsumePayload()
+    public void Envelope_CopyAndSerializationPreserveBytesAndIsolateDecodedArrays()
     {
-        DurableEnvelope retained;
-        using (var envelope = Type<Notify>().Create(Command, Sender, Receiver, new Notify("owned")))
-        {
-            retained = envelope.Retain();
-        }
+        var envelope = Type<Notify>().Create(Command, Sender, Receiver, new Notify("managed"));
+        var originalBytes = envelope.Payload.ToArray();
+        var view = envelope;
+        Assert.Same(envelope.Payload, view.Payload);
+        var copied = _services.GetRequiredService<DeepCopier<DurableEnvelope>>().Copy(envelope);
+        Assert.Equal(envelope.MessageId, copied.MessageId);
+        Assert.Equal(envelope.SenderId, copied.SenderId);
+        Assert.Equal(envelope.ReceiverId, copied.ReceiverId);
+        Assert.Equal(envelope.Subject, copied.Subject);
+        Assert.NotSame(envelope.Payload, copied.Payload);
+        Assert.Equal(originalBytes, copied.Payload);
 
-        using (retained)
-        {
-            using var encoder = new ArcBufferWriter();
-            Serializer.Serialize(retained, encoder);
-            using var first = encoder.ConsumeSlice(encoder.Length);
-            Serializer.Serialize(retained, encoder);
-            using var second = encoder.ConsumeSlice(encoder.Length);
-            Assert.Equal(first.ToArray(), second.ToArray());
-            using var decoded = Serializer.Deserialize<DurableEnvelope>(first);
-            Assert.Equal(retained.MessageId, decoded.MessageId);
-            Assert.Equal(retained.Subject, decoded.Subject);
-            Assert.Equal(new Notify("owned"), Type<Notify>().Decode(decoded));
-            Assert.Equal(new Notify("owned"), Type<Notify>().Decode(retained));
-        }
+        var first = Serializer.SerializeToArray(envelope);
+        var second = Serializer.SerializeToArray(envelope);
+        Assert.Equal(first, second);
+        Assert.NotSame(first, second);
+        var decoded = Serializer.Deserialize<DurableEnvelope>(first);
+        Assert.Equal(envelope.MessageId, decoded.MessageId);
+        Assert.Equal(envelope.SenderId, decoded.SenderId);
+        Assert.Equal(envelope.ReceiverId, decoded.ReceiverId);
+        Assert.Equal(envelope.Subject, decoded.Subject);
+        Assert.NotSame(envelope.Payload, decoded.Payload);
+        Assert.Equal(originalBytes, decoded.Payload);
+        Assert.Equal(new Notify("managed"), Type<Notify>().Decode(decoded));
+        Assert.Equal(new Notify("managed"), Type<Notify>().Decode(copied));
+        Assert.Equal(new Notify("managed"), Type<Notify>().Decode(envelope));
+        Assert.Equal(originalBytes, envelope.Payload);
     }
 
     [Fact]
@@ -267,12 +266,12 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var outbox = Substitute.For<IDurableOutbox>();
         outbox.SenderId.Returns(Receiver);
         var context = Substitute.For<IInboxHandlerContext>();
-        var input = Own(Type<Notify>().Create(Command, Sender, Receiver, new Notify("prepared", Sender)));
+        var input = Type<Notify>().Create(Command, Sender, Receiver, new Notify("prepared", Sender));
         context.Envelope.Returns(input);
-        ArcBuffer borrowedReply = default;
+        byte[] publishedReply = [];
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            borrowedReply = call.Arg<DurableEnvelope>().Payload;
+            publishedReply = call.Arg<DurableEnvelope>().Payload;
             throw new IOException("staging failed");
         });
         IInboxHandler handler = null!;
@@ -283,7 +282,9 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         await Assert.ThrowsAsync<IOException>(async () =>
             await handler.HandleAsync(context, TestContext.Current.CancellationToken));
         context.DidNotReceive().Complete();
-        Assert.NotEqual(0, borrowedReply.Length);
+        Assert.NotEmpty(publishedReply);
+        Assert.Equal(new NotificationReceived("prepared", Command),
+            _services.GetRequiredService<Serializer<NotificationReceived>>().Deserialize(publishedReply));
         Assert.Equal(7, count.Value);
     }
 
@@ -293,14 +294,14 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var outbox = Substitute.For<IDurableOutbox>();
         outbox.SenderId.Returns(Receiver);
         var context = Substitute.For<IInboxHandlerContext>();
-        var input = Own(Type<Notify>().Create(Command, Sender, Receiver, message));
+        var input = Type<Notify>().Create(Command, Sender, Receiver, message);
         context.Envelope.Returns(input);
         var events = new List<string>();
         var output = new List<DurableEnvelope>();
         var count = new TestCount(events);
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
+            output.Add(call.Arg<DurableEnvelope>());
             events.Add("send");
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
@@ -311,11 +312,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         return new(grain, handler, inbox, outbox, context, count, output, events);
     }
 
-    public void Dispose()
-    {
-        foreach (var envelope in _owned) envelope.Dispose();
-        _services.Dispose();
-    }
+    public void Dispose() => _services.Dispose();
 
     private sealed record Attempt(NotificationGrain Grain, IInboxHandler Handler, IDurableInbox Inbox, IDurableOutbox Outbox,
         IInboxHandlerContext Context, TestCount Count, List<DurableEnvelope> Output, List<string> Events);
