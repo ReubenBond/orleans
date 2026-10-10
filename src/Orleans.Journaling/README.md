@@ -226,6 +226,10 @@ For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configu
 
 ## In-memory storage capacity
 
+`IJournalStorage.AppendAsync` and `ReplaceAsync` accept caller-owned `ArcBuffer` values.
+Callers keep their buffers pinned through actual operation completion; providers which retain
+bytes acquire independent slices for the stored lifetime.
+
 `VolatileJournalStorage` retains journal bytes on reference-counted pages across manager lifetimes.
 Replacement and deletion release retired storage references, while active readers retain stable
 bytes until completion. Each nonempty journal can retain a minimum 16 KiB page even for a small

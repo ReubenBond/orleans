@@ -1,3 +1,4 @@
+using Orleans.Serialization.Buffers;
 #nullable enable
 #pragma warning disable ORLEANSEXP005
 
@@ -4245,7 +4246,7 @@ public class LocalDurableJobManagerTests
                 return provider.RejectMetadataUpdates ? null : await inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
             }
 
-            public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
             {
                 if (provider.BeforeWrite is { } beforeWrite)
                 {
@@ -4255,7 +4256,7 @@ public class LocalDurableJobManagerTests
                 await inner.ReplaceAsync(value, cancellationToken);
             }
 
-            public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
             {
                 if (provider.BeforeWrite is { } beforeWrite)
                 {

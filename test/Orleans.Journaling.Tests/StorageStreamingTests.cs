@@ -1,9 +1,9 @@
 using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -23,12 +23,12 @@ public sealed class StorageStreamingTests
 
         using (var segmentData = CreateBuffer(segmentBytes))
         {
-            await storage.AppendAsync(segmentData.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(segmentData, CancellationToken.None);
         }
 
         using (var snapshotData = CreateBuffer(snapshotBytes))
         {
-            await storage.ReplaceAsync(snapshotData.AsReadOnlySequence(), CancellationToken.None);
+            await storage.ReplaceAsync(snapshotData, CancellationToken.None);
         }
 
         Assert.Single(storage.Segments);
@@ -44,7 +44,7 @@ public sealed class StorageStreamingTests
 
         using (var data = CreateBuffer(rawBytes))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data, CancellationToken.None);
         }
 
         await storage.ReadAsync(consumer, CancellationToken.None);
@@ -63,12 +63,12 @@ public sealed class StorageStreamingTests
 
         using (var data = CreateBuffer(first))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data, CancellationToken.None);
         }
 
         using (var data = CreateBuffer(second))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data, CancellationToken.None);
         }
 
         await storage.ReadAsync(consumer, CancellationToken.None);

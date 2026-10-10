@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization;
 using Xunit;
 
@@ -801,7 +802,7 @@ public sealed class DurableStateManagerTests
             await _inner.ReadAsync(consumer, cancellationToken);
         }
 
-        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _appendCount);
             if (NextAppendBarrier is { } barrier)
@@ -821,7 +822,7 @@ public sealed class DurableStateManagerTests
                 throw failure;
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
             => _inner.ReplaceAsync(value, cancellationToken);
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)

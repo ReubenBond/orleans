@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using Orleans.Serialization.Buffers;
+using NSubstitute;
 using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Orleans.Storage;
-using NSubstitute;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -117,7 +117,7 @@ public partial class StateManagerTests : JournalingTestBase
         var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
         using (var data = CreateBuffer([1, 2, 3]))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data, CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage, journalFormat: new NonConsumingJournalFormat());
@@ -190,7 +190,7 @@ public partial class StateManagerTests : JournalingTestBase
 
         using var data = segment.GetBuffer();
         var originalBytes = data.ToArray();
-        await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        await storage.AppendAsync(data, CancellationToken.None);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
@@ -209,7 +209,7 @@ public partial class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage { IsCompactionRequested = true };
         using (var data = CreateBuffer(physicalBytes))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data, CancellationToken.None);
         }
 
         var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload, SessionPool);
@@ -979,7 +979,7 @@ public partial class StateManagerTests : JournalingTestBase
             AppendDirectorySet(segment, "existing", recoveredStreamId);
             CreateValueCodec<int>().WriteSet(42, segment.CreateJournalStreamWriter(recoveredStreamId));
             using var committed = segment.GetBuffer();
-            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(committed, CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage);
@@ -1010,7 +1010,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
 
             using var committed = segment.GetBuffer();
-            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(committed, CancellationToken.None);
         }
 
         var sut = CreateTestSystem(storage: storage);
@@ -1647,9 +1647,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2000,9 +2000,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _appendCount) == 1)
@@ -2033,9 +2033,9 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
         public async ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
@@ -2192,7 +2192,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Exception? exceptionToThrow;
@@ -2239,7 +2239,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _activeAppends);
@@ -2339,14 +2339,14 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             WriteCount++;
             Bytes = value.ToArray();
             return default;
         }
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             WriteCount++;
             Bytes = [.. Bytes, .. value.ToArray()];
@@ -2450,7 +2450,7 @@ public partial class StateManagerTests : JournalingTestBase
             consumer.Read(snapshot, metadata: BinaryMetadata, complete: true);
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
@@ -2464,7 +2464,7 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var appendBytes = value.ToArray();
@@ -2495,9 +2495,9 @@ public partial class StateManagerTests : JournalingTestBase
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
             => ValueTask.FromException(Exception);
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2527,9 +2527,9 @@ public partial class StateManagerTests : JournalingTestBase
             }
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -2548,14 +2548,14 @@ public partial class StateManagerTests : JournalingTestBase
             return default;
         }
 
-        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();
             ReplaceBytesAfterYield = value.ToArray();
         }
 
-        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
         {
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();

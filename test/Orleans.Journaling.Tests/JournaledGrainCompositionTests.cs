@@ -8,6 +8,7 @@ using NSubstitute;
 using Orleans.Journaling.Json;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -652,7 +653,7 @@ public sealed class JournalCompositionStorage : IJournalStorage
         Interlocked.Increment(ref Reads);
         return _inner.ReadAsync(consumer, cancellationToken);
     }
-    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref Writes);
         var failure = FailNextWrite;
@@ -666,6 +667,6 @@ public sealed class JournalCompositionStorage : IJournalStorage
             throw new IOException(FailureMessage);
         }
     }
-    public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => _inner.ReplaceAsync(value, cancellationToken);
+    public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => _inner.ReplaceAsync(value, cancellationToken);
     public ValueTask DeleteAsync(CancellationToken cancellationToken) => _inner.DeleteAsync(cancellationToken);
 }

@@ -3,14 +3,15 @@ using System.Security.Cryptography;
 using Azure.Core;
 using Azure.Data.Tables;
 using Azure.Identity;
-using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers;
+using Orleans;
 
 namespace Benchmarks.Journaling.Azure;
 
@@ -29,6 +30,8 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
     internal const string FormatKey = "benchmark-bytes-v1";
     private readonly byte[] _append = CreatePayload(options.AppendBytes, options.Seed);
     private readonly byte[] _checkpoint = CreatePayload(options.CheckpointBytes, unchecked(options.Seed + 1));
+    private ArcBuffer _appendBuffer;
+    private ArcBuffer _checkpointBuffer;
     private readonly string _resourceName = "journalbench" + Guid.NewGuid().ToString("N");
     private ServiceProvider? _services;
     private SiloLifecycleSubject? _lifecycle;
@@ -45,6 +48,8 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
     public async Task PrepareAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _appendBuffer = CreateBuffer(_append);
+        _checkpointBuffer = CreateBuffer(_checkpoint);
         report.Resource = _resourceName;
         Console.Error.WriteLine($"Azure journal benchmark resource={_resourceName}; backend={options.Backend}");
         var expectedBatches = options.Workload switch
@@ -131,10 +136,10 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
             {
                 var storage = _provider.CreateStorage(WorkId(index));
                 await CreateJournalAsync(storage, cancellationToken);
-                await storage.ReplaceAsync(new ReadOnlySequence<byte>(_checkpoint), cancellationToken);
+                await storage.ReplaceAsync(_checkpointBuffer, cancellationToken);
                 for (var batch = 0; batch < options.HistoryBatches; batch++)
                 {
-                    await storage.AppendAsync(new ReadOnlySequence<byte>(_append), cancellationToken);
+                    await storage.AppendAsync(_appendBuffer, cancellationToken);
                 }
 
                 _journals.Add(storage);
@@ -168,10 +173,10 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
         switch (options.Workload)
         {
             case AzureJournalWorkload.DurableAppend:
-                await _journals[index].AppendAsync(new ReadOnlySequence<byte>(_append), cancellationToken);
+                await _journals[index].AppendAsync(_appendBuffer, cancellationToken);
                 break;
             case AzureJournalWorkload.CheckpointReplace:
-                await _journals[index].ReplaceAsync(new ReadOnlySequence<byte>(_checkpoint), cancellationToken);
+                await _journals[index].ReplaceAsync(_checkpointBuffer, cancellationToken);
                 break;
             case AzureJournalWorkload.RecoveryReplay:
                 await VerifyJournalAsync(index, options.HistoryBatches, cancellationToken);
@@ -325,6 +330,18 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
         }
         finally
         {
+            if (_appendBuffer.Length > 0)
+            {
+                _appendBuffer.Dispose();
+                _appendBuffer = default;
+            }
+
+            if (_checkpointBuffer.Length > 0)
+            {
+                _checkpointBuffer.Dispose();
+                _checkpointBuffer = default;
+            }
+
             _metrics?.Dispose();
             if (_services is not null)
             {
@@ -332,6 +349,13 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
                 _services = null;
             }
         }
+    }
+
+    private static ArcBuffer CreateBuffer(byte[] bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        return writer.PeekSlice(writer.Length);
     }
 
     internal static void VerifyAccount(AzureJournalBackend backend, AccountKind kind, SkuName sku)
