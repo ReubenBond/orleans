@@ -3506,6 +3506,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     public static partial class OrleansGeneratedCodeHelper
     {
+        public static void CompleteArgumentResourcesOnFailure(Invocation.IInvokableArgumentOwner request, System.Exception cause, System.IServiceProvider services) { }
+
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }

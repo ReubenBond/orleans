@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Threading;
-using Orleans.Serialization.Buffers;
 using NSubstitute;
 using Orleans;
 using Orleans.Runtime;
@@ -556,11 +555,7 @@ public class InvokableObjectManagerTests
     {
         var receiver = new OwnedReceiver { Fail = outcome == "throw" };
         await using var fixture = new ManagerFixture(observer: receiver);
-        using var source = new ArcBufferWriter();
-        source.Write(OwnedRpcArgumentLifetimeTests.Bytes);
-        using var argument = source.PeekSlice(source.Length);
-        var pages = argument.Pages.ToArray();
-        var baseline = pages.Select(page => page.ReferenceCount).ToArray();
+        using var argument = new OwnedTransportArgument(OwnedRpcArgumentLifetimeTests.Bytes);
         using var request = OwnedRpcArgumentLifetimeTests.CreateRequest(fixture.Services, argument);
         var message = fixture.Request(11, request);
         fixture.Manager.Dispatch(message);
@@ -580,8 +575,8 @@ public class InvokableObjectManagerTests
                 Assert.False(Assert.IsAssignableFrom<IInvokableArgumentOwner>(request).TryRetainArgumentResources());
             }
 
-            OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 1);
-            Assert.Equal(OwnedRpcArgumentLifetimeTests.Bytes, Assert.IsType<ArcBuffer>(request.GetArgument(0)).ToArray());
+            OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 1);
+            Assert.Equal(OwnedRpcArgumentLifetimeTests.Bytes, Assert.IsType<OwnedTransportArgument>(request.GetArgument(0)).Buffer);
         }
         finally
         {
@@ -589,12 +584,12 @@ public class InvokableObjectManagerTests
         }
 
         await fixture.WaitAsync(fixture.StopAsync(), "owned invocation and response drained");
-        OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
         Assert.Equal(OwnedRpcArgumentLifetimeTests.Bytes, receiver.Observed);
         if (outcome == "throw") fixture.AssertException<InvalidOperationException>(message);
         fixture.AssertResponseCount(1);
         message.Dispose();
-        OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
     }
 
     [Theory]
@@ -602,17 +597,13 @@ public class InvokableObjectManagerTests
     [InlineData("expired")]
     [InlineData("filter")]
     [InlineData("retired")]
-    public async Task OwnedInvocation_DroppedBeforeBodyReleasesPins(string outcome)
+    public async Task OwnedInvocation_DroppedBeforeBodyReleasesArguments(string outcome)
     {
         var receiver = new OwnedReceiver();
         var filter = Substitute.For<IIncomingGrainCallFilter>();
         filter.Invoke(Arg.Any<IIncomingGrainCallContext>()).Returns(_ => throw new InvalidOperationException("incoming filter failed"));
         await using var fixture = new ManagerFixture(observer: receiver, filter: outcome == "filter" ? filter : null);
-        using var source = new ArcBufferWriter();
-        source.Write(OwnedRpcArgumentLifetimeTests.Bytes);
-        using var argument = source.PeekSlice(source.Length);
-        var pages = argument.Pages.ToArray();
-        var baseline = pages.Select(page => page.ReferenceCount).ToArray();
+        using var argument = new OwnedTransportArgument(OwnedRpcArgumentLifetimeTests.Bytes);
         using var request = OwnedRpcArgumentLifetimeTests.CreateRequest(fixture.Services, argument);
         var message = fixture.Request(11, request);
         if (outcome == "shutdown") await fixture.WaitAsync(fixture.StopAsync(), "admission closed before owned dispatch");
@@ -620,13 +611,13 @@ public class InvokableObjectManagerTests
         if (outcome == "retired") Assert.IsAssignableFrom<IInvokableArgumentOwner>(request).CompleteArgumentResources();
         fixture.Manager.Dispatch(message);
         await fixture.WaitAsync(fixture.StopAsync(), "dropped owned request drained");
-        OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
         Assert.False(receiver.Entered.Task.IsCompleted);
         if (outcome == "shutdown") fixture.AssertUnavailable(message);
         if (outcome == "filter") fixture.AssertException<InvalidOperationException>(message);
         if (outcome == "retired") fixture.AssertException<OperationCanceledException>(message);
         message.Dispose();
-        OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
     }
 
     [Fact]
@@ -638,11 +629,7 @@ public class InvokableObjectManagerTests
         var first = fixture.Request(11, held);
         data.ReceiveMessage(first);
         await fixture.WaitAsync(held.Entered.Task, "first invocation holding queue");
-        using var source = new ArcBufferWriter();
-        source.Write(OwnedRpcArgumentLifetimeTests.Bytes);
-        using var argument = source.PeekSlice(source.Length);
-        var pages = argument.Pages.ToArray();
-        var baseline = pages.Select(page => page.ReferenceCount).ToArray();
+        using var argument = new OwnedTransportArgument(OwnedRpcArgumentLifetimeTests.Bytes);
         using var request = OwnedRpcArgumentLifetimeTests.CreateRequest(fixture.Services, argument);
         var queued = fixture.Request(12, request);
         try
@@ -651,12 +638,49 @@ public class InvokableObjectManagerTests
             await ((IGrainCallCancellationExtension)data).CancelRequestAsync(queued.SendingGrain, queued.Id,
                 TestContext.Current.CancellationToken);
             fixture.AssertException<OperationCanceledException>(queued);
-            OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+            OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
         }
         finally { held.Release.TrySetResult(); }
         await fixture.WaitAsync(fixture.StopAsync(), "owned queued cancellation drained");
         queued.Dispose();
-        OwnedRpcArgumentLifetimeTests.AssertCounts(pages, baseline, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(argument, 0);
+    }
+
+    [Fact]
+    public async Task OwnedCleanupFailure_DoesNotInterruptObserverDrain()
+    {
+        var receiver = new OwnedReceiver { Fail = true };
+        var logger = Substitute.For<ILogger<InvokableObjectManager>>();
+        logger.IsEnabled(LogLevel.Warning).Returns(true);
+        await using var fixture = new ManagerFixture(observer: receiver, logger: logger);
+        using var first = new OwnedTransportArgument(OwnedRpcArgumentLifetimeTests.Bytes);
+        using var second = new OwnedTransportArgument(OwnedRpcArgumentLifetimeTests.Bytes);
+        using var firstRequest = OwnedRpcArgumentLifetimeTests.CreateRequest(fixture.Services, first);
+        using var secondRequest = OwnedRpcArgumentLifetimeTests.CreateRequest(fixture.Services, second);
+        var cleanupFailure = new InvalidOperationException("observer argument cleanup failed");
+        Assert.IsType<OwnedTransportArgument>(firstRequest.GetArgument(0)).DisposeError = cleanupFailure;
+        var firstMessage = fixture.Request(11, firstRequest);
+        var secondMessage = fixture.Request(12, secondRequest);
+        fixture.Manager.Dispatch(firstMessage);
+        try
+        {
+            await fixture.WaitAsync(receiver.Entered.Task, "first owned observer invocation entered");
+            fixture.Manager.Dispatch(secondMessage);
+        }
+        finally
+        {
+            receiver.Release.TrySetResult();
+        }
+
+        await fixture.WaitAsync(fixture.StopAsync(), "observer drain through throwing cleanup");
+
+        OwnedRpcArgumentLifetimeTests.AssertCopies(first, 0);
+        OwnedRpcArgumentLifetimeTests.AssertCopies(second, 0);
+        Assert.Equal("owned invocation failure", fixture.AssertException<InvalidOperationException>(firstMessage).Message);
+        Assert.Equal("owned invocation failure", fixture.AssertException<InvalidOperationException>(secondMessage).Message);
+        fixture.AssertResponseCount(2);
+        Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && ReferenceEquals(call.GetArguments()[3], cleanupFailure));
     }
 
     private sealed class OwnedReceiver : IOwnedTransportCalls
@@ -665,14 +689,13 @@ public class InvokableObjectManagerTests
         internal TaskCompletionSource Release { get; } = DrainTestHelpers.CreateSignal();
         internal byte[]? Observed { get; private set; }
         internal bool Fail { get; init; }
-        public async Task Owned(ArcBuffer buffer)
+        public async Task Owned(OwnedTransportArgument argument)
         {
             Entered.TrySetResult();
             await Release.Task;
-            Observed = buffer.ToArray();
+            Observed = argument.Buffer.ToArray();
             if (Fail) throw new InvalidOperationException("owned invocation failure");
         }
-        public Task Blocked(OwnedTransportArgument argument) => Owned(argument.Buffer);
     }
 
     private sealed class ManagerFixture : IAsyncDisposable
@@ -686,7 +709,7 @@ public class InvokableObjectManagerTests
         private readonly List<Task> _stops = [];
 
         internal ManagerFixture(bool registerObserver = true, [CallerMemberName] string testName = "", IAddressable? observer = null,
-            IIncomingGrainCallFilter? filter = null)
+            IIncomingGrainCallFilter? filter = null, ILogger<InvokableObjectManager>? logger = null)
         {
             _testName = testName;
             Observer = observer ?? new DrainObserver();
@@ -712,7 +735,7 @@ public class InvokableObjectManagerTests
                 trace,
                 _services.GetRequiredService<DeepCopier<Response>>(),
                 new InterfaceToImplementationMappingCache(),
-                _services.GetRequiredService<ILogger<InvokableObjectManager>>());
+                logger ?? _services.GetRequiredService<ILogger<InvokableObjectManager>>());
             if (registerObserver)
             {
                 Assert.True(Manager.TryRegister(Observer, ObserverId));
