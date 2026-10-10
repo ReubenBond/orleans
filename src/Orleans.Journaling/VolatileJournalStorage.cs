@@ -386,6 +386,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
 
         public long AppendCount { get; set; }
 
+        // List count and each stored array length fit in int, so their total fits in long.
         public long AppendedBytes { get; set; }
 
         public Dictionary<string, string> Properties { get; } = new(StringComparer.Ordinal);

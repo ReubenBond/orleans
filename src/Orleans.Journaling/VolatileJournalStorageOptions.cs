@@ -3,6 +3,10 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Configures the journal history retained by volatile storage between snapshots.
 /// </summary>
+/// <remarks>
+/// Providers and isolated storage instances capture these values during construction.
+/// Each journal counts successful storage append calls, including empty appends.
+/// </remarks>
 public sealed class VolatileJournalStorageOptions
 {
     /// <summary>
@@ -16,8 +20,8 @@ public sealed class VolatileJournalStorageOptions
     /// The default is 1 MiB (1,048,576 bytes). The value must be positive.
     /// </summary>
     /// <remarks>
-    /// Storage requests a snapshot when either limit is reached. Snapshot bytes are excluded
-    /// from the appended byte count. A successful snapshot or deletion resets both counters.
+    /// Storage requests a snapshot when either limit is reached. The appended byte count measures
+    /// encoded journal bytes, with snapshot bytes excluded. A successful snapshot or deletion resets both counters.
     /// The state manager checks the request before its next write, so an individual append can exceed this limit.
     /// </remarks>
     public long MaxBytesBeforeSnapshot { get; set; } = 1024 * 1024;

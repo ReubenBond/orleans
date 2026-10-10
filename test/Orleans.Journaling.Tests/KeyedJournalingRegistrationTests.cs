@@ -96,6 +96,52 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Theory]
+    [InlineData(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
+    [InlineData("configured")]
+    public async Task VolatileProviders_SeparateOptionsPipelineAppliesOnceAndIsCapturedAtConstruction(string name)
+    {
+        var builder = CreateNamedProviderBuilder();
+        var optionsName = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME ? Options.DefaultName : name;
+        builder.Services.Configure<VolatileJournalStorageOptions>(optionsName, options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        builder.AddVolatileJournalStorage(name, configureOptions: null);
+        builder.Services.ConfigureAll<VolatileJournalStorageOptions>(options => options.MaxAppendsBeforeSnapshot++);
+        builder.Services.PostConfigure<VolatileJournalStorageOptions>(optionsName, options => options.MaxAppendsBeforeSnapshot++);
+        await using var services = builder.Services.BuildServiceProvider();
+        var configured = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME
+            ? services.GetRequiredService<IOptions<VolatileJournalStorageOptions>>().Value
+            : services.GetRequiredService<IOptionsMonitor<VolatileJournalStorageOptions>>().Get(optionsName);
+        Assert.Equal(4, configured.MaxAppendsBeforeSnapshot);
+        Assert.Equal(long.MaxValue, configured.MaxBytesBeforeSnapshot);
+        var provider = services.GetRequiredKeyedService<IJournalStorageProvider>(name);
+        var storage = provider.CreateStorage(new("options-pipeline"));
+        if (name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+        {
+            Assert.Same(provider, services.GetRequiredService<IJournalStorageProvider>());
+        }
+
+        configured.MaxAppendsBeforeSnapshot = 1;
+        var token = TestContext.Current.CancellationToken;
+        for (var index = 0; index < 3; index++)
+        {
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+            Assert.False(storage.IsCompactionRequested);
+        }
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(storage.IsCompactionRequested);
+        var second = provider.CreateStorage(new("options-pipeline"));
+        Assert.True(second.IsCompactionRequested);
+        await second.ReplaceAsync(new ReadOnlySequence<byte>([3]), token);
+        Assert.False(storage.IsCompactionRequested);
+        await second.AppendAsync(new ReadOnlySequence<byte>([4]), token);
+        Assert.False(storage.IsCompactionRequested);
+    }
+
+    [Theory]
     [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
     [InlineData(JsonLinesJournalFormat.JournalFormatKey)]
     public async Task VolatileProviders_ThresholdSnapshotIsAcknowledgedAndReplaysCurrentFormats(string formatKey)

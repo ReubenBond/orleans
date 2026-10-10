@@ -191,9 +191,12 @@ recreation begin with empty history. Each limit must be positive; a single appen
 can exceed the byte threshold.
 
 Use the overload accepting a provider name and options delegate to configure
-independent named thresholds. Counters belong to each journal and are shared by
+independent named thresholds. Providers capture the configured limits when
+constructed. Counters belong to each journal and are shared by
 handles for the same journal within one provider. Larger limits amortize
 full-state snapshot copies over more updates; smaller limits reduce retained
 append history and replay work. Size both limits alongside the current snapshot.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and the storage provider's bookkeeping.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

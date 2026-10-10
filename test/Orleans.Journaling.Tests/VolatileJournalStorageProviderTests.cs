@@ -201,6 +201,46 @@ public sealed class VolatileJournalStorageProviderTests
     }
 
     [Theory]
+    [InlineData(8, long.MaxValue)]
+    [InlineData(int.MaxValue, 8)]
+    public async Task Compaction_ConcurrentHandlesPreserveEveryAppendAndResetTogether(int appends, long bytes)
+    {
+        var provider = new VolatileJournalStorageProvider(
+            Options.Create(new JournaledStateManagerOptions()),
+            Options.Create(new VolatileJournalStorageOptions
+            {
+                MaxAppendsBeforeSnapshot = appends,
+                MaxBytesBeforeSnapshot = bytes
+            }), null);
+        var id = new JournalId("concurrent-thresholds");
+        var handles = Enumerable.Range(0, 8).Select(_ => provider.CreateStorage(id)).ToArray();
+        var other = provider.CreateStorage(new("isolated-thresholds"));
+        var storage = Assert.IsType<VolatileJournalStorage>(handles[0]);
+        var token = TestContext.Current.CancellationToken;
+        await AppendConcurrently(8);
+        Assert.Equal(Enumerable.Range(0, 8).Select(static index => (byte)index),
+            storage.Segments.SelectMany(static segment => segment).Order());
+        Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
+        Assert.False(other.IsCompactionRequested);
+
+        await handles[^1].ReplaceAsync(new ReadOnlySequence<byte>([99]), token);
+        Assert.Equal([99], Assert.Single(storage.Segments));
+        Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
+        await AppendConcurrently(7);
+        Assert.Equal(8, storage.Segments.Count);
+        Assert.Equal(Enumerable.Range(0, 7).Select(static index => (byte)index),
+            storage.Segments.Skip(1).SelectMany(static segment => segment).Order());
+        Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
+        await handles[^1].AppendAsync(new ReadOnlySequence<byte>([7]), token);
+        Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
+        Assert.False(other.IsCompactionRequested);
+
+        Task AppendConcurrently(int count) => Task.WhenAll(
+            Enumerable.Range(0, count).Select(index => Task.Run(
+                async () => await handles[index].AppendAsync(new ReadOnlySequence<byte>([(byte)index]), token), token)));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Compaction_CanceledOperationsPreserveHistoryAndCounters(bool thresholdReached)
