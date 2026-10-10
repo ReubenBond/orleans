@@ -28,27 +28,50 @@ try
     var stock = client.GetGrain<IStockGrain>("trail-shoes");
     var order = client.GetGrain<IOrderGrain>("order-1042");
     var commandId = HierarchicalKey.Create("orders", "order-1042", "reserve-stock");
+    var probe = host.Services.GetRequiredService<CommittedReceiptsProbe>();
     await stock.InitializeAsync(10).WaitAsync(timeout.Token);
 
-    var first = await order.ReserveAsync(stock.GetGrainId(), commandId, 2).WaitAsync(timeout.Token);
-    Require(first == commandId, "The envelope must preserve the application's command ID.");
+    (HierarchicalKey Id, int Quantity, ReservationRejectionReason? Rejection)[] commands =
+    [
+        (commandId, 2, null),
+        (HierarchicalKey.Create("orders", "order-1042", "reserve-too-much"), 9,
+            ReservationRejectionReason.InsufficientStock),
+        (HierarchicalKey.Create("orders", "order-1042", "reserve-invalid-quantity"), 0,
+            ReservationRejectionReason.InvalidQuantity)
+    ];
+    for (var index = 0; index < commands.Length; index++)
+    {
+        var command = commands[index];
+        var acknowledgement = probe.WaitForAsync(command.Id);
+        var submitted = await order.ReserveAsync(stock.GetGrainId(), command.Id, command.Quantity)
+            .WaitAsync(timeout.Token);
+        Require(submitted == command.Id, "The envelope must preserve the application's command ID.");
 
-    var receipts = await host.Services.GetRequiredService<CommittedReceiptsProbe>()
-        .Completion.WaitAsync(timeout.Token);
-    var duplicate = await order.ResubmitAsync(stock.GetGrainId(), commandId, 2).WaitAsync(timeout.Token);
-    Require(duplicate.Status == DeliveryStatus.Duplicate, "Resubmission must recognize the completed command.");
-    var snapshot = await stock.GetSnapshotAsync().WaitAsync(timeout.Token);
-    Require(receipts.Length == 1, "The original command must produce one acknowledged reply.");
-    var outcome = receipts[0];
-    Require(outcome.CommandId == commandId && outcome.Accepted && outcome.Quantity == 2
-        && outcome.RemainingStock == 8,
-        "The original outcome must reserve two units from ten.");
-    Require(snapshot.Inventory is { Remaining: 8, Reservations: 1, ProcessedRequests: 1 },
-        "Two submissions of one command must produce one handler execution and one business effect.");
+        var receipts = await acknowledgement.WaitAsync(timeout.Token);
+        Require(receipts.Length == index + 1 && receipts.Select(receipt => receipt.CommandId).Distinct().Count() == index + 1,
+            "Every independent command must produce exactly one acknowledged reply.");
+        var outcome = receipts.Single(receipt => receipt.CommandId == command.Id);
+        Require(outcome.Quantity == command.Quantity && outcome.RemainingStock == 8,
+            "Only the accepted reservation may consume stock.");
+        Require(command.Rejection is { } reason
+                ? outcome is ReservationRejected rejected && rejected.Reason == reason
+                : outcome is ReservationAccepted,
+            "The reply must distinguish acceptance, insufficient stock, and invalid quantity.");
 
-    Console.WriteLine($"ACKNOWLEDGED: original reply {commandId.CreateChildKey("result")}");
-    Console.WriteLine($"RESUBMITTED: {commandId}, admission={duplicate.Status}");
-    Console.WriteLine("VERIFIED: remaining stock=8, reservations=1, processed requests=1.");
+        var duplicate = await order.ResubmitAsync(stock.GetGrainId(), command.Id, command.Quantity).WaitAsync(timeout.Token);
+        Require(duplicate.Status == DeliveryStatus.Duplicate, "Resubmission must recognize the completed command.");
+        var snapshot = await stock.GetSnapshotAsync().WaitAsync(timeout.Token);
+        Require(snapshot.Inventory is { Remaining: 8, Reservations: 1 }
+                && snapshot.Inventory.ProcessedRequests == index + 1,
+            "Resubmission must preserve one handler execution per command and unchanged stock for rejections.");
+
+        var decision = outcome is ReservationRejected rejection
+            ? $"ReservationRejected ({rejection.Reason})"
+            : nameof(ReservationAccepted);
+        Console.WriteLine($"ACKNOWLEDGED: {command.Id.CreateChildKey("result")}, outcome={decision}");
+        Console.WriteLine($"RESUBMITTED: {command.Id}, admission={duplicate.Status}");
+    }
+    Console.WriteLine("VERIFIED: remaining stock=8, reservations=1, processed requests=3.");
     Console.WriteLine("Volatile storage is for this demonstration only; stopping the host discards all journals and jobs.");
 }
 finally

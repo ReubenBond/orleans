@@ -13,11 +13,26 @@ public sealed record ReserveStock(
 public sealed record Restock([property: Id(0)] int Quantity);
 
 [GenerateSerializer]
-public sealed record ReservationOutcome(
+public abstract record ReservationOutcome(
     [property: Id(0)] HierarchicalKey CommandId,
     [property: Id(1)] int Quantity,
-    [property: Id(2)] bool Accepted,
     [property: Id(4)] int RemainingStock);
+
+[GenerateSerializer]
+public sealed record ReservationAccepted(HierarchicalKey CommandId, int Quantity, int RemainingStock)
+    : ReservationOutcome(CommandId, Quantity, RemainingStock);
+
+[GenerateSerializer]
+public sealed record ReservationRejected(
+    HierarchicalKey CommandId, int Quantity, int RemainingStock,
+    [property: Id(0)] ReservationRejectionReason Reason)
+    : ReservationOutcome(CommandId, Quantity, RemainingStock);
+
+public enum ReservationRejectionReason
+{
+    InvalidQuantity,
+    InsufficientStock
+}
 
 [GenerateSerializer]
 public sealed record Inventory(

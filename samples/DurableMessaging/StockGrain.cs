@@ -46,13 +46,17 @@ public sealed class StockGrain(
 
     private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");
-        var accepted = request.Quantity <= inventory.Remaining;
-        var outcome = new ReservationOutcome(context.Envelope.MessageId, request.Quantity, accepted,
-            accepted ? inventory.Remaining - request.Quantity : inventory.Remaining);
+        var commandId = context.Envelope.MessageId;
+        ReservationOutcome outcome = request.Quantity <= 0
+            ? new ReservationRejected(commandId, request.Quantity, inventory.Remaining,
+                ReservationRejectionReason.InvalidQuantity)
+            : request.Quantity > inventory.Remaining
+                ? new ReservationRejected(commandId, request.Quantity, inventory.Remaining,
+                    ReservationRejectionReason.InsufficientStock)
+                : new ReservationAccepted(commandId, request.Quantity, inventory.Remaining - request.Quantity);
         var next = new Inventory(outcome.RemainingStock,
-            checked(inventory.Reservations + (accepted ? 1 : 0)),
+            checked(inventory.Reservations + (outcome is ReservationAccepted ? 1 : 0)),
             checked(inventory.ProcessedRequests + 1));
         // SendReply encodes before staging; remaining changes run synchronously through return.
         outbox.SendReply(result, context, request.ReplyDestination, outcome);
@@ -62,7 +66,11 @@ public sealed class StockGrain(
 
     private void HandleRestock(Restock request, IInboxHandlerContext context)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
+        if (request.Quantity <= 0)
+        {
+            context.DeadLetter("Restock quantity must be positive.");
+            return;
+        }
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");
         var next = inventory with
         {

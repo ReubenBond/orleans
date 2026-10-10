@@ -2,8 +2,10 @@
 
 A self-contained .NET 10 console host runs one localhost Orleans silo and two
 application grains. An **order** submits a typed reservation under an application
-command ID; a **stock** grain updates inventory and sends a deterministic reply.
-Resubmitting that same ID produces `Duplicate` admission and one stock decrement.
+command ID; a **stock** grain sends a deterministic typed acceptance or rejection.
+The host exercises accepted, insufficient-stock, and invalid-quantity commands.
+Resubmitting each ID produces `Duplicate` admission, including rejected commands,
+with one handler execution per command and only one stock decrement.
 Volatile journals and in-memory jobs keep the demonstration self-contained.
 
 ## Run
@@ -57,11 +59,18 @@ will not replace its declared versions.
 
 1. The host initializes ten units of `trail-shoes`, then submits
    `orders/order-1042/reserve-stock` for two units through the order's outbox.
-   Once the original reply is journal-acknowledged, it reconstructs the same command
-   and calls explicit inbox admission. The second submission returns `Duplicate`.
-2. `ReserveStock`, `Restock`, and `ReservationOutcome` have keyed `DurableMessageType<T>`
+   It also submits `orders/order-1042/reserve-too-much` for nine units and
+   `orders/order-1042/reserve-invalid-quantity` for zero units, under independent IDs.
+   For each command, once its original reply is journal-acknowledged, the host
+   reconstructs the same immutable command and calls explicit inbox admission.
+   Each second submission returns `Duplicate`.
+2. `ReserveStock`, `Restock`, and abstract `ReservationOutcome` have keyed `DurableMessageType<T>`
    bindings under `inventory.reserve.v1`, `inventory.restock.v1`, and
    `inventory.reservation-result.v1`.
+   Serialized sealed `ReservationAccepted` and `ReservationRejected` records
+   carry the command ID, original quantity, and remaining stock.
+   Rejections distinguish `InvalidQuantity` from `InsufficientStock` using
+   `ReservationRejectionReason`; callers dispatch on the concrete outcome type.
    Each envelope carries its hierarchical command ID, exact subject, sender,
    receiver, and owning `ArcBuffer` payload.
 3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
@@ -75,40 +84,55 @@ will not replace its declared versions.
    the attempt token before entering the method.
    The console run exercises reservation and outcome subjects; `Restock` supplies
    the additional positive-stock-increment protocol for the same stock inbox.
+   Because it has no reply protocol, a nonpositive restock is permanently unusable:
+   its handler calls `context.DeadLetter("Restock quantity must be positive.")`
+   and returns before mutation. Checked stock overflow still throws and uses
+   the ordinary bounded processing retry policy.
    Typed outbox `Send` and `SendReply` rent internal pooled encoders, stage the
    message, and dispose their temporary envelopes after retaining the outbox's pin.
    The explicit duplicate-admission call uses `DurableMessageType<T>.Create` and
    a local `using` owner. Handlers borrow inbox envelopes through actual method
    completion.
-4. The stock handler runs once. Its inbox completion fact recognizes the same
+4. The stock handler runs once per command. Its inbox completion fact recognizes the same
    command ID across senders and subjects during retention. The result reply uses
    the deterministic child `orders/order-1042/reserve-stock/result`; inventory
    stores the remaining stock, accepted reservation count, and execution count.
    One ID binds an immutable command, including quantity, destination, and subject.
 5. The dispatcher decodes and checks cancellation at its boundary. Each typed
-   handler validates and computes all results locally. Stock calls `SendReply`
+   handler validates and computes all results locally. Invalid reservation quantities
+   and shortages are normal completed business rejections: they send a typed reply
+   and leave stock unchanged, rather than throwing an exception for retry.
+   The sender deliberately permits nonpositive quantities so the receiver's
+   durable rejection protocol is exercised. Stock calls `SendReply`
    before inventory mutation; the helper encodes before outgoing staging.
    From that first staging through inventory assignment, `context.Complete()`,
    and method return, execution is synchronous.
    Inventory, outgoing intent, and inbox completion share the journal
    boundary. The runtime owns the subsequent write and acknowledgement.
 6. The order's ordinary submit method awaits `WriteStateAsync` to commit its
-   outgoing intent. To observe the completed round trip, the host awaits a
-   `TaskCompletionSource` observer released
-   by the order's journal **after-acknowledgement hook**. The hook reports a snapshot
-   taken before capture. The observer is host-local demo instrumentation;
+   outgoing intent. To observe each completed round trip, the host awaits a
+   command-keyed `TaskCompletionSource` observer armed before submission and
+   released by the order's journal **after-acknowledgement hook**. The hook reports
+   the receipt snapshot captured before persistence. These observers are host-local demo instrumentation;
    the durable reply is the outcome in the order grain's journaled receipts.
 
 A successful run prints:
 
 ```text
-ACKNOWLEDGED: original reply orders/order-1042/reserve-stock/result
+ACKNOWLEDGED: orders/order-1042/reserve-stock/result, outcome=ReservationAccepted
 RESUBMITTED: orders/order-1042/reserve-stock, admission=Duplicate
-VERIFIED: remaining stock=8, reservations=1, processed requests=1.
+ACKNOWLEDGED: orders/order-1042/reserve-too-much/result, outcome=ReservationRejected (InsufficientStock)
+RESUBMITTED: orders/order-1042/reserve-too-much, admission=Duplicate
+ACKNOWLEDGED: orders/order-1042/reserve-invalid-quantity/result, outcome=ReservationRejected (InvalidQuantity)
+RESUBMITTED: orders/order-1042/reserve-invalid-quantity, admission=Duplicate
+VERIFIED: remaining stock=8, reservations=1, processed requests=3.
 ```
 
-The assertions verify the original correlated outcome, duplicate admission,
-exactly one handler execution, and exactly one business effect. A failed assertion or the two-minute deadline
+The assertions verify all three correlated concrete outcome types/reasons, duplicate admission
+for accepted and rejected commands, exactly one handler execution per ID, unchanged
+stock for both rejections, and exactly one stock decrement. Every outcome wait uses
+an explicit journal-acknowledgement signal, without sleeps or polling.
+A failed assertion or the two-minute deadline
 fails the process with a nonzero exit code. The host stops after the verification.
 Only one localhost sample using the default silo/gateway ports should run at a time.
 

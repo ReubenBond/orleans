@@ -35,7 +35,6 @@ public sealed class OrderGrain(
 
     public async Task<HierarchicalKey> ReserveAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
         outbox.Send(reserve, commandId, stock, new ReserveStock(quantity, this.GetGrainId()));
         await state.WriteStateAsync(); // Ordinary callers explicitly await intent persistence.
         return commandId;
@@ -43,7 +42,6 @@ public sealed class OrderGrain(
 
     public async Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
         using var request = reserve.Create(commandId, outbox.SenderId, stock,
             new ReserveStock(quantity, this.GetGrainId()));
         // Explicit admission exposes the duplicate result after the original reply's ACK.
@@ -78,19 +76,34 @@ public sealed class OrderGrain(
     }
 }
 
-// The after-ack hook releases the host-local observer when the original reply is committed.
+// Arm each command's observer before sending; only its journal-acknowledged reply releases it.
 public sealed class CommittedReceiptsProbe
 {
-    private readonly TaskCompletionSource<ReservationOutcome[]> _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Dictionary<HierarchicalKey, TaskCompletionSource<ReservationOutcome[]>> _pending = [];
+    private readonly object _lock = new();
 
-    public Task<ReservationOutcome[]> Completion => _completion.Task;
+    public Task<ReservationOutcome[]> WaitForAsync(HierarchicalKey commandId)
+    {
+        lock (_lock)
+        {
+            var completion = new TaskCompletionSource<ReservationOutcome[]>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _pending.Add(commandId, completion);
+            return completion.Task;
+        }
+    }
 
     public void OnAcknowledged(ReservationOutcome[] receipts)
     {
-        if (receipts.Length >= 1)
+        lock (_lock)
         {
-            _completion.TrySetResult(receipts);
+            foreach (var receipt in receipts)
+            {
+                if (_pending.Remove(receipt.CommandId, out var completion))
+                {
+                    completion.TrySetResult(receipts);
+                }
+            }
         }
     }
 }

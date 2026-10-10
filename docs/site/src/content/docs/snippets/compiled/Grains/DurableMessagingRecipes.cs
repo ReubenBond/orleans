@@ -66,9 +66,25 @@ public sealed record ReserveStock(
 public sealed record Restock([property: Id(0)] int Quantity);
 
 [GenerateSerializer]
-public sealed record ReservationResult(
+public abstract record ReservationResult(
     [property: Id(1)] int Quantity,
-    [property: Id(2)] bool Reserved) : OrderOutcome;
+    [property: Id(3)] int RemainingStock) : OrderOutcome;
+
+[GenerateSerializer]
+public sealed record ReservationAccepted(int Quantity, int RemainingStock)
+    : ReservationResult(Quantity, RemainingStock);
+
+[GenerateSerializer]
+public sealed record ReservationRejected(
+    int Quantity, int RemainingStock,
+    [property: Id(0)] ReservationRejectionReason Reason)
+    : ReservationResult(Quantity, RemainingStock);
+
+public enum ReservationRejectionReason
+{
+    InvalidQuantity,
+    InsufficientStock
+}
 
 public interface IInventoryGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
@@ -105,18 +121,25 @@ public sealed class InventoryGrain(
 
     private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var current = available.Value;
-        var reserved = current >= request.Quantity;
+        ReservationResult outcome = request.Quantity <= 0
+            ? new ReservationRejected(request.Quantity, current, ReservationRejectionReason.InvalidQuantity)
+            : request.Quantity > current
+                ? new ReservationRejected(request.Quantity, current, ReservationRejectionReason.InsufficientStock)
+                : new ReservationAccepted(request.Quantity, current - request.Quantity);
 
-        outbox.SendReply(result, context, request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
-        if (reserved) available.Value = current - request.Quantity;
+        outbox.SendReply(result, context, request.ResponseDestination, outcome);
+        if (outcome is ReservationAccepted) available.Value = outcome.RemainingStock;
         context.Complete();
     }
 
     private void HandleRestock(Restock request, IInboxHandlerContext context)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
+        if (request.Quantity <= 0)
+        {
+            context.DeadLetter("Restock quantity must be positive.");
+            return;
+        }
         var next = checked(available.Value + request.Quantity);
         available.Value = next;
         context.Complete();

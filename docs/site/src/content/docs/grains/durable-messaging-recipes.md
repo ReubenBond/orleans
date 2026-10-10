@@ -30,10 +30,13 @@ Bulk preparation and raw/package protocols retain explicit local ownership.
 ## Run the stock-reservation sample
 
 The [Durable Messaging sample](https://github.com/dotnet/orleans/tree/main/samples/DurableMessaging)
-runs an order grain and a stock grain in one localhost silo. Two submissions use
-the same hierarchical command ID. The host observes the original reply's journal
-acknowledgement, explicitly resubmits the same command, and verifies `Duplicate`
-admission, one handler execution, and one stock decrement.
+runs an order grain and a stock grain in one localhost silo. Three independent
+hierarchical command IDs exercise acceptance, insufficient stock, and invalid
+quantity. For each command, the host arms an explicit journal-acknowledgement
+observer before submission, awaits the typed reply's acknowledgement, and resubmits
+the same immutable command. It verifies `Duplicate` admission for successful and
+rejected commands, one handler execution per ID, unchanged stock for rejections,
+and one stock decrement, without sleeps or polling.
 
 From the repository root:
 
@@ -76,13 +79,23 @@ The reservation method computes its next stock and result locally. `SendReply`
 encodes and stages the deterministic `result` reply, then the method applies stock
 and completes synchronously. The first command commits that stock decrement, reply,
 and inbox completion together. A repeat with the same command ID recognizes the
-retained completion fact and preserves the original handler effects. A shortage
-sends `Reserved = false` and completes with unchanged stock. That rejection is a
-normal completed business outcome. The original outbox intent delivers the reply
+retained completion fact and preserves the original handler effects.
+The serialized abstract `ReservationResult` derives from `OrderOutcome`;
+sealed `ReservationAccepted` and `ReservationRejected` records distinguish the
+valid business result types and carry the original quantity and remaining stock.
+A nonpositive quantity sends `ReservationRejected` with `InvalidQuantity`;
+a shortage sends it with `InsufficientStock`. Both complete with unchanged stock.
+Invalid immutable reservation commands are normal durable business rejections,
+not exceptions to retry. The original outbox intent delivers the reply
 within its configured delivery policy.
 
-`Restock` validates a positive increment and computes the checked new stock value
-before mutation, then commits that update with inbox completion. Give each distinct
+`Restock` has no business reply protocol. A nonpositive increment is permanently
+unusable, so the handler calls
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*> with a clear reason
+and returns before mutation. A positive increment computes the checked new stock
+value before mutation, then commits that update with inbox completion. Checked
+overflow still throws and follows the ordinary bounded processing retry policy.
+Give each distinct
 restocking operation its own stable command ID. The example's `SetAvailableAsync`
 is an administrative absolute-stock update. In
 an order workflow, add explicit confirmation, expiry, and release policies for held
@@ -228,7 +241,10 @@ outgoing envelopes, and completion together. Test activation recovery and ambigu
 storage/provider outcomes against the actual providers used in deployment.
 
 The executable documentation examples exercise hierarchical key isolation,
-reservation completion, shortages, provider-success/local-cancellation retry,
+typed reservation acceptance, zero/negative-quantity rejections, shortages,
+polymorphic result round trips, reply-stage failure without stock mutation,
+permanent invalid-restock dead-lettering, checked restock overflow,
+provider-success/local-cancellation retry,
 out-of-order projections, typed multi-subject dispatch, and independently decoded
 package entries. Verify the original reply's actual journal acknowledgement and
 the exact completion-retention boundary when testing end-to-end resubmission.

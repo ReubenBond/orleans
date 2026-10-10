@@ -73,15 +73,16 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     }
 
     [Theory]
-    [InlineData(10, 3, true, 7)]
-    [InlineData(2, 3, false, 2)]
-    public async Task Reservation_OneCommandStagesDecisionAndDeterministicResult(
-        int available, int quantity, bool reserved, int expectedStock)
+    [InlineData(10, 3, 7)]
+    [InlineData(3, 3, 0)]
+    public async Task Reservation_AcceptedCommandStagesTypedResultBeforeStockMutation(
+        int available, int quantity, int expectedStock)
     {
         var stock = new TestValue<int> { Value = available };
         var (_, handler) = await CreateInventoryAsync(stock);
         var request = new ReserveStock(quantity, Sender);
         var attempt = CreateContext(request, Command);
+        _outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(_ => Assert.Equal(available, stock.Value));
 
         var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
@@ -91,8 +92,87 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var reply = Assert.Single(attempt.Output);
         Assert.Equal(Command.CreateChildKey("result"), reply.MessageId);
         Assert.Equal(Sender, reply.ReceiverId);
-        Assert.Equal(new ReservationResult(quantity, reserved), ReadBody<ReservationResult>(reply));
+        Assert.Equal(new ReservationAccepted(quantity, expectedStock),
+            Assert.IsType<ReservationAccepted>(ReadBody<ReservationResult>(reply)));
         Assert.Equal(new[] { "send", "complete" }, attempt.Events);
+    }
+
+    [Theory]
+    [InlineData(10, 0, ReservationRejectionReason.InvalidQuantity)]
+    [InlineData(10, -1, ReservationRejectionReason.InvalidQuantity)]
+    [InlineData(2, 3, ReservationRejectionReason.InsufficientStock)]
+    [InlineData(0, 1, ReservationRejectionReason.InsufficientStock)]
+    public async Task Reservation_RejectedCommandStagesReasonAndCompletesWithoutStockMutation(
+        int available, int quantity, ReservationRejectionReason reason)
+    {
+        var stock = new TestValue<int> { Value = available };
+        var (_, handler) = await CreateInventoryAsync(stock);
+        var attempt = CreateContext(new ReserveStock(quantity, Sender), Command);
+
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
+        Assert.Equal(available, stock.Value);
+        var reply = Assert.Single(attempt.Output);
+        Assert.Equal(Command.CreateChildKey("result"), reply.MessageId);
+        Assert.Equal(Sender, reply.ReceiverId);
+        Assert.Equal(new ReservationRejected(quantity, available, reason),
+            Assert.IsType<ReservationRejected>(ReadBody<ReservationResult>(reply)));
+        Assert.Equal(new[] { "send", "complete" }, attempt.Events);
+        attempt.Context.DidNotReceive().DeadLetter(Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(11)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Reservation_ReplySendFailurePreservesStockAndCompletion(int quantity)
+    {
+        var stock = new TestValue<int> { Value = 10 };
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Receiver);
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(_ =>
+        {
+            Assert.Equal(10, stock.Value);
+            throw new IOException("The reply could not be staged.");
+        });
+        var (_, handler) = await RegisterAsync(inbox => new InventoryGrain(inbox, outbox, Type<ReserveStock>(),
+            Type<Restock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock));
+        var attempt = CreateContext(new ReserveStock(quantity, Sender), Command);
+
+        await Assert.ThrowsAsync<IOException>(async () =>
+            await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+
+        Assert.Equal(10, stock.Value);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
+        outbox.Received(1).Send(Arg.Any<DurableEnvelope>());
+    }
+
+    [Fact]
+    public void ReservationResults_PolymorphicRoundTripsPreserveBothOutcomeTypesAndRejectionReasons()
+    {
+        ReservationResult[] outcomes =
+        [
+            new ReservationAccepted(3, 7),
+            new ReservationRejected(0, 10, ReservationRejectionReason.InvalidQuantity),
+            new ReservationRejected(-1, 10, ReservationRejectionReason.InvalidQuantity),
+            new ReservationRejected(11, 10, ReservationRejectionReason.InsufficientStock)
+        ];
+        foreach (var outcome in outcomes)
+        {
+            using var reservation = Type<ReservationResult>().Create(Command, Sender, Receiver, outcome);
+            var reservationCopy = ReadBody<ReservationResult>(reservation);
+            Assert.Equal(outcome.GetType(), reservationCopy.GetType());
+            Assert.Equal(outcome, reservationCopy);
+
+            using var order = Type<OrderOutcome>().Create(Command, Sender, Receiver, outcome);
+            var orderCopy = ReadBody<OrderOutcome>(order);
+            Assert.Equal(outcome.GetType(), orderCopy.GetType());
+            Assert.Equal(outcome, orderCopy);
+        }
     }
 
     [Fact]
@@ -127,7 +207,8 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         await handler.HandleAsync(reserve.Context, TestContext.Current.CancellationToken);
 
         Assert.Equal(4, await grain.GetAvailableAsync());
-        Assert.Equal(new ReservationResult(3, true), ReadBody<ReservationResult>(Assert.Single(reserve.Output)));
+        Assert.Equal(new ReservationAccepted(3, 4),
+            Assert.IsType<ReservationAccepted>(ReadBody<ReservationResult>(Assert.Single(reserve.Output))));
         Assert.Equal(new[] { "send", "complete" }, reserve.Events);
         Assert.IsType<DurableInboxDispatcher>(handler);
     }
@@ -135,24 +216,32 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    [InlineData(int.MaxValue)]
-    public async Task Restock_InvalidOrOverflowingQuantityLeavesStockAndCompletionUnchanged(int quantity)
+    public async Task Restock_InvalidQuantityDeadLettersWithoutStockMutationOrReply(int quantity)
     {
         var stock = new TestValue<int> { Value = 10 };
         var (_, handler) = await CreateInventoryAsync(stock);
         var attempt = CreateContext(new Restock(quantity), Command);
 
-        if (quantity <= 0)
-        {
-            var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
-                await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
-            Assert.Equal("request.Quantity", exception.ParamName);
-        }
-        else
-        {
-            await Assert.ThrowsAsync<OverflowException>(async () =>
-                await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
-        }
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
+        Assert.Equal(10, stock.Value);
+        Assert.Empty(attempt.Output);
+        Assert.Equal(new[] { "dead-letter" }, attempt.Events);
+        attempt.Context.Received(1).DeadLetter("Restock quantity must be positive.");
+        attempt.Context.DidNotReceive().Complete();
+    }
+
+    [Fact]
+    public async Task Restock_CheckedOverflowPreservesStockAndCompletionForRetry()
+    {
+        var stock = new TestValue<int> { Value = 10 };
+        var (_, handler) = await CreateInventoryAsync(stock);
+        var attempt = CreateContext(new Restock(int.MaxValue), Command);
+
+        await Assert.ThrowsAsync<OverflowException>(async () =>
+            await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(10, stock.Value);
         Assert.Empty(attempt.Output);
@@ -292,7 +381,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     }
 
     [Fact]
-    public async Task OrderDispatcher_MultipleSubjectsRecordOneOutcomePerCommand()
+    public async Task OrderDispatcher_MultipleSubjectsStoreAcceptedRejectedAndPaymentOutcomes()
     {
         var outcomes = new TestDictionary<HierarchicalKey, OrderOutcome>();
         var inbox = Substitute.For<IDurableInbox>();
@@ -300,14 +389,17 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => dispatcher = call.Arg<IInboxHandler>());
         var grain = new OrderOutcomesGrain(inbox, Type<ReservationResult>(), Type<PaymentResult>(), outcomes);
         await grain.OnActivateAsync(TestContext.Current.CancellationToken);
-        var reservation = new ReservationResult(3, true);
+        ReservationResult reservation = new ReservationAccepted(3, 7);
+        ReservationResult rejection = new ReservationRejected(11, 10, ReservationRejectionReason.InsufficientStock);
         var payment = new PaymentResult(new ChargePayment(12.5m, "USD", Sender), "provider-charge-1", true);
         var reservationId = Command.CreateChildKey("result");
+        var rejectionId = HierarchicalKey.Create("orders", "43", "reserve", "result");
         var paymentId = HierarchicalKey.Create("orders", "42", "charge", "result");
         var first = CreateContext(reservation, reservationId);
-        var second = CreateContext(payment, paymentId);
+        var second = CreateContext(rejection, rejectionId);
+        var third = CreateContext(payment, paymentId);
 
-        foreach (var attempt in new[] { first, second })
+        foreach (var attempt in new[] { first, second, third })
         {
             var handling = dispatcher.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
             Assert.True(handling.IsCompletedSuccessfully);
@@ -316,9 +408,10 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             Assert.Empty(attempt.Output);
         }
         Assert.IsType<DurableInboxDispatcher>(dispatcher);
-        Assert.Equal(2, await grain.GetCompletedStepCountAsync());
-        Assert.Equal(reservation, outcomes[reservationId]);
-        Assert.Equal(payment, outcomes[paymentId]);
+        Assert.Equal(3, await grain.GetCompletedStepCountAsync());
+        Assert.Equal(reservation, Assert.IsType<ReservationAccepted>(await grain.GetOutcomeAsync(reservationId)));
+        Assert.Equal(rejection, Assert.IsType<ReservationRejected>(await grain.GetOutcomeAsync(rejectionId)));
+        Assert.Equal(payment, await grain.GetOutcomeAsync(paymentId));
         inbox.Received(1).RegisterHandler(dispatcher);
     }
 
@@ -413,6 +506,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             return envelope;
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
+        context.When(value => value.DeadLetter(Arg.Any<string>())).Do(_ => events.Add("dead-letter"));
         return (context, output, events);
     }
 
