@@ -1,9 +1,14 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Hosting;
+using Orleans.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -100,6 +105,28 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
         Assert.Equal(1, stored.Disposes);
         Assert.Equal(1, caller.Owners);
         Assert.Equal(23, caller.Value);
+    }
+
+    [Fact]
+    public void EqualPairRemoval_RetiresStoredOwner_AndPreservesBorrowedCaller()
+    {
+        using var fixture = CreateFixture();
+        using var caller = new ResourceProbe(23);
+        fixture.Dictionary.Add("key", caller);
+        var stored = fixture.Dictionary["key"];
+        Assert.NotSame(caller, stored);
+        Assert.Equal(caller, stored);
+        var pair = new KeyValuePair<string, ResourceProbe>("key", caller);
+
+        Assert.Contains(pair, fixture.Dictionary);
+        Assert.True(fixture.Dictionary.Remove(pair));
+
+        Assert.Same(stored, Assert.Single(fixture.Lifecycle.Released));
+        Assert.Equal(1, stored.Disposes);
+        Assert.Equal(0, caller.Disposes);
+        Assert.Equal(1, caller.Owners);
+        Assert.Equal(23, caller.Value);
+        Assert.Empty(fixture.Dictionary);
     }
 
     [Theory]
@@ -338,6 +365,153 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task JsonRecovery_ScopeDisposalRetiresTransferredOwners_AfterSuccessFailureOrRetry(bool failRecovery, bool retryRecovery)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var storage = new VolatileJournalStorage(JsonLinesJournalFormat.JournalFormatKey);
+        var lifecycle = new ProbeLifecycle();
+        var converter = new ProbeJsonConverter();
+        var builder = new TestSiloBuilder();
+        builder.Services.AddLogging();
+        builder.Services.AddSerializer();
+        builder.Services.AddKeyedSingleton<TimeProvider>(JournalingTimeProviderNames.Journaling, TimeProvider.System);
+        builder.AddJournaling();
+        builder.Services.Configure<JsonJournalOptions>(options => options.SerializerOptions = new()
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            Converters = { converter }
+        });
+        builder.Services.AddSingleton<IDurableDictionaryValueLifecycle<ResourceProbe>>(lifecycle);
+        builder.Services.AddScoped<IJournaledStateManager>(services =>
+            new JournaledStateManager(services.GetRequiredService<JournaledStateManagerShared>(), storage));
+        await using var provider = builder.Services.BuildServiceProvider();
+        using var first = new ResourceProbe(11);
+        using var second = new ResourceProbe(22);
+        using var neighbor = new ResourceProbe(33);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dictionary = scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, ResourceProbe>>("owned");
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            await manager.InitializeAsync(token);
+            dictionary.Add("key", first);
+            dictionary.Add("neighbor", neighbor);
+            dictionary["key"] = second;
+            await manager.WriteStateAsync(token);
+            Assert.Equal(
+                "[0,[\"set\",\"owned\",8]]\n" +
+                "[8,[\"set\",\"key\",11]]\n" +
+                "[8,[\"set\",\"neighbor\",33]]\n" +
+                "[8,[\"set\",\"key\",22]]\n",
+                Encoding.UTF8.GetString(Assert.Single(storage.Segments)));
+            Assert.Equal(1, converter.Encoded[0].Disposes);
+            Assert.Equal(0, converter.Encoded[1].Disposes);
+            Assert.Equal(0, converter.Encoded[2].Disposes);
+        }
+
+        Assert.Equal(3, lifecycle.Released.Count);
+        Assert.All(converter.Encoded, value => Assert.Equal(1, value.Disposes));
+        var validJournal = Assert.Single(storage.Segments);
+        if (failRecovery)
+        {
+            await storage.AppendAsync(
+                new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("[8,[\"set\",\"partial\",44,\"unexpected\"]]\n")), token);
+        }
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dictionary = scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, ResourceProbe>>("owned");
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            if (failRecovery)
+            {
+                var error = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(token).AsTask());
+                Assert.NotNull(error.InnerException);
+                var uninitialized = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(token).AsTask());
+                Assert.Equal("The journaled state manager has not been initialized.", uninitialized.Message);
+                Assert.Same(converter.Decoded[3], dictionary["partial"]);
+                Assert.Equal(44, dictionary["partial"].Value);
+            }
+            else
+            {
+                await manager.InitializeAsync(token);
+            }
+
+            Assert.Equal(3, lifecycle.Retains);
+            Assert.Equal(failRecovery ? 4 : 3, converter.Decoded.Count);
+            Assert.Same(converter.Decoded[2], dictionary["key"]);
+            Assert.Same(converter.Decoded[1], dictionary["neighbor"]);
+            Assert.Equal(22, dictionary["key"].Value);
+            Assert.Equal(33, dictionary["neighbor"].Value);
+            Assert.Equal(1, converter.Decoded[0].Disposes);
+            Assert.Equal(4, lifecycle.Released.Count);
+            ((IDurableDictionaryCommandHandler<string, ResourceProbe>)dictionary).ApplyRemove("missing");
+            Assert.Equal(4, lifecycle.Released.Count);
+            if (retryRecovery)
+            {
+                var previousOwners = converter.Decoded.ToArray();
+                await storage.ReplaceAsync(new ReadOnlySequence<byte>(validJournal), token);
+                await manager.InitializeAsync(token);
+
+                Assert.All(previousOwners, value =>
+                {
+                    Assert.Equal(1, value.Disposes);
+                    Assert.Equal(0, value.Owners);
+                });
+                Assert.Equal(7, converter.Decoded.Count);
+                Assert.Equal(8, lifecycle.Released.Count);
+                Assert.Equal(3, lifecycle.Retains);
+                Assert.Same(converter.Decoded[6], dictionary["key"]);
+                Assert.Same(converter.Decoded[5], dictionary["neighbor"]);
+                Assert.Equal(22, dictionary["key"].Value);
+                Assert.Equal(33, dictionary["neighbor"].Value);
+                Assert.False(dictionary.ContainsKey("partial"));
+            }
+        }
+
+        Assert.Equal(3 + converter.Decoded.Count, lifecycle.Released.Count);
+        Assert.All(converter.Decoded, value =>
+        {
+            Assert.Equal(1, value.Disposes);
+            Assert.Equal(0, value.Owners);
+        });
+        Assert.Equal(1, first.Owners);
+        Assert.Equal(1, second.Owners);
+        Assert.Equal(1, neighbor.Owners);
+        Assert.Equal(11, first.Value);
+        Assert.Equal(22, second.Value);
+        Assert.Equal(33, neighbor.Value);
+    }
+
+    [Theory]
+    [InlineData("[\"snapshot\",[[\"bad\",44,\"unexpected\"]]]")]
+    [InlineData("[\"snapshot\",[[null,44]]]")]
+    [InlineData("[\"snapshot\",[[\"bad\"]]]")]
+    public void JsonSnapshotValidation_RejectsInvalidPairBeforeMaterializingOwners(string payload)
+    {
+        using var fixture = CreateFixture();
+        using var caller = new ResourceProbe(11);
+        fixture.Dictionary.Add("prior", caller);
+        var previousOwner = fixture.Dictionary["prior"];
+        var converter = new ProbeJsonConverter();
+        var codec = new JsonDurableDictionaryCommandCodec<string, ResourceProbe>(new JsonSerializerOptions
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            Converters = { converter }
+        });
+
+        Assert.Throws<JsonException>(() => codec.Apply(CodecTestHelpers.ReadBuffer(Encoding.UTF8.GetBytes(payload)), fixture.Dictionary));
+
+        Assert.Empty(converter.Decoded);
+        Assert.Empty(fixture.Dictionary);
+        Assert.Same(previousOwner, Assert.Single(fixture.Lifecycle.Released));
+        Assert.Equal(1, previousOwner.Disposes);
+        Assert.Equal(1, caller.Owners);
+        Assert.Equal(11, caller.Value);
+    }
+
     [Fact]
     public void ScopedResolution_UsesRegisteredLifecycle_AndDisposesStoredOwners()
     {
@@ -498,7 +672,7 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
-    private sealed class ResourceProbe : IDisposable
+    private sealed class ResourceProbe : IDisposable, IEquatable<ResourceProbe>
     {
         private readonly Resource _resource;
 
@@ -526,6 +700,12 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
             _ = Value;
             return new(_resource);
         }
+
+        public bool Equals(ResourceProbe? other) => other is not null && ReferenceEquals(_resource, other._resource);
+
+        public override bool Equals(object? obj) => obj is ResourceProbe other && Equals(other);
+
+        public override int GetHashCode() => _resource.GetHashCode();
 
         public void Dispose()
         {
@@ -556,10 +736,29 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
 
         public void Release(ResourceProbe value)
         {
-            Assert.DoesNotContain(value, Released);
+            Assert.DoesNotContain(Released, item => ReferenceEquals(item, value));
             Assert.Equal(0, value.Disposes);
             Released.Add(value);
             value.Dispose();
+        }
+    }
+
+    private sealed class ProbeJsonConverter : JsonConverter<ResourceProbe>
+    {
+        public List<ResourceProbe> Encoded { get; } = [];
+        public List<ResourceProbe> Decoded { get; } = [];
+
+        public override ResourceProbe Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = new ResourceProbe(reader.GetInt32());
+            Decoded.Add(value);
+            return value;
+        }
+
+        public override void Write(Utf8JsonWriter writer, ResourceProbe value, JsonSerializerOptions options)
+        {
+            Encoded.Add(value);
+            writer.WriteNumberValue(value.Value);
         }
     }
 

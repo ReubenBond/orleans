@@ -147,23 +147,31 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void ApplySet(TKey key, TValue value)
     {
-        bool replacing;
-        TValue? previous;
-        try
+        if (_valueLifecycle is { } lifecycle)
         {
-            replacing = _items.TryGetValue(key, out previous);
+            bool replacing;
+            TValue? previous;
+            try
+            {
+                replacing = _items.TryGetValue(key, out previous);
+                _items[key] = value;
+            }
+            catch
+            {
+                lifecycle.Release(value);
+                throw;
+            }
+
+            if (replacing)
+            {
+                lifecycle.Release(previous!);
+            }
+        }
+        else
+        {
             _items[key] = value;
         }
-        catch
-        {
-            _valueLifecycle?.Release(value);
-            throw;
-        }
 
-        if (replacing)
-        {
-            _valueLifecycle?.Release(previous!);
-        }
         OnSet(key, value);
     }
 

@@ -57,7 +57,7 @@ Register <xref:Orleans.Journaling.IDurableDictionaryValueLifecycle`1> for a dict
 
 Replay transfers decoded owners into the dictionary. Replacement, successful removal, clear, reset, and whole-journal deletion release the stored owners. A rejected mutation releases any owner it acquired and preserves existing entries. Snapshot encoding borrows the current entries.
 
-Lifecycle implementations complete retention atomically and release synchronously without throwing. Orleans disposes DI-created dictionaries with the activation scope, releasing their remaining owners. Applications arrange disposal of manually constructed dictionaries and their dependencies. Value types with ordinary managed lifetimes retain the standard dictionary reference semantics.
+Lifecycle implementations preserve value contents and equality when retaining an owner, complete retention atomically, and release synchronously without throwing. Callbacks operate on the supplied value's resources, with dictionary mutation left to the caller. Command codecs borrow values during encoding and transfer decoded owners to the dictionary. Orleans disposes DI-created dictionaries with the activation scope, releasing their remaining owners even when recovery fails partway through a journal. Applications arrange disposal of manually constructed dictionaries and their dependencies. Value types with ordinary managed lifetimes retain the standard dictionary reference semantics.
 
 ## Keep state names and schemas stable
 

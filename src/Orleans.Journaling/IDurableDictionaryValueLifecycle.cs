@@ -10,7 +10,10 @@ namespace Orleans.Journaling;
 /// Replacement, removal, clear, reset, journal deletion, and dictionary disposal release stored owners.
 /// Values returned by dictionary reads are borrowed from the dictionary.
 /// Implementations must support independent owners of the same resources and run synchronously
-/// on the dictionary's logical execution thread. A failed retain leaves ownership with the caller;
+/// on the dictionary's logical execution thread, with dictionary mutation left to the caller.
+/// Retention preserves the value's contents and equality semantics.
+/// Command codecs borrow values during encoding and transfer decoded owners to the command handler.
+/// A failed retain leaves ownership with the caller;
 /// release must complete without throwing. The activation scope disposes DI-created dictionaries.
 /// Callers arrange disposal of manually constructed dictionaries and their dependencies.
 /// </remarks>
