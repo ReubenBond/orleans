@@ -191,6 +191,8 @@ internal sealed partial class DurableInboxExtension :
         DurableEnvelopeValidation.Validate(envelope);
 
         EnsureMetricsActive();
+        // Direct publication shares immutable payload bytes; the admitted task keeps the
+        // envelope reachable independently of cancellation of its caller's wait.
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         var delivery = DeliverUnderGateAsync(envelope);
         _activeDelivery = delivery;
