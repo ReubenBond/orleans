@@ -255,25 +255,16 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         ValidateReady();
         ValidateEnvelope(envelope, nameof(envelope));
-        if (_pendingMessages.TryGetValue(envelope.MessageId, out var pending))
-        {
-            ValidateEquivalent(pending.Envelope, envelope);
-            return;
-        }
-        else if (_messages.TryGetValue(envelope.MessageId, out var existing))
+        if (_messages.TryGetValue(envelope.MessageId, out var existing))
         {
             ValidateEquivalent(existing, envelope);
             return;
         }
-        else
-        {
-            pending = new(envelope);
-            _pendingMessages.Add(envelope.MessageId, pending);
-        }
+        _pendingMessages.Add(envelope.MessageId, new(envelope.MessageId));
 
         try
         {
-            StageMessage(pending);
+            StageMessage(envelope);
         }
         catch (Exception exception)
         {
@@ -295,13 +286,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private void StageMessage(PendingMessage pending)
+    private void StageMessage(DurableEnvelope envelope)
     {
         RestorePendingRetirement();
         var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
         _idleRetirementAt = null;
-        _messages.Add(pending.Envelope.MessageId, pending.Envelope);
-        _messageStates.Add(pending.Envelope.MessageId, state);
+        _messages.Add(envelope.MessageId, envelope);
+        _messageStates.Add(envelope.MessageId, state);
         _unacknowledgedMessageCount++;
         EnsureMetricsActive();
         ReconcileOutboxDepth();
@@ -537,7 +528,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         foreach (var message in _capturedMessages)
         {
             _unacknowledgedMessageCount--;
-            _pendingMessages.Remove(message.Envelope.MessageId);
+            _pendingMessages.Remove(message.MessageId);
         }
         _capturedMessages = [];
         _captureStarted = false;
@@ -1631,9 +1622,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     private readonly record struct PumpOwner(string? Id, DurableJob? Job, long Generation);
-    private sealed class PendingMessage(DurableEnvelope envelope)
+    private sealed class PendingMessage(HierarchicalKey messageId)
     {
-        public DurableEnvelope Envelope { get; } = envelope;
+        public HierarchicalKey MessageId { get; } = messageId;
         public bool Captured { get; set; }
     }
 
