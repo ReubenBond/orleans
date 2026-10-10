@@ -355,6 +355,74 @@ public sealed class GrainTimerTests
         Assert.Equal(infinite ? 0 : 1, fixture.Time.TimerCreations);
     }
 
+    [Fact]
+    public async Task QueuedTick_DelayedReplacementExpiresBeforeDrain_ReusesQueuedTurn()
+    {
+        using var fixture = new TimerFixture();
+        var calls = 0;
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, (_, _) =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        }, 0, new(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
+        var message = Assert.Single(fixture.Messages);
+        timer.Change(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
+        fixture.Time.Advance(TimeSpan.FromSeconds(2));
+        fixture.Time.FireStaleCallback();
+        Assert.Single(fixture.Messages);
+        Assert.Equal(0, calls);
+        await fixture.InvokeAsync(message);
+        Assert.Equal(1, calls);
+        fixture.Time.Advance(TimeSpan.FromSeconds(3) - TimeSpan.FromTicks(1));
+        Assert.Single(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromTicks(1));
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.Same(message.BodyObject, fixture.Messages[1].BodyObject);
+        await fixture.InvokeAsync(fixture.Messages[1]);
+        Assert.Equal(2, calls);
+        Assert.Equal(1, fixture.Time.TimerCreations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunningCallback_StalePhysicalTickPreservesPeriodFromCompletion(bool interleave)
+    {
+        using var fixture = new TimerFixture();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, async (_, _) =>
+        {
+            if (++calls == 1)
+            {
+                started.SetResult();
+                await release.Task;
+            }
+        }, 0, new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)) { Interleave = interleave });
+        fixture.Time.Advance(TimeSpan.FromSeconds(1));
+        var invocation = fixture.InvokeAsync(Assert.Single(fixture.Messages));
+        try
+        {
+            await started.Task;
+            fixture.Time.Advance(TimeSpan.FromSeconds(10));
+            fixture.Time.FireStaleCallback();
+            Assert.Single(fixture.Messages);
+            Assert.Equal(1, calls);
+        }
+        finally
+        {
+            release.SetResult();
+            await invocation;
+        }
+        fixture.Time.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+        Assert.Single(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromTicks(1));
+        await fixture.InvokeAsync(fixture.Messages[1]);
+        Assert.Equal(2, calls);
+        Assert.Equal(1, fixture.Time.TimerCreations);
+    }
+
     [Theory]
     [InlineData(0.5, false)]
     [InlineData(0.5, true)]
@@ -665,8 +733,10 @@ public sealed class GrainTimerTests
         }
     }
 
-    [Fact]
-    public async Task FailedAdmission_LogsErrorAndAllowsImmediateRearm()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedAdmission_LogsErrorAndPreservesReplacementSchedule(bool replaceWithDelay)
     {
         var logger = Substitute.For<ILogger>();
         logger.IsEnabled(LogLevel.Error).Returns(true);
@@ -681,7 +751,14 @@ public sealed class GrainTimerTests
             calls++;
             return Task.CompletedTask;
         }, 0, new(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan));
-        fixture.BeforeReceive = () => throw exception;
+        fixture.BeforeReceive = () =>
+        {
+            if (replaceWithDelay)
+            {
+                timer.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+            }
+            throw exception;
+        };
         timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         Assert.Empty(fixture.Messages);
         Assert.Equal(0, calls);
@@ -690,12 +767,21 @@ public sealed class GrainTimerTests
             && Equals(call.GetArguments()[0], LogLevel.Error));
         Assert.Same(exception, error.GetArguments()[3]);
         fixture.BeforeReceive = null;
-        timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        if (replaceWithDelay)
+        {
+            fixture.Time.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+            Assert.Empty(fixture.Messages);
+            fixture.Time.Advance(TimeSpan.FromTicks(1));
+        }
+        else
+        {
+            timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        }
         await fixture.InvokeAsync(Assert.Single(fixture.Messages));
         Assert.Equal(1, calls);
         Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStart>());
         Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStop>());
-        Assert.Equal(0, fixture.Time.TimerCreations);
+        Assert.Equal(replaceWithDelay ? 1 : 0, fixture.Time.TimerCreations);
     }
 
     [Fact]
