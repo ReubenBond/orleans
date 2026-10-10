@@ -37,9 +37,9 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var stopped = WaitForPumpAsync(events, receiver.GetGrainId());
-        using var envelope = CreateEnvelope(receiver, NewMessage(192, "invocation-retry"));
+        var envelope = CreateEnvelope(receiver, NewMessage(192, "invocation-retry"));
         var now = Fixture.Clock.GetUtcNow();
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         var owner = grain.GetSnapshotForTest().InboxJob;
         var ownershipId = grain.GetSnapshotForTest().InboxJobId;
@@ -94,7 +94,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Empty(completed.InboxDeadLetters);
         Assert.Equal(1, ScheduleCount(receiver));
         Assert.Same(context, Fixture.GetGrainContext(receiver));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
     }
 
     private sealed class InvocationFaultHandler(Exception failure, bool deferred, Action beforeThrow) : IInboxHandler, IDisposable
@@ -127,8 +127,8 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         await receiver.ConfigureHandlerAsync(false);
         var originalContext = Fixture.GetGrainContext(receiver);
         var originalGrain = Assert.IsType<DurableMessagingTestGrain>(originalContext.GrainInstance);
-        using var envelope = CreateEnvelope(receiver, NewMessage(190, "missing-after-replay"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(190, "missing-after-replay"), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
         await originalContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         var accepted = Assert.IsType<DurableEndpointSnapshot>(originalGrain.AcceptedSnapshot);
         Assert.Equal(1, accepted.InboxCount);
@@ -149,22 +149,22 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(0, completed.OutboxCount);
         Assert.Equal(0, completed.MaxConcurrentHandlers);
         var deadLetter = Assert.Single(completed.InboxDeadLetters);
-        Assert.Equal(envelope.Value.MessageId, deadLetter.MessageId);
+        Assert.Equal(envelope.MessageId, deadLetter.MessageId);
         Assert.Equal("No inbox handler is registered.", deadLetter.Reason);
         Assert.Equal(0, deadLetter.AttemptCount);
         Assert.Equal(now, deadLetter.DeadLetteredAt);
         var context = Fixture.GetGrainContext(receiver);
         var retained = Assert.Single(context.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>().InboxDeadLetters);
-        Assert.Equal(envelope.Value.SenderId, retained.Message.SenderId);
+        Assert.Equal(envelope.SenderId, retained.Message.SenderId);
         Assert.Empty(GetAttemptStates(context));
         var processed = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
-        Assert.Equal(now, processed[envelope.Value.MessageId]);
+        Assert.Equal(now, processed[envelope.MessageId]);
         Assert.Equal(job.Id, completed.InboxJob!.Id);
         Assert.Equal(job.ShardId, completed.InboxJob.ShardId);
         Assert.Equal(accepted.InboxJobId, completed.InboxJobId);
         Assert.Equal(1, ScheduleCount(receiver));
         Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).DeactivationFailure.Task.IsCompleted);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
 
         Assert.Equal(DurableJobRunStatus.Completed, (await RunPumpAsync(receiver, job)).Status);
         var retired = await receiver.GetSnapshotAsync();
@@ -178,11 +178,11 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(deadLetter, Assert.Single(recovered.InboxDeadLetters));
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Empty(recovered.Effects);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(deadLetter, Assert.Single((await receiver.GetSnapshotAsync()).InboxDeadLetters));
         Assert.Equal(1, ScheduleCount(receiver));
     }
@@ -198,11 +198,11 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
     private async Task RetryUntilExactConfiguredAttemptLimitAsync(bool startBackgroundBeforeDuplicate)
     {
         var receiver = NewGrain();
-        using var envelope = CreateEnvelope(receiver, NewMessage(191, "retry-limit") with { ThrowDuringPreparation = true });
+        var envelope = CreateEnvelope(receiver, NewMessage(191, "retry-limit") with { ThrowDuringPreparation = true });
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var stopped = WaitForPumpAsync(events, receiver.GetGrainId());
         var now = Fixture.Clock.GetUtcNow();
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await stopped;
         var first = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
@@ -218,13 +218,13 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         using var tick = startBackgroundBeforeDuplicate
             ? Fixture.Clock.CreateTimer(_ => background = RunPumpAsync(receiver, job), null, TimeSpan.FromMinutes(1), Timeout.InfiniteTimeSpan)
             : null;
-        using (var runningLocalDrain = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope.Value).Route, TimeSpan.FromMinutes(1)))
+        using (var runningLocalDrain = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope).Route, TimeSpan.FromMinutes(1)))
         {
             if (startBackgroundBeforeDuplicate)
             {
                 await runningLocalDrain.WaitUntilEnteredAsync();
             }
-            var duplicate = DeliverAsync(receiver, envelope.Value);
+            var duplicate = DeliverAsync(receiver, envelope);
             await runningLocalDrain.WaitUntilEnteredAsync();
             var retry = startBackgroundBeforeDuplicate
                 ? Assert.IsAssignableFrom<Task<DurableJobRunResult>>(background)
@@ -240,7 +240,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
             Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         }
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
-        using var runningRequestedPump = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope.Value).Route, TimeSpan.FromMinutes(2));
+        using var runningRequestedPump = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope).Route, TimeSpan.FromMinutes(2));
         var terminal = RunPumpAsync(receiver, job);
         await runningRequestedPump.WaitUntilEnteredAsync();
         await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, terminal);
@@ -250,7 +250,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         var deadLetter = Assert.Single(completed.InboxDeadLetters);
         Assert.Equal(3, deadLetter.AttemptCount);
         Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
-        Assert.Equal(envelope.Value.MessageId, deadLetter.MessageId);
+        Assert.Equal(envelope.MessageId, deadLetter.MessageId);
         Assert.Empty(completed.Effects);
         Assert.Equal(0, completed.OutboxCount);
         Assert.Equal(0, completed.InboxCount);
@@ -258,7 +258,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Empty(GetAttemptStates(context));
         Assert.Null(completed.InboxJobId);
         Assert.Equal(1, ScheduleCount(receiver));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).DeactivationFailure.Task.IsCompleted);
     }
 
@@ -266,11 +266,11 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
     public async Task RetryBarrier_IsArmedWhenClockMakesBackgroundPumpEligible()
     {
         var receiver = NewGrain();
-        using var envelope = CreateEnvelope(receiver, NewMessage(192, "clock-boundary") with { ThrowDuringPreparation = true });
+        var envelope = CreateEnvelope(receiver, NewMessage(192, "clock-boundary") with { ThrowDuringPreparation = true });
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var stopped = WaitForPumpAsync(events, receiver.GetGrainId());
         var now = Fixture.Clock.GetUtcNow();
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await stopped;
         var first = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
@@ -282,11 +282,11 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Task<DurableJobRunResult>? background = null;
         using var tick = Fixture.Clock.CreateTimer(_ =>
         {
-            Fixture.HandlerProbe.TryGet(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope.Value).Route, out observedBarrier);
+            Fixture.HandlerProbe.TryGet(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope).Route, out observedBarrier);
             background = RunPumpAsync(receiver, job);
         }, null, TimeSpan.FromMinutes(1), Timeout.InfiniteTimeSpan);
 
-        using var handler = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope.Value).Route, TimeSpan.FromMinutes(1));
+        using var handler = ArmHandlerBeforeAdvance(receiver.GetGrainId(), TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), envelope).Route, TimeSpan.FromMinutes(1));
         Assert.Same(handler, observedBarrier);
         Assert.NotNull(background);
         await handler.WaitUntilEnteredAsync();

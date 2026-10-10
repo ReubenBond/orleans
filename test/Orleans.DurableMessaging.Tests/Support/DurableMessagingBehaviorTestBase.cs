@@ -64,31 +64,19 @@ public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
         }
     }
 
-    protected EnvelopeLease CreateEnvelope(
+    protected DurableEnvelope CreateEnvelope(
         IDurableMessagingTestGrain receiver,
         DurableTestMessage message,
         string route = "messages/record") =>
         CreateEnvelope(receiver, (object)message, route);
 
-    protected EnvelopeLease CreateEnvelope(
+    protected DurableEnvelope CreateEnvelope(
         IDurableMessagingTestGrain receiver,
         object body,
         string route)
     {
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("external-test-sender", Guid.NewGuid().ToString("N"));
-        return new EnvelopeLease(TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), route, body));
-    }
-
-    protected sealed class EnvelopeLease(DurableEnvelope value) : IDisposable
-    {
-        public DurableEnvelope Value { get; } = value;
-        private bool _disposed;
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            Value.Dispose();
-        }
+        return TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), route, body);
     }
 }

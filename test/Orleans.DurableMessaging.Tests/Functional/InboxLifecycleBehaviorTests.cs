@@ -24,8 +24,8 @@ public sealed class InboxLifecycleBehaviorTests : DurableMessagingBehaviorTestBa
         var token = shutdown.Token;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName, GrainLifecycleEvents.ListenerName);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/teardown-active");
-        using var envelope = CreateEnvelope(receiver, NewMessage(95, "active-timer"), "messages/teardown-active");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(95, "active-timer"), "messages/teardown-active");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var started = Assert.Single(events.Events.Select(static item => item.Payload)
             .OfType<GrainTimerEvents.TickStart>(), item => ReferenceEquals(item.GrainContext, context));
@@ -73,9 +73,9 @@ public sealed class InboxLifecycleBehaviorTests : DurableMessagingBehaviorTestBa
         var shutdown = GetShutdownSource(context);
         var token = shutdown.Token;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName, GrainLifecycleEvents.ListenerName);
-        using var envelope = CreateEnvelope(receiver, NewMessage(96, "queued-timer"));
+        var envelope = CreateEnvelope(receiver, NewMessage(96, "queued-timer"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
         await WaitForDeactivationAsync(context);
 
         var captured = events.Events.Select(static item => item.Payload).ToList();

@@ -21,9 +21,9 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
         _ = await receiver.GetSnapshotAsync();
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
         var barrier = Fixture.Storage.BlockWrite(journalId);
-        using var envelope = CreateEnvelope(receiver, NewMessage(1, "durability"));
+        var envelope = CreateEnvelope(receiver, NewMessage(1, "durability"));
 
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope);
         await barrier.WaitUntilEnteredAsync();
 
         Assert.False(delivery.IsCompleted);
@@ -67,15 +67,15 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var barrier = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
-        using var firstEnvelope = CreateEnvelope(receiver, NewMessage(72, "holds-gate"));
-        using var secondEnvelope = CreateEnvelope(receiver, NewMessage(73, "canceled"));
-        var firstDelivery = DeliverAsync(receiver, firstEnvelope.Value);
+        var firstEnvelope = CreateEnvelope(receiver, NewMessage(72, "holds-gate"));
+        var secondEnvelope = CreateEnvelope(receiver, NewMessage(73, "canceled"));
+        var firstDelivery = DeliverAsync(receiver, firstEnvelope);
         await barrier.WaitUntilEnteredAsync();
         using var cancellation = new CancellationTokenSource();
 
         var canceledDelivery = DeliverWithCancellationAsync(
             receiver,
-            secondEnvelope.Value,
+            secondEnvelope,
             cancellation.Token);
         Assert.False(canceledDelivery.IsCompleted);
         cancellation.Cancel();
@@ -99,8 +99,8 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
         var effect = new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 74, "prior-safe-state");
         await receiver.StageEffectAsync(effect);
         using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
-        using var envelope = CreateEnvelope(receiver, NewMessage(75, "schedule-barrier"));
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var envelope = CreateEnvelope(receiver, NewMessage(75, "schedule-barrier"));
+        var delivery = DeliverAsync(receiver, envelope);
         await schedule.WaitUntilEnteredAsync();
         var staged = Fixture.GetSnapshot(receiver);
         Assert.Equal(0, staged.InboxCount);
@@ -120,11 +120,11 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         using var barrier = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/blocked-duplicate");
-        using var envelope = CreateEnvelope(receiver, NewMessage(11, "duplicate"), "messages/blocked-duplicate");
+        var envelope = CreateEnvelope(receiver, NewMessage(11, "duplicate"), "messages/blocked-duplicate");
 
-        var first = await DeliverAsync(receiver, envelope.Value);
+        var first = await DeliverAsync(receiver, envelope);
         await barrier.WaitUntilEnteredAsync();
-        var second = DeliverAsync(receiver, envelope.Value);
+        var second = DeliverAsync(receiver, envelope);
 
         Assert.Equal(DeliveryStatus.Accepted, first.Status);
         Assert.False(second.IsCompleted);
@@ -141,15 +141,15 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     public async Task DuplicateAfterReactivationWithinRetention_RemainsEffectivelyOnce()
     {
         var receiver = NewGrain();
-        using var envelope = CreateEnvelope(receiver, NewMessage(13, "reactivation"));
+        var envelope = CreateEnvelope(receiver, NewMessage(13, "reactivation"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         var before = await Fixture.WaitForEffectCountAsync(receiver, 1);
         await receiver.RequestDeactivationAsync();
         var after = await receiver.GetSnapshotAsync();
 
         Assert.NotEqual(before.ActivationId, after.ActivationId);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -157,17 +157,17 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     public async Task SameMessageIdFromDistinctSenders_DeduplicatesOneReceiverCommand()
     {
         var receiver = NewGrain();
-        using var original = CreateEnvelope(receiver, NewMessage(14, "sender-scoped"));
+        var original = CreateEnvelope(receiver, NewMessage(14, "sender-scoped"));
         var other = new DurableEnvelope
         {
-            MessageId = original.Value.MessageId,
+            MessageId = original.MessageId,
             SenderId = GrainId.Create("other-sender", "same-message-id"),
-            ReceiverId = original.Value.ReceiverId,
-            Subject = original.Value.Subject,
-            Payload = original.Value.Payload,
+            ReceiverId = original.ReceiverId,
+            Subject = original.Subject,
+            Payload = original.Payload,
         };
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
@@ -176,7 +176,7 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
         var previous = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, original.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, original)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(completed.ActivationId, recovered.ActivationId);
@@ -197,9 +197,9 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
 
         foreach (var message in messages)
         {
-            using var envelope = CreateEnvelope(receiver, message);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+            var envelope = CreateEnvelope(receiver, message);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         }
 
         var state = await Fixture.WaitForEffectCountAsync(receiver, 3);
@@ -212,12 +212,12 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         using var barrier = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/sequential");
-        using var first = CreateEnvelope(receiver, NewMessage(21, "first"), "messages/sequential");
-        using var second = CreateEnvelope(receiver, NewMessage(22, "second"), "messages/sequential");
+        var first = CreateEnvelope(receiver, NewMessage(21, "first"), "messages/sequential");
+        var second = CreateEnvelope(receiver, NewMessage(22, "second"), "messages/sequential");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
         await WaitForBarrierAsync(receiver, barrier);
-        var secondDelivery = DeliverAsync(receiver, second.Value);
+        var secondDelivery = DeliverAsync(receiver, second);
         Assert.False(secondDelivery.IsCompleted);
 
         barrier.Release();

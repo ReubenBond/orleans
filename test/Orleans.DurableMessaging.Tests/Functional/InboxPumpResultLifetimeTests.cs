@@ -28,9 +28,9 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var results = GetEntries(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-replacement");
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/replacement");
-        using var envelope = CreateEnvelope(receiver, NewMessage(170, "replacement"), "messages/replacement");
+        var envelope = CreateEnvelope(receiver, NewMessage(170, "replacement"), "messages/replacement");
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        var turn = receiver.HoldPumpTurnAsync("hold-replacement", envelope.Value, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-replacement", envelope, deactivate: false);
         await hold.WaitUntilEnteredAsync();
         var run = CreateRun(oldJob);
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeAsync(receiver, run)).Status);
@@ -87,7 +87,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var job = CreateJob(receiver, "shutdown:1");
         await receiver.SetInboxOwnershipAsync("shutdown:1", job);
         await RefreshSeededOwnerAsync(receiver);
-        using var envelope = CreateEnvelope(receiver, NewMessage(171, "fresh-after-stop"));
+        var envelope = CreateEnvelope(receiver, NewMessage(171, "fresh-after-stop"));
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var entries = GetEntries(context);
@@ -105,7 +105,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         Task persisted = null!;
         await OnTurnAsync(context, () =>
         {
-            messages.Add(envelope.Value.MessageId, envelope.Value);
+            messages.Add(envelope.MessageId, envelope);
             persisted = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         });
         await persisted;

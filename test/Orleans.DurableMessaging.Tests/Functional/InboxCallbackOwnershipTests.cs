@@ -20,8 +20,8 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
     {
         var receiver = NewGrain();
         const string route = "messages/repair-owner";
-        using var envelope = CreateEnvelope(receiver, NewMessage(90, "repaired"), route);
-        await receiver.SeedInboxStateAsync(envelope.Value, null, null);
+        var envelope = CreateEnvelope(receiver, NewMessage(90, "repaired"), route);
+        await receiver.SeedInboxStateAsync(envelope, null, null);
         var oldContext = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -67,10 +67,10 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
     public async Task RecoveredInvalidPair_FailsStartupAndStopsCallbacksWithoutRepair(string fault)
     {
         var receiver = NewGrain();
-        using var envelope = CreateEnvelope(receiver, NewMessage(91, fault));
+        var envelope = CreateEnvelope(receiver, NewMessage(91, fault));
         var handle = CreateJob(receiver, "physical", "shard", fault == "mismatched-metadata" ? "other:1" : "owner:1");
         await receiver.SeedInboxStateAsync(
-            envelope.Value,
+            envelope,
             fault == "handle-only" ? null : "owner:1",
             fault == "generation-only" ? null : handle);
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
@@ -89,7 +89,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await ExecuteAsync(extension, handle));
         var delivery = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             OnTurnAsync(extension.Context, () =>
-                ((IDurableInboxExtension)extension.Handler).DeliverAsync(envelope.Value, TestContext.Current.CancellationToken)));
+                ((IDurableInboxExtension)extension.Handler).DeliverAsync(envelope, TestContext.Current.CancellationToken)));
         Assert.Contains(delivery.Message, lifecycle.ToString(), StringComparison.Ordinal);
         Assert.Contains(fault == "mismatched-metadata" ? "metadata does not match" : "both be present or both be absent", delivery.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
@@ -108,8 +108,8 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var receiver = NewGrain();
         const string route = "messages/physical-owner";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        using var envelope = CreateEnvelope(receiver, NewMessage(92, fault), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(92, fault), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var owned = Fixture.GetSnapshot(receiver);
         var handle = Assert.IsType<DurableJob>(owned.InboxJob);
@@ -136,9 +136,9 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
     {
         var receiver = NewGrain();
         const string route = "messages/callback-initialization";
-        using var envelope = CreateEnvelope(receiver, NewMessage(93, "initialization"), route);
+        var envelope = CreateEnvelope(receiver, NewMessage(93, "initialization"), route);
         var handle = CreateJob(receiver, "committed-physical", "committed-shard", "owner:1");
-        await receiver.SeedInboxStateAsync(envelope.Value, "owner:1", handle);
+        await receiver.SeedInboxStateAsync(envelope, "owner:1", handle);
         var oldContext = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -170,10 +170,10 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         const string route = "messages/duplicate-jobs";
         _ = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        using var envelope = CreateEnvelope(receiver, NewMessage(94, "duplicate-jobs"), route);
+        var envelope = CreateEnvelope(receiver, NewMessage(94, "duplicate-jobs"), route);
         Fixture.JobManagerProbe.DuplicateNext(ReceiverTestServices.InboxJobName);
         using var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope);
         await write.WaitUntilEnteredAsync();
         var jobs = Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId());
         Assert.Equal(2, jobs.Count);
@@ -205,9 +205,9 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         using var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/replacement-quiescence");
-        using var envelope = CreateEnvelope(receiver, NewMessage(116, "replacement-quiescence"), "messages/replacement-quiescence");
+        var envelope = CreateEnvelope(receiver, NewMessage(116, "replacement-quiescence"), "messages/replacement-quiescence");
         using var timers = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope);
         await schedule.WaitUntilEnteredAsync();
 
         var callback = await InvokeDurableCallbackAsync(receiver, oldJob);

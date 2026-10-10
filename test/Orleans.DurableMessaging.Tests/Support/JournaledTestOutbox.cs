@@ -34,7 +34,7 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Du
         {
             if (existing.SenderId != envelope.SenderId || existing.ReceiverId != envelope.ReceiverId
                 || !string.Equals(existing.Subject, envelope.Subject, StringComparison.Ordinal)
-                || !existing.Payload.ToArray().AsSpan().SequenceEqual(envelope.Payload.ToArray()))
+                || !existing.Payload.AsSpan().SequenceEqual(envelope.Payload))
             {
                 throw new InvalidOperationException($"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
             }
