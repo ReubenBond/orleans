@@ -964,7 +964,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             true => Argument(resultVar).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
             false => Argument(resultVar)
         };
-        var deserialize = ExpressionStatement(
+        innerBody.Add(
+            ExpressionStatement(
                 InvocationExpression(
                     IdentifierName(DeserializeMethodName),
                     ArgumentList(
@@ -972,19 +973,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             [
                                 Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                                 resultArgument
-                            ]))));
-        if (type.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
-        {
-            innerBody.Add(TryStatement(Block(deserialize), SingletonList(CatchClause()
-                .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
-                .WithBlock(Block(
-                ParseStatement("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CompleteArgumentResourcesOnFailure(result, exception, reader.Session.CodecProvider.Services);"),
-                ThrowStatement()))), null));
-        }
-        else
-        {
-            innerBody.Add(deserialize);
-        }
+                            ])))));
 
         innerBody.Add(ReturnStatement(resultVar));
 

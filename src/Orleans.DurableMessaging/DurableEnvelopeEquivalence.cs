@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 
 namespace Orleans.DurableMessaging;
 
@@ -16,12 +15,6 @@ internal static class DurableEnvelopeEquivalence
         {
             return false;
         }
-        var first = new SequenceReader<byte>(left.Payload.AsReadOnlySequence());
-        var second = new SequenceReader<byte>(right.Payload.AsReadOnlySequence());
-        while (first.TryRead(out var value))
-        {
-            if (!second.TryRead(out var other) || value != other) return false;
-        }
-        return true;
+        return left.Payload.AsSpan().SequenceEqual(right.Payload);
     }
 }

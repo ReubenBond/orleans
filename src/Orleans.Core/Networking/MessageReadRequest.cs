@@ -197,7 +197,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
 
                     // Send the error response and continue processing the next message.
                     connection.Send(response);
-                    message.Dispose(Shared.ConnectionTrace);
+                    message.Dispose();
                 }
                 else if (message.Direction == Message.Directions.Response)
                 {
@@ -208,12 +208,12 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 }
                 else
                 {
-                    message.Dispose(Shared.ConnectionTrace);
+                    message.Dispose();
                 }
             }
             else
             {
-                message.Dispose(Shared.ConnectionTrace);
+                message.Dispose();
             }
 
         }

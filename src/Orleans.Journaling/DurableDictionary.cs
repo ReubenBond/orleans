@@ -16,21 +16,16 @@ public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> wh
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue>, IDisposable where TKey : notnull
+internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
-    private readonly IDurableDictionaryValueLifecycle<TValue>? _valueLifecycle;
     private readonly Dictionary<TKey, TValue> _items = [];
     private JournalStreamWriter _writer;
-    private bool _disposed;
 
-    protected DurableDictionary(
-        IDurableDictionaryCommandCodec<TKey, TValue> codec,
-        IDurableDictionaryValueLifecycle<TValue>? valueLifecycle = null)
+    protected DurableDictionary(IDurableDictionaryCommandCodec<TKey, TValue> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
-        _valueLifecycle = valueLifecycle;
     }
 
     public DurableDictionary(
@@ -38,19 +33,13 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(
-            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey),
-            serviceProvider.GetService<IDurableDictionaryValueLifecycle<TValue>>())
+        : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableDictionary(
-        string key,
-        IJournaledStateManager manager,
-        IDurableDictionaryCommandCodec<TKey, TValue> codec,
-        IDurableDictionaryValueLifecycle<TValue>? valueLifecycle = null) : this(codec, valueLifecycle)
+    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -62,7 +51,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
         set
         {
-            SetValue(key, value);
+            WriteSet(key, value);
+            ApplySet(key, value);
         }
     }
 
@@ -79,8 +69,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        ThrowIfDisposed();
-        ApplyClear();
+        _items.Clear();
         _writer = writer;
     }
 
@@ -126,78 +115,16 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         _codec.WriteSet(key, value, GetWriter());
     }
 
-    private void SetValue(TKey key, TValue value)
-    {
-        ThrowIfDisposed();
-        var owned = _valueLifecycle is { } lifecycle ? lifecycle.Retain(value) : value;
-        try
-        {
-            WriteSet(key, owned);
-        }
-        catch
-        {
-            _valueLifecycle?.Release(owned);
-            throw;
-        }
-
-        ApplySet(key, owned);
-    }
-
     protected virtual void OnSet(TKey key, TValue value) { }
 
     private void ApplySet(TKey key, TValue value)
     {
-        if (_valueLifecycle is { } lifecycle)
-        {
-            bool replacing;
-            TValue? previous;
-            try
-            {
-                replacing = _items.TryGetValue(key, out previous);
-                _items[key] = value;
-            }
-            catch
-            {
-                lifecycle.Release(value);
-                throw;
-            }
-
-            if (replacing)
-            {
-                lifecycle.Release(previous!);
-            }
-        }
-        else
-        {
-            _items[key] = value;
-        }
-
+        _items[key] = value;
         OnSet(key, value);
     }
 
-    internal bool ApplyRemove(TKey key)
-    {
-        if (!_items.Remove(key, out var value))
-        {
-            return false;
-        }
-
-        _valueLifecycle?.Release(value);
-        return true;
-    }
-
-    private void ApplyClear()
-    {
-        if (_valueLifecycle is { } lifecycle)
-        {
-            foreach (var value in _items.Values)
-            {
-                lifecycle.Release(value);
-            }
-        }
-
-        _items.Clear();
-    }
+    internal bool ApplyRemove(TKey key) => _items.Remove(key);
+    private void ApplyClear() => _items.Clear();
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplySet(TKey key, TValue value) => ApplySet(key, value);
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyRemove(TKey key) => ApplyRemove(key);
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyClear() => ApplyClear();
@@ -209,7 +136,6 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     protected virtual JournalStreamWriter GetWriter()
     {
-        ThrowIfDisposed();
         Debug.Assert(_writer.IsInitialized);
         return _writer;
     }
@@ -221,7 +147,9 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             ThrowDuplicateKey(key);
         }
 
-        SetValue(key, value);
+        WriteSet(key, value);
+        _items.Add(key, value);
+        OnSet(key, value);
     }
 
     public bool ContainsKey(TKey key) => _items.ContainsKey(key);
@@ -237,22 +165,11 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         }
 
         WriteRemove(item.Key);
-        ApplyRemove(item.Key);
+        _ = ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
         return true;
     }
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
-
-    public void Dispose()
-    {
-        if (!_disposed && _valueLifecycle is not null)
-        {
-            _disposed = true;
-            ApplyClear();
-        }
-    }
-
-    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     [DoesNotReturn]
     private static void ThrowDuplicateKey(TKey key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));

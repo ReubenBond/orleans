@@ -164,7 +164,7 @@ namespace Orleans.Runtime.Messaging
                 else
                 {
                     this.messagingTrace.OnDropBlockedApplicationMessage(msg);
-                    msg.Dispose(log);
+                    msg.Dispose();
                 }
 
                 return;
@@ -184,7 +184,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
-                    msg.Dispose(log);
+                    msg.Dispose();
                     return;
                 }
 
@@ -227,7 +227,7 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
-                            msg.Dispose(log);
+                            msg.Dispose();
                         }
 
                         return;
@@ -286,7 +286,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                message.Dispose(log);
+                message.Dispose();
             }
         }
 
@@ -437,7 +437,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     else
                     {
-                        message.Dispose(log);
+                        message.Dispose();
                     }
                 }
             }
@@ -617,7 +617,7 @@ namespace Orleans.Runtime.Messaging
                     SendMessage(response);
                 }
 
-                msg.Dispose(log);
+                msg.Dispose();
             }
             else
             {
@@ -651,7 +651,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                msg.Dispose(log);
+                msg.Dispose();
             }
         }
 

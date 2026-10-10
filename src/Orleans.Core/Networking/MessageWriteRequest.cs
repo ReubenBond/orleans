@@ -47,7 +47,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
 
             // Serialize the message in full
-            var (headerLength, bodyLength) = messageSerializer.Write(_buffer, message, _shared.ConnectionTrace);
+            var (headerLength, bodyLength) = messageSerializer.Write(_buffer, message);
 
             // Write the framing
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes, headerLength);
@@ -87,11 +87,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         {
             foreach (var (message, _, _) in _messages)
             {
-                if (message.Direction == Message.Directions.OneWay)
-                {
-                    message.CompleteArgumentResources(_shared.ConnectionTrace);
-                }
-
                 message.ReleaseBodyBuffer();
             }
 
@@ -142,11 +137,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
         _disposed = true;
         CompleteWriting();
-        foreach (var (message, _, _) in _messages)
-        {
-            message.Dispose(_shared.ConnectionTrace);
-        }
-
         _messages.Clear();
         _buffer.Dispose();
     }

@@ -126,20 +126,13 @@ namespace Orleans.Runtime
                 return;
             }
 
-            try
-            {
-                RecordElapsedTime();
-                SignalCancellation();
-                shared.Unregister(Message);
-                _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
-                OrleansCallBackDataEvent.Instance.OnCanceled(Message);
-                context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
-            }
-            finally
-            {
-                Message.CompleteArgumentResources(shared.Logger);
-                DisposeCancellationRegistration();
-            }
+            RecordElapsedTime();
+            SignalCancellation();
+            shared.Unregister(Message);
+            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
+            OrleansCallBackDataEvent.Instance.OnCanceled(Message);
+            context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
+            DisposeCancellationRegistration();
         }
 
         public void OnTimeout()
@@ -149,34 +142,26 @@ namespace Orleans.Runtime
                 return;
             }
 
-            try
+            RecordElapsedTime();
+            if (shared.CancelRequestOnTimeout)
             {
-                RecordElapsedTime();
-                if (shared.CancelRequestOnTimeout)
-                {
-                    SignalCancellation();
-                }
-
-                this.shared.Unregister(this.Message);
-                DisposeCancellationRegistration();
-                _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
-
-                OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
-
-                var msg = this.Message; // Local working copy
-
-                var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-                var timeout = GetResponseTimeout();
-                LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
-
-                var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
-                context.Complete(Response.FromException(exception));
+                SignalCancellation();
             }
-            finally
-            {
-                Message.CompleteArgumentResources(shared.Logger);
-                DisposeCancellationRegistration();
-            }
+
+            this.shared.Unregister(this.Message);
+            DisposeCancellationRegistration();
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+
+            OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
+
+            var msg = this.Message; // Local working copy
+
+            var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
+            var timeout = GetResponseTimeout();
+            LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
+
+            var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
+            context.Complete(Response.FromException(exception));
         }
 
         public void OnTargetSiloFail()
@@ -186,24 +171,16 @@ namespace Orleans.Runtime
                 return;
             }
 
-            try
-            {
-                RecordElapsedTime();
-                this.shared.Unregister(this.Message);
-                DisposeCancellationRegistration();
+            RecordElapsedTime();
+            this.shared.Unregister(this.Message);
+            DisposeCancellationRegistration();
 
-                OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
-                var msg = this.Message;
-                var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-                LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
-                var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
-                this.context.Complete(Response.FromException(exception));
-            }
-            finally
-            {
-                Message.CompleteArgumentResources(shared.Logger);
-                DisposeCancellationRegistration();
-            }
+            OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
+            var msg = this.Message;
+            var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
+            LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
+            var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
+            this.context.Complete(Response.FromException(exception));
         }
 
         public void OnHostShutdown()
@@ -213,21 +190,13 @@ namespace Orleans.Runtime
                 return;
             }
 
-            try
-            {
-                RecordElapsedTime();
-                this.shared.Unregister(this.Message);
-                DisposeCancellationRegistration();
+            RecordElapsedTime();
+            this.shared.Unregister(this.Message);
+            DisposeCancellationRegistration();
 
-                var msg = this.Message;
-                var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
-                this.context.Complete(Response.FromException(exception));
-            }
-            finally
-            {
-                Message.CompleteArgumentResources(shared.Logger);
-                DisposeCancellationRegistration();
-            }
+            var msg = this.Message;
+            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
+            this.context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
@@ -237,21 +206,13 @@ namespace Orleans.Runtime
                 return;
             }
 
-            try
-            {
-                OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
+            OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
 
-                RecordElapsedTime();
-                DisposeCancellationRegistration();
+            RecordElapsedTime();
+            DisposeCancellationRegistration();
 
-                // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-                ResponseCallback(response, this.context);
-            }
-            finally
-            {
-                Message.CompleteArgumentResources(shared.Logger);
-                DisposeCancellationRegistration();
-            }
+            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
+            ResponseCallback(response, this.context);
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
