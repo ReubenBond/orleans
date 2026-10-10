@@ -391,7 +391,7 @@ public sealed class JournalBufferWriterOwnershipTests
             using var entry = writer.CreateJournalStreamWriter(new(2)).BeginEntry();
             var borrowed = entry.Writer.GetMemory(256 * 1024);
             writer.Consume(captured);
-            using (var empty = writer.GetBuffer()) Assert.Equal(256 * 1024, empty.First.Array.Length);
+            using (var empty = writer.GetBuffer()) Assert.Equal(256 * 1024, Assert.IsType<ArcBufferPage>(empty.First).Array.Length);
             borrowed.Span[0] = 99;
             entry.Writer.Advance(1);
             entry.Commit();
@@ -405,7 +405,7 @@ public sealed class JournalBufferWriterOwnershipTests
         }
         using var drained = writer.GetBuffer();
         Assert.Equal(0, drained.Length);
-        Assert.Equal(activeEntry ? 256 * 1024 : 128 * 1024, drained.First.Array.Length);
+        Assert.Equal(activeEntry ? 256 * 1024 : 128 * 1024, Assert.IsType<ArcBufferPage>(drained.First).Array.Length);
         Assert.Equal(payload, captured.ToArray());
     }
 
@@ -432,12 +432,12 @@ public sealed class JournalBufferWriterOwnershipTests
         using (var drained = writer.GetBuffer())
         {
             Assert.Equal(0, drained.Length);
-            Assert.Equal(128 * 1024, drained.First.Array.Length);
+            Assert.Equal(128 * 1024, Assert.IsType<ArcBufferPage>(drained.First).Array.Length);
         }
 
         writer.Reset();
         using var reset = writer.GetBuffer();
-        Assert.Equal(ArcBufferWriter.MinimumPageSize, reset.First.Array.Length);
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, Assert.IsType<ArcBufferPage>(reset.First).Array.Length);
         Assert.Equal(new byte[] { 42 }, captured.ToArray());
     }
 

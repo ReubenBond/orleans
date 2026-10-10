@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
@@ -38,19 +39,93 @@ public sealed class ArcBufferLifetimeTests
     [InlineData(1, 1)]
     public void OwnerFreeBuffer_RejectsInvalidShape(int offset, int length)
     {
-        var value = new ArcBuffer(null!, 0, offset, length);
-        Assert.Throws<InvalidOperationException>(() => value.ToArray());
-        Assert.Throws<InvalidOperationException>(() => value.Slice(0));
-        Assert.Throws<InvalidOperationException>(() => value.MemorySegments.MoveNext());
-        using var services = ArcBufferCodecTests.Services();
-        var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
-        Assert.Throws<InvalidOperationException>(() => serializer.SerializeToArray(value));
-        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
-        Assert.Throws<InvalidOperationException>(() =>
-        {
-            var reader = Reader.Create(value, session);
-            _ = reader.Length;
-        });
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => new ArcBuffer(null!, 0, offset, length));
+        Assert.Equal(offset == 0 ? "length" : "offset", error.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    [InlineData(ArcBufferWriter.MinimumPageSize + 1, 0)]
+    [InlineData(0, ArcBufferWriter.MinimumPageSize * 3 + 18)]
+    [InlineData(16, ArcBufferWriter.MinimumPageSize * 3 + 2)]
+    [InlineData(0, int.MaxValue)]
+    public void PublicConstructor_RejectsInvalidPageBoundsWithoutAcquiringPins(int offset, int length)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(ArcBufferCodecTests.Bytes(ArcBufferWriter.MinimumPageSize * 3 + 17));
+        using var input = writer.PeekSlice(writer.Length);
+        var first = Assert.IsType<ArcBufferPage>(input.First);
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => new ArcBuffer(first, first.Version, offset, length));
+        Assert.Equal(offset < 0 || offset > first.Length ? "offset" : "length", error.ParamName);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(17)]
+    [InlineData(ArcBufferWriter.MinimumPageSize)]
+    public void PublicConstructor_BorrowsValidMultiPageBytes(int offset)
+    {
+        using var writer = new ArcBufferWriter();
+        var expected = ArcBufferCodecTests.Bytes(ArcBufferWriter.MinimumPageSize * 3 + 17);
+        writer.Write(expected);
+        using var input = writer.PeekSlice(writer.Length);
+        var first = Assert.IsType<ArcBufferPage>(input.First);
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var borrowed = new ArcBuffer(first, first.Version, offset, expected.Length - offset);
+        Assert.Equal(expected.AsSpan(offset).ToArray(), borrowed.ToArray());
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        borrowed.Pin();
+        borrowed.Dispose();
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
+    [Fact]
+    public void PublicConstructor_RejectsInvalidPageToken()
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 1 });
+        using var input = writer.PeekSlice(1);
+        var first = Assert.IsType<ArcBufferPage>(input.First);
+        var before = first.ReferenceCount;
+        Assert.Throws<InvalidOperationException>(() => new ArcBuffer(first, first.Version + 1, 0, 1));
+        Assert.Equal(before, first.ReferenceCount);
+    }
+
+    [Fact]
+    public void PublicEmptyPageContract_IsNullable()
+    {
+        var nullability = new NullabilityInfoContext();
+        var field = typeof(ArcBuffer).GetField(nameof(ArcBuffer.First))!;
+        var constructor = typeof(ArcBuffer).GetConstructors().Single();
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(field).ReadState);
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(constructor.GetParameters()[0]).ReadState);
+        var value = new ArcBuffer(null!, 0, 0, 0);
+        Assert.Null(value.First);
+        Assert.Empty(value.ToArray());
+        value.Dispose();
+    }
+
+    [Theory]
+    [InlineData(ArcBufferWriter.MinimumPageSize)]
+    [InlineData(ArcBufferWriter.MinimumPageSize + 1)]
+    [InlineData(ArcBufferWriter.MinimumPageSize * 3 + 17)]
+    public void ZeroLengthSlice_KeepsOffsetWithinReferencedPage(int offset)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(ArcBufferCodecTests.Bytes(ArcBufferWriter.MinimumPageSize * 3 + 17));
+        using var input = writer.PeekSlice(writer.Length);
+        using var empty = input.Slice(offset, 0);
+        var page = Assert.IsType<ArcBufferPage>(empty.First);
+        Assert.InRange(empty.Offset, 0, page.Length);
+        Assert.Empty(empty.ToArray());
+        var borrowed = new ArcBuffer(page, page.Version, empty.Offset, empty.Length);
+        Assert.Empty(borrowed.ToArray());
+        Assert.Equal(empty.Offset, borrowed.Offset);
     }
 
     [Fact]
@@ -58,7 +133,7 @@ public sealed class ArcBufferLifetimeTests
     {
         var writer = new ArcBufferWriter();
         var empty = writer.ConsumeSlice(0);
-        var page = empty.First;
+        var page = Assert.IsType<ArcBufferPage>(empty.First);
         Assert.Equal(2, page.ReferenceCount);
         var retained = empty.Slice(0);
         Assert.Equal(3, page.ReferenceCount);
