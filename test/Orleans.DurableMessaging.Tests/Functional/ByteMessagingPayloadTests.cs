@@ -22,6 +22,7 @@ public sealed class ByteMessagingPayloadTests : DurableMessagingBehaviorTestBase
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(
             ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         var envelope = CreateEnvelope(receiver, NewMessage(300, "gc-admission"));
+        var publishedPayload = envelope.Payload;
         var expected = envelope.Payload.ToArray();
         using var handler = new PayloadProbe(expected);
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
@@ -39,6 +40,7 @@ public sealed class ByteMessagingPayloadTests : DurableMessagingBehaviorTestBase
         scheduling.Continue();
         await actual.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Same(publishedPayload, handler.Payload);
         Assert.Equal(expected, handler.Payload);
         handler.Release.TrySetResult();
         await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
