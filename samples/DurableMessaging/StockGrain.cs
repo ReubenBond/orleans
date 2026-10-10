@@ -25,8 +25,8 @@ public sealed class StockGrain(
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         inbox.RegisterHandlers(routes => routes
-            .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
-            .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
+            .Register(reserve, HandleReserveStock)
+            .Register(restock, HandleRestock));
         return base.OnActivateAsync(cancellationToken);
     }
 

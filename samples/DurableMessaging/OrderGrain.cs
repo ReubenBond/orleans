@@ -27,8 +27,7 @@ public sealed class OrderGrain(
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(result, this,
-            static (outcome, grain, context) => grain.HandleResult(outcome, context)));
+        inbox.RegisterHandlers(routes => routes.Register(result, HandleResult));
         journal.Hooks.Add(this);
         return base.OnActivateAsync(cancellationToken);
     }

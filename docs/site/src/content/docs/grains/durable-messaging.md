@@ -87,12 +87,12 @@ after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#res
 and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
 `Register` accepts synchronous actions or asynchronous functions returning
-`ValueTask`. Pass a state argument with an
+`ValueTask`. The recipes use succinct method-group registrations, such as
+`Register(payment, Record)`. For explicit state and static delegates, pass a state argument with an
 `Action<T, TArg, IInboxHandlerContext>` or
 `Func<T, TArg, IInboxHandlerContext, CancellationToken, ValueTask>` to use static
-delegates. The dispatcher stores typed handler objects with that state and invokes
-their concrete generic serializer directly, supporting AOT compilation. Simple
-delegate overloads are also available.
+delegates. The dispatcher stores typed handler objects and invokes their concrete
+generic serializer directly, supporting AOT compilation.
 
 Register handlers in <xref:Orleans.Grain.OnActivateAsync*>. Journal recovery
 restores durable state before this method runs, and queued inbox pump turns and

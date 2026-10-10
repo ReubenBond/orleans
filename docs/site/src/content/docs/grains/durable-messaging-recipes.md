@@ -64,8 +64,8 @@ The inventory registers typed methods through
 `inventory.reserve.v1` selects `ReserveStock` and its reservation method;
 `inventory.restock.v1` selects `Restock` and its stock-increment method. One
 dispatcher performs exact subject lookup and typed decoding, so each method
-receives its application record directly. Each registration passes the grain as
-state and uses a static delegate. Synchronous dispatch checks cancellation at the
+receives its application record directly. Registrations use method groups such as
+`Register(reserve, HandleReserveStock)`. Synchronous dispatch checks cancellation at the
 boundary before entering these methods.
 
 These primary-constructor grains register routes in
@@ -114,7 +114,7 @@ reconciliation protocol.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_payment" language="csharp":::
 
-The provider call precedes shared journaled changes. The static asynchronous route
+The provider call precedes shared journaled changes. The asynchronous handler
 passes its token to the gateway, and the method checks cancellation after that
 await before `SendReply` and the final result update. If the provider succeeds and activation
 loss interrupts the local commit, a replacement attempt uses the same provider key.
@@ -193,7 +193,7 @@ progress and result queries:
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_dispatcher" language="csharp":::
 
 The dispatcher matches subjects ordinally and invokes typed handler objects
-containing each binding, static delegate, and grain state argument. Configuration
+containing each binding and method-group delegate. Configuration
 freezes the routes before installation. Asynchronous routes return their actual
 handler `ValueTask`.
 Each delegate explicitly completes in the same synchronous block as its shared

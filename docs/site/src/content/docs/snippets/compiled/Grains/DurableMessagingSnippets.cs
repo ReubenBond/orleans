@@ -79,8 +79,7 @@ public sealed class NotificationGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(notification, this,
-            static (message, grain, context) => grain.HandleNotification(message, context)));
+        inbox.RegisterHandlers(routes => routes.Register(notification, HandleNotification));
         return base.OnActivateAsync(cancellationToken);
     }
 

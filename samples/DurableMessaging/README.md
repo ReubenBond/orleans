@@ -75,8 +75,8 @@ will not replace its declared versions.
    receiver, and owning `ArcBuffer` payload.
 3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
    registers separate typed reservation and restocking methods; the order registers
-   its typed outcome method. Each registration supplies the grain as state and a
-   static delegate receiving the decoded record, grain, and inbox context.
+   its typed outcome method. Registrations use method groups such as
+   `Register(reserve, HandleReserveStock)`, receiving the decoded record and inbox context.
    The primary-constructor grains register routes and the order's receipt hook in
    `OnActivateAsync`. Journal recovery restores their durable state first; requests
    and queued inbox pump turns begin after activation completes.

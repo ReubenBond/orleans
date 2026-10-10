@@ -105,8 +105,8 @@ public sealed class InventoryGrain(
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         inbox.RegisterHandlers(routes => routes
-            .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
-            .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
+            .Register(reserve, HandleReserveStock)
+            .Register(restock, HandleRestock));
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -184,8 +184,7 @@ public sealed class PaymentGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(charge, this,
-            static (request, grain, context, token) => grain.HandleChargeAsync(request, context, token)));
+        inbox.RegisterHandlers(routes => routes.Register(charge, HandleChargeAsync));
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -240,8 +239,7 @@ public sealed class StockProjectionGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(type, this,
-            static (update, grain, context) => grain.HandleSnapshot(update, context)));
+        inbox.RegisterHandlers(routes => routes.Register(type, HandleSnapshot));
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -343,8 +341,8 @@ public sealed class OrderOutcomesGrain(
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         inbox.RegisterHandlers(routes => routes
-            .Register(reservation, this, static (outcome, grain, context) => grain.Record(outcome, context))
-            .Register(payment, this, static (outcome, grain, context) => grain.Record(outcome, context)));
+            .Register(reservation, Record)
+            .Register(payment, Record));
         return base.OnActivateAsync(cancellationToken);
     }
 
