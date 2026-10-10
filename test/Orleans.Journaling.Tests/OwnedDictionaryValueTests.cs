@@ -417,7 +417,7 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
         var validJournal = Assert.Single(storage.Segments);
         if (failRecovery)
         {
-            await storage.AppendAsync(
+            await storage.AppendBytesAsync(
                 new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("[8,[\"set\",\"partial\",44,\"unexpected\"]]\n")), token);
         }
 
@@ -452,7 +452,7 @@ public sealed class OwnedDictionaryValueTests : JournalingTestBase
             if (retryRecovery)
             {
                 var previousOwners = converter.Decoded.ToArray();
-                await storage.ReplaceAsync(new ReadOnlySequence<byte>(validJournal), token);
+                await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(validJournal), token);
                 await manager.InitializeAsync(token);
 
                 Assert.All(previousOwners, value =>

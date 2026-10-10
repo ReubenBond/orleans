@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Core;
-using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization;
 using Xunit;
 using static VerifyXunit.Verifier;
 
@@ -36,7 +36,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     {
         var journalBytes = LoadUpstreamMainJournal();
         var storage = new VolatileJournalStorage();
-        await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
+        await storage.AppendBytesAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
 
         var states = CreateStates(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

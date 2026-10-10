@@ -2,8 +2,8 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
-using Azure;
 using Azure.Data.Tables;
+using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
@@ -237,7 +237,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         // Appends are written as one entity group transaction, so validate its limits before touching storage.
         ThrowIfBatchTooLarge(value.Length);
@@ -258,7 +258,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 var expectedProviderState = _headerProviderState;
                 var generation = expectedProviderState.Generation
                     ?? throw new InvalidOperationException("Azure Table journal header state does not include a generation.");
-                var entities = CreateDataEntities(value, generation, firstSequence: expectedProviderState.RowCount);
+                var entities = CreateDataEntities(value.AsReadOnlySequence(), generation, firstSequence: expectedProviderState.RowCount);
                 var newProviderState = expectedProviderState with
                 {
                     RowCount = checked(expectedProviderState.RowCount + entities.Count),
@@ -466,7 +466,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         var startTimestamp = Stopwatch.GetTimestamp();
         var succeeded = false;
@@ -493,7 +493,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             var published = false;
             try
             {
-                var rowCount = await SubmitDataEntitiesAsync(value, newGeneration, cancellationToken).ConfigureAwait(false);
+                var rowCount = await SubmitDataEntitiesAsync(value.AsReadOnlySequence(), newGeneration, cancellationToken).ConfigureAwait(false);
 
                 for (var attempt = 0; ; attempt++)
                 {

@@ -3,10 +3,11 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
-using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 
 namespace Orleans.Journaling;
@@ -248,20 +249,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         var startTimestamp = Stopwatch.GetTimestamp();
         var succeeded = false;
 
         try
         {
-            if (value.Length > MaxSinglePutObjectBytes)
-            {
-                throw new InvalidOperationException(
-                    $"S3 journal appends larger than 5 GB are not supported by a single append request. " +
-                    $"Append length: {value.Length:N0} bytes.");
-            }
-
             for (var attempt = 0; ; attempt++)
             {
                 if (!WalExists)
@@ -277,11 +271,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 {
                     if (_shared.Options.UseS3ExpressAppend)
                     {
-                        await AppendWithS3ExpressAsync(value, expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
+                        await AppendWithS3ExpressAsync(value.AsReadOnlySequence(), expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {
-                        await AppendWithConditionalRewriteAsync(value, expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
+                        await AppendWithConditionalRewriteAsync(value.AsReadOnlySequence(), expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
                     }
 
                     LogAppend(_shared.Logger, value.Length, _shared.BucketName, _walObjectKey);
@@ -545,19 +539,12 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         var startTimestamp = Stopwatch.GetTimestamp();
         var succeeded = false;
         try
         {
-            if (value.Length > MaxSinglePutObjectBytes)
-            {
-                throw new InvalidOperationException(
-                    $"S3 journal checkpoints larger than 5 GB are not supported by the single-request upload path. " +
-                    $"Checkpoint length: {value.Length:N0} bytes.");
-            }
-
             await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
 
             var expectedWalETag = _walETag!;
@@ -594,7 +581,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
             var previousCheckpointName = _shared.Options.DeleteOldCheckpoints ? walState.Value.Manifest.Checkpoint?.Name : null;
 
-            using var checkpointStream = new S3ReadOnlySequenceStream(value);
+            using var checkpointStream = new S3ReadOnlySequenceStream(value.AsReadOnlySequence());
             while (true)
             {
                 var checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));

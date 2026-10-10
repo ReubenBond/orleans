@@ -355,46 +355,127 @@ public sealed class GrainTimerTests
         Assert.Equal(infinite ? 0 : 1, fixture.Time.TimerCreations);
     }
 
-    [Theory]
-    [InlineData(0.5, false)]
-    [InlineData(0.5, true)]
-    [InlineData(2.5, false)]
-    [InlineData(2.5, true)]
-    public async Task EarlyPhysicalCallback_PreservesDelayedTickAndPeriod(double earlyMilliseconds, bool repeating)
+    [Fact]
+    public async Task QueuedTick_DelayedReplacementExpiresBeforeDrain_ReusesQueuedTurn()
     {
         using var fixture = new TimerFixture();
-        using var diagnostics = new TimerDiagnostics(fixture.Grain);
         var calls = 0;
-        var dueTime = TimeSpan.FromMilliseconds(100);
-        var earlyBy = TimeSpan.FromMilliseconds(earlyMilliseconds);
-        var rearmDelay = TimeSpan.FromMilliseconds(Math.Ceiling(earlyMilliseconds));
-        var expectedTicks = repeating ? 3 : 1;
         using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, (_, _) =>
         {
             calls++;
             return Task.CompletedTask;
-        }, 0, new(dueTime, repeating ? dueTime : Timeout.InfiniteTimeSpan));
-
-        for (var i = 0; i < expectedTicks; i++)
-        {
-            fixture.Time.Advance(dueTime - earlyBy);
-            fixture.Time.FireEarlyCallback();
-            Assert.Equal(i, fixture.Messages.Count);
-            Assert.Equal(i, calls);
-            fixture.Time.Advance(rearmDelay - TimeSpan.FromTicks(1));
-            Assert.Equal(i, fixture.Messages.Count);
-            fixture.Time.Advance(TimeSpan.FromTicks(1));
-            Assert.Equal(i + 1, fixture.Messages.Count);
-            await fixture.InvokeAsync(fixture.Messages[i]);
-            Assert.Equal(i + 1, calls);
-        }
-
+        }, 0, new(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
+        var message = Assert.Single(fixture.Messages);
+        timer.Change(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
+        fixture.Time.Advance(TimeSpan.FromSeconds(2));
+        fixture.Time.FireStaleCallback();
+        Assert.Single(fixture.Messages);
+        Assert.Equal(0, calls);
+        await fixture.InvokeAsync(message);
+        Assert.Equal(1, calls);
+        fixture.Time.Advance(TimeSpan.FromSeconds(3) - TimeSpan.FromTicks(1));
+        Assert.Single(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromTicks(1));
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.Same(message.BodyObject, fixture.Messages[1].BodyObject);
+        await fixture.InvokeAsync(fixture.Messages[1]);
+        Assert.Equal(2, calls);
         Assert.Equal(1, fixture.Time.TimerCreations);
-        Assert.Equal(expectedTicks, diagnostics.Events.OfType<GrainTimerEvents.TickStart>().Count());
-        Assert.Equal(expectedTicks, diagnostics.Events.OfType<GrainTimerEvents.TickStop>().Count());
-        timer.Dispose();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunningCallback_StalePhysicalTickPreservesPeriodFromCompletion(bool interleave)
+    {
+        using var fixture = new TimerFixture();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, async (_, _) =>
+        {
+            if (++calls == 1)
+            {
+                started.SetResult();
+                await release.Task;
+            }
+        }, 0, new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)) { Interleave = interleave });
+        fixture.Time.Advance(TimeSpan.FromSeconds(1));
+        var invocation = fixture.InvokeAsync(Assert.Single(fixture.Messages));
+        try
+        {
+            await started.Task;
+            fixture.Time.Advance(TimeSpan.FromSeconds(10));
+            fixture.Time.FireStaleCallback();
+            Assert.Single(fixture.Messages);
+            Assert.Equal(1, calls);
+        }
+        finally
+        {
+            release.SetResult();
+            await invocation;
+        }
+        fixture.Time.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+        Assert.Single(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromTicks(1));
+        await fixture.InvokeAsync(fixture.Messages[1]);
+        Assert.Equal(2, calls);
+        Assert.Equal(1, fixture.Time.TimerCreations);
+    }
+
+    [Theory]
+    [InlineData(0.5)]
+    [InlineData(100.5)]
+    public async Task DelayedTick_UsesProviderTimingAndResolution(double milliseconds)
+    {
+        using var fixture = new TimerFixture();
+        using var diagnostics = new TimerDiagnostics(fixture.Grain);
+        var calls = 0;
+        var dueTime = TimeSpan.FromMilliseconds(milliseconds);
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, (_, _) =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        }, 0, new(dueTime, Timeout.InfiniteTimeSpan));
+
+        fixture.Time.Advance(dueTime - TimeSpan.FromTicks(1));
+        Assert.Empty(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromTicks(1));
+        Assert.Equal(0, calls);
+        await fixture.InvokeAsync(Assert.Single(fixture.Messages));
+        Assert.Equal(1, calls);
+        Assert.Equal(1, fixture.Time.TimerCreations);
+        Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStart>());
+        Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStop>());
         fixture.Time.Advance(TimeSpan.FromDays(1));
-        Assert.Equal(expectedTicks, fixture.Messages.Count);
+        Assert.Single(fixture.Messages);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DispatchedPhysicalTick_RacingDelayedChange_IsAdmittedAndResumesPeriod(bool interleave)
+    {
+        using var fixture = new TimerFixture();
+        var calls = 0;
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, (_, _) =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        }, 0, new(TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan) { Interleave = interleave });
+        timer.Change(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5));
+        // Deliver a previously dispatched callback after the replacement schedule was armed.
+        fixture.Time.FireStaleCallback();
+        Assert.Equal(0, calls);
+        await fixture.InvokeAsync(Assert.Single(fixture.Messages));
+        Assert.Equal(1, calls);
+        fixture.Time.Advance(TimeSpan.FromSeconds(3));
+        Assert.Single(fixture.Messages);
+        fixture.Time.Advance(TimeSpan.FromSeconds(2));
+        Assert.Equal(2, fixture.Messages.Count);
+        await fixture.InvokeAsync(fixture.Messages[1]);
+        Assert.Equal(2, calls);
+        Assert.Equal(1, fixture.Time.TimerCreations);
     }
 
     [Fact]
@@ -414,7 +495,6 @@ public sealed class GrainTimerTests
         fixture.Time.FireStaleCallback();
         Assert.Single(fixture.Messages);
         timer.Change(TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
-        fixture.Time.FireStaleCallback();
         fixture.Time.Advance(TimeSpan.FromSeconds(2));
         Assert.Single(fixture.Messages);
         fixture.Time.Advance(TimeSpan.FromSeconds(1));
@@ -665,8 +745,10 @@ public sealed class GrainTimerTests
         }
     }
 
-    [Fact]
-    public async Task FailedAdmission_LogsErrorAndAllowsImmediateRearm()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedAdmission_LogsErrorAndPreservesReplacementSchedule(bool replaceWithDelay)
     {
         var logger = Substitute.For<ILogger>();
         logger.IsEnabled(LogLevel.Error).Returns(true);
@@ -681,7 +763,14 @@ public sealed class GrainTimerTests
             calls++;
             return Task.CompletedTask;
         }, 0, new(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan));
-        fixture.BeforeReceive = () => throw exception;
+        fixture.BeforeReceive = () =>
+        {
+            if (replaceWithDelay)
+            {
+                timer.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+            }
+            throw exception;
+        };
         timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         Assert.Empty(fixture.Messages);
         Assert.Equal(0, calls);
@@ -690,12 +779,21 @@ public sealed class GrainTimerTests
             && Equals(call.GetArguments()[0], LogLevel.Error));
         Assert.Same(exception, error.GetArguments()[3]);
         fixture.BeforeReceive = null;
-        timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        if (replaceWithDelay)
+        {
+            fixture.Time.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+            Assert.Empty(fixture.Messages);
+            fixture.Time.Advance(TimeSpan.FromTicks(1));
+        }
+        else
+        {
+            timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        }
         await fixture.InvokeAsync(Assert.Single(fixture.Messages));
         Assert.Equal(1, calls);
         Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStart>());
         Assert.Single(diagnostics.Events.OfType<GrainTimerEvents.TickStop>());
-        Assert.Equal(0, fixture.Time.TimerCreations);
+        Assert.Equal(replaceWithDelay ? 1 : 0, fixture.Time.TimerCreations);
     }
 
     [Fact]
@@ -833,19 +931,13 @@ public sealed class GrainTimerTests
         public int TimerCreations { get; private set; }
         private TimerCallback? _callback;
         private object? _state;
-        private ITimer? _timer;
         public void FireStaleCallback() => _callback!(_state);
-        public void FireEarlyCallback()
-        {
-            _timer!.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            _callback!(_state);
-        }
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             TimerCreations++;
             _callback = callback;
             _state = state;
-            return _timer = base.CreateTimer(callback, state, dueTime, period);
+            return base.CreateTimer(callback, state, dueTime, period);
         }
     }
 }

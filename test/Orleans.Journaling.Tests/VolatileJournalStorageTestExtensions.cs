@@ -18,12 +18,6 @@ internal static class VolatileJournalStorageTestExtensions
                 }
             }
 
-            if (store.CopyWriter is { } writer)
-            {
-                using var tail = writer.PeekSlice(0);
-                pages.Add(tail.First);
-            }
-
             return (store.Segments.Count, pages.Sum(static page => (long)page.Array.Length), pages.Count);
         }
     }
