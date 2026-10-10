@@ -4,8 +4,6 @@ using Orleans.DurableMessaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 
 #pragma warning disable ORLEANSEXP005
 
@@ -35,6 +33,7 @@ public static class MessagingSubjects
     public const string ChargePayment = "payments.charge.v1";
     public const string PaymentResult = "payments.result.v1";
     public const string StockSnapshot = "inventory.snapshot.v1";
+    public const string Shipment = "shipments.manifest.v1";
 }
 
 public static class MessagingProtocol
@@ -49,6 +48,7 @@ public static class MessagingProtocol
         services.AddDurableMessageType<ChargePayment>(MessagingSubjects.ChargePayment);
         services.AddDurableMessageType<PaymentResult>(MessagingSubjects.PaymentResult);
         services.AddDurableMessageType<StockSnapshot>(MessagingSubjects.StockSnapshot);
+        services.AddDurableMessageType<Shipment>(MessagingSubjects.Shipment);
     }
 }
 
@@ -79,7 +79,8 @@ public sealed class NotificationGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(notification, HandleNotification));
+        inbox.RegisterHandlers(routes => routes
+            .Register(notification, HandleNotification));
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -123,102 +124,27 @@ public sealed class NotificationSenderGrain(
 }
 // </messaging_send>
 
-// <messaging_buffer_package>
-internal static class ShipmentPackage
+// <messaging_shipment>
+[GenerateSerializer]
+public sealed record Shipment(
+    [property: Id(0)] ReserveStock Reservation,
+    [property: Id(1)] byte[] Manifest);
+
+public interface IShipmentSenderGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
-    public const string Subject = "shipments.manifest.v1";
+    Task SendAsync(HierarchicalKey commandId, GrainId receiver, Shipment shipment);
+}
 
-    internal static DurableEnvelope CreateEnvelope(
-        Serializer serializer, ArcBufferWriter encoder, HierarchicalKey commandId,
-        GrainId sender, GrainId receiver, ReserveStock request, ReadOnlySpan<byte> manifest) => new()
+public sealed class ShipmentSenderGrain(
+    IDurableOutbox outbox,
+    IDurableStateManager state,
+    [FromKeyedServices(MessagingSubjects.Shipment)] DurableMessageType<Shipment> shipments)
+    : Grain, IShipmentSenderGrain
+{
+    public async Task SendAsync(HierarchicalKey commandId, GrainId receiver, Shipment shipment)
     {
-        MessageId = commandId,
-        Subject = Subject,
-        SenderId = sender,
-        ReceiverId = receiver,
-        Payload = Encode(serializer, encoder, request, manifest)
-    };
-
-    internal static ArcBuffer Encode(
-        Serializer serializer, ArcBufferWriter encoder, ReserveStock request, ReadOnlySpan<byte> manifest)
-    {
-        using var builder = new BufferPackageBuilder();
-        builder.Add("reservation", writer => serializer.Serialize(request, writer));
-        builder.Add("manifest", manifest);
-        using var package = builder.Build();
-        try
-        {
-            serializer.Serialize(package, encoder);
-            return encoder.ConsumeSlice(encoder.Length);
-        }
-        catch
-        {
-            encoder.Reset();
-            throw;
-        }
-    }
-
-    internal static BufferPackage DecodeEnvelope(Serializer serializer, DurableEnvelope envelope)
-    {
-        if (!string.Equals(envelope.Subject, Subject, StringComparison.Ordinal))
-        {
-            throw new ArgumentException("Expected a shipment manifest subject.", nameof(envelope));
-        }
-        return Decode(serializer, envelope.Payload);
-    }
-
-    internal static BufferPackage Decode(Serializer serializer, ArcBuffer payload) =>
-        serializer.Deserialize<BufferPackage>(payload)
-        ?? throw new ArgumentException("A shipment requires a package.");
-
-    internal static ReserveStock ReadReservation(Serializer serializer, BufferPackage package)
-    {
-        if (!package.TryGetBytes("reservation", out var request))
-        {
-            throw new ArgumentException("A shipment requires a reservation entry.");
-        }
-        // The entry sequence is borrowed while the package owner stays alive.
-        return serializer.Deserialize<ReserveStock>(request)
-            ?? throw new ArgumentException("A shipment requires a reservation request.");
+        outbox.Send(shipments, commandId, receiver, shipment);
+        await state.WriteStateAsync();
     }
 }
-// </messaging_buffer_package>
-
-// <messaging_arc_ownership>
-internal static class ArcPayloadEncoder
-{
-    internal static DurableEnvelope CreateEnvelope(
-        Serializer<Notify> serializer, ArcBufferWriter encoder, HierarchicalKey commandId,
-        GrainId sender, GrainId receiver, Notify message) => new()
-    {
-        MessageId = commandId,
-        Subject = MessagingSubjects.Notify,
-        SenderId = sender,
-        ReceiverId = receiver,
-        Payload = Encode(serializer, encoder, message)
-    };
-
-    internal static ArcBuffer Encode(Serializer<Notify> serializer, ArcBufferWriter encoder, Notify message)
-    {
-        try
-        {
-            serializer.Serialize(message, encoder);
-            return encoder.ConsumeSlice(encoder.Length);
-        }
-        catch
-        {
-            encoder.Reset();
-            throw;
-        }
-    }
-
-    internal static Notify DecodeRetained(Serializer serializer, ArcBuffer borrowedPayload)
-    {
-        using var retained = borrowedPayload.Slice(0, borrowedPayload.Length);
-        using var session = serializer.SessionPool.GetSession();
-        var reader = Reader.Create(retained, session);
-        return serializer.GetSerializer<Notify>().Deserialize(ref reader)
-            ?? throw new ArgumentException("A notification is required.");
-    }
-}
-// </messaging_arc_ownership>
+// </messaging_shipment>

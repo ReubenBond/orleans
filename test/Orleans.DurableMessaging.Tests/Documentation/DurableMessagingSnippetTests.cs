@@ -1,4 +1,3 @@
-using System.Buffers;
 using Documentation.Grains.DurableMessaging;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -152,63 +151,88 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         Assert.Empty(attempt.Output);
     }
 
-    [Fact]
-    public void ShipmentPackage_EntriesRemainValidWhileDecodedOwnerIsRetained()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Shipment_OrdinarySerializationRoundTripPreservesReservationAndManifest(bool emptyManifest)
     {
         var request = new ReserveStock(3, Sender);
         byte[] manifest = [1, 2, 3];
-        BufferPackage retained;
-        using (var encoder = new ArcBufferWriter())
-        using (var encoded = ShipmentPackage.Encode(Serializer, encoder, request, manifest))
-        using (var package = ShipmentPackage.Decode(Serializer, encoded))
-        {
-            manifest[0] = 99;
-            Assert.Equal(request, ShipmentPackage.ReadReservation(Serializer, package));
-            Assert.Equal(new[] { "manifest", "reservation" }, package.Keys.Order().ToArray());
-            Assert.False(package.TryGetBytes("missing", out _));
-            Assert.Same(encoded.First, package.Buffer.First);
-            retained = package.Retain();
-        }
+        if (emptyManifest) manifest = [];
+        var shipment = new Shipment(request, manifest);
+        var serializer = _services.GetRequiredService<Serializer<Shipment>>();
 
-        using (retained)
+        var bytes = serializer.SerializeToArray(shipment);
+        if (!emptyManifest) manifest[0] = 99;
+        var decoded = Assert.IsType<Shipment>(serializer.Deserialize(bytes));
+
+        Assert.Equal(request, decoded.Reservation);
+        Assert.NotSame(shipment, decoded);
+        if (emptyManifest)
         {
-            Assert.Equal(request, ShipmentPackage.ReadReservation(Serializer, retained));
-            Assert.True(retained.TryGetBytes("manifest", out var bytes));
-            Assert.Equal(new byte[] { 1, 2, 3 }, bytes.ToArray());
+            Assert.Empty(decoded.Manifest);
         }
-        Assert.Throws<ObjectDisposedException>(() => retained.TryGetBytes("manifest", out _));
+        else
+        {
+            Assert.Equal(new byte[] { 1, 2, 3 }, decoded.Manifest);
+            Assert.NotSame(manifest, decoded.Manifest);
+        }
     }
 
     [Fact]
-    public void ArcPayload_ConsumedSlicesSharePagesAndSurviveEncoderDisposal()
+    public async Task ShipmentSender_StagesOrdinaryRecordBeforeAwaitingJournalAcknowledgement()
     {
-        var serializer = _services.GetRequiredService<Serializer<Notify>>();
-        var message = new Notify("retained", Sender);
-        ArcBuffer first;
-        ArcBuffer second;
-        using (var encoder = new ArcBufferWriter())
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
+        var state = Substitute.For<IDurableStateManager>();
+        var shipments = new DurableMessageType<Shipment>(MessagingSubjects.Shipment,
+            _services.GetRequiredService<Serializer<Shipment>>());
+        var grain = new ShipmentSenderGrain(outbox, state, shipments);
+        var acknowledgement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var output = new List<DurableEnvelope>();
+        var events = new List<string>();
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            first = ArcPayloadEncoder.Encode(serializer, encoder, message);
-            try
-            {
-                second = ArcPayloadEncoder.Encode(serializer, encoder, message with { Text = "different bytes" });
-            }
-            catch
-            {
-                first.Dispose();
-                throw;
-            }
-        }
+            output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
+            events.Add("send");
+        });
+        state.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            events.Add("write");
+            return new ValueTask(acknowledgement.Task);
+        });
+        var shipment = new Shipment(new ReserveStock(3, Sender), [1, 2, 3]);
 
-        using (first)
-        using (second)
-        {
-            Assert.Same(first.First, second.First);
-            Assert.True(second.Offset >= first.Offset + first.Length);
-            Assert.Equal(message, ArcPayloadEncoder.DecodeRetained(Serializer, first));
-            Assert.Equal("different bytes", serializer.Deserialize(second)!.Text);
-            Assert.Equal(message, serializer.Deserialize(first));
-        }
+        var sending = grain.SendAsync(Command, Receiver, shipment);
+
+        Assert.False(sending.IsCompleted);
+        Assert.Equal(new[] { "send", "write" }, events);
+        shipment.Manifest[0] = 99;
+        var envelope = Assert.Single(output);
+        Assert.Equal(Command, envelope.MessageId);
+        Assert.Equal(Sender, envelope.SenderId);
+        Assert.Equal(Receiver, envelope.ReceiverId);
+        Assert.Equal(MessagingSubjects.Shipment, envelope.Subject);
+        var received = shipments.Decode(envelope);
+        Assert.Equal(shipment.Reservation, received.Reservation);
+        Assert.Equal(new byte[] { 1, 2, 3 }, received.Manifest);
+        acknowledgement.SetResult();
+        await sending;
+        await state.Received(1).WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ShipmentSender_InvalidBodyLeavesIntentAndJournalWriteUnstaged()
+    {
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
+        var state = Substitute.For<IDurableStateManager>();
+        var grain = new ShipmentSenderGrain(outbox, state, Type<Shipment>());
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => grain.SendAsync(Command, Receiver, null!));
+
+        outbox.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

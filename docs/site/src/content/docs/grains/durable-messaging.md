@@ -67,7 +67,7 @@ locally, call typed send/reply before business mutation, then apply the prepared
 state and call `Complete()` synchronously. Encoding finishes before the helper's
 first outbox mutation; serialization errors propagate with no outgoing intent staged.
 
-For explicit admission or bulk preparation,
+For explicit admission,
 <xref:Orleans.DurableMessaging.DurableMessageType`1.Create*> accepts the command ID,
 sender ID, destination ID, and body and returns an owning envelope. Use `using` or
 `finally` for these explicitly created owners. The typed outbox helpers manage
@@ -120,7 +120,6 @@ slice of the newly written bytes; subsequent messages occupy disjoint regions an
 can share backing pages. Consuming a slice advances the writer's readable range;
 the returned slice independently keeps its pages alive after the encoder returns
 to the pool. Failed encoding clears partial output before returning the encoder.
-Application-owned raw encoders have explicit scope disposal and synchronous usage.
 
 | Boundary | Ownership and release |
 | --- | --- |
@@ -149,47 +148,29 @@ state owners. Handler and delivery-batch pins keep borrowed payloads readable
 through their actual outcomes even when a preceding writer captures completion
 and removes a state owner earlier.
 
-The Arc overloads of <xref:Orleans.Serialization.Serializer.Deserialize*> and
-<xref:Orleans.Serialization.Serializer`1.Deserialize*> create an Arc-backed reader.
-Codecs can retain raw sub-slices during decode instead of copying them. For explicit
-reader control, use <xref:Orleans.Serialization.Buffers.Reader.Create*> with the
-borrowed Arc buffer and a serializer session, then the generic serializer's public
-`Deserialize(ref reader)` overload:
+The runtime's serializer reads directly from the retained payload. Application
+handlers receive ordinary decoded records through their registered method groups.
 
-:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_arc_ownership" language="csharp":::
+<a id="carry-independently-encoded-items"></a>
 
-### Carry independently encoded items
+### Carry related values in one message
 
-<xref:Orleans.Serialization.Buffers.BufferPackage> owns one Arc buffer and a read-only
-ordinal key index of `(offset, length)` entries. The application chooses each entry's
-encoding. <xref:Orleans.Serialization.Buffers.BufferPackageBuilder> owns its Arc
-writer; dispose the builder even if adding or encoding an entry fails.
-<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Build*> transfers the
-buffer owner into a disposable package. Encoding that package with an ordinary
-serializer borrows it; release the package after encoding.
+Use an ordinary serializable record for a composite message. Fields can contain
+other application records, arrays, collections, and binary data. For example, a
+shipment carries a reservation request and a `byte[]` manifest in one body:
 
-<xref:Orleans.Serialization.Buffers.BufferPackage.Keys> inspects the index without
-decoding values. <xref:Orleans.Serialization.Buffers.BufferPackage.TryGetBytes*>
-returns a borrowed <xref:System.Buffers.ReadOnlySequence`1> for an entry, and
-<xref:Orleans.Serialization.Buffers.BufferPackage.Buffer> exposes a borrowed Arc
-view. Keep an owning package alive throughout access to these views; dispose
-neither the borrowed buffer nor its entry views. Use
-<xref:Orleans.Serialization.Buffers.BufferPackage.Retain*> for an independent package
-lifetime. <xref:Orleans.Serialization.Buffers.BufferPackage.Count> includes empty
-entries. The index references the concatenated bytes directly, without an array per
-entry.
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_shipment" language="csharp":::
 
-Decode through the Arc serializer overload to retain the package's raw sub-slice.
-The decoded package owns its pin independently of the envelope. Use `using` around
-that package while inspecting or decoding entries, and dispose it after use:
+The typed send helper serializes the entire `Shipment` using
+<xref:Orleans.Serialization.Serializer`1>. A receiving typed handler gets the
+decoded record and accesses `Reservation` and `Manifest` directly. For explicit
+serialization outside messaging, use the ordinary serializer's
+<xref:Orleans.Serialization.Serializer`1.SerializeToArray*> and
+<xref:Orleans.Serialization.Serializer`1.Deserialize*> methods.
 
-:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_buffer_package" language="csharp":::
-
-Raw/package protocols choose an explicit subject and body encoding. The shipment
-example returns an owning envelope under `shipments.manifest.v1`; its decoder
-checks that subject and returns an independently owning package. Keep that package
-in a `using` scope while reading its borrowed entries. Typed DTOs containing owning
-Arc slices or packages have the same explicit application disposal responsibility.
+The command identity, destination, and `shipments.manifest.v1` subject follow the
+same routing and retry contract as other typed messages. Ordinary managed fields
+remain available for application use after handler completion.
 
 ## Commit and delivery guarantees
 

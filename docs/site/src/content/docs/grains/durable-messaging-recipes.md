@@ -228,7 +228,7 @@ records, using the durable inbox/outbox commit boundary for outgoing intent:
 | Business update followed by a remote call | Stage the outgoing envelope with the business update; acknowledged outbox state drives delivery and retry. |
 | External provider call | Prepare the provider outcome using the canonical command ID, then commit its local query state, reply, and inbox completion together. |
 | Notification loop | Call typed `Send` for each stable recipient identity, record the campaign after successful staging, and await the journal write. |
-| Multiple encoded attachments | Build one disposable keyed package; decode only needed borrowed entries while retaining its owner. |
+| Related records and attachments | Put application records and `byte[]` attachments in one serializable message and use the typed send and handler helpers. |
 
 Preserve command identity and recorded outcomes when moving application workflows.
 Typed subject bindings and outbox send/reply helpers carry ordinary records in Arc payloads.

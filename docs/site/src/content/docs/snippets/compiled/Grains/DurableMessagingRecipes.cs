@@ -184,7 +184,8 @@ public sealed class PaymentGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(charge, HandleChargeAsync));
+        inbox.RegisterHandlers(routes => routes
+            .Register(charge, HandleChargeAsync));
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -239,7 +240,8 @@ public sealed class StockProjectionGrain(
 {
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        inbox.RegisterHandlers(routes => routes.Register(type, HandleSnapshot));
+        inbox.RegisterHandlers(routes => routes
+            .Register(type, HandleSnapshot));
         return base.OnActivateAsync(cancellationToken);
     }
 

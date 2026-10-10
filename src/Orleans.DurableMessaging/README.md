@@ -5,7 +5,7 @@ outboxes built on Orleans Journaling and Durable Jobs. Configure their storage f
 the deployment, then call `AddDurableMessaging` on the silo builder. The
 `IServiceCollection` overload registers the same messaging services. Grains implement
 `IDurableMessagingGrain` or derive from `DurableGrain`, inject `IDurableInbox` to
-register their single handler, and inject `IDurableOutbox` to enqueue envelopes.
+register typed handler methods, and inject `IDurableOutbox` to send ordinary application records.
 
 `AddDurableMessaging` selects the built-in `orleans-binary` journal format from the
 default JSON format and preserves an explicit binary configuration. Another
@@ -43,18 +43,9 @@ The protocol and runtime provide:
   cancellation, and exceptions. Ordinary persistence/network serialization borrows
   payloads without consuming them. Retained operation owners remain alive through the
   actual operation, not just a caller's canceled wait.
-- Application encoders use one reusable `ArcBufferWriter` per non-reentrant activation
-  or serialized application scope. Ordinary serializers write records into it;
-  `ConsumeSlice` returns owned disjoint payload slices which can share pages. Dispose
-  the encoder through grain `IDisposable` or a DI-owned scoped service at teardown.
-  Arc serializer overloads use `Reader.Create(ArcBuffer, session)`, permitting codecs
-  to retain raw sub-slices during decoding without copying.
-- `BufferPackage` is disposable, owning one Arc buffer and a read-only ordinal index
-  of key offsets and lengths. Its `Buffer` and `TryGetBytes` sequence views are borrowed
-  while the package owner remains live. `Retain()` returns an independent owner.
-  `BufferPackageBuilder` owns a disposable Arc writer; `Add(key, span)` or a writer
-  callback encodes entries, and `Build` transfers the buffer owner to the package.
-  Serialize packages normally and release them after use, including decoded packages.
+- Application messages are ordinary serializable records. Related values and
+  binary attachments can be fields in one record. Typed helpers use ordinary
+  `Serializer<T>` serialization and manage the transport payload internally.
 - `DurableMessageType<T>` binds an exact subject to ordinary `Serializer<T>` and verifies
   the subject before decoding. `AddDurableMessageType<T>` registers a keyed singleton binding.
   Typed outbox `Send` and `SendReply` encode using a shared bounded pool and manage
@@ -89,10 +80,10 @@ Owned RPC arguments remain retained through their actual serialization and invoc
 
 ## Handler and persistence boundaries
 
-Handlers perform asynchronous I/O, validation, envelope construction, and cancellation
-checks using local values before the first shared business or journaled mutation. Prepare
-owned replies with `using var reply = ...`; disposal releases local pins after staging,
-including on exceptions, while durable dictionary state retains its own pins. From
+Handlers perform asynchronous I/O, validation, and cancellation checks using local
+values before the first shared business or journaled mutation. Compute reply records
+locally and stage them with typed `SendReply`, which handles serialization and temporary
+ownership. From
 that first shared mutation through method completion, execute synchronously with no
 awaits. Apply complete safe-to-commit changes, stage outgoing envelopes, call
 `context.Complete()`, and return without further awaits. This mutation boundary is the
@@ -106,8 +97,8 @@ Repeated completion in the same still-active completed attempt coalesces after a
 identity validation. Wrong-attempt and retired completion calls are rejected. The
 handler stages all outgoing work before completion; the envelope remains inspectable.
 
-Ordinary application methods prepare and encode outgoing envelopes locally, apply
-business updates, call `outbox.Send(envelope)`, and await their usual journal write.
+Ordinary application methods send application records through typed `Send`, apply
+business updates, and await their usual journal write.
 Compiled notification, inventory, payment, projection, fan-out, and dispatcher examples
 live in the [documentation snippets](../../docs/site/src/content/docs/snippets/compiled/Grains/).
 Handlers instead call `context.Complete()` after staging the final shared update and

@@ -71,8 +71,8 @@ will not replace its declared versions.
    carry the command ID, original quantity, and remaining stock.
    Rejections distinguish `InvalidQuantity` from `InsufficientStock` using
    `ReservationRejectionReason`; callers dispatch on the concrete outcome type.
-   Each envelope carries its hierarchical command ID, exact subject, sender,
-   receiver, and owning `ArcBuffer` payload.
+   Typed helpers serialize these records and carry the command ID, subject,
+   sender, and receiver with the message.
 3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
    registers separate typed reservation and restocking methods; the order registers
    its typed outcome method. Registrations use method groups such as
@@ -88,8 +88,8 @@ will not replace its declared versions.
    its handler calls `context.Fail("Restock quantity must be positive.")`
    and returns before mutation. Checked stock overflow still throws and uses
    the ordinary bounded processing retry policy.
-   Typed outbox `Send` and `SendReply` rent internal pooled encoders, stage the
-   message, and dispose their temporary envelopes after retaining the outbox's pin.
+   Typed outbox `Send` and `SendReply` handle serialization and temporary message
+   ownership, so the handlers work with ordinary records.
    The explicit duplicate-admission call uses `DurableMessageType<T>.Create` and
    a local `using` owner. Handlers borrow inbox envelopes through actual method
    completion.
