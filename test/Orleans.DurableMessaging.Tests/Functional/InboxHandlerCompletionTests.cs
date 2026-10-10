@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
+using Orleans.DurableMessaging.Configuration;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -16,6 +17,251 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBase
 {
+    [Fact]
+    public async Task DeadLetter_StagesReasonPayloadAndDedupeBeforeReturnAndPersistsAfterAcknowledgement()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var calls = 0;
+        handler.Body = (self, _) =>
+        {
+            calls++;
+            self.Context.DeadLetter("unsupported input");
+            AssertCompletedState(rig, self.Context.Envelope);
+            var retained = Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
+            Assert.Equal("unsupported input", retained.Reason);
+            Assert.Equal(1, retained.AttemptCount);
+            Assert.Equal(self.Context.Envelope.MessageId, retained.MessageId);
+            Assert.Equal(new DurableTestMessage(self.Context.Envelope.MessageId, 501, "async-handler"),
+                Assert.IsType<DurableTestMessage>(TestApplicationProtocol.Read(
+                    rig.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), self.Context.Envelope).Body));
+            self.Context.DeadLetter("unsupported input");
+            self.Context.Complete();
+            Assert.Equal(retained, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters));
+            return ValueTask.CompletedTask;
+        };
+        using var input = await DeliverAsync(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        Assert.False(finished.IsCompleted);
+        AssertCompletedState(rig, input.Value);
+        Assert.Empty(rig.Effects);
+        Assert.Empty(rig.Outbox);
+        storage.Release();
+        await WaitAsync(finished);
+        Assert.Equal(1, calls);
+        Assert.Equal(1, Fixture.Metrics.GetCount("orleans-durable-messaging-inbox-messages-processed", "dead_lettered"));
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(1, calls);
+        await AssertHealthyAsync(rig);
+        await DeactivateAsync(rig);
+        var recovered = await rig.Receiver.GetSnapshotAsync();
+        var letter = Assert.Single(recovered.InboxDeadLetters);
+        Assert.Equal("unsupported input", letter.Reason);
+        Assert.Equal(1, letter.AttemptCount);
+        Assert.Equal(input.Value.MessageId, letter.MessageId);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        var recoveredContext = Fixture.GetGrainContext(rig.Receiver);
+        await OnTurnAsync(recoveredContext, async () =>
+        {
+            var diagnostics = recoveredContext.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>();
+            var retained = Assert.Single(diagnostics.InboxDeadLetters);
+            Assert.Equal(input.Value.Payload.ToArray(), retained.Message.Payload.ToArray());
+            Assert.Equal(input.Value.Subject, retained.Message.Subject);
+            Assert.Equal(input.Value.SenderId, retained.Message.SenderId);
+            Assert.Equal(input.Value.ReceiverId, retained.Message.ReceiverId);
+            Assert.True(diagnostics.RemoveInboxDeadLetter(input.Value.MessageId));
+            await recoveredContext.ActivationServices.GetRequiredService<IJournaledStateManager>().WriteStateAsync();
+            Assert.Empty(diagnostics.InboxDeadLetters);
+        });
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+    }
+
+    [Collection(DurableMessagingClusterCollection.Name)]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("DurableMessaging")]
+    public sealed class InboxPermanentFailureTests() : DurableMessagingBehaviorTestBase(new PermanentFailureClusterFixture())
+    {
+        [Fact]
+        public async Task DeadLetter_AfterPreparationRetryTerminatesBeforeLimitAndCountsCurrentAttempt()
+        {
+            var receiver = NewGrain();
+            await receiver.GetSnapshotAsync();
+            var context = Fixture.GetGrainContext(receiver);
+            var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+            var handler = new PermanentHandler();
+            var installed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            context.Scheduler.QueueAction(() =>
+            {
+                grain.HandlerOverride = handler;
+                installed.SetResult();
+            });
+            await installed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            using var input = CreateEnvelope(receiver, NewMessage(901, "permanent input"), "permanent/input");
+            const string counter = "orleans-durable-messaging-inbox-messages-processed";
+            var retried = Fixture.Metrics.WaitForCountAsync(counter, 1, "retry");
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, input.Value)).Status);
+            await retried;
+            Assert.Equal(1, handler.Attempts);
+            Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
+
+            var terminated = Fixture.Metrics.WaitForCountAsync(counter, 1, "dead_lettered");
+            Fixture.Clock.Advance(TimeSpan.FromHours(1));
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input.Value)).Status);
+            await terminated;
+            var snapshot = await receiver.GetSnapshotAsync();
+            Assert.Equal(2, handler.Attempts);
+            Assert.Equal(0, snapshot.InboxCount);
+            Assert.Equal(1, snapshot.ProcessedMessageCount);
+            Assert.Empty(snapshot.Effects);
+            var deadLetter = Assert.Single(snapshot.InboxDeadLetters);
+            Assert.Equal(input.Value.MessageId, deadLetter.MessageId);
+            Assert.Equal("permanent input", deadLetter.Reason);
+            Assert.Equal(2, deadLetter.AttemptCount);
+            Assert.Equal(1, Fixture.Metrics.GetCount(counter, "retry"));
+            Assert.Equal(1, Fixture.Metrics.GetCount(counter, "dead_lettered"));
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input.Value)).Status);
+            Assert.Equal(2, handler.Attempts);
+        }
+
+        private sealed class PermanentHandler : IInboxHandler
+        {
+            public int Attempts { get; private set; }
+
+            public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+            {
+                if (++Attempts == 1)
+                {
+                    throw new ArgumentException("preparation failed");
+                }
+                context.DeadLetter("permanent input");
+                return ValueTask.CompletedTask;
+            }
+        }
+
+        private sealed class PermanentFailureClusterFixture : DurableMessagingClusterFixture
+        {
+            protected override void ConfigureOptions(DurableInboxOptions options)
+            {
+                base.ConfigureOptions(options);
+                options.MaxProcessingAttempts = 5;
+                options.BackpressureRetryDelay = TimeSpan.FromHours(1);
+                options.DeduplicationWindow = TimeSpan.FromDays(7);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task DeadLetter_InvalidReasonLeavesTerminalStateUnchanged(string? reason)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (self, _) =>
+        {
+            var error = Assert.ThrowsAny<ArgumentException>(() => self.Context.DeadLetter(reason!));
+            Assert.Equal("reason", error.ParamName);
+            Assert.Single(rig.Inbox);
+            Assert.Empty(rig.Processed);
+            Assert.Empty(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
+            self.Mutate();
+            self.Context.Complete();
+            return ValueTask.CompletedTask;
+        };
+        using var input = await DeliverAsync(rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 0);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeadLetter_ConflictingTerminalOutcomePreservesFirstChoice(bool completeFirst)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        Exception? expected = null;
+        handler.Body = (self, _) =>
+        {
+            if (completeFirst) self.Context.Complete();
+            else self.Context.DeadLetter("original reason");
+            expected = Assert.Throws<InvalidOperationException>(() => self.Context.DeadLetter("different reason"));
+            return ValueTask.CompletedTask;
+        };
+        using var input = await DeliverAsync(rig);
+        var timer = GetTimer(events, rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        Assert.Same(expected, Assert.IsType<GrainTimerEvents.TickStop>(
+            (await TimerStoppedAsync(events, timer)).Payload).Exception);
+        AssertCompletedState(rig, input.Value);
+        var letters = rig.Grain.GetSnapshotForTest().InboxDeadLetters;
+        if (completeFirst) Assert.Empty(letters);
+        else Assert.Equal("original reason", Assert.Single(letters).Reason);
+        Assert.Empty(rig.Effects);
+        Assert.Empty(rig.Outbox);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeadLetter_CancellationAndHandlerErrorPreserveTerminalOutcomeUnlessStorageFails(bool failWrite)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        IGrainTimer timer = null!;
+        var handlerError = new IOException("after dead letter");
+        handler.Body = (self, token) =>
+        {
+            timer.Dispose();
+            Assert.True(token.IsCancellationRequested);
+            self.Context.DeadLetter("permanent input failure");
+            throw handlerError;
+        };
+        using var input = await DeliverAsync(rig);
+        timer = GetTimer(events, rig);
+        using var storage = Fixture.Storage.BlockWrite(rig.Journal);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        AssertCompletedState(rig, input.Value);
+        Assert.Equal("permanent input failure", Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).Reason);
+        var storageError = new IOException("actual persistence failure");
+        if (failWrite) storage.Fail(storageError);
+        else storage.Release();
+        await WaitAsync(finished);
+        if (failWrite)
+        {
+            Assert.Same(storageError, await WaitAsync(rig.Grain.DeactivationFailure.Task));
+            await AssertFailureReplayAsync(rig, input.Value);
+            Assert.NotEqual("permanent input failure", Assert.Single((await rig.Receiver.GetSnapshotAsync()).InboxDeadLetters).Reason);
+        }
+        else
+        {
+            Assert.Same(handlerError, Assert.IsType<GrainTimerEvents.TickStop>(
+                (await TimerStoppedAsync(events, timer)).Payload).Exception);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+            Assert.Empty(rig.Effects);
+            Assert.Empty(rig.Outbox);
+            await AssertHealthyAsync(rig);
+        }
+    }
+
     [Fact]
     public async Task LateAcknowledgedAcceptance_ImmediatelyRearmsSameLocalTimerWithoutClockAdvance()
     {
@@ -242,6 +488,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
 
     [Theory]
     [InlineData("complete")]
+    [InlineData("dead-letter")]
     public async Task RetainedContext_AfterRetirementRejectsAndKeepsOwnerHealthy(string operation)
     {
         var rig = await CreateAsync();
@@ -259,6 +506,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
 
     [Theory]
     [InlineData("complete")]
+    [InlineData("dead-letter")]
     public async Task RetainedContext_DuringOtherAttemptRetainsFirstMisuse(string operation)
     {
         var rig = await CreateAsync();
@@ -513,6 +761,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         switch (operation)
         {
             case "complete": handler.Context.Complete(); break;
+            case "dead-letter": handler.Context.DeadLetter("unusable input"); break;
             default: throw new ArgumentException(nameof(operation));
         }
     }

@@ -1,7 +1,7 @@
 namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Exposes the received message and its attempt-scoped logical completion.
+/// Exposes the received message and its attempt-scoped terminal outcome.
 /// </summary>
 public interface IInboxHandlerContext
 {
@@ -10,7 +10,7 @@ public interface IInboxHandlerContext
     /// </summary>
     /// <remarks>
     /// This envelope is borrowed until the handler method actually completes, including
-    /// after Complete removes the pending message. Do not dispose it. Use
+    /// after Complete or DeadLetter removes the pending message. Do not dispose it. Use
     /// <see cref="DurableEnvelope.Retain"/> for an independently owned longer lifetime.
     /// </remarks>
     DurableEnvelope Envelope { get; }
@@ -29,4 +29,25 @@ public interface IInboxHandlerContext
     /// The context is retired or belongs to another activation or handler attempt.
     /// </exception>
     void Complete();
+
+    /// <summary>
+    /// Synchronously stages a permanent processing failure, retaining the message as a dead letter
+    /// and recording its identity for transport deduplication.
+    /// </summary>
+    /// <param name="reason">The nonblank diagnostic reason for the permanent failure.</param>
+    /// <remarks>
+    /// Stage any safe-to-commit business changes and outgoing messages before this operation,
+    /// then return synchronously. The runtime persists the dead letter and completion together
+    /// and owns their journal acknowledgement. The dead letter records the current attempt count.
+    /// Repeated calls with the same reason coalesce; Complete preserves an already staged dead letter.
+    /// Cancellation after staging preserves the terminal outcome.
+    /// Use an application reply and Complete for normal business rejection outcomes.
+    /// </remarks>
+    /// <exception cref="System.ArgumentException">The reason is blank.</exception>
+    /// <exception cref="System.ArgumentNullException">The reason is null.</exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// The context is retired or belongs to another activation or attempt, or a different
+    /// terminal outcome has already been staged.
+    /// </exception>
+    void DeadLetter(string reason);
 }

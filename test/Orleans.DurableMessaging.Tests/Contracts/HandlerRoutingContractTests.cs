@@ -257,18 +257,56 @@ public sealed class HandlerRoutingContractTests
     {
         using var envelope = Envelope();
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
-        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
+        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null, (Action<string>)(_ => { })]));
         Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
         var parameters = Assert.Single(type.GetConstructors()).GetParameters();
-        Assert.Equal(2, parameters.Length);
+        Assert.Equal(3, parameters.Length);
         Assert.Equal(typeof(Action), parameters[1].ParameterType);
         Assert.False(parameters[1].IsOptional);
     }
 
-    private static IInboxHandlerContext CreateContext(DurableEnvelope envelope, Action complete)
+    [Fact]
+    public void HandlerContext_Constructor_RequiresDeadLetterCallback()
+    {
+        using var envelope = Envelope();
+        var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            Activator.CreateInstance(type, [envelope, (Action)(() => { }), null]));
+        Assert.Equal("deadLetter", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
+        var parameter = Assert.Single(type.GetConstructors()).GetParameters()[2];
+        Assert.Equal(typeof(Action<string>), parameter.ParameterType);
+        Assert.False(parameter.IsOptional);
+    }
+
+    [Fact]
+    public void HandlerContext_DeadLetter_ForwardsReasonSynchronouslyAndPreservesEnvelope()
+    {
+        using var envelope = Envelope();
+        var reasons = new List<string>();
+        var context = CreateContext(envelope, () => throw new InvalidOperationException("Unexpected completion."), reasons.Add);
+
+        context.DeadLetter("unsupported input");
+
+        Assert.Equal(new[] { "unsupported input" }, reasons);
+        AssertEnvelope(envelope, context.Envelope);
+    }
+
+    [Fact]
+    public void HandlerContext_DeadLetter_PropagatesOriginalCallbackFailure()
+    {
+        using var envelope = Envelope();
+        var sentinel = new InvalidOperationException("owner failure");
+        var context = CreateContext(envelope, () => { }, _ => throw sentinel);
+
+        Assert.Same(sentinel, Assert.Throws<InvalidOperationException>(() => context.DeadLetter("unusable input")));
+        AssertEnvelope(envelope, context.Envelope);
+    }
+
+    private static IInboxHandlerContext CreateContext(DurableEnvelope envelope, Action complete, Action<string>? deadLetter = null)
     {
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
-        return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete));
+        return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete,
+            deadLetter ?? (_ => throw new InvalidOperationException("Unexpected dead letter."))));
     }
 
     private static DurableEnvelope Envelope(ArcBuffer? payload = null)

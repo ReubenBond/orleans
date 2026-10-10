@@ -42,7 +42,8 @@ public interface IDurableOutbox
     /// The sender identity must match this outbox's grain. Equivalent repeated identities retain
     /// the original intent; subject, destination, sender, and body must match that intent. Conflicts fail explicitly.
     /// Inbox handlers stage outgoing
-    /// messages in their synchronous final block before calling <see cref="IInboxHandlerContext.Complete"/>.
+    /// messages in their synchronous final block before calling <see cref="IInboxHandlerContext.Complete"/>
+    /// or <see cref="IInboxHandlerContext.DeadLetter"/>.
     /// Ordinary callers persist staged messages using their journaled state manager.
     /// An explicit write retry retains pending business changes and messages after a scheduling failure.
     /// </remarks>

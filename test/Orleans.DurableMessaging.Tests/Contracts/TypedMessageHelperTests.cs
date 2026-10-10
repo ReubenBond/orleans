@@ -2139,6 +2139,7 @@ public sealed class TypedMessageHelperTests
         public DurableEnvelope Envelope { get; } = envelope;
         public int CompletionCount { get; private set; }
         public void Complete() => CompletionCount++;
+        public void DeadLetter(string reason) => throw new InvalidOperationException("Unexpected dead letter.");
     }
 
     private sealed class ProbeCodec<T>(IFieldCodec<T> inner) : IFieldCodec<T>

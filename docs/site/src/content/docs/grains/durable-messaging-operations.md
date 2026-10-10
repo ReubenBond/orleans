@@ -92,10 +92,10 @@ correlated reply for end-to-end business confirmation.
 
 | Symptom | Boundary and remedy |
 | --- | --- |
-| Repeated handler errors | Validate subject registration, body compatibility, command ID, response destination, and preparation dependencies. Business rejections are completed outcomes; persistent preparation errors reach dead letters. |
+| Repeated handler errors | Validate subject registration, body compatibility, command ID, response destination, and preparation dependencies. Send typed business rejection replies and call `Complete()`; use `DeadLetter(reason)` for diagnosed permanent processing failures. Unhandled preparation exceptions use the bounded retry policy. |
 | Conflicting pending command reuse | Preserve the original command ID, subject, destination, and encoded body. Authorize a distinct ID for a genuinely new command. |
-| Successful return without `Complete()` | A handler contract error retires the owner. Ensure every successful branch, including no-effect outcomes, calls `Complete()` and returns synchronously. |
-| Handler error after `Complete()` | The runtime persists the staged completion and output, cleans up, then reports the error. Diagnose the original error using the committed business state. |
+| Successful return without a terminal operation | A handler contract error retires the owner. Ensure every successful branch, including no-effect outcomes, stages `Complete()` or `DeadLetter(reason)` and returns synchronously. |
+| Handler error after a terminal operation | The runtime persists the staged completion or dead letter and output, cleans up, then reports the error. Diagnose the original error using committed state. |
 | `JournaledStatePreCommitException` | A persistence prerequisite failed before storage. Complete changes remain staged. Choose explicit persistence retry or retire the owner and reconcile fresh replay. |
 | Storage failure or ambiguous append | The owner is fenced and deactivated. A new activation replays the actual committed journal outcome, including any acknowledged ownership and message cohort. |
 | `JournaledStatePostCommitException` | Storage and state acknowledgement succeeded. Reconcile the failed post-persistence action from committed state. |
@@ -114,6 +114,15 @@ Expose application-authorized diagnostic methods which inspect
 <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.InboxDeadLetters>
 and <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.OutboxDeadLetters>.
 Each record includes its envelope, attempt count, failure reason, and terminal time.
+
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*> creates an inbox
+record in the current attempt for a diagnosed permanent processing failure.
+The runtime commits that record and the command's deduplication fact together.
+The processed-message counter reports `dead_lettered`. Repeated commands recognize
+the retained completion even after the diagnostic dead letter is removed.
+Normal business rejections are typed application replies committed with `Complete()`;
+the [inventory recipe](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
+models accepted and rejected reservation outcomes explicitly.
 
 Capture the evidence before age/count retention removes it. Preserve original
 command IDs, subjects, and enough immutable request data to reconcile business outcomes.

@@ -237,6 +237,7 @@ namespace Orleans.DurableMessaging
         DurableEnvelope Envelope { get; }
 
         void Complete();
+        void DeadLetter(string reason);
     }
 }
 

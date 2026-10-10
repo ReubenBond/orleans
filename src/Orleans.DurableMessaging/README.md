@@ -74,8 +74,8 @@ The protocol and runtime provide:
   follows acknowledgement of the exact captured messages and physical owner pair.
 - `IInboxHandler` has only `ValueTask HandleAsync(IInboxHandlerContext,
   CancellationToken)`. The inbox has a single `RegisterHandler(handler)` registration.
-  Use one application dispatcher for multiple message kinds. Its context exposes only
-  `Envelope` and `Complete()`; inject `IDurableOutbox` directly to stage messages.
+  Use one application dispatcher for multiple message kinds. Its context exposes
+  `Envelope`, `Complete()`, and `DeadLetter(reason)`; inject `IDurableOutbox` directly to stage messages.
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
@@ -202,12 +202,21 @@ method return without completion reports an explicit contract error. Method erro
 completion retain the staged logical outcome through actual persistence and cleanup,
 then surface the original error.
 
-Before `Complete()`, ordinary handler errors follow bounded retry/dead-letter accounting
+For business rejection, send a typed rejection result and call `Complete()`.
+For diagnosed permanent processing failure, `DeadLetter(reason)` synchronously stages
+the original envelope, reason, current attempt count, and terminal timestamp in
+dead-letter storage alongside the completion/deduplication record. Return from the
+handler synchronously; the runtime owns the subsequent journal write and acknowledgement.
+Dead-letter payload retention and processed-command retention have independent bounds.
+Repeated calls with the same reason coalesce, and `Complete()` preserves a staged
+dead letter. Conflicting terminal choices report misuse while preserving the first outcome.
+
+Before either terminal operation, ordinary handler errors follow bounded retry/dead-letter accounting
 under the trusted local-preparation contract. Attempt cancellation retains the committed
 inbox and owner for another attempt on the same activation. The runtime owns admitted
 persistence operations through their actual outcomes.
 
-After `Complete()`, a handler exception is logged and retained while the ordinary
+After `Complete()` or `DeadLetter(reason)`, a handler exception is logged and retained while the ordinary
 owned write persists the completed logical outcome. The exception is reported after
 acknowledgement and cleanup. Subsequent wakeups observe completion and deduplication.
 Actual persistence failure remains authoritative and terminal; any earlier handler

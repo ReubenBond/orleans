@@ -489,13 +489,13 @@ internal sealed partial class DurableInboxExtension :
 
             execution.Active = true;
             await handler!.HandleAsync(new InboxHandlerContext(
-                operation.Envelope, execution.Complete),
+                operation.Envelope, execution.Complete, execution.DeadLetter),
                 combinedToken).ConfigureAwait(true);
             ThrowIfHandlerOperationRejected(execution);
             if (!operation.Completed)
             {
                 execution.RejectOperation(new InvalidOperationException(
-                    "Inbox handlers must call Complete before returning successfully."));
+                    "Inbox handlers must call Complete or DeadLetter before returning successfully."));
             }
         }
         catch (Exception exception) when (operation.Completed)
@@ -598,21 +598,14 @@ internal sealed partial class DurableInboxExtension :
                 }
                 else
                 {
-                    var now = _timeProvider.GetUtcNow();
                     if (handler.DeadLetter)
                     {
-                        DurableDeadLetterRetention.Compact(_deadLetters, now, _deadLetterRetentionPeriod,
-                            _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
-                            reservedCapacity: _deadLetters.ContainsKey(handler.Key) ? 0 : 1);
-                        _deadLetters[handler.Key] = new InboxDeadLetter
-                        {
-                            Envelope = handler.Envelope,
-                            DeadLetteredAt = now,
-                            Reason = handler.Error!.Message,
-                            AttemptCount = handler.Retry?.AttemptCount ?? 0
-                        };
+                        StageHandlerDeadLetter(handler, handler.Error!.Message, handler.Retry?.AttemptCount ?? 0);
                     }
-                    StageHandlerCompletion(handler);
+                    else
+                    {
+                        StageHandlerCompletion(handler);
+                    }
                 }
                 break;
             case ClearOwnerWrite clear:
@@ -648,6 +641,24 @@ internal sealed partial class DurableInboxExtension :
         _processed[operation.Key] = now;
         TrackProcessedExpiry(now);
         operation.Completed = true;
+    }
+
+    private void StageHandlerDeadLetter(HandlerWrite operation, string reason, int attemptCount)
+    {
+        var now = _timeProvider.GetUtcNow();
+        DurableDeadLetterRetention.Compact(_deadLetters, now, _deadLetterRetentionPeriod,
+            _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
+            reservedCapacity: _deadLetters.ContainsKey(operation.Key) ? 0 : 1);
+        _deadLetters[operation.Key] = new InboxDeadLetter
+        {
+            Envelope = operation.Envelope,
+            DeadLetteredAt = now,
+            Reason = reason,
+            AttemptCount = attemptCount
+        };
+        operation.DeadLetter = true;
+        operation.DeadLetterReason = reason;
+        StageHandlerCompletion(operation);
     }
 
     private void ApplyOwnership(OwnershipProposal proposal)
@@ -841,6 +852,31 @@ internal sealed partial class DurableInboxExtension :
             }
         }
 
+        public void DeadLetter(string reason)
+        {
+            ValidateAttempt();
+            ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+            if (operation.Completed)
+            {
+                if (string.Equals(operation.DeadLetterReason, reason, StringComparison.Ordinal))
+                {
+                    return;
+                }
+                RejectOperation(new InvalidOperationException(
+                    "The inbox handler has already staged a different terminal outcome."));
+            }
+            try
+            {
+                var attempts = Owner._messageStates.TryGetValue(operation.Key, out var state) ? state.AttemptCount : 0;
+                Owner.StageHandlerDeadLetter(operation, reason, checked(attempts + 1));
+            }
+            catch (Exception exception)
+            {
+                RejectOperation(exception);
+                throw;
+            }
+        }
+
         private void ValidateAttempt()
         {
             if (!Active || !ReferenceEquals(_handlerExecution.Value, this))
@@ -913,6 +949,7 @@ internal sealed partial class DurableInboxExtension :
         public ExceptionDispatchInfo? PostCompletionFailure { get; set; }
         public bool Skipped { get; set; }
         public bool DeadLetter { get; set; }
+        public string? DeadLetterReason { get; set; }
         public Exception? Error { get; set; }
         public InboxMessageState? Retry { get; set; }
     }
@@ -1104,7 +1141,7 @@ internal sealed partial class DurableInboxExtension :
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                 }
-                var status = operation.Error is null ? "success" : operation.DeadLetter ? "dead_lettered" : "retry";
+                var status = operation.DeadLetter ? "dead_lettered" : operation.Error is null ? "success" : "retry";
                 _instruments.OnInboxMessageProcessed(_grainType, status);
                 _instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _grainType);
             }

@@ -82,7 +82,7 @@ to register typed methods for one or several subjects. It installs one
 and decodes each body with its subject's binding before invoking the selected method.
 Configuration requires at least one route and rejects duplicate subjects before
 installing the handler. The dispatcher returns the actual handler outcome;
-each successful handler explicitly calls `Complete()` and returns synchronously
+each successful handler explicitly stages `Complete()` or `DeadLetter(reason)` and returns synchronously
 after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
 and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
@@ -282,7 +282,7 @@ for scheduling and recovery-budget guidance.
 
 The single registered handler receives the envelope through
 <xref:Orleans.DurableMessaging.IInboxHandlerContext.Envelope>. Its context exposes
-only that envelope and `Complete()`. Inject
+the envelope, `Complete()`, and `DeadLetter(reason)`. Inject
 <xref:Orleans.DurableMessaging.IDurableOutbox> directly for outgoing messages.
 Application dispatch, validation, authorization, and decoding run inside the handler.
 
@@ -316,14 +316,30 @@ business changes and completion. Bulk output prepares all envelopes before the
 final block. Earlier journal writes can complete during
 asynchronous local preparation because proposed business effects are still local.
 
-Every successful handler calls `Complete()`, including handlers which produce no
-business or outgoing-message changes. A successful return which omits completion reports
+Every successful handler stages `Complete()` or
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*>, including handlers
+which produce no business or outgoing-message changes. A successful return which omits a terminal operation reports
 a handler contract error and retires the owner. Context operations retain their actual
 attempt, activation and resource lifetimes. Completion ends that attempt; the received
 envelope remains available for inspection.
 
-An expected failure before completion follows preparation retry/dead-letter policy
-under the coding contract. A handler error after completion is reported after
+Business rejection is a completed application outcome: send a typed rejection reply
+with a reason, then call `Complete()`. The reply, any business changes, and receiver
+deduplication become durable together.
+
+For a permanent processing failure, call `DeadLetter(reason)` and return synchronously.
+It stages the original envelope, a nonblank reason, the current attempt count and
+terminal time in inbox dead-letter storage, removes pending input and retry metadata,
+and records the command ID for deduplication. The runtime persists that terminal
+outcome in the current attempt. Stage any application-selected outgoing messages
+before calling it. Dead-letter retention bounds diagnostic payload ownership;
+completion retention bounds duplicate suppression independently.
+Repeated dead-lettering with the same reason coalesces. `Complete()` preserves a
+staged dead letter; a conflicting terminal choice reports a handler contract error
+and preserves the first staged outcome.
+
+An exception before either terminal operation follows preparation retry/dead-letter policy
+under the coding contract. A handler error after either operation is reported after
 owned persistence and cleanup; its already-staged completion and output are
 preserved, so the runtime completes the logical operation rather than reapplying
 its business effects. Actual storage failures retain terminal handling and their
@@ -404,9 +420,11 @@ so dead-letter storage remains bounded by the application's retention policy.
 Removal is staged in the grain's journaled state and becomes durable with its next
 journal write.
 
-Unknown subjects, malformed application payloads, and validation errors follow the
-processing retry and dead-letter path. Typed decoding precedes business mutation;
-later envelopes remain available for recovery and processing.
+Unhandled subject lookup, payload decoding, and validation exceptions follow the
+processing retry and dead-letter path. An application handler can diagnose a
+permanent failure during preparation and use `DeadLetter(reason)` to terminate
+the current attempt. Typed decoding precedes business mutation; later envelopes
+remain available for recovery and processing.
 
 Processed-record maintenance begins at the earliest tracked expiry and amortizes
 subsequent maintenance cycles to at most once per quarter of the deduplication window.
