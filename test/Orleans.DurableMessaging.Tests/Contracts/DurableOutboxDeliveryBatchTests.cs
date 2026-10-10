@@ -282,7 +282,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(2, fixture.ProxyAcquisitionCount);
         for (var index = 0; index < 65; index++)
         {
-            { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()) with { ReceiverId = GrainId.Create("destination", index.ToString(); }) await fixture.SendAsync(newEnvelope); }
+            var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()) with
+            {
+                ReceiverId = GrainId.Create("destination", index.ToString())
+            };
+            await fixture.SendAsync(newEnvelope);
         }
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
