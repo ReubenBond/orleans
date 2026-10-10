@@ -25,7 +25,7 @@ public sealed class ArcBufferCodecTests
         writer.GetSpan(length)[..length].Fill(0x5a);
         writer.AdvanceWriter(length);
         var original = writer.ConsumeSlice(length);
-        var prefix = original.First;
+        var prefix = Assert.IsType<ArcBufferPage>(original.First);
         var payloadPage = prefix.Next!;
         Assert.Equal(0, prefix.Length);
         Assert.Equal(length, payloadPage.Length);
@@ -64,7 +64,7 @@ public sealed class ArcBufferCodecTests
         var expected = Bytes(length);
         source.Write(expected);
         using var value = source.PeekSlice(source.Length);
-        var pages = value.IsEmpty ? new[] { value.First } : value.Pages.ToArray();
+        var pages = value.IsEmpty ? new[] { Assert.IsType<ArcBufferPage>(value.First) } : value.Pages.ToArray();
         var references = pages.Select(page => page.ReferenceCount).ToArray();
         var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
         var first = serializer.SerializeToArray(value);
@@ -149,9 +149,10 @@ public sealed class ArcBufferCodecTests
         var empty = emptyWriter.PeekSlice(0);
         using var emptyCopy = services.GetRequiredService<DeepCopier>().Copy(empty);
         Assert.Same(empty.First, emptyCopy.First);
-        Assert.Equal(3, empty.First.ReferenceCount);
+        var emptyPage = Assert.IsType<ArcBufferPage>(empty.First);
+        Assert.Equal(3, emptyPage.ReferenceCount);
         empty.Dispose();
-        Assert.Equal(2, emptyCopy.First.ReferenceCount);
+        Assert.Equal(2, emptyPage.ReferenceCount);
     }
 
     [Fact]
@@ -245,8 +246,9 @@ public sealed class ArcBufferCodecTests
         using var input = source.PeekSlice(source.Length);
         if (leadingEmptyPages)
         {
-            Assert.Equal(0, input.First.Length);
-            Assert.Equal(0, input.First.Next!.Length);
+            var firstPage = Assert.IsType<ArcBufferPage>(input.First);
+            Assert.Equal(0, firstPage.Length);
+            Assert.Equal(0, firstPage.Next!.Length);
         }
 
         var pages = input.Pages.ToArray();
@@ -275,6 +277,66 @@ public sealed class ArcBufferCodecTests
         }
 
         Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ArcReader_SkipsConsecutiveEmptyPagesForByteAndPrimitiveReads(bool leadingEmptyPages, bool middleEmptyPages)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        if (leadingEmptyPages)
+        {
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 2);
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 4);
+        }
+
+        source.Write(new byte[] { 0x11, 0x12 });
+        if (middleEmptyPages)
+        {
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 8);
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 16);
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 32);
+        }
+
+        source.Write(new byte[] { 0x21, 0x22, 0x23, 0x24, 0x25 });
+        using var input = source.PeekSlice(source.Length);
+        var pages = input.Pages.ToArray();
+        Assert.True(pages.Count(page => page.Length == 0) >= 2);
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var reader = Reader.Create(input, session);
+        Assert.Equal(0x11, reader.ReadByte());
+        Assert.Equal(0x12, reader.ReadByte());
+        Assert.Equal(0x24232221U, reader.ReadUInt32());
+        Assert.Equal(0x25, reader.ReadByte());
+        Assert.Equal(input.Length, reader.Position);
+        Assert.Equal(0, reader.Remaining);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
+    [Fact]
+    public void ArcInput_DeserializesThroughConsecutiveLeadingEmptyPages()
+    {
+        using var services = Services();
+        var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var value = source.PeekSlice(source.Length);
+        using var wire = new ArcBufferWriter();
+        wire.GetSpan(ArcBufferWriter.MinimumPageSize * 2);
+        wire.GetSpan(ArcBufferWriter.MinimumPageSize * 4);
+        wire.Write(serializer.SerializeToArray(value));
+        using var input = wire.PeekSlice(wire.Length);
+        var pages = input.Pages.ToArray();
+        Assert.Equal(0, pages[0].Length);
+        Assert.Equal(0, pages[1].Length);
+        using var decoded = serializer.Deserialize(input);
+        Assert.Equal(expected, decoded.ToArray());
+        Assert.Same(pages[2], decoded.First);
     }
 
     [Fact]
@@ -388,10 +450,11 @@ public sealed class ArcBufferCodecTests
         using var source = new ArcBufferWriter();
         source.Write(Bytes(7));
         using var input = source.PeekSlice(source.Length);
-        var before = input.First.ReferenceCount;
+        var firstPage = Assert.IsType<ArcBufferPage>(input.First);
+        var before = firstPage.ReferenceCount;
         var arcReader = Reader.Create(input, session);
         VerifyInvalidLength(ref arcReader, length);
-        Assert.Equal(before, input.First.ReferenceCount);
+        Assert.Equal(before, firstPage.ReferenceCount);
 
         var spanReader = Reader.Create(Bytes(7), session);
         VerifyInvalidLength(ref spanReader, length);
@@ -440,7 +503,7 @@ public sealed class ArcBufferCodecTests
         }
         catch (IOException) { }
         Assert.True(failing.CommittedCount > 0);
-        Assert.Equal(2, value.First.ReferenceCount);
+        Assert.Equal(2, Assert.IsType<ArcBufferPage>(value.First).ReferenceCount);
         Assert.Equal(Bytes(37), value.ToArray());
     }
 
@@ -484,15 +547,16 @@ public sealed class ArcBufferCodecTests
 
         using var writer = new ArcBufferWriter();
         using var input = writer.PeekSlice(0);
-        var before = input.First.ReferenceCount;
+        var firstPage = Assert.IsType<ArcBufferPage>(input.First);
+        var before = firstPage.ReferenceCount;
         var ownedReader = Reader.Create(input, session);
         var result = ownedReader.ReadArcBuffer(0);
         Assert.True(result.IsEmpty);
         Assert.Null(result.First);
         Assert.Equal(0, ownedReader.Position);
-        Assert.Equal(before, input.First.ReferenceCount);
+        Assert.Equal(before, firstPage.ReferenceCount);
         result.Dispose();
-        Assert.Equal(before, input.First.ReferenceCount);
+        Assert.Equal(before, firstPage.ReferenceCount);
     }
 
     [Fact]
@@ -533,14 +597,15 @@ public sealed class ArcBufferCodecTests
             writer.Commit();
         }
         using var input = wire.PeekSlice(wire.Length);
-        var before = input.First.ReferenceCount;
+        var firstPage = Assert.IsType<ArcBufferPage>(input.First);
+        var before = firstPage.ReferenceCount;
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
         var reader = Reader.Create(input, session);
         Exception? error = null;
         try { new ArcBufferCodec().ReadValue(ref reader, reader.ReadFieldHeader()); }
         catch (Exception exception) { error = exception; }
         Assert.IsType<IndexOutOfRangeException>(error);
-        Assert.Equal(before, input.First.ReferenceCount);
+        Assert.Equal(before, firstPage.ReferenceCount);
     }
 
     [Fact]
@@ -558,7 +623,8 @@ public sealed class ArcBufferCodecTests
 
         wire.Truncate(wire.Length - 1);
         using var input = wire.PeekSlice(wire.Length);
-        var before = input.First.ReferenceCount;
+        var firstPage = Assert.IsType<ArcBufferPage>(input.First);
+        var before = firstPage.ReferenceCount;
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
         var reader = Reader.Create(input, session);
         try
@@ -570,7 +636,7 @@ public sealed class ArcBufferCodecTests
         {
         }
 
-        Assert.Equal(before, input.First.ReferenceCount);
+        Assert.Equal(before, firstPage.ReferenceCount);
     }
 
     [Fact]
@@ -590,7 +656,7 @@ public sealed class ArcBufferCodecTests
         Assert.IsType<IOException>(error);
         Assert.Equal(2, input.ByteReadCalls);
         Assert.Equal(Bytes(50037), value.ToArray());
-        Assert.Equal(2, value.First.ReferenceCount);
+        Assert.Equal(2, Assert.IsType<ArcBufferPage>(value.First).ReferenceCount);
     }
 
     [Fact]
