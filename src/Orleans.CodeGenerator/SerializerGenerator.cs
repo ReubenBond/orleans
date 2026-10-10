@@ -975,8 +975,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             ]))));
         if (type.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
         {
-            innerBody.Add(TryStatement(Block(deserialize), SingletonList(CatchClause().WithBlock(Block(
-                ParseStatement("result.CompleteArgumentResources();"),
+            innerBody.Add(TryStatement(Block(deserialize), SingletonList(CatchClause()
+                .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
+                .WithBlock(Block(
+                ParseStatement("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CompleteArgumentResourcesOnFailure(result, exception, reader.Session.CodecProvider.Services);"),
                 ThrowStatement()))), null));
         }
         else

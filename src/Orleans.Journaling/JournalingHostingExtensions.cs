@@ -279,6 +279,7 @@ public static class JournalingHostingExtensions
         this ISiloBuilder builder, string name, Action<VolatileJournalStorageOptions>? configureOptions)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var options = builder.Services.AddJournalStorageOptions<VolatileJournalStorageOptions>(name)
             .Validate(static configuration => configuration.MaxAppendsBeforeSnapshot > 0,
                 "MaxAppendsBeforeSnapshot must be positive.")
@@ -288,6 +289,7 @@ public static class JournalingHostingExtensions
         {
             options.Configure(configureOptions);
         }
+
         return builder.AddJournalStorage(name, services => new VolatileJournalStorageProvider(
             services.GetRequiredService<IOptions<JournaledStateManagerOptions>>(),
             services.GetJournalStorageOptions<VolatileJournalStorageOptions>(name),

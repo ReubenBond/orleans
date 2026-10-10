@@ -68,19 +68,6 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             .Where(method => method.MethodTypeParameters.Count == 0)
             .SelectMany(method => method.GeneratedInvokable.Members);
         _copierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
-        // Resolve proxy dependencies by their contract, not their concrete generated implementation.
-        // The provider owns caching and honors custom copier factories and registrations.
-        for (var i = 0; i < fields.Count; i++)
-        {
-            if (fields[i] is CopierFieldDescription copier)
-            {
-                fields[i] = new CopierFieldDescription(
-                    LibraryTypes.DeepCopier_1.ToTypeSyntax(copier.UnderlyingType.ToTypeSyntax()),
-                    copier.FieldName,
-                    copier.UnderlyingType);
-            }
-        }
-
         return fields;
     }
 
@@ -449,8 +436,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         {
             return (isAsync, Block(
                 statements[0],
-                TryStatement(Block(statements.Skip(1)), SingletonList(CatchClause().WithBlock(Block(
-                    ParseStatement("request.CompleteArgumentResources();"),
+                TryStatement(Block(statements.Skip(1)), SingletonList(CatchClause()
+                    .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
+                    .WithBlock(Block(
+                    ParseStatement("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CompleteArgumentResourcesOnFailure(request, exception, CodecProvider.Services);"),
                     ThrowStatement()))), null)));
         }
 
@@ -560,7 +549,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                                 AssignmentExpression(
                                     SyntaxKind.SimpleAssignmentExpression,
                                     field.FieldName.ToIdentifierName(),
-                                    GetCopier(codec.UnderlyingType.ToTypeSyntax()))));
+                                    GetService(field.FieldType))));
                         }
                         break;
                 }
@@ -574,10 +563,11 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
             }
 
-            static ExpressionSyntax GetCopier(TypeSyntax type)
+            static ExpressionSyntax GetService(TypeSyntax type)
             {
                 return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName(CodecProviderMemberName), GenericName(Identifier("GetDeepCopier"), TypeArgumentList(SingletonSeparatedList(type)))));
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
             }
         }
     }

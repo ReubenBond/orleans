@@ -126,15 +126,39 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
+            request is IInvokableArgumentOwner
+                ? InvokeOwnedMethodWithFiltersAsync<TResult>(reference, request, options)
+                : InvokeBorrowedMethodWithFiltersAsync<TResult>(reference, request, options);
+
+        private ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
+            request is IInvokableArgumentOwner
+                ? InvokeOwnedMethodWithFiltersAsync(reference, request, options)
+                : InvokeBorrowedMethodWithFiltersAsync(reference, request, options);
+
+        private async ValueTask<TResult?> InvokeBorrowedMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            SetGrainCancellationTokensTarget(reference, request);
+            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
+            await invoker.Invoke();
+            return invoker.TypedResult;
+        }
+
+        private async ValueTask InvokeBorrowedMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            SetGrainCancellationTokensTarget(reference, request);
+            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
+            await invoker.Invoke();
+        }
+
+        private async ValueTask<TResult?> InvokeOwnedMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             var owner = RetainArgumentResources(request);
             var sent = false;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var sender = owner is null ? this.sendRequest : SendOwnedRequest;
-                var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, sender, this.filters);
+                var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, SendOwnedRequest, this.filters);
                 await invoker.Invoke();
                 return invoker.TypedResult;
             }
@@ -161,15 +185,14 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private async ValueTask InvokeOwnedMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             var owner = RetainArgumentResources(request);
             var sent = false;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var sender = owner is null ? this.sendRequest : SendOwnedRequest;
-                var invoker = new OutgoingCallInvoker<object>(reference, request, options, sender, this.filters);
+                var invoker = new OutgoingCallInvoker<object>(reference, request, options, SendOwnedRequest, this.filters);
                 await invoker.Invoke();
             }
             catch

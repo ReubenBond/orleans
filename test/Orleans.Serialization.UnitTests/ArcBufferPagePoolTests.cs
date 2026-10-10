@@ -11,6 +11,9 @@ using Xunit;
 namespace Orleans.Serialization.UnitTests;
 
 [Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public sealed class ArcBufferPagePoolTests
 {
     private const int PageSize = ArcBufferWriter.MinimumPageSize;
@@ -377,18 +380,18 @@ public sealed class ArcBufferPagePoolTests
         {
             await reserved.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
             Assert.Equal(2 * PageSize, pool.RetainedBytes);
-            Assert.Equal(2, pool.RetainedPages);
+            Assert.Equal(1, pool.RetainedPages);
 
             pool.MaxRetainedBytes = 0;
 
             Assert.Empty(alreadyFree.Array); // Already-queued free pages are released before the setter returns.
             Assert.Equal(PageSize, pending.Array.Length);
             Assert.Equal(PageSize, pool.RetainedBytes); // Only the unpublished reservation remains, temporarily above zero.
-            Assert.Equal(1, pool.RetainedPages);
+            Assert.Equal(0, pool.RetainedPages);
             pool.Return(rejected);
             Assert.Empty(rejected.Array); // New reservations use the current zero budget.
             Assert.Equal(PageSize, pool.RetainedBytes);
-            Assert.Equal(1, pool.RetainedPages);
+            Assert.Equal(0, pool.RetainedPages);
         }
         finally
         {

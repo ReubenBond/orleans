@@ -1,13 +1,21 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Defines the independent resource ownership of values stored in durable dictionaries.
+/// Defines independent resource ownership for values stored in durable dictionaries.
 /// </summary>
 /// <typeparam name="TValue">The dictionary value type.</typeparam>
 /// <remarks>
 /// Register this service for values whose resources require explicit retention and release.
-/// Live mutations retain the caller's value. Replay transfers ownership of decoded values.
-/// Replacement, removal, reset, and dictionary disposal release the dictionary's owners.
+/// Live mutations acquire an owner before encoding. Replay transfers ownership of decoded values.
+/// Replacement, removal, clear, reset, journal deletion, and dictionary disposal release stored owners.
+/// Values returned by dictionary reads are borrowed from the dictionary.
+/// Implementations must support independent owners of the same resources and run synchronously
+/// on the dictionary's logical execution thread, with dictionary mutation left to the caller.
+/// Retention preserves the value's contents and equality semantics.
+/// Command codecs borrow values during encoding and transfer decoded owners to the command handler.
+/// A failed retain leaves ownership with the caller;
+/// release must complete without throwing. The activation scope disposes DI-created dictionaries.
+/// Callers arrange disposal of manually constructed dictionaries and their dependencies.
 /// </remarks>
 public interface IDurableDictionaryValueLifecycle<TValue>
 {

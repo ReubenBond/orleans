@@ -15,12 +15,17 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `VolatileJournalStorageOptions.MaxAppendsBeforeSnapshot` (default 100) and
 `MaxBytesBeforeSnapshot` (default 1,048,576 bytes). The named-provider overload
 configures each provider independently. Both values must be positive.
+Providers capture the configured limits when constructed.
 
 Reaching either threshold requests a snapshot before the next journal write.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies
 over more updates; smaller limits reduce retained history and replay work.
+Counters belong to each journal and are shared by handles for the same journal
+within one provider.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and provider bookkeeping.
 
 ## Persistence hooks
 
@@ -126,7 +131,7 @@ Recovery reads the selected provider's physical namespace using the existing
 journal identity. Changing the selection for a grain type with existing journals
 requires a deliberate data migration or cutover strategy, including rollback.
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. Nonempty journals require stored format metadata; recovery fails explicitly when the format key is absent. New empty journals use the configured write format.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. When stored format metadata is absent, recovery uses the configured format. New empty journals use the configured write format.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -219,6 +224,18 @@ Built-in durable state components use the configured JSON codec automatically. C
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
+## In-memory storage capacity
+
+`VolatileJournalStorage` retains journal bytes on reference-counted pages across manager lifetimes.
+Replacement and deletion release retired storage references, while active readers retain stable
+bytes until completion. Each nonempty journal can retain a minimum 16 KiB page even for a small
+payload. Capacity planning includes the number and lifetime of stored journals and concurrent reads.
+`ArcBufferWriter.MaxRetainedPoolBytes` separately bounds the process-wide cache of free pages to
+4 MiB by default; zero releases free pages and disables caching.
+
+See [Journaling runtime behavior](https://dotnet.github.io/orleans/docs/grains/journaling/runtime-behavior/)
+for captured-buffer ownership, cancellation, shutdown, and storage lifetime contracts.
+
 ## Custom state and standalone ownership
 
 Register a grain-facing state component contract and its implementation with
@@ -298,6 +315,41 @@ the operation's token before use, or deliberately supply them through a registra
 lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent
 of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle.
 
+## Journal operation hooks
+
+`IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
+registrations. Features inspect and deduplicate their registrations on the owner's logical
+execution context while persistence is quiescent. Registration persists through recovery and
+whole-journal deletion. The standard manager rejects mutation of the list throughout an
+operation and admits at most one `IJournaledStateCaptureHook`.
+
+For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
+the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously
+captures the registered states or starts deletion. Prerequisites cover all changes staged during
+asynchronous preparation, including changes arriving while the capture hook awaits its own I/O.
+Keep operation-local bookkeeping for the captured batch separate from later pending changes.
+
+After hooks run in list order after storage acknowledgement and state acknowledgement or reset.
+They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
+operation. `JournaledStateHook` adapts synchronous and asynchronous delegates; within each phase
+the synchronous delegate executes first.
+
+| Outcome | Owner and caller behavior |
+| --- | --- |
+| Before hook fails | `JournaledStatePreCommitException` retains pending state for an explicit retry after restoring the prerequisite. |
+| Storage or state processing fails | The original failure fences the manager; create a fresh owner and recover the durable outcome. |
+| After hook fails | `JournaledStatePostCommitException` reports successful persistence. Every remaining after hook runs, failures are aggregated, and the manager stays usable. The feature's durable recovery protocol resumes interrupted post-persistence work. |
+
+Hooks receive the owner's shutdown token. Caller cancellation ends the caller's wait while
+the owned prerequisite, capture, storage, and completion phases continue. Disposal cancels the
+owner token and drains owned work before releasing journal resources, including when cancellation
+callbacks or after-hook cleanup fail. Concurrent disposal callers share that drain and its outcome.
+Shutdown closes work admission and cancels queued operations while an already running operation
+drains to its actual storage and hook outcome.
+Recursive initialization, persistence, or disposal on the same owner from a hook is rejected.
+Before whole-journal deletion, the feature owner stops admission and drains its own operations;
+deletion completion follows storage deletion and registered-state reset.
+
 ## State identity and retirement
 
 Preserve state names across activations and deployments. A stream absent from the setup declarations
@@ -346,7 +398,7 @@ Each record contains the state id as element 0 and the durable operation payload
 
 Inside the operation payload array, element 0 is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-Existing data is read using its required stored format metadata and migrated to the configured write format by the next snapshot write.
+Existing data is read using its stored format key, or the configured format when metadata is absent, and migrated to the configured write format by the next snapshot write.
 
 ## Catalog enumeration
 

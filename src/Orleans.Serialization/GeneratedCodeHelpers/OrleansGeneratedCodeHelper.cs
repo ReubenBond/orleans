@@ -7,10 +7,12 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -38,6 +40,37 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             finally
             {
                 argument = default!;
+            }
+        }
+
+        /// <summary>
+        /// Completes a partially initialized request while preserving the failure which interrupted initialization.
+        /// </summary>
+        /// <param name="request">The request owning copied or decoded arguments.</param>
+        /// <param name="cause">The failure which interrupted copying, decoding, or submission.</param>
+        /// <param name="services">The services used to resolve the cleanup logger.</param>
+        /// <exception cref="AggregateException">
+        /// Cleanup failed and a logger was unavailable. The aggregate contains the original cause followed by the cleanup failure.
+        /// </exception>
+        public static void CompleteArgumentResourcesOnFailure(IInvokableArgumentOwner request, Exception cause, IServiceProvider services)
+        {
+            if (request is null) throw new ArgumentNullException(nameof(request));
+            if (cause is null) throw new ArgumentNullException(nameof(cause));
+            if (services is null) throw new ArgumentNullException(nameof(services));
+
+            try
+            {
+                request.CompleteArgumentResources();
+            }
+            catch (Exception cleanupFailure)
+            {
+                var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Orleans.Serialization.Invocation");
+                if (logger is null)
+                {
+                    throw new AggregateException("RPC initialization and owned argument cleanup failed.", cause, cleanupFailure);
+                }
+
+                logger.LogWarning(cleanupFailure, "Error releasing explicitly owned RPC argument resources");
             }
         }
 
@@ -96,8 +129,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Unwraps the provided service if it was wrapped.
+        /// Resolves and unwraps the requested service.
         /// </summary>
+        /// <remarks>
+        /// Registered serialization implementations are cached by the codec provider.
+        /// Other services retain their configured dependency-injection lifetimes.
+        /// </remarks>
         /// <typeparam name="TService">The service type.</typeparam>
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
@@ -128,17 +165,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     }
                 }
 
-                TService val;
-                if (codecProvider is CodecProvider provider)
-                {
-                    if (provider.TryGetSerializerService(typeof(TService), out var registered))
-                    {
-                        return (TService)registered;
-                    }
-
-                }
-
-                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                var val = codecProvider is CodecProvider provider
+                    ? (TService)provider.GetServiceOrCreateInstance(typeof(TService))
+                    : ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
