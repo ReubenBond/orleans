@@ -506,6 +506,56 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, fixture.Outbox.Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task DuplicateAfterCallerDisposal_UsesDurablePayloadOwnerThroughCaptureAck(bool duringCapture) => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var command = HierarchicalKey.Create("test", "retained-owner", "command", "0");
+        var original = fixture.CreateEnvelope(command, "retained-owner.v1");
+        var page = original.Payload.First;
+        var expected = original.Payload.ToArray();
+        var references = typeof(ArcBufferPage).GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        int Pins() => (int)references.GetValue(page)!;
+        try
+        {
+            fixture.Outbox.Send(original);
+            Assert.Equal(2, Pins());
+        }
+        finally
+        {
+            original.Dispose();
+        }
+        Assert.Equal(1, Pins());
+        using var duplicate = fixture.CreateEnvelope(HierarchicalKey.Parse(command.ToString(), provider: null), "retained-owner.v1");
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        Task? write = null;
+        if (duringCapture)
+        {
+            write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            await storage.WaitUntilEnteredAsync();
+        }
+        fixture.Outbox.Send(duplicate);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.Probe.Count(nameof(DurableEnvelope)));
+        Assert.True(fixture.Outbox.TryGetMessage(command, out var stored));
+        Assert.Same(page, stored.Payload.First);
+        Assert.Equal(expected, stored.Payload.ToArray());
+        Assert.Equal(1, Pins());
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Receiver.ReceivedCalls());
+        storage.Release();
+        if (write is not null) await write;
+        else await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(command, ((DurableEnvelope)Assert.Single(fixture.Receiver.ReceivedCalls()).GetArguments()[0]!).MessageId);
+        Assert.Equal(expected, duplicate.Payload.ToArray());
+    });
+
     [Fact]
     public Task ApplicationIdentity_EquivalentReconstructionPreservesOriginalRetainedIntent() => OnOwnerAsync(async () =>
     {
