@@ -36,7 +36,7 @@ public partial class StateManagerTests
             Assert.Equal(500, recoveredValue.Value);
         }
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, storage.Observation.First.ReferenceCount); // only the probe's independently owned pin
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount); // only the probe's independently owned pin
         Assert.Equal(0, storage.Inner.GetMemoryStatistics().RetainedCapacity);
         storage.ReleaseObservation();
     }
@@ -81,7 +81,7 @@ public partial class StateManagerTests
             Assert.Equal(committed ? 2 : 1, recoveredValue.Value);
         }
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, storage.Observation.First.ReferenceCount);
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         Assert.Equal(0, storage.Inner.GetMemoryStatistics().RetainedPages);
         storage.ReleaseObservation();
     }
@@ -99,19 +99,19 @@ public partial class StateManagerTests
         using var caller = new CancellationTokenSource();
         var write = manager.WriteStateAsync(caller.Token).AsTask();
         await WaitFor(storage.Entered.Task);
-        var sourceRefCount = storage.Observation.First.ReferenceCount;
+        var sourceRefCount = Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount;
         var expectedBytes = storage.Observation.ToArray();
         caller.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
-        Assert.Equal(sourceRefCount, storage.Observation.First.ReferenceCount);
+        Assert.Equal(sourceRefCount, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         var disposal = manager.DisposeAsync().AsTask();
         Assert.False(disposal.IsCompleted);
-        Assert.Equal(sourceRefCount, storage.Observation.First.ReferenceCount);
+        Assert.Equal(sourceRefCount, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         Assert.Equal(expectedBytes, storage.Observation.ToArray());
         storage.Release.SetResult();
         await WaitFor(disposal);
         Assert.Equal(expectedBytes, Assert.Single(storage.Inner.Segments));
-        Assert.Equal(2, storage.Observation.First.ReferenceCount); // storage + observation; all manager/writer pins drained
+        Assert.Equal(2, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount); // storage + observation; all manager/writer pins drained
         await using (var recovered = CreateTestSystem(storage.Inner).Manager)
         {
             var recoveredValue = new DurableValue<int>("value", recovered, CreateValueCodec<int>());
@@ -119,7 +119,7 @@ public partial class StateManagerTests
             Assert.Equal(42, recoveredValue.Value);
         }
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, storage.Observation.First.ReferenceCount);
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         storage.ReleaseObservation();
     }
 
@@ -146,14 +146,14 @@ public partial class StateManagerTests
         value.Value = 42;
         var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await WaitFor(storage.Entered.Task);
-        var baseline = storage.Observation.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount;
         var bytes = storage.Observation.ToArray();
 
         var disposal = manager.DisposeAsync().AsTask();
         try
         {
             Assert.False(disposal.IsCompleted);
-            Assert.Equal(baseline, storage.Observation.First.ReferenceCount);
+            Assert.Equal(baseline, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
             Assert.Equal(bytes, storage.Observation.ToArray());
         }
         finally
@@ -172,10 +172,10 @@ public partial class StateManagerTests
 
         var failure = await Assert.ThrowsAsync<AggregateException>(() => WaitFor(disposal));
         Assert.Same(expected, Assert.Single(failure.InnerExceptions));
-        Assert.Equal(2, storage.Observation.First.ReferenceCount);
+        Assert.Equal(2, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         Assert.Equal(bytes, Assert.Single(storage.Inner.Segments));
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, storage.Observation.First.ReferenceCount);
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(storage.Observation.First).ReferenceCount);
         storage.ReleaseObservation();
     }
 

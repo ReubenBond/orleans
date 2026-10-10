@@ -21,7 +21,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         using var writer = new ArcBufferWriter();
         writer.Write(new byte[] { 10, 20, 30 });
         using var source = writer.PeekSlice(writer.Length);
-        var page = source.First;
+        var page = Assert.IsType<ArcBufferPage>(source.First);
         var baseline = page.ReferenceCount;
         var capability = storage;
         if (replace) await capability.ReplaceAsync(source, Token);
@@ -114,7 +114,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         await first.AppendAsync(source, Token);
         await second.AppendBytesAsync(new ReadOnlySequence<byte>(new byte[] { 4, 5 }), Token);
         var originalMetadata = await first.GetMetadataAsync(Token);
-        var baseline = source.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(source.First).ReferenceCount;
         using var entered = new CountdownEvent(2);
         using var release = new ManualResetEventSlim();
         var readers = Enumerable.Range(0, 2).Select(_ => Task.Run(async () =>
@@ -133,9 +133,9 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         try
         {
             Assert.True(entered.Wait(TimeSpan.FromSeconds(30), Token), "Both stable readers must enter before replacing storage.");
-            Assert.Equal(baseline + 2, source.First.ReferenceCount);
+            Assert.Equal(baseline + 2, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
             await second.ReplaceBytesAsync(new ReadOnlySequence<byte>(new byte[] { 8, 9 }), Token);
-            Assert.Equal(baseline + 1, source.First.ReferenceCount); // writer + source + two readers, no store pin
+            Assert.Equal(baseline + 1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount); // writer + source + two readers, no store pin
             await second.DeleteAsync(Token);
             Assert.True(await first.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "new" }, Token));
             await second.AppendBytesAsync(new ReadOnlySequence<byte>(new byte[] { 10, 11 }), Token);
@@ -148,7 +148,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
             await Task.WhenAll(readers);
         }
 
-        Assert.Equal(baseline - 1, source.First.ReferenceCount);
+        Assert.Equal(baseline - 1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         await second.DeleteAsync(Token);
         Assert.Equal(0, first.GetMemoryStatistics().RetainedCapacity);
     }
@@ -164,12 +164,12 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         using var source = writer.PeekSlice(writer.Length);
         await storage.AppendAsync(source, Token);
         await storage.AppendBytesAsync(new ReadOnlySequence<byte>(new byte[] { 4 }), Token);
-        var baseline = source.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(source.First).ReferenceCount;
         using var cancellation = new CancellationTokenSource();
         var expected = new IOException("Consumer failed after capture.");
         var consumer = new CapturingConsumer(() =>
         {
-            Assert.Equal(baseline + 1, source.First.ReferenceCount);
+            Assert.Equal(baseline + 1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
             if (cancel) cancellation.Cancel();
             else throw expected;
         });
@@ -177,10 +177,10 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => storage.ReadAsync(consumer, cancellation.Token).AsTask());
         else
             Assert.Same(expected, await Record.ExceptionAsync(() => storage.ReadAsync(consumer, cancellation.Token).AsTask()));
-        Assert.Equal(baseline, source.First.ReferenceCount);
+        Assert.Equal(baseline, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, await Read(storage));
         await storage.DeleteAsync(Token);
-        Assert.Equal(baseline - 1, source.First.ReferenceCount);
+        Assert.Equal(baseline - 1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
     }
 
     [Theory]
@@ -194,7 +194,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         using var writer = new ArcBufferWriter();
         writer.Write(new byte[] { 10 });
         using var source = writer.PeekSlice(writer.Length);
-        var baseline = source.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(source.First).ReferenceCount;
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var retained = storage;
@@ -205,7 +205,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
             ? storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(new byte[] { 99 }), cancellation.Token).AsTask()
             : storage.AppendBytesAsync(new ReadOnlySequence<byte>(new byte[] { 99 }), cancellation.Token).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => storage.DeleteAsync(cancellation.Token).AsTask());
-        Assert.Equal(baseline, source.First.ReferenceCount);
+        Assert.Equal(baseline, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         Assert.Equal(metadata!.ETag, (await storage.GetMetadataAsync(Token))!.ETag);
         Assert.True(storage.IsCompactionRequested);
         Assert.Equal(new byte[] { 42 }, await Read(storage));
@@ -231,7 +231,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
                 using var source = writer.PeekSlice(1);
                 await storage.AppendAsync(source, Token);
                 observations.Add(source.Slice(0));
-                pages.Add(source.First);
+                pages.Add(Assert.IsType<ArcBufferPage>(source.First));
             }
 
             Assert.Equal(journalCount, pages.Distinct().Count());
@@ -335,7 +335,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         await borrowed.DeleteAsync(Token);
         Assert.Equal(0, retained.GetMemoryStatistics().RetainedCapacity);
         Assert.Equal(0, borrowed.GetMemoryStatistics().RetainedCapacity);
-        Assert.Equal(2, source.First.ReferenceCount); // source and its writer, no leaked storage/reader references
+        Assert.Equal(2, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount); // source and its writer, no leaked storage/reader references
     }
 
     [Fact]
@@ -373,12 +373,12 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         writer.Write(new byte[] { 10 });
         var source = writer.PeekSlice(writer.Length);
         source.Dispose();
-        Assert.Equal(1, source.First.ReferenceCount); // writer still pins the page, source no longer owns a token
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount); // writer still pins the page, source no longer owns a token
         var capability = storage;
         await Assert.ThrowsAsync<InvalidOperationException>(() => replace
             ? capability.ReplaceAsync(source, Token).AsTask()
             : capability.AppendAsync(source, Token).AsTask());
-        Assert.Equal(1, source.First.ReferenceCount);
+        Assert.Equal(1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         Assert.Equal(before, storage.GetMemoryStatistics());
         Assert.Equal(metadata!.ETag, (await storage.GetMetadataAsync(Token))!.ETag);
         Assert.True(storage.IsCompactionRequested);
@@ -392,13 +392,13 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
         using var writer = new ArcBufferWriter();
         writer.Write(new byte[] { 1, 2, 3 });
         using var source = writer.PeekSlice(writer.Length);
-        var baseline = source.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(source.First).ReferenceCount;
         var abandoned = await CreateAbandonedStore(source);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         Assert.False(abandoned.IsAlive);
-        Assert.Equal(baseline, source.First.ReferenceCount);
+        Assert.Equal(baseline, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         Assert.Equal(new byte[] { 1, 2, 3 }, source.ToArray());
     }
 
@@ -407,9 +407,9 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
     {
         var store = new VolatileJournalStorage.Store("abandoned");
         var storage = new VolatileJournalStorage(store, journalFormatKey: null);
-        var baseline = source.First.ReferenceCount;
+        var baseline = Assert.IsType<ArcBufferPage>(source.First).ReferenceCount;
         await storage.AppendAsync(source, Token);
-        Assert.Equal(baseline + 1, source.First.ReferenceCount);
+        Assert.Equal(baseline + 1, Assert.IsType<ArcBufferPage>(source.First).ReferenceCount);
         var result = new WeakReference(store);
         GC.KeepAlive(store);
         return result;

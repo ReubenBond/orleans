@@ -271,11 +271,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 {
                     if (_shared.Options.UseS3ExpressAppend)
                     {
-                        await AppendWithS3ExpressAsync(value.AsReadOnlySequence(), expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
+                        await AppendWithS3ExpressAsync(value, expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {
-                        await AppendWithConditionalRewriteAsync(value.AsReadOnlySequence(), expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
+                        await AppendWithConditionalRewriteAsync(value, expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
                     }
 
                     LogAppend(_shared.Logger, value.Length, _shared.BucketName, _walObjectKey);
@@ -659,12 +659,12 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     }
 
     private async ValueTask AppendWithS3ExpressAsync(
-        ReadOnlySequence<byte> value,
+        ArcBuffer value,
         string expectedETag,
         WalProviderState expectedProviderState,
         CancellationToken cancellationToken)
     {
-        using var stream = new S3ReadOnlySequenceStream(value);
+        using var stream = new S3ReadOnlySequenceStream(value.AsReadOnlySequence());
         var response = await _client.PutObjectAsync(
             new PutObjectRequest
             {
@@ -689,7 +689,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     }
 
     private async ValueTask AppendWithConditionalRewriteAsync(
-        ReadOnlySequence<byte> value,
+        ArcBuffer value,
         string expectedETag,
         WalProviderState expectedProviderState,
         CancellationToken cancellationToken)
@@ -729,7 +729,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         var metadata = CreateWalMetadata(manifest);
         await using var payload = CreateTemporaryPayloadStream();
         await walResult.ResponseStream.CopyToAsync(payload, cancellationToken).ConfigureAwait(false);
-        foreach (var segment in value)
+        foreach (var segment in value.MemorySegments)
         {
             await payload.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
         }
