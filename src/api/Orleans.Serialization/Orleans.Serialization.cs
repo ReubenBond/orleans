@@ -858,36 +858,6 @@ namespace Orleans.Serialization.Buffers
         public readonly System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
     }
 
-    public sealed partial class BufferPackage : System.IDisposable
-    {
-        internal BufferPackage() { }
-
-        public ArcBuffer Buffer { get { throw null; } }
-
-        public int Count { get { throw null; } }
-
-        public System.Collections.Generic.IReadOnlyCollection<string> Keys { get { throw null; } }
-
-        public void Dispose() { }
-
-        public void Release() { }
-
-        public BufferPackage Retain() { throw null; }
-
-        public bool TryGetBytes(string key, out System.Buffers.ReadOnlySequence<byte> bytes) { throw null; }
-    }
-
-    public sealed partial class BufferPackageBuilder : System.IDisposable
-    {
-        public void Add(string key, System.Action<System.Buffers.IBufferWriter<byte>> write) { }
-
-        public void Add(string key, System.ReadOnlySpan<byte> bytes) { }
-
-        public BufferPackage Build() { throw null; }
-
-        public void Dispose() { }
-    }
-
     public static partial class BufferWriterExtensions
     {
         public static Writer<TBufferWriter> CreateWriter<TBufferWriter>(this TBufferWriter buffer, Session.SerializerSession session)
@@ -1595,23 +1565,6 @@ namespace Orleans.Serialization.Codecs
 
         public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, bool value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [RegisterSerializer]
-    public sealed partial class BufferPackageCodec : IFieldCodec<Buffers.BufferPackage>, IFieldCodec
-    {
-        public BufferPackageCodec(IFieldCodec<string> keyCodec) { }
-
-        public Buffers.BufferPackage ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.BufferPackage? value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [RegisterCopier]
-    public sealed partial class BufferPackageCopier : Cloning.IDeepCopier<Buffers.BufferPackage>, Cloning.IDeepCopier
-    {
-        public Buffers.BufferPackage? DeepCopy(Buffers.BufferPackage? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
