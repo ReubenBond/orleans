@@ -58,7 +58,7 @@ Call <xref:Orleans.Runtime.IGrainTimer.Change*> to replace the due time and peri
 
 A change to a delayed or infinite due time invalidates a queued tick. The queued message drains according to activation scheduling, and the replacement schedule determines the next callback.
 
-Dispose <xref:Orleans.Runtime.IGrainTimer> to cancel its callback token and stop further scheduling. An already queued callback receives the canceled token when invoked. Orleans also cancels the token and disposes the timer when the activation begins deactivating.
+Dispose <xref:Orleans.Runtime.IGrainTimer> to invalidate queued ticks, cancel the token of an admitted callback, and stop further scheduling. Queued messages drain through activation scheduling. Orleans also cancels the token and disposes the timer when the activation begins deactivating.
 
 ## Handle callback failures
 
