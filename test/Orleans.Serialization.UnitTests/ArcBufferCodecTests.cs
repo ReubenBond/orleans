@@ -205,7 +205,7 @@ public sealed class ArcBufferCodecTests
         using var input = source.PeekSlice(source.Length);
         var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, 113);
         reader.Skip(17000);
-        var value = reader.ReadArcBuffer(18000);
+        var value = reader.ReadOwnedBuffer(18000);
         using (value)
         {
             Assert.Equal(expected.AsSpan(17000, 18000).ToArray(), value.ToArray());
@@ -213,15 +213,15 @@ public sealed class ArcBufferCodecTests
         }
         reader.ForkFrom(18113, out var fork);
         fork.ForkFrom(19113, out var nestedFork);
-        var forked = nestedFork.ReadArcBuffer(7);
+        var forked = nestedFork.ReadOwnedBuffer(7);
         using (forked) Assert.Equal(expected.AsSpan(19000, 7).ToArray(), forked.ToArray());
 
         var emptyReader = Reader.Create(default(ArcBuffer), session);
         Assert.Equal(0, emptyReader.Remaining);
-        var empty = emptyReader.ReadArcBuffer(0);
+        var empty = emptyReader.ReadOwnedBuffer(0);
         Assert.Null(empty.First);
         empty.Dispose();
-        try { emptyReader.ReadArcBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
+        try { emptyReader.ReadOwnedBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
         catch (IndexOutOfRangeException) { }
     }
 
@@ -230,7 +230,7 @@ public sealed class ArcBufferCodecTests
     [InlineData(false, 17000)]
     [InlineData(true, 0)]
     [InlineData(true, 17000)]
-    public void ReadArcBuffer_ValidatedSkipReachesExactEnd(bool leadingEmptyPages, int offset)
+    public void ReadOwnedBuffer_ValidatedSkipReachesExactEnd(bool leadingEmptyPages, int offset)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -257,7 +257,7 @@ public sealed class ArcBufferCodecTests
         reader.Skip(offset);
         var remaining = (int)reader.Remaining;
         reader.EnsureAvailable((uint)remaining);
-        var value = reader.ReadArcBuffer(remaining);
+        var value = reader.ReadOwnedBuffer(remaining);
         try
         {
             Assert.Equal(113 + input.Length, reader.Position);
@@ -366,7 +366,7 @@ public sealed class ArcBufferCodecTests
     [InlineData(0)]
     [InlineData(7)]
     [InlineData(50037)]
-    public void ReadArcBuffer_NonArcInputsReturnOwnedBytesAndAdvanceExactly(int length)
+    public void ReadOwnedBuffer_NonArcInputsReturnOwnedBytesAndAdvanceExactly(int length)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -374,7 +374,7 @@ public sealed class ArcBufferCodecTests
         var expected = input.AsSpan(7, length).ToArray();
         var spanReader = Reader.Create(input, session);
         spanReader.Skip(7);
-        var spanValue = spanReader.ReadArcBuffer(length);
+        var spanValue = spanReader.ReadOwnedBuffer(length);
         Assert.Equal(length + 7, spanReader.Position);
         Assert.Equal(4, spanReader.Remaining);
 
@@ -382,20 +382,20 @@ public sealed class ArcBufferCodecTests
         pooled.Write(input);
         var sequenceReader = Reader.Create(pooled.AsReadOnlySequence(), session);
         sequenceReader.Skip(7);
-        var sequenceValue = sequenceReader.ReadArcBuffer(length);
+        var sequenceValue = sequenceReader.ReadOwnedBuffer(length);
         Assert.Equal(length + 7, sequenceReader.Position);
         Assert.Equal(4, sequenceReader.Remaining);
 
         var pooledReader = Reader.Create(pooled, session);
         pooledReader.Skip(7);
-        var pooledValue = pooledReader.ReadArcBuffer(length);
+        var pooledValue = pooledReader.ReadOwnedBuffer(length);
         Assert.Equal(length + 7, pooledReader.Position);
         Assert.Equal(4, pooledReader.Remaining);
 
         using var stream = new MemoryStream(input, writable: false);
         var streamReader = Reader.Create(stream, session);
         streamReader.Skip(7);
-        var streamValue = streamReader.ReadArcBuffer(length);
+        var streamValue = streamReader.ReadOwnedBuffer(length);
         Assert.Equal(length + 7, streamReader.Position);
         Assert.Equal(4, streamReader.Remaining);
 
@@ -423,13 +423,13 @@ public sealed class ArcBufferCodecTests
     }
 
     [Fact]
-    public void ReadArcBuffer_CopyFillsPagesBeforeAllocatingAnother()
+    public void ReadOwnedBuffer_CopyFillsPagesBeforeAllocatingAnother()
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
         var expected = Bytes(ArcBufferWriter.MinimumPageSize * 3);
         var reader = Reader.Create(expected, session);
-        using var value = reader.ReadArcBuffer(expected.Length);
+        using var value = reader.ReadOwnedBuffer(expected.Length);
         var pages = value.Pages.ToArray();
         Assert.Equal(3, pages.Length);
         Assert.All(pages, page => Assert.Equal(ArcBufferWriter.MinimumPageSize, page.Length));
@@ -443,7 +443,7 @@ public sealed class ArcBufferCodecTests
     [InlineData(-1)]
     [InlineData(8)]
     [InlineData(int.MaxValue)]
-    public void ReadArcBuffer_InvalidLengthsPreservePositionAndOwnership(int length)
+    public void ReadOwnedBuffer_InvalidLengthsPreservePositionAndOwnership(int length)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -474,7 +474,7 @@ public sealed class ArcBufferCodecTests
         Exception? error = null;
         try
         {
-            using var value = reader.ReadArcBuffer(length);
+            using var value = reader.ReadOwnedBuffer(length);
         }
         catch (Exception exception)
         {
@@ -537,7 +537,7 @@ public sealed class ArcBufferCodecTests
         if (!pageBacked)
         {
             var reader = Reader.Create(ArcBuffer.Empty, session);
-            var empty = reader.ReadArcBuffer(0);
+            var empty = reader.ReadOwnedBuffer(0);
             Assert.True(empty.IsEmpty);
             Assert.Null(empty.First);
             Assert.Equal(0, reader.Position);
@@ -550,7 +550,7 @@ public sealed class ArcBufferCodecTests
         var firstPage = Assert.IsType<ArcBufferPage>(input.First);
         var before = firstPage.ReferenceCount;
         var ownedReader = Reader.Create(input, session);
-        var result = ownedReader.ReadArcBuffer(0);
+        var result = ownedReader.ReadOwnedBuffer(0);
         Assert.True(result.IsEmpty);
         Assert.Null(result.First);
         Assert.Equal(0, ownedReader.Position);
@@ -560,7 +560,7 @@ public sealed class ArcBufferCodecTests
     }
 
     [Fact]
-    public void ReadArcBuffer_ZeroLengthAtNonzeroOffsetReturnsOwnerFreeBuffer()
+    public void ReadOwnedBuffer_ZeroLengthAtNonzeroOffsetReturnsOwnerFreeBuffer()
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -572,7 +572,7 @@ public sealed class ArcBufferCodecTests
         var reader = Reader.Create(input, session);
         reader.Skip(17000);
         var remaining = reader.Remaining;
-        var empty = reader.ReadArcBuffer(0);
+        var empty = reader.ReadOwnedBuffer(0);
         Assert.True(empty.IsEmpty);
         Assert.Null(empty.First);
         Assert.Equal(17000, reader.Position);
@@ -660,7 +660,7 @@ public sealed class ArcBufferCodecTests
     }
 
     [Fact]
-    public void ReadArcBuffer_InputFailurePropagatesAfterPartialCopy()
+    public void ReadOwnedBuffer_InputFailurePropagatesAfterPartialCopy()
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -669,7 +669,7 @@ public sealed class ArcBufferCodecTests
         Exception? error = null;
         try
         {
-            using var value = reader.ReadArcBuffer(50037);
+            using var value = reader.ReadOwnedBuffer(50037);
         }
         catch (Exception exception)
         {
