@@ -821,12 +821,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public async Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
     {
         await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        Items<DeliveryCandidate> candidates = default;
         try
         {
             ValidateReady();
             var owner = CurrentOwner;
-            candidates = SelectMessages();
+            var candidates = SelectMessages();
             Items<DeliveryOutcome> outcomes = default;
             if (candidates.Count == 1)
             {

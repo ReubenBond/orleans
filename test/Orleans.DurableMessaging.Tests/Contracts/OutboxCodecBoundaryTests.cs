@@ -58,7 +58,7 @@ public sealed class OutboxCodecBoundaryTests
     public async Task DeadLetter_EncodesAtJournalApplicationWithoutPayloadPreflight()
     {
         await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.HandlerNotFound());
-        { var newEnvelope = fixture.CreateEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
 
@@ -76,7 +76,7 @@ public sealed class OutboxCodecBoundaryTests
     public async Task RetryState_EncodesOnceWhenApplied()
     {
         await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.Backpressured(), maxAttempts: 3);
-        { var newEnvelope = fixture.CreateEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
 
@@ -307,7 +307,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Null(recovered.Job.Value);
         Assert.ThrowsAny<OperationCanceledException>(() => recovered.Outbox.Send(first));
         await using var fresh = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
-        { var newEnvelope = fresh.CreateEnvelope(); await fresh.SendAsync(newEnvelope); }
+        await fresh.SendAsync(fresh.CreateEnvelope());
         await fresh.WriteAsync(TestContext.Current.CancellationToken);
         Assert.Single(fresh.Messages);
         Assert.NotNull(fresh.Job.Value);
@@ -443,7 +443,7 @@ public sealed class OutboxCodecBoundaryTests
         var arrivingCommand = HierarchicalKey.Create("test", "owner-repair", "command", "arriving");
         { var seedEnvelope = seed.CreateEnvelope(recoveredCommand); await seed.SeedOwnerlessJournalAsync(journal, seedEnvelope); }
         await using var fixture = await CodecFixture.CreateAsync(seed.Storage, journal);
-        { var newEnvelope = fixture.CreateEnvelope(arrivingCommand); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope(arrivingCommand));
         Assert.NotEqual(recoveredCommand, arrivingCommand);
         Assert.Equal(2, fixture.Outbox.Count);
         Assert.True(fixture.Outbox.TryGetMessage(recoveredCommand, out _));
@@ -475,7 +475,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Equal(0, fixture.Outbox.Count);
         Assert.Empty(fixture.Jobs.ReceivedCalls());
-        { var newEnvelope = fixture.CreateEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Messages);
         Assert.NotNull(fixture.Job.Value);
@@ -488,7 +488,7 @@ public sealed class OutboxCodecBoundaryTests
     public async Task CanceledCallerDuringStorageAck_PreservesOwnedCaptureAndAck(int rotation)
     {
         await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation);
-        { var newEnvelope = fixture.CreateEnvelope(); await fixture.SendAsync(newEnvelope); }
+        await fixture.SendAsync(fixture.CreateEnvelope());
         var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         using var cancellation = new CancellationTokenSource();
         var write = fixture.WriteAsync(cancellation.Token).AsTask();
