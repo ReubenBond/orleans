@@ -3,18 +3,20 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Internal opt-in capability for retaining serialized journal pages without copying them.
+/// Allows storage to retain independently pinned journal pages.
 /// </summary>
 /// <remarks>
 /// The caller owns the argument and keeps it pinned until the returned operation actually completes,
-/// including cancellation or failure. Implementations must acquire an independent pinned slice before
-/// retaining any bytes, and release it on rejection or when the stored bytes are retired. Copying an
-/// ArcBuffer value is not an ownership transfer. A failed/ambiguous operation can still have committed:
-/// its retained reference then belongs to storage, independently of the caller's completion reference.
-/// This capability does not change IJournalStorage's borrowed ReadOnlySequence contract.
+/// including cancellation or failure. Storage acquires an independent pinned slice before retaining
+/// bytes and releases that slice on rejection or when the stored bytes are retired. A failed operation
+/// can still have committed: its retained reference then belongs to storage, independently of the
+/// caller's completion reference. Providers without this capability use the borrowed sequence contract.
+/// Retained bytes remain immutable while storage owns them; the originating writer can append new
+/// bytes or release its own pages independently.
 /// </remarks>
 internal interface IRetainedJournalStorage
 {
     ValueTask AppendRetainedAsync(ArcBuffer value, CancellationToken cancellationToken);
+
     ValueTask ReplaceRetainedAsync(ArcBuffer value, CancellationToken cancellationToken);
 }

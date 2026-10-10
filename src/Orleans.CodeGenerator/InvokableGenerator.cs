@@ -152,6 +152,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                     ParseMemberDeclaration("""
                         public void ReleaseArgumentResources()
                         {
+                            global::System.Diagnostics.Debug.Assert(
+                                (global::System.Threading.Volatile.Read(ref _ownedArgumentState) & int.MaxValue) > 0,
+                                "Every argument-resource release must match a retained use or initial completion.");
                             var state = global::System.Threading.Interlocked.Decrement(ref _ownedArgumentState);
                             if (state == int.MinValue) DisposeOwnedArguments();
                         }
@@ -159,8 +162,16 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                     ParseMemberDeclaration("""
                         public void CompleteArgumentResources()
                         {
-                            var state = global::System.Threading.Interlocked.Or(ref _ownedArgumentState, int.MinValue);
-                            if (state >= 0) ReleaseArgumentResources();
+                            while (true)
+                            {
+                                var state = global::System.Threading.Volatile.Read(ref _ownedArgumentState);
+                                if (state <= 0) return;
+                                if (global::System.Threading.Interlocked.CompareExchange(ref _ownedArgumentState, state | int.MinValue, state) == state)
+                                {
+                                    ReleaseArgumentResources();
+                                    return;
+                                }
+                            }
                         }
                         """)!,
                     GenerateDisposeOwnedArguments(fieldDescriptions));
@@ -710,14 +721,33 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         {
             ParseStatement("var disposalFailure = default(global::System.Runtime.ExceptionServices.ExceptionDispatchInfo);")
         };
+        var previousReferenceArguments = new List<string>();
         foreach (var field in fields.OfType<MethodParameterFieldDescription>().Where(IsOwnedArgument))
         {
+            StatementSyntax? skipDuplicate = null;
+            if (!field.Type.IsValueType)
+            {
+                if (previousReferenceArguments.Count > 0)
+                {
+                    var duplicate = string.Join(" || ", previousReferenceArguments.Select(previous =>
+                        $"global::System.Object.ReferenceEquals({field.FieldName}, {previous})"));
+                    skipDuplicate = ParseStatement($"if ({duplicate}) {{ {field.FieldName} = default; }}");
+                }
+
+                var previousName = $"disposed_{field.FieldName}";
+                body.Add(ParseStatement($"var {previousName} = {field.FieldName};"));
+                previousReferenceArguments.Add(previousName);
+            }
+
             var dispose = ExpressionStatement(InvocationExpression(
                 ParseName("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")
                     .Member("DisposeOwnedArgument"),
                 ArgumentList(SingletonSeparatedList(
                     Argument(IdentifierName(field.FieldName)).WithRefKindKeyword(Token(SyntaxKind.RefKeyword))))));
-            body.Add(TryStatement(Block(dispose), SingletonList(
+            var release = skipDuplicate is IfStatementSyntax duplicateCheck
+                ? duplicateCheck.WithElse(ElseClause(Block(dispose)))
+                : (StatementSyntax)dispose;
+            body.Add(TryStatement(Block(release), SingletonList(
                 CatchClause()
                     .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
                     .WithBlock(Block(ParseStatement(

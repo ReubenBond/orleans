@@ -77,23 +77,20 @@ public partial class StateManagerTests : JournalingTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task StateManager_Recovery_RejectsNonemptyJournalWithoutFormatMetadata(bool hasMetadata)
+    public async Task StateManager_Recovery_UsesConfiguredFormatWithoutStoredMetadata(bool hasMetadata)
     {
-        var bytes = CreatePersistedStringValueBytes("value", "unreadable");
+        var bytes = CreatePersistedStringValueBytes("value", "recovered");
         var storage = new RawReadStorage(bytes, hasMetadata ? JournalMetadata.Empty : null, omitFormatMetadata: true);
         await using var manager = CreateTestSystem(storage).Manager;
         var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
         var value = new DurableValue<string>("value", manager, codec);
 
-        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
-            manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Nonempty journal data requires stored journal format metadata.", exception.Message);
-        Assert.Null(value.Value);
-        Assert.Empty(codec.AppliedValues);
+        Assert.Equal("recovered", value.Value);
+        Assert.Equal(new[] { "recovered" }, codec.AppliedValues);
         Assert.Equal(bytes, storage.Bytes);
         Assert.Equal(0, storage.WriteCount);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(CancellationToken.None).AsTask());
     }
 
     [Fact]
@@ -1088,7 +1085,7 @@ public partial class StateManagerTests : JournalingTestBase
             }
 
             using var committed = segment.GetBuffer();
-            bytes = [.. committed.ToArray(), 0];
+            bytes = [.. committed.ToArray(), 0x02];
         }
 
         var storage = new RawReadStorage(bytes);
@@ -1109,14 +1106,14 @@ public partial class StateManagerTests : JournalingTestBase
         Assert.Contains("journal format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
         var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("Malformed binary journal entry stream", inner.Message, StringComparison.Ordinal);
-        Assert.Contains("truncated fixed-width entry header", inner.Message, StringComparison.Ordinal);
+        Assert.Contains("truncated varuint32 entry length prefix", inner.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task StateManager_RecoveryRetry_ReplaysFixedStorage()
     {
         var validBytes = CreatePersistedValueBytes("value", 42);
-        var storage = new MutableReadStorage([.. validBytes, 0, 2, 3], validBytes);
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3], validBytes);
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
@@ -1148,7 +1145,7 @@ public partial class StateManagerTests : JournalingTestBase
         }
 
         var bytes = seedStorage.RecoverableBytes;
-        var storage = new MutableReadStorage([.. bytes, 0, 2, 3], bytes);
+        var storage = new MutableReadStorage([.. bytes, 1, 2, 3], bytes);
         await using var manager = CreateTestSystem(storage).Manager;
         var items = new DurableList<int>("items", manager,
             new OrleansBinaryDurableListCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool));
@@ -1167,7 +1164,7 @@ public partial class StateManagerTests : JournalingTestBase
     public async Task StateManager_RecoveryRetry_PreservesUnknownStreamOnce()
     {
         var validBytes = CreateUnknownStreamBytes(new JournalStreamId(99), [1, 2, 3]);
-        var storage = new MutableReadStorage([.. validBytes, 0, 2, 3], validBytes) { IsCompactionRequested = true };
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3], validBytes) { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -1188,7 +1185,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
     {
-        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new JournalStreamId(8), [1, 2, 3]), 0, 2, 3], []);
+        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new JournalStreamId(8), [1, 2, 3]), 1, 2, 3], []);
         var sut = CreateTestSystem(storage: storage);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -1596,10 +1593,9 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task RecoverAsync_UnsupportedFramingVersionRecoversInNewManagerAfterRepair()
+    public async Task RecoverAsync_UnsupportedLegacyRecordRecoversInNewManagerAfterRepair()
     {
-        var unsupportedBytes = CreatePersistedStringValueBytes("value", "unreadable");
-        unsupportedBytes[0] = 1;
+        var unsupportedBytes = CreateUnsupportedLegacyCommandVersionRecord(streamId: 128, commandVersion: 1);
         var validBytes = CreatePersistedStringValueBytes("value", "recovered");
         var storage = new MutableReadStorage(blockedReadNumber: 2, unsupportedBytes, validBytes);
         var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
@@ -1615,7 +1611,7 @@ public partial class StateManagerTests : JournalingTestBase
             "The configured write journal format key is 'orleans-binary'.",
             exception.Message);
         var inner = Assert.IsType<NotSupportedException>(exception.InnerException);
-        Assert.Equal("Unsupported binary journal entry format version at byte offset 0: Unsupported framing version: 1.", inner.Message);
+        Assert.Equal("Unsupported legacy binary journal command format version at byte offset 0: 1.", inner.Message);
         Assert.Null(value.Value);
         Assert.Empty(codec.AppliedValues);
         Assert.Equal(unsupportedBytes, storage.Bytes);
@@ -1683,6 +1679,29 @@ public partial class StateManagerTests : JournalingTestBase
 
         using var committed = segment.GetBuffer();
         return committed.ToArray();
+    }
+
+    private static byte[] CreateUnsupportedLegacyCommandVersionRecord(ulong streamId, byte commandVersion)
+    {
+        using var writer = new ArcBufferWriter();
+        var serializerWriter = Writer.Create(writer, session: null!);
+        serializerWriter.WriteVarUInt32(checked((uint)(GetVarUInt64ByteCount(streamId) + 1)));
+        serializerWriter.WriteVarUInt64(streamId);
+        serializerWriter.WriteByte(commandVersion);
+        serializerWriter.Commit();
+        using var buffer = writer.PeekSlice(writer.Length);
+        return buffer.ToArray();
+    }
+
+    private static int GetVarUInt64ByteCount(ulong value)
+    {
+        var result = 1;
+        while (value >= 128)
+        {
+            value >>= 7;
+            result++;
+        }
+        return result;
     }
 
     private byte[] CreateUnknownStreamBytes(JournalStreamId streamId, ReadOnlySpan<byte> payload)
@@ -1773,7 +1792,7 @@ public partial class StateManagerTests : JournalingTestBase
         while (offset < buffer.Length)
         {
             var remaining = buffer.UnsafeSlice(offset, buffer.Length - offset);
-            if (!OrleansBinaryJournalReader.TryReadVersionAndLength(remaining, out _, out var length, out var lengthPrefixLength))
+            if (!OrleansBinaryJournalReader.TryReadVersionAndLength(remaining, out var version, out var length, out var lengthPrefixLength))
             {
                 throw new InvalidOperationException("The binary journal entry stream is malformed.");
             }
@@ -1785,7 +1804,9 @@ public partial class StateManagerTests : JournalingTestBase
             }
 
             var entry = buffer.UnsafeSlice(entryStart, checked((int)length));
-            var streamIdValue = OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry.UnsafeSlice(0, sizeof(uint)));
+            var streamIdValue = version == OrleansBinaryJournalReader.FramingVersion
+                ? OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry.UnsafeSlice(0, sizeof(uint)))
+                : checked((uint)Reader.Create(entry, session: null!).ReadVarUInt64());
 
             var streamId = new JournalStreamId(streamIdValue);
             if (!streamIds.Contains(streamId))

@@ -90,6 +90,43 @@ public sealed class ArcBufferCodecTests
     }
 
     [Fact]
+    public void GeneratedContainer_UsesOwnedArcCodecAndCopier()
+    {
+        using var services = Services();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        var original = source.ConsumeSlice(source.Length);
+        var container = new ArcContainer { Buffer = original };
+        var serializer = services.GetRequiredService<Serializer<ArcContainer>>();
+        var first = serializer.SerializeToArray(container);
+        var second = serializer.SerializeToArray(container);
+        var decoded = Assert.IsType<ArcContainer>(serializer.Deserialize(first));
+        var pages = original.Pages.ToArray();
+        var references = pages.Select(page => page.ReferenceCount).ToArray();
+        var copy = Assert.IsType<ArcContainer>(services.GetRequiredService<DeepCopier>().Copy(container));
+        using var decodedBuffer = decoded.Buffer;
+        using var copiedBuffer = copy.Buffer;
+        try
+        {
+            Assert.Equal(first, second);
+            Assert.Same(original.First, copiedBuffer.First);
+            Assert.NotSame(original.First, decodedBuffer.First);
+            Assert.Equal(references.Select(count => count + 1), pages.Select(page => page.ReferenceCount));
+            original.Dispose();
+            original = default;
+            source.Dispose();
+            Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+            Assert.Equal(expected, decodedBuffer.ToArray());
+            Assert.Equal(expected, copiedBuffer.ToArray());
+        }
+        finally
+        {
+            original.Dispose();
+        }
+    }
+
+    [Fact]
     public void DeepCopy_IndependentlyPinsEveryPageIncludingPageBackedEmpty()
     {
         using var services = Services();
@@ -167,7 +204,7 @@ public sealed class ArcBufferCodecTests
         using var input = source.PeekSlice(source.Length);
         var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, 113);
         reader.Skip(17000);
-        Assert.True(reader.TryReadArcBuffer(18000, out var value));
+        var value = reader.ReadArcBuffer(18000);
         using (value)
         {
             Assert.Equal(expected.AsSpan(17000, 18000).ToArray(), value.ToArray());
@@ -175,16 +212,69 @@ public sealed class ArcBufferCodecTests
         }
         reader.ForkFrom(18113, out var fork);
         fork.ForkFrom(19113, out var nestedFork);
-        Assert.True(nestedFork.TryReadArcBuffer(7, out var forked));
+        var forked = nestedFork.ReadArcBuffer(7);
         using (forked) Assert.Equal(expected.AsSpan(19000, 7).ToArray(), forked.ToArray());
 
         var emptyReader = Reader.Create(default(ArcBuffer), session);
         Assert.Equal(0, emptyReader.Remaining);
-        Assert.True(emptyReader.TryReadArcBuffer(0, out var empty));
+        var empty = emptyReader.ReadArcBuffer(0);
         Assert.Null(empty.First);
         empty.Dispose();
-        try { emptyReader.TryReadArcBuffer(1, out _); Assert.Fail("Truncated Arc input must throw."); }
+        try { emptyReader.ReadArcBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
         catch (IndexOutOfRangeException) { }
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 17000)]
+    [InlineData(true, 0)]
+    [InlineData(true, 17000)]
+    public void ReadArcBuffer_ValidatedSkipReachesExactEnd(bool leadingEmptyPages, int offset)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        if (leadingEmptyPages)
+        {
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 2);
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 4);
+        }
+
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var input = source.PeekSlice(source.Length);
+        if (leadingEmptyPages)
+        {
+            Assert.Equal(0, input.First.Length);
+            Assert.Equal(0, input.First.Next!.Length);
+        }
+
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, 113);
+        reader.Skip(offset);
+        var remaining = (int)reader.Remaining;
+        reader.EnsureAvailable((uint)remaining);
+        var value = reader.ReadArcBuffer(remaining);
+        try
+        {
+            Assert.Equal(113 + input.Length, reader.Position);
+            Assert.Equal(0, reader.Remaining);
+            reader.Skip(0);
+            Assert.Equal(113 + input.Length, reader.Position);
+            Assert.Equal(expected.AsSpan(offset).ToArray(), value.ToArray());
+            var ownedPages = value.Pages.ToArray();
+            for (var i = 0; i < pages.Length; i++)
+            {
+                Assert.Equal(before[i] + (ownedPages.Contains(pages[i]) ? 1 : 0), pages[i].ReferenceCount);
+            }
+        }
+        finally
+        {
+            value.Dispose();
+        }
+
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
     }
 
     [Fact]
@@ -208,6 +298,129 @@ public sealed class ArcBufferCodecTests
         Assert.Equal(expected, sequenceValue.ToArray());
         Assert.Equal(expected, streamValue.ToArray());
         Assert.NotSame(value.First, sequenceValue.First);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(50037)]
+    public void ReadArcBuffer_NonArcInputsReturnOwnedBytesAndAdvanceExactly(int length)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var input = Bytes(length + 11);
+        var expected = input.AsSpan(7, length).ToArray();
+        var spanReader = Reader.Create(input, session);
+        spanReader.Skip(7);
+        var spanValue = spanReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, spanReader.Position);
+        Assert.Equal(4, spanReader.Remaining);
+
+        using var pooled = new PooledBuffer();
+        pooled.Write(input);
+        var sequenceReader = Reader.Create(pooled.AsReadOnlySequence(), session);
+        sequenceReader.Skip(7);
+        var sequenceValue = sequenceReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, sequenceReader.Position);
+        Assert.Equal(4, sequenceReader.Remaining);
+
+        var pooledReader = Reader.Create(pooled, session);
+        pooledReader.Skip(7);
+        var pooledValue = pooledReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, pooledReader.Position);
+        Assert.Equal(4, pooledReader.Remaining);
+
+        using var stream = new MemoryStream(input, writable: false);
+        var streamReader = Reader.Create(stream, session);
+        streamReader.Skip(7);
+        var streamValue = streamReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, streamReader.Position);
+        Assert.Equal(4, streamReader.Remaining);
+
+        pooled.Dispose();
+        stream.Dispose();
+        Array.Fill(input, (byte)0);
+        var values = new[] { spanValue, sequenceValue, pooledValue, streamValue };
+        foreach (var buffer in values)
+        {
+            var owned = buffer;
+            Assert.Equal(expected, owned.ToArray());
+            if (length == 0)
+            {
+                Assert.Null(owned.First);
+                owned.Dispose();
+            }
+            else
+            {
+                var pages = owned.Pages.ToArray();
+                Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+                owned.Dispose();
+                Assert.All(pages, page => Assert.Equal(0, page.ReferenceCount));
+            }
+        }
+    }
+
+    [Fact]
+    public void ReadArcBuffer_CopyFillsPagesBeforeAllocatingAnother()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var expected = Bytes(ArcBufferWriter.MinimumPageSize * 3);
+        var reader = Reader.Create(expected, session);
+        using var value = reader.ReadArcBuffer(expected.Length);
+        var pages = value.Pages.ToArray();
+        Assert.Equal(3, pages.Length);
+        Assert.All(pages, page => Assert.Equal(ArcBufferWriter.MinimumPageSize, page.Length));
+        Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+        Assert.Equal(expected, value.ToArray());
+        Assert.Equal(expected.Length, reader.Position);
+        Assert.Equal(0, reader.Remaining);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(8)]
+    [InlineData(int.MaxValue)]
+    public void ReadArcBuffer_InvalidLengthsPreservePositionAndOwnership(int length)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        source.Write(Bytes(7));
+        using var input = source.PeekSlice(source.Length);
+        var before = input.First.ReferenceCount;
+        var arcReader = Reader.Create(input, session);
+        VerifyInvalidLength(ref arcReader, length);
+        Assert.Equal(before, input.First.ReferenceCount);
+
+        var spanReader = Reader.Create(Bytes(7), session);
+        VerifyInvalidLength(ref spanReader, length);
+        var sequenceReader = Reader.Create(new ReadOnlySequence<byte>(Bytes(7)), session);
+        VerifyInvalidLength(ref sequenceReader, length);
+        using var stream = new MemoryStream(Bytes(7), writable: false);
+        var streamReader = Reader.Create(stream, session);
+        VerifyInvalidLength(ref streamReader, length);
+        using var pooled = new PooledBuffer();
+        pooled.Write(Bytes(7));
+        var pooledReader = Reader.Create(pooled, session);
+        VerifyInvalidLength(ref pooledReader, length);
+    }
+
+    private static void VerifyInvalidLength<TInput>(ref Reader<TInput> reader, int length)
+    {
+        Exception? error = null;
+        try
+        {
+            using var value = reader.ReadArcBuffer(length);
+        }
+        catch (Exception exception)
+        {
+            error = exception;
+        }
+
+        Assert.Equal(length < 0 ? typeof(ArgumentOutOfRangeException) : typeof(IndexOutOfRangeException), error?.GetType());
+        Assert.Equal(0, reader.Position);
+        Assert.Equal(7, reader.Remaining);
     }
 
     [Fact]
@@ -254,15 +467,17 @@ public sealed class ArcBufferCodecTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void EmptyArcInputPayload_ReturnsExactlyOneOwnedPin(bool pageBacked)
+    public void EmptyArcInputPayload_ReturnsOwnerFreeBuffer(bool pageBacked)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
         if (!pageBacked)
         {
             var reader = Reader.Create(ArcBuffer.Empty, session);
-            Assert.True(reader.TryReadArcBuffer(0, out var empty));
+            var empty = reader.ReadArcBuffer(0);
+            Assert.True(empty.IsEmpty);
             Assert.Null(empty.First);
+            Assert.Equal(0, reader.Position);
             empty.Dispose();
             return;
         }
@@ -271,15 +486,42 @@ public sealed class ArcBufferCodecTests
         using var input = writer.PeekSlice(0);
         var before = input.First.ReferenceCount;
         var ownedReader = Reader.Create(input, session);
-        Assert.True(ownedReader.TryReadArcBuffer(0, out var result));
-        Assert.Same(input.First, result.First);
-        Assert.Equal(before + 1, input.First.ReferenceCount);
+        var result = ownedReader.ReadArcBuffer(0);
+        Assert.True(result.IsEmpty);
+        Assert.Null(result.First);
+        Assert.Equal(0, ownedReader.Position);
+        Assert.Equal(before, input.First.ReferenceCount);
         result.Dispose();
         Assert.Equal(before, input.First.ReferenceCount);
     }
 
     [Fact]
-    public void OversizedLength_IsRejectedBeforeReadingOrPinningPayload()
+    public void ReadArcBuffer_ZeroLengthAtNonzeroOffsetReturnsOwnerFreeBuffer()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        source.Write(Bytes(50037));
+        using var input = source.PeekSlice(source.Length);
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var reader = Reader.Create(input, session);
+        reader.Skip(17000);
+        var remaining = reader.Remaining;
+        var empty = reader.ReadArcBuffer(0);
+        Assert.True(empty.IsEmpty);
+        Assert.Null(empty.First);
+        Assert.Equal(17000, reader.Position);
+        Assert.Equal(remaining, reader.Remaining);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        empty.Dispose();
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
+    [Theory]
+    [InlineData(0x80000000U)]
+    [InlineData(uint.MaxValue)]
+    public void OversizedLength_IsRejectedBeforeReadingOrPinningPayload(uint encodedLength)
     {
         using var services = Services();
         using var wire = new ArcBufferWriter();
@@ -287,7 +529,7 @@ public sealed class ArcBufferCodecTests
         {
             var writer = Writer.Create(wire, writeSession);
             writer.WriteFieldHeader(0, typeof(ArcBuffer), typeof(ArcBuffer), Orleans.Serialization.WireProtocol.WireType.LengthPrefixed);
-            writer.WriteVarUInt32(uint.MaxValue);
+            writer.WriteVarUInt32(encodedLength);
             writer.Commit();
         }
         using var input = wire.PeekSlice(wire.Length);
@@ -298,6 +540,36 @@ public sealed class ArcBufferCodecTests
         try { new ArcBufferCodec().ReadValue(ref reader, reader.ReadFieldHeader()); }
         catch (Exception exception) { error = exception; }
         Assert.IsType<IndexOutOfRangeException>(error);
+        Assert.Equal(before, input.First.ReferenceCount);
+    }
+
+    [Fact]
+    public void TruncatedLengthPrefix_IsRejectedWithoutPinningPayload()
+    {
+        using var services = Services();
+        using var wire = new ArcBufferWriter();
+        using (var writeSession = services.GetRequiredService<SerializerSessionPool>().GetSession())
+        {
+            var writer = Writer.Create(wire, writeSession);
+            writer.WriteFieldHeader(0, typeof(ArcBuffer), typeof(ArcBuffer), Orleans.Serialization.WireProtocol.WireType.LengthPrefixed);
+            writer.WriteVarUInt32(50037);
+            writer.Commit();
+        }
+
+        wire.Truncate(wire.Length - 1);
+        using var input = wire.PeekSlice(wire.Length);
+        var before = input.First.ReferenceCount;
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(input, session);
+        try
+        {
+            new ArcBufferCodec().ReadValue(ref reader, reader.ReadFieldHeader());
+            Assert.Fail("Expected truncated length prefix");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
         Assert.Equal(before, input.First.ReferenceCount);
     }
 
@@ -319,6 +591,29 @@ public sealed class ArcBufferCodecTests
         Assert.Equal(2, input.ByteReadCalls);
         Assert.Equal(Bytes(50037), value.ToArray());
         Assert.Equal(2, value.First.ReferenceCount);
+    }
+
+    [Fact]
+    public void ReadArcBuffer_InputFailurePropagatesAfterPartialCopy()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var input = new FailingReaderInput(Bytes(50037));
+        var reader = new Reader<ReaderInput>(input, session, 0);
+        Exception? error = null;
+        try
+        {
+            using var value = reader.ReadArcBuffer(50037);
+        }
+        catch (Exception exception)
+        {
+            error = exception;
+        }
+
+        Assert.IsType<IOException>(error);
+        Assert.Equal(2, input.ByteReadCalls);
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, reader.Position);
+        Assert.Equal(50037 - ArcBufferWriter.MinimumPageSize, reader.Remaining);
     }
 
     private sealed class FailingReaderInput(byte[] input) : ReaderInput
@@ -361,4 +656,11 @@ public sealed class ArcBufferCodecTests
 
     internal static byte[] Bytes(int length) => Enumerable.Range(0, length).Select(i => (byte)(i * 31)).ToArray();
     internal static ServiceProvider Services() => new ServiceCollection().AddSerializer().BuildServiceProvider();
+}
+
+[GenerateSerializer]
+public sealed class ArcContainer
+{
+    [Id(0)]
+    public ArcBuffer Buffer { get; set; }
 }

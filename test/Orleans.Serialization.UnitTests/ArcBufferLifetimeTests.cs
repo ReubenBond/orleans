@@ -1,8 +1,8 @@
 using System;
 using System.Buffers;
 using System.Linq;
-using Orleans.Serialization.Buffers;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Serialization.UnitTests;
@@ -30,6 +30,27 @@ public sealed class ArcBufferLifetimeTests
         value.Dispose();
         Assert.Empty(ArcBuffer.Empty.ToArray());
         Assert.Throws<ArgumentOutOfRangeException>(() => value.Slice(1));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, 1)]
+    public void OwnerFreeBuffer_RejectsInvalidShape(int offset, int length)
+    {
+        var value = new ArcBuffer(null!, 0, offset, length);
+        Assert.Throws<InvalidOperationException>(() => value.ToArray());
+        Assert.Throws<InvalidOperationException>(() => value.Slice(0));
+        Assert.Throws<InvalidOperationException>(() => value.MemorySegments.MoveNext());
+        using var services = ArcBufferCodecTests.Services();
+        var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
+        Assert.Throws<InvalidOperationException>(() => serializer.SerializeToArray(value));
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            var reader = Reader.Create(value, session);
+            _ = reader.Length;
+        });
     }
 
     [Fact]
@@ -95,5 +116,27 @@ public sealed class ArcBufferLifetimeTests
             _ = reader.Length;
         });
         Assert.Equal(new byte[] { 0x80, 0xff }, retained.ToArray());
+    }
+
+    [Fact]
+    public void DisposedWriter_RejectsMutationAndCanBeReset()
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 1, 2, 3 });
+        using var retained = writer.PeekSlice(writer.Length);
+        writer.Dispose();
+        writer.Dispose();
+        Assert.Equal(new byte[] { 1, 2, 3 }, retained.ToArray());
+        Assert.Throws<ObjectDisposedException>(() => writer.GetMemory());
+        Assert.Throws<ObjectDisposedException>(() => writer.GetSpan());
+        Assert.Throws<ObjectDisposedException>(() => writer.AdvanceWriter(1));
+        Assert.Throws<ObjectDisposedException>(() => writer.Write(new byte[] { 4 }));
+        Assert.Throws<ObjectDisposedException>(() => writer.WriteAt(0, new byte[] { 4 }));
+        Assert.Throws<ObjectDisposedException>(() => writer.Truncate(0));
+        writer.Reset();
+        writer.Write(new byte[] { 5, 6 });
+        using var resetSlice = writer.PeekSlice(writer.Length);
+        Assert.Equal(new byte[] { 5, 6 }, resetSlice.ToArray());
+        Assert.Equal(new byte[] { 1, 2, 3 }, retained.ToArray());
     }
 }
