@@ -48,15 +48,21 @@ public sealed class StockGrain(
     {
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");
         var commandId = context.Envelope.MessageId;
-        ReservationOutcome outcome = request.Quantity <= 0
-            ? new ReservationRejected(commandId, request.Quantity, inventory.Remaining,
-                ReservationRejectionReason.InvalidQuantity)
-            : request.Quantity > inventory.Remaining
-                ? new ReservationRejected(commandId, request.Quantity, inventory.Remaining,
-                    ReservationRejectionReason.InsufficientStock)
-                : new ReservationAccepted(commandId, request.Quantity, inventory.Remaining - request.Quantity);
+        ReservationOutcome outcome = request.Quantity switch
+        {
+            <= 0 => new ReservationRejected(commandId, request.Quantity, inventory.Remaining,
+                ReservationRejectionReason.InvalidQuantity),
+            var quantity when quantity > inventory.Remaining => new ReservationRejected(commandId, quantity, inventory.Remaining,
+                ReservationRejectionReason.InsufficientStock),
+            var quantity => new ReservationAccepted(commandId, quantity, inventory.Remaining - quantity)
+        };
+        var reservations = inventory.Reservations;
+        if (outcome is ReservationAccepted)
+        {
+            reservations = checked(reservations + 1);
+        }
         var next = new Inventory(outcome.RemainingStock,
-            checked(inventory.Reservations + (outcome is ReservationAccepted ? 1 : 0)),
+            reservations,
             checked(inventory.ProcessedRequests + 1));
         // SendReply encodes before staging; remaining changes run synchronously through return.
         outbox.SendReply(result, context, request.ReplyDestination, outcome);

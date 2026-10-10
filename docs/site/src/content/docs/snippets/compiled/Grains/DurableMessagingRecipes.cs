@@ -122,11 +122,12 @@ public sealed class InventoryGrain(
     private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
         var current = available.Value;
-        ReservationResult outcome = request.Quantity <= 0
-            ? new ReservationRejected(request.Quantity, current, ReservationRejectionReason.InvalidQuantity)
-            : request.Quantity > current
-                ? new ReservationRejected(request.Quantity, current, ReservationRejectionReason.InsufficientStock)
-                : new ReservationAccepted(request.Quantity, current - request.Quantity);
+        ReservationResult outcome = request.Quantity switch
+        {
+            <= 0 => new ReservationRejected(request.Quantity, current, ReservationRejectionReason.InvalidQuantity),
+            var quantity when quantity > current => new ReservationRejected(quantity, current, ReservationRejectionReason.InsufficientStock),
+            var quantity => new ReservationAccepted(quantity, current - quantity)
+        };
 
         outbox.SendReply(result, context, request.ResponseDestination, outcome);
         if (outcome is ReservationAccepted) available.Value = outcome.RemainingStock;
@@ -188,8 +189,14 @@ public sealed class PaymentGrain(
         return base.OnActivateAsync(cancellationToken);
     }
 
-    public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId) =>
-        new(results.TryGetValue(commandId, out var outcome) ? outcome : null);
+    public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId)
+    {
+        if (results.TryGetValue(commandId, out var outcome))
+        {
+            return new(outcome);
+        }
+        return new((PaymentResult?)null);
+    }
 
     private async ValueTask HandleChargeAsync(
         ChargePayment request, IInboxHandlerContext context, CancellationToken cancellationToken)
@@ -281,8 +288,14 @@ public sealed class CampaignGrain(
     [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
     IGrainContext grainContext) : Grain(grainContext), ICampaignGrain
 {
-    public ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId) =>
-        new(campaigns.TryGetValue(campaignId, out var campaign) ? campaign : null);
+    public ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId)
+    {
+        if (campaigns.TryGetValue(campaignId, out var campaign))
+        {
+            return new(campaign);
+        }
+        return new((NotificationCampaign?)null);
+    }
 
     public async Task PublishAsync(Guid campaignId, string text, GrainId[] recipients)
     {
@@ -361,8 +374,14 @@ public sealed class OrderOutcomesGrain(
 
     public ValueTask<int> GetCompletedStepCountAsync() => new(outcomes.Count);
 
-    public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId) =>
-        new(outcomes.TryGetValue(replyId, out var outcome) ? outcome : null);
+    public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId)
+    {
+        if (outcomes.TryGetValue(replyId, out var outcome))
+        {
+            return new(outcome);
+        }
+        return new((OrderOutcome?)null);
+    }
 
     private void Record(OrderOutcome outcome, IInboxHandlerContext context)
     {

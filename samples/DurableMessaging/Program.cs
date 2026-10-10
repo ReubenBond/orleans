@@ -53,9 +53,13 @@ try
         var outcome = receipts.Single(receipt => receipt.CommandId == command.Id);
         Require(outcome.Quantity == command.Quantity && outcome.RemainingStock == 8,
             "Only the accepted reservation may consume stock.");
-        Require(command.Rejection is { } reason
-                ? outcome is ReservationRejected rejected && rejected.Reason == reason
-                : outcome is ReservationAccepted,
+        var expectedOutcome = (command.Rejection, outcome) switch
+        {
+            (null, ReservationAccepted) => true,
+            ({ } reason, ReservationRejected rejected) => rejected.Reason == reason,
+            _ => false
+        };
+        Require(expectedOutcome,
             "The reply must distinguish acceptance, insufficient stock, and invalid quantity.");
 
         var duplicate = await order.ResubmitAsync(stock.GetGrainId(), command.Id, command.Quantity).WaitAsync(timeout.Token);
@@ -65,9 +69,11 @@ try
                 && snapshot.Inventory.ProcessedRequests == index + 1,
             "Resubmission must preserve one handler execution per command and unchanged stock for rejections.");
 
-        var decision = outcome is ReservationRejected rejection
-            ? $"ReservationRejected ({rejection.Reason})"
-            : nameof(ReservationAccepted);
+        var decision = nameof(ReservationAccepted);
+        if (outcome is ReservationRejected rejection)
+        {
+            decision = $"ReservationRejected ({rejection.Reason})";
+        }
         Console.WriteLine($"ACKNOWLEDGED: {command.Id.CreateChildKey("result")}, outcome={decision}");
         Console.WriteLine($"RESUBMITTED: {command.Id}, admission={duplicate.Status}");
     }
