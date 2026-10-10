@@ -37,7 +37,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
         ArcBufferPage storedPage = null!;
-        await OnTurnAsync(rig.Context, () => storedPage = Assert.Single(rig.Pending).Value.Payload.First);
+        await OnTurnAsync(rig.Context, () => storedPage = Assert.IsType<ArcBufferPage>(Assert.Single(rig.Pending).Value.Payload.First));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, repeated)).Status);
         await OnTurnAsync(rig.Context, () =>
         {
@@ -90,7 +90,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
         var pins = Pins(conflict.Payload.First);
         ArcBufferPage storedPage = null!;
-        await OnTurnAsync(rig.Context, () => storedPage = Assert.Single(rig.Pending).Value.Payload.First);
+        await OnTurnAsync(rig.Context, () => storedPage = Assert.IsType<ArcBufferPage>(Assert.Single(rig.Pending).Value.Payload.First));
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(rig, conflict));
         Assert.Contains(key.ToString(), failure.Message, StringComparison.Ordinal);
         Assert.Contains("different command", failure.Message, StringComparison.Ordinal);
@@ -431,7 +431,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             subject, new DurableTestMessage(key, 610, value), key);
 
     private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(rig.Context.GrainId));
-    private static int Pins(ArcBufferPage page) => (int)References.GetValue(page)!;
+    private static int Pins(ArcBufferPage? page) => (int)References.GetValue(Assert.IsType<ArcBufferPage>(page))!;
 
     private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
     {

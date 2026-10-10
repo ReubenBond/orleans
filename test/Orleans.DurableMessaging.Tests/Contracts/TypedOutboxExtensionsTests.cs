@@ -271,8 +271,8 @@ public sealed class TypedOutboxExtensionsTests
         // An interior consumed page belongs only to this multi-page payload:
         // neither the pooled writer nor a concurrent neighboring slice pins it.
         var interior = outbox.InteriorBorrowed!.Value;
-        Assert.NotNull(interior.First.Next);
-        var page = interior.First;
+        var page = Assert.IsType<ArcBufferPage>(interior.First);
+        Assert.NotNull(page.Next);
         var version = page.Version;
         outbox.ReleaseMessages();
 
@@ -514,8 +514,9 @@ public sealed class TypedOutboxExtensionsTests
             if (envelope.Payload.Length > 2_097_152)
             {
                 // Borrow an interior page without acquiring another owner.
+                var first = Assert.IsType<ArcBufferPage>(envelope.Payload.First);
                 InteriorBorrowed = envelope.Payload.UnsafeSlice(
-                    envelope.Payload.First.Length - envelope.Payload.Offset, 1);
+                    first.Length - envelope.Payload.Offset, 1);
             }
             if (Failure is { } failure)
             {

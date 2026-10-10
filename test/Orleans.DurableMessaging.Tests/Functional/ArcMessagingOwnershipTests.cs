@@ -26,7 +26,7 @@ public sealed class ArcMessagingOwnershipTests : DurableMessagingBehaviorTestBas
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         using var caller = CreateEnvelope(receiver, NewMessage(300, "owned-admission"));
         using var observer = caller.Value.Retain();
-        var page = observer.Payload.First;
+        var page = Assert.IsType<ArcBufferPage>(observer.Payload.First);
         var expected = observer.Payload.ToArray();
         Assert.Equal(2, Pins(page)); // caller and test observer, no durable owner yet
         using var handler = new BorrowProbe(page, expected);
@@ -64,7 +64,7 @@ public sealed class ArcMessagingOwnershipTests : DurableMessagingBehaviorTestBas
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         using var caller = CreateEnvelope(receiver, NewMessage(302, "rpc-owned-success"));
-        var page = caller.Value.Payload.First;
+        var page = Assert.IsType<ArcBufferPage>(caller.Value.Payload.First);
         var expected = caller.Value.Payload.ToArray();
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, caller.Value)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
@@ -88,7 +88,7 @@ public sealed class ArcMessagingOwnershipTests : DurableMessagingBehaviorTestBas
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         using var caller = CreateEnvelope(receiver, NewMessage(301, "rejected-owner"));
-        var page = caller.Value.Payload.First;
+        var page = Assert.IsType<ArcBufferPage>(caller.Value.Payload.First);
         var expected = caller.Value.Payload.ToArray();
         Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(receiver, caller.Value)).Status);
         await receiver.RequestDeactivationAsync();
