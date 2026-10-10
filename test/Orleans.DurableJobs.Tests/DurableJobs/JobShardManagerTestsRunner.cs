@@ -1,3 +1,4 @@
+using Orleans.Serialization.Buffers;
 #nullable enable
 
 using System.Buffers;
@@ -482,10 +483,10 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
                 => inner.ReadAsync(consumer, cancellationToken);
 
-            public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
                 => inner.AppendAsync(value, cancellationToken);
 
-            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
                 => inner.ReplaceAsync(value, cancellationToken);
 
             public ValueTask DeleteAsync(CancellationToken cancellationToken)

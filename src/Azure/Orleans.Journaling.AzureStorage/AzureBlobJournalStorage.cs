@@ -1,11 +1,12 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
-using Azure;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 
 namespace Orleans.Journaling;
@@ -200,7 +201,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         // Appends are written as one Azure append block, so validate blob limits before touching storage.
         ThrowIfBatchTooLarge(value.Length);
@@ -221,7 +222,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
                 var expectedETag = _walETag;
                 var expectedProviderState = _walProviderState;
-                using var stream = new ReadOnlySequenceStream(value);
+                using var stream = new ReadOnlySequenceStream(value.AsReadOnlySequence());
                 try
                 {
                     // Use the last observed WAL ETag so appends fail if the WAL changed since this instance recovered it.
@@ -469,7 +470,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         var startTimestamp = Stopwatch.GetTimestamp();
         var succeeded = false;
@@ -506,7 +507,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
             var previousCheckpointName = _shared.Options.DeleteOldCheckpoints ? walState.Value.Manifest.Checkpoint?.Name : null;
 
-            using var checkpointStream = new ReadOnlySequenceStream(value);
+            using var checkpointStream = new ReadOnlySequenceStream(value.AsReadOnlySequence());
             while (true)
             {
                 // The checkpoint blob is immutable and content-addressed by a random snapshot id for safe retry on collision.

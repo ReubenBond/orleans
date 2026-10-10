@@ -374,7 +374,7 @@ public sealed class JournalBufferWriterOwnershipTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Consume_TrimsOversizedDrainedCapacityWithoutInvalidatingCapturedOrActiveBuffers(bool activeEntry)
+    public void Consume_PreservesCapturedAndActiveBuffersWithoutTrimming(bool activeEntry)
     {
         using var writer = new CacheBoundWriter();
         var payload = Enumerable.Repeat((byte)42, 128 * 1024).ToArray();
@@ -405,12 +405,12 @@ public sealed class JournalBufferWriterOwnershipTests
         }
         using var drained = writer.GetBuffer();
         Assert.Equal(0, drained.Length);
-        Assert.Equal(16 * 1024, drained.First.Array.Length);
+        Assert.Equal(activeEntry ? 256 * 1024 : 128 * 1024, drained.First.Array.Length);
         Assert.Equal(payload, captured.ToArray());
     }
 
     [Fact]
-    public void AbortedEntry_TrimsOversizedIdleCapacityAndPreservesCapture()
+    public void AbortedEntry_PreservesCaptureUntilExplicitReset()
     {
         using var writer = new CacheBoundWriter();
         using (var entry = writer.CreateJournalStreamWriter(new(1)).BeginEntry())
@@ -427,11 +427,17 @@ public sealed class JournalBufferWriterOwnershipTests
             writer.Consume(captured);
             borrowed.Span[0] = 99;
             entry.Writer.Advance(1);
-            // Dispose rolls this entry back. The idle oversized tail can now be released.
+            // Dispose rolls this entry back.
         }
-        using var drained = writer.GetBuffer();
-        Assert.Equal(0, drained.Length);
-        Assert.Equal(16 * 1024, drained.First.Array.Length);
+        using (var drained = writer.GetBuffer())
+        {
+            Assert.Equal(0, drained.Length);
+            Assert.Equal(128 * 1024, drained.First.Array.Length);
+        }
+
+        writer.Reset();
+        using var reset = writer.GetBuffer();
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, reset.First.Array.Length);
         Assert.Equal(new byte[] { 42 }, captured.ToArray());
     }
 

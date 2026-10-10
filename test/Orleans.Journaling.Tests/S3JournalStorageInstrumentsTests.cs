@@ -1,8 +1,8 @@
 using System.Buffers;
 using System.Diagnostics.Metrics;
 using System.Net;
-using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -244,7 +244,7 @@ public sealed class S3JournalStorageInstrumentsTests
         await context.Provider.InitializeAsync(TestContext.Current.CancellationToken);
         var storage = context.Provider.CreateStorage(new("journals/a"));
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
-        await storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var consumer = new CapturingConsumer();
         await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
 
@@ -318,7 +318,7 @@ public sealed class S3JournalStorageInstrumentsTests
         await context.Provider.InitializeAsync(TestContext.Current.CancellationToken);
         var storage = context.Provider.CreateStorage(new("journals/a"));
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var consumer = new CapturingConsumer();
         await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
 

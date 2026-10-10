@@ -199,7 +199,7 @@ public partial class StateManagerTests
         }
     }
 
-    private sealed class RetainedProbeStorage : IJournalStorage, IRetainedJournalStorage
+    private sealed class RetainedProbeStorage : IJournalStorage
     {
         public VolatileJournalStorage Inner { get; } = new(OrleansBinaryJournalFormat.JournalFormatKey);
         public bool IsCompactionRequested { get; set; }
@@ -221,12 +221,8 @@ public partial class StateManagerTests
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) => Inner.ReadAsync(consumer, cancellationToken);
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => Inner.DeleteAsync(cancellationToken);
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("The manager must select the explicit retained capability.");
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("The manager must select the explicit retained capability.");
-        public ValueTask AppendRetainedAsync(ArcBuffer value, CancellationToken cancellationToken) => Write(value, replace: false, cancellationToken);
-        public ValueTask ReplaceRetainedAsync(ArcBuffer value, CancellationToken cancellationToken) => Write(value, replace: true, cancellationToken);
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => Write(value, replace: false, cancellationToken);
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => Write(value, replace: true, cancellationToken);
 
         private async ValueTask Write(ArcBuffer value, bool replace, CancellationToken cancellationToken)
         {
@@ -244,9 +240,8 @@ public partial class StateManagerTests
             var failure = NextFailure;
             NextFailure = null;
             if (failure is not null && !CommitBeforeFailure) throw failure;
-            var capability = (IRetainedJournalStorage)Inner;
-            if (replace) await capability.ReplaceRetainedAsync(value, CancellationToken.None);
-            else await capability.AppendRetainedAsync(value, CancellationToken.None);
+            if (replace) await Inner.ReplaceAsync(value, CancellationToken.None);
+            else await Inner.AppendAsync(value, CancellationToken.None);
             if (failure is not null) throw failure;
         }
     }
