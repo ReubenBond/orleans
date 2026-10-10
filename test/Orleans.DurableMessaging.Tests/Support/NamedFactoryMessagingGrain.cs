@@ -66,7 +66,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 
     public async Task SendAsync(GrainId target, string route, DurableTestMessage message)
     {
-        using var envelope = TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, route, message);
+        var envelope = TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, route, message);
         _outbox.Send(envelope);
         await _owner.WriteStateAsync();
     }
@@ -86,7 +86,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         var message = Assert.IsType<DurableTestMessage>(TestApplicationProtocol.Read(_sessions, context.Envelope).Body);
-        using var outgoing = message.ForwardTo is { } target
+        var outgoing = message.ForwardTo is { } target
             ? TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, "messages/forwarded",
                 message with { ForwardTo = null }, context.Envelope.MessageId.CreateChildKey("forwarded"))
             : (DurableEnvelope?)null;

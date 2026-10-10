@@ -235,9 +235,9 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var independentSender = NewGrain();
         var independentReceiver = NewGrain();
         using var barrier = Fixture.HandlerProbe.Arm(blocked.GetGrainId(), "messages/blocked-pump");
-        using var blockedEnvelope = CreateEnvelope(blocked, NewMessage(61, "blocked"), "messages/blocked-pump");
+        var blockedEnvelope = CreateEnvelope(blocked, NewMessage(61, "blocked"), "messages/blocked-pump");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(blocked, blockedEnvelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(blocked, blockedEnvelope)).Status);
         await barrier.WaitUntilEnteredAsync();
         await independentSender.SendAsync(
             independentReceiver.GetGrainId(),

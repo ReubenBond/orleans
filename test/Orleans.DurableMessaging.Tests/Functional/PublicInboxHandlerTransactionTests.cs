@@ -32,15 +32,13 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var sinkGrain = Assert.IsType<RawPayloadTestGrain>(sinkContext.GrainInstance);
         sinkGrain.ExpectedAcknowledgedEffects = sends;
         var bytes = System.Text.Encoding.UTF8.GetBytes("raw application bytes\0\u03c0/forward").Concat(new byte[] { 0xff, 0x80, 0x01 }).ToArray();
-        using var payloadWriter = new Orleans.Serialization.Buffers.ArcBufferWriter();
-        payloadWriter.Write(bytes);
-        using var envelope = new DurableEnvelope
+        var envelope = new DurableEnvelope
         {
             MessageId = HierarchicalKey.Create("raw", Guid.NewGuid().ToString("N")),
             SenderId = GrainId.Create("raw-external-sender", "1"),
             ReceiverId = receiver.GetGrainId(),
             Subject = "raw.forward.v1",
-            Payload = payloadWriter.PeekSlice(payloadWriter.Length)
+            Payload = bytes
         };
         Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
         await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -58,8 +56,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.True(Fixture.Cluster.TryGetGrainContext(receiver.GetGrainId(), out var current));
         Assert.NotSame(original, current);
         var grain = Assert.IsType<RawPayloadTestGrain>(current.GrainInstance);
-        using var pending = Assert.Single(current.ActivationServices.GetRequiredService<IDurableInbox>().Messages).Retain();
-        Assert.Equal(bytes, pending.Payload.ToArray());
+        var pending = Assert.Single(current.ActivationServices.GetRequiredService<IDurableInbox>().Messages);
+        Assert.Equal(bytes, pending.Payload);
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         using var completion = Fixture.Storage.BlockWrite(journal);
         handler.Release();
@@ -77,8 +75,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         {
             Assert.Equal(receiver.GetGrainId(), output.SenderId);
             Assert.Equal(sink.GetGrainId(), output.ReceiverId);
-            Assert.Equal(bytes, output.Payload.ToArray());
-            Assert.Same(pending.Payload.First, output.Payload.First);
+            Assert.Equal(bytes, output.Payload);
+            Assert.Same(pending.Payload, output.Payload);
         });
         Assert.False(grain.Acknowledged.IsCompleted);
         Assert.False(sinkGrain.Acknowledged.IsCompleted);
@@ -147,11 +145,11 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var receiver = NewGrain();
         var sink = NewGrain();
         var logicalId = HierarchicalKey.Create("atomic", Guid.NewGuid().ToString("N"));
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
 
-        var result = await DeliverAsync(receiver, envelope.Value);
+        var result = await DeliverAsync(receiver, envelope);
         var receiverState = await Fixture.WaitForEffectCountAsync(receiver, 1);
         var sinkState = await Fixture.WaitForEffectCountAsync(sink, 1);
         receiverState = await Fixture.WaitForOutboxCountAsync(receiver, 0);
@@ -163,7 +161,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Equal(0, receiverState.OutboxCount);
         Assert.Equal(effect, Assert.Single(sinkState.Effects));
 
-        var duplicate = await DeliverAsync(receiver, envelope.Value);
+        var duplicate = await DeliverAsync(receiver, envelope);
         Assert.Equal(DeliveryStatus.Duplicate, duplicate.Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         Assert.Equal(1, Assert.Single((await sink.GetSnapshotAsync()).Effects).Count);
@@ -174,11 +172,11 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
     {
         var receiver = NewGrain();
         var sink = NewGrain();
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(HierarchicalKey.Create("preparation", "failure"), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
-        var accepted = await DeliverAsync(receiver, envelope.Value);
+        var accepted = await DeliverAsync(receiver, envelope);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
@@ -186,7 +184,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Equal(0, state.InboxCount);
         Assert.Equal(0, state.OutboxCount);
         var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Equal(envelope.Value.MessageId, deadLetter.MessageId);
+        Assert.Equal(envelope.MessageId, deadLetter.MessageId);
         Assert.Equal(1, deadLetter.AttemptCount);
         Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty((await sink.GetSnapshotAsync()).Effects);
@@ -201,9 +199,9 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/admitted-outgoing");
-        using var envelope = CreateEnvelope(receiver,
+        var envelope = CreateEnvelope(receiver,
             new DurableTestMessage(HierarchicalKey.Create("preparation", "admitted"), 91, "admitted", sink.GetGrainId()), "messages/admitted-outgoing");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var localPreparation = grain.GetSnapshotForTest();
         Assert.Empty(localPreparation.Effects);
@@ -267,7 +265,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var completed = await Fixture.WaitForOutboxCountAsync(receiver, 0);
         Assert.Equal(Assert.Single(completed.Effects), Assert.Single(delivered.Effects));
         Assert.DoesNotContain(grain.Captures, snapshot => snapshot.Effects.Count > 0 && snapshot.ProcessedMessageCount == 0);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
     }
 
     [Theory]
@@ -282,8 +280,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-outcome");
         var message = new DurableTestMessage(HierarchicalKey.Create("completion", "outcome"), 92, "completion-outcome", sink.GetGrainId());
-        using var envelope = CreateEnvelope(receiver, message, "messages/completion-outcome");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, message, "messages/completion-outcome");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         if (storageCommitted)
@@ -311,7 +309,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Equal(0, completed.InboxCount);
         Assert.Empty(completed.InboxDeadLetters);
         Assert.Empty(completed.OutboxDeadLetters);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await sink.GetSnapshotAsync()).Effects).Count);
     }
 

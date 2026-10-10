@@ -8,7 +8,7 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public interface IRawPayloadTestGrain : IGrainWithGuidKey
 {
     Task ConfigureForwardAsync(GrainId target, int copies = 1);
-    Task<DeliveryResult> AcceptAndDeactivateAsync([DisposeOnCompletion] DurableEnvelope envelope);
+    Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
     Task<RawPayloadSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
@@ -89,7 +89,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         }
         cancellationToken.ThrowIfCancellationRequested();
         var input = context.Envelope;
-        var bytes = Convert.ToBase64String(input.Payload.ToArray());
+        var bytes = Convert.ToBase64String(input.Payload);
         var outgoing = _forward.Value.IsDefault
             ? []
             : Enumerable.Range(0, _forwardCopies.Value).Select(index => new DurableEnvelope
