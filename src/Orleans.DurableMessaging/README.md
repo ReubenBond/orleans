@@ -15,41 +15,35 @@ and required formats. Its optional `DurableInboxOptions` callback configures
 capacity, batches, retries, deduplication, and dead-letter retention.
 
 `DurableEnvelope` carries application-supplied `HierarchicalKey MessageId`, `SenderId`, `ReceiverId`,
-ordinal `Subject`, and an owned `ArcBuffer` payload.
+ordinal `Subject`, and a GC-owned `byte[]` payload.
 The exact message identity supplies receiver-local deduplication across senders and subjects.
 Applications namespace independent commands and preserve each command's destination, subject, and
 body across resubmissions. Exact-key completion affects that command independently of parents
 and children. Admission validates up to 1,024 UTF-8 bytes/32 segments per canonical key and
 256 UTF-8 bytes per nonempty subject. Applications define payload formats, dispatch, and replies.
-Dispose each owned envelope;
-`Retain()` acquires an independent payload lifetime. Serialization borrows its input, deserialization
-transfers ownership to its result, and deep copying acquires an independent retained slice.
+Published payload contents remain immutable. Envelope values and stored references keep their
+arrays available; ordinary RPC copying and deserialization create isolated arrays.
 
 The protocol and runtime provide:
 
-- `DurableEnvelope` is a disposable readonly struct with `MessageId` (`HierarchicalKey`),
-  `SenderId` and `ReceiverId` (`GrainId`), required ordinal `Subject`, and `Payload` (`ArcBuffer` from
-  `Orleans.Serialization.Buffers`, field ID 3). Payload bytes are opaque to transport
-  and treated as read-only. `ArcBuffer.Empty` is a valid owner-free empty payload.
-- The caller owns each constructed slice/envelope. `DurableEnvelope.Retain()` creates
-  an independent payload pin; struct copies borrow the same pin. Dispose each owned
-  envelope exactly once, after staging or actual direct-send completion.
-- `IDurableOutbox.Send` borrows the envelope; durable dictionary state independently
-  retains it. `IInboxHandlerContext.Envelope` is borrowed until the actual handler
-  method ends, including asynchronous preparation. Do not dispose a borrowed context
-  payload. Retain explicitly to store it longer.
-- Generated `IDurableInboxExtension` request copying retains its own payload pin.
-  The extension owns and disposes that request clone on every path, including rejection,
-  cancellation, and exceptions. Ordinary persistence/network serialization borrows
-  payloads without consuming them. Retained operation owners remain alive through the
-  actual operation, not just a caller's canceled wait.
+- `DurableEnvelope` is an ordinary readonly struct with `MessageId` (`HierarchicalKey`),
+  `SenderId` and `ReceiverId` (`GrainId`), required ordinal `Subject`, and non-null
+  `Payload` (`byte[]`, field ID 3). Payload bytes are opaque to transport and treated
+  as read-only. An empty array is a valid empty payload.
+- `IDurableOutbox.Send` and direct delivery share published array references.
+  Durable state, handlers and in-flight operations keep those references for their
+  required lifetime. `IInboxHandlerContext.Envelope` is ordinary managed data which
+  can remain available through application references after handler completion.
+- `IDurableInboxExtension` uses ordinary Orleans request copying and serialization.
+  RPC copies and decoded envelopes have independent payload arrays. Caller wait
+  cancellation preserves the admitted operation's actual completion boundary.
 - Application messages are ordinary serializable records. Related values and
   binary attachments can be fields in one record. Typed helpers use ordinary
   `Serializer<T>` serialization and manage the transport payload internally.
 - `DurableMessageType<T>` binds an exact subject to ordinary `Serializer<T>` and verifies
   the subject before decoding. `AddDurableMessageType<T>` registers a keyed singleton binding.
-  Typed outbox `Send` and `SendReply` encode using a shared bounded pool and manage
-  temporary payload ownership internally. `Create` exposes an owned envelope for explicit admission.
+  Typed outbox `Send` and `SendReply` encode into independently allocated arrays.
+  `Create` returns an ordinary envelope for explicit admission.
   `DurableInboxDispatcher` optionally selects typed delegates by exact subject.
   `inbox.RegisterHandlers` configures and installs that dispatcher once, freezes
   its subject routes, and delivers decoded bodies to synchronous or task-returning methods.
@@ -74,16 +68,14 @@ The protocol and runtime provide:
 `HierarchicalKey` is a readonly ordinal value with one immutable canonical backing path and a
 cached process-local hash. `Create` and `CreateChildKey` accept literal segments; `Parse` reads an
 escaped canonical path. `Append` composes built hierarchies. `default` is an unset identity.
-Serialization stores canonical paths and reconstructs hash/navigation state. Shared journal value
-lifecycles retain and release pending-message and dead-letter payloads at actual ownership boundaries.
-Owned RPC arguments remain retained through their actual serialization and invocation outcomes.
+Serialization stores canonical paths and reconstructs hash/navigation state. Pending messages,
+dead letters and active operations hold ordinary envelope references for their required lifetimes.
 
 ## Handler and persistence boundaries
 
 Handlers perform asynchronous I/O, validation, and cancellation checks using local
 values before the first shared business or journaled mutation. Compute reply records
-locally and stage them with typed `SendReply`, which handles serialization and temporary
-ownership. From
+locally and stage them with typed `SendReply`, which serializes their managed payload bytes. From
 that first shared mutation through method completion, execute synchronously with no
 awaits. Apply complete safe-to-commit changes, stage outgoing envelopes, call
 `context.Complete()`, and return without further awaits. This mutation boundary is the
