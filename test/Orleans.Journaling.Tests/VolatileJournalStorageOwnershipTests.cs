@@ -210,7 +210,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
     [InlineData(true)]
     public async Task CanceledWrites_DoNotAcquirePinsChangeMetadataOrResetCompaction(bool replace)
     {
-        var storage = new VolatileJournalStorage();
+        var storage = new VolatileJournalStorage(null, new() { MaxAppendsBeforeSnapshot = 11 });
         await SeedCompactionRequest(storage, [42]);
         var metadata = await storage.GetMetadataAsync(Token);
         using var writer = new ArcBufferWriter();
@@ -306,7 +306,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
     [Fact]
     public async Task EmptyBorrowedAndRetainedWrites_PreserveSegmentsMetadataAndAppendLimit()
     {
-        var storage = new VolatileJournalStorage("empty-format");
+        var storage = new VolatileJournalStorage("empty-format", new() { MaxAppendsBeforeSnapshot = 10 });
         using var writer = new ArcBufferWriter();
         using var source = writer.PeekSlice(0);
         await ((IRetainedJournalStorage)storage).ReplaceRetainedAsync(source, Token);
@@ -350,7 +350,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
     [InlineData(true)]
     public async Task BorrowedCopyFailure_IsAtomicAndReleasesUnpublishedPages(bool replace)
     {
-        var storage = new VolatileJournalStorage();
+        var storage = new VolatileJournalStorage(null, new() { MaxAppendsBeforeSnapshot = 11 });
         await SeedCompactionRequest(storage, [1, 2, 3]);
         var before = storage.GetMemoryStatistics();
         var metadata = await storage.GetMetadataAsync(Token);
@@ -465,7 +465,7 @@ public sealed class VolatileJournalStorageOwnershipTests(ITestOutputHelper outpu
     [InlineData(true)]
     public async Task RetainedWrite_InvalidOwnershipTokenDoesNotPublishOrResetCounters(bool replace)
     {
-        var storage = new VolatileJournalStorage();
+        var storage = new VolatileJournalStorage(null, new() { MaxAppendsBeforeSnapshot = 11 });
         await SeedCompactionRequest(storage, [42]);
         var before = storage.GetMemoryStatistics();
         var metadata = await storage.GetMetadataAsync(Token);
