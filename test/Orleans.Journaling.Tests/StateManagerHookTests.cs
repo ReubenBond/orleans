@@ -1,8 +1,8 @@
-using System.Buffers;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -606,10 +606,10 @@ public partial class StateManagerTests
             call.Arg<IJournalStorageConsumer>().Complete(metadata: null);
             return ValueTask.CompletedTask;
         });
-        storage.AppendAsync(Arg.Any<ReadOnlySequence<byte>>(), Arg.Any<CancellationToken>())
-            .Returns(call => WriteAsync(call.Arg<ReadOnlySequence<byte>>(), call.Arg<CancellationToken>()));
-        storage.ReplaceAsync(Arg.Any<ReadOnlySequence<byte>>(), Arg.Any<CancellationToken>())
-            .Returns(call => WriteAsync(call.Arg<ReadOnlySequence<byte>>(), call.Arg<CancellationToken>()));
+        storage.AppendAsync(Arg.Any<ArcBuffer>(), Arg.Any<CancellationToken>())
+            .Returns(call => WriteAsync(call.Arg<ArcBuffer>(), call.Arg<CancellationToken>()));
+        storage.ReplaceAsync(Arg.Any<ArcBuffer>(), Arg.Any<CancellationToken>())
+            .Returns(call => WriteAsync(call.Arg<ArcBuffer>(), call.Arg<CancellationToken>()));
         var manager = CreateTestSystem(storage).Manager;
         var state = new LifecycleState();
         manager.RegisterStateMachine("state", state);
@@ -657,7 +657,7 @@ public partial class StateManagerTests
             await Assert.ThrowsAsync<AggregateException>(() => manager.DisposeAsync().AsTask());
         }
 
-        async ValueTask WriteAsync(ReadOnlySequence<byte> bytes, CancellationToken token)
+        async ValueTask WriteAsync(ArcBuffer bytes, CancellationToken token)
         {
             var original = bytes.ToArray();
             entered.TrySetResult();
