@@ -23,7 +23,6 @@ internal abstract partial class GrainTimer : IGrainTimer
     private readonly bool _keepAlive;
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
-    private long _scheduledAt;
     // The current arm until admission, then the next delay. Change replaces it in either phase.
     private TimeSpan _dueTime;
     private TimeSpan _period;
@@ -58,7 +57,6 @@ internal abstract partial class GrainTimer : IGrainTimer
         Debug.Assert(_state is TimerState.Idle or TimerState.Queued);
         if (_dueTime != TimeSpan.Zero && _dueTime != Timeout.InfiniteTimeSpan)
         {
-            _scheduledAt = _shared.TimeProvider.GetTimestamp();
             if (_timer is null)
             {
                 using (new ExecutionContextSuppressor())
@@ -101,23 +99,11 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            // A callback from a previous physical arm can arrive after Change or Dispose. Only the
-            // current elapsed deadline is eligible, and changing to zero/infinite invalidates it.
+            // The provider owns delayed tick timing. A callback dispatched before Change can
+            // still arrive afterward; paused, immediate, running, and disposed timers ignore it.
             if (_state is TimerState.Running or TimerState.Disposed
                 || _dueTime == TimeSpan.Zero || _dueTime == Timeout.InfiniteTimeSpan)
             {
-                return;
-            }
-
-            Debug.Assert(_timer is not null);
-            // Match System.Threading.Timer's millisecond resolution.
-            var remaining = TimeSpan.FromMilliseconds((long)_dueTime.TotalMilliseconds)
-                - _shared.TimeProvider.GetElapsedTime(_scheduledAt);
-            if (remaining > TimeSpan.Zero)
-            {
-                // Physical timers can fire before this higher-resolution deadline. Preserve the
-                // one-shot arm, rounding up so a sub-millisecond remainder stays asynchronous.
-                _timer!.Change(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), Timeout.InfiniteTimeSpan);
                 return;
             }
 
