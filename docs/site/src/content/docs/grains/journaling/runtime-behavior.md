@@ -103,6 +103,8 @@ Orleans executes that synchronous block on a single activation thread. Another g
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
 
+<a id="persistence-operation-hooks"></a>
+
 ## Journal operation hooks
 
 Activation-scoped features coordinate prerequisites and completion through
