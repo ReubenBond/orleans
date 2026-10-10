@@ -22,15 +22,14 @@ public interface IDurableInbox
     /// <summary>
     /// Gets pending messages in unspecified order.
     /// </summary>
-    /// <remarks>Values are borrowed from durable state until removal or scope disposal.
-    /// Do not dispose them; use <see cref="DurableEnvelope.Retain"/> for a longer lifetime.</remarks>
+    /// <remarks>Values expose stored payload arrays. Keep their command contents unchanged; copy arrays for independent mutation.</remarks>
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
     /// Looks up a pending command by its application identity within this inbox.
     /// </summary>
     /// <param name="messageId">The exact command identity, independent of its immediate sender and subject.</param>
-    /// <param name="envelope">The borrowed matching envelope when found.</param>
+    /// <param name="envelope">The matching stored envelope when found.</param>
     /// <returns>Whether the message is pending.</returns>
     bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
 
