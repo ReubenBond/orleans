@@ -1194,11 +1194,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         {
             if (replace)
             {
-                await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
+                await _storage.ReplaceAsync(value.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
             }
             else
             {
-                await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
+                await _storage.AppendAsync(value.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
             }
 
             _shared.Instruments.OnStorageOperation(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);

@@ -1,8 +1,8 @@
 using System.Buffers;
 using System.Text.Json;
+using Azure;
 using Azure.Core;
 using Azure.Data.Tables;
-using Azure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -40,7 +40,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([4, 5]), TestContext.Current.CancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([4, 5]), TestContext.Current.CancellationToken);
 
         Assert.Equal(3, store.TransactionAttempts);
         Assert.Equal(1, store.SuccessfulTransactions);
@@ -86,7 +86,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([7, 8, 9]), TestContext.Current.CancellationToken).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([7, 8, 9]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(412, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
         Assert.Equal(3, store.TransactionAttempts);
@@ -126,7 +126,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(1, store.TransactionAttempts);
         Assert.Equal(0, store.SuccessfulTransactions);
@@ -162,7 +162,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
         using var cancellation = new CancellationTokenSource();
 
-        var appendTask = storage.AppendBytesAsync(new ReadOnlySequence<byte>([2]), cancellation.Token).AsTask();
+        var appendTask = storage.AppendAsync(new ReadOnlySequence<byte>([2]), cancellation.Token).AsTask();
         await conflictObserved.Task;
         await Task.Yield();
         cancellation.Cancel();
@@ -224,7 +224,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var seed = CreateStorage(store);
-        await seed.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await seed.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var blockedWriter = CreateStorage(store, maxRetries: 3);
         var winningWriter = CreateStorage(store, maxRetries: 3);
@@ -242,9 +242,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        var blockedTask = blockedWriter.AppendBytesAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask();
+        var blockedTask = blockedWriter.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask();
         await blockedAttemptEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
-        await winningWriter.AppendBytesAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
+        await winningWriter.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
         releaseBlockedAttempt.TrySetResult();
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => blockedTask);
 
@@ -343,7 +343,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var oldGeneration = store.HeaderGeneration;
         store.BeforeUpdateAsync = (attempt, entity, _, _, _) =>
         {
@@ -356,7 +356,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             return Task.CompletedTask;
         };
 
-        await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([8, 9]), TestContext.Current.CancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([8, 9]), TestContext.Current.CancellationToken);
 
         Assert.Equal(3, store.UpdateAttempts);
         Assert.Equal(1, store.SuccessfulUpdates);
@@ -375,7 +375,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         store.BeforeDeleteAsync = (attempt, _, _, _) =>
         {
             if (attempt <= 2)
@@ -407,7 +407,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(404, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
         Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -422,7 +422,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var replacement = CreateStorage(store, maxRetries: 3);
-        await replacement.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var appender = CreateStorage(store, maxRetries: 3);
         await RecoverAsync(appender, TestContext.Current.CancellationToken);
@@ -438,9 +438,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        var replaceTask = replacement.ReplaceBytesAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken).AsTask();
+        var replaceTask = replacement.ReplaceAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken).AsTask();
         await flipEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
-        await appender.AppendBytesAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
+        await appender.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
         releaseFlip.TrySetResult();
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => replaceTask);
 

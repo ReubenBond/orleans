@@ -11,10 +11,9 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
-using Orleans.Journaling.Json;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Tester.DurableJobs;
@@ -762,14 +761,14 @@ public partial class JournaledJobShardManagerTests
                 return inner.ReadAsync(consumer, cancellationToken);
             }
 
-            public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+            public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
                 owner.JournalAppends.Enqueue(journalId);
                 await owner.OnAppendAsync(cancellationToken).ConfigureAwait(false);
                 await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             }
 
-            public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
                 owner.JournalReplacements.Enqueue(journalId);
                 return inner.ReplaceAsync(value, cancellationToken);

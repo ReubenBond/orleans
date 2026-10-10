@@ -50,18 +50,18 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var named = services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold"));
         var large = services.GetRequiredKeyedService<IJournalStorageProvider>("large").CreateStorage(new("threshold"));
         var token = TestContext.Current.CancellationToken;
-        await defaults.AppendBytesAsync(new ReadOnlySequence<byte>([1]), token);
-        await named.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2]), token);
-        await large.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2, 3]), token);
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        await named.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
+        await large.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), token);
         Assert.False(defaults.IsCompactionRequested);
         Assert.False(named.IsCompactionRequested);
         Assert.False(large.IsCompactionRequested);
-        await defaults.AppendBytesAsync(new ReadOnlySequence<byte>([2]), token);
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([2]), token);
         Assert.True(defaults.IsCompactionRequested);
         Assert.False(named.IsCompactionRequested);
-        await named.AppendBytesAsync(new ReadOnlySequence<byte>([3]), token);
+        await named.AppendAsync(new ReadOnlySequence<byte>([3]), token);
         Assert.True(named.IsCompactionRequested);
-        await defaults.ReplaceBytesAsync(new ReadOnlySequence<byte>([4]), token);
+        await defaults.ReplaceAsync(new ReadOnlySequence<byte>([4]), token);
         Assert.False(defaults.IsCompactionRequested);
         Assert.True(named.IsCompactionRequested);
         Assert.False(large.IsCompactionRequested);
@@ -127,17 +127,17 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var token = TestContext.Current.CancellationToken;
         for (var index = 0; index < 3; index++)
         {
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), token);
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
             Assert.False(storage.IsCompactionRequested);
         }
 
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([2]), token);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
         Assert.True(storage.IsCompactionRequested);
         var second = provider.CreateStorage(new("options-pipeline"));
         Assert.True(second.IsCompactionRequested);
-        await second.ReplaceBytesAsync(new ReadOnlySequence<byte>([3]), token);
+        await second.ReplaceAsync(new ReadOnlySequence<byte>([3]), token);
         Assert.False(storage.IsCompactionRequested);
-        await second.AppendBytesAsync(new ReadOnlySequence<byte>([4]), token);
+        await second.AppendAsync(new ReadOnlySequence<byte>([4]), token);
         Assert.False(storage.IsCompactionRequested);
     }
 
@@ -746,8 +746,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class DelegatingStateManager(IJournaledStateManager inner) : IJournaledStateManager
     {
-        public IList<IJournaledStateHook> Hooks => inner.Hooks;
-
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
         public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
         public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? state)

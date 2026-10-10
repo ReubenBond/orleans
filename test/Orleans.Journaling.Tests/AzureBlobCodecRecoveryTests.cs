@@ -5,10 +5,10 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
 using Orleans.Journaling.Json;
-using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
-using Orleans.Serialization;
+using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 
@@ -158,8 +158,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
         {
             var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-            await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
+            await storage.AppendAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
         }
 
         await using var readerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token);

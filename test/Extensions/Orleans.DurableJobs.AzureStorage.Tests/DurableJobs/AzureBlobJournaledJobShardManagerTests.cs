@@ -1,4 +1,3 @@
-using Orleans.Serialization.Buffers;
 #nullable enable
 
 using System.Buffers;
@@ -147,7 +146,7 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => delete
             ? staleStorage.DeleteAsync(token).AsTask()
-            : staleStorage.ReplaceBytesAsync(ReadOnlySequence<byte>.Empty, token).AsTask());
+            : staleStorage.ReplaceAsync(ReadOnlySequence<byte>.Empty, token).AsTask());
         Assert.Equal(1, await adopted.GetJobCountAsync());
         Assert.Equal(DurableJobMutationResult.Applied, await adopted.RemoveJobAsync(job.Id, token));
         await nextOwner.UnregisterShardAsync(adopted, token);
@@ -659,7 +658,7 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
                 await inner.ReadAsync(consumer, cancellationToken);
             }
 
-            public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+            public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
                 provider._appendSizes.Enqueue(value.Length);
                 Interlocked.Increment(ref provider._appendCount);
@@ -672,7 +671,7 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
                 await inner.AppendAsync(value, cancellationToken);
             }
 
-            public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
                 => inner.ReplaceAsync(value, cancellationToken);
 
             public async ValueTask DeleteAsync(CancellationToken cancellationToken)

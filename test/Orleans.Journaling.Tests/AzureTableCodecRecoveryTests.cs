@@ -5,10 +5,10 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
 using Orleans.Journaling.Json;
-using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
-using Orleans.Serialization;
+using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 
@@ -158,8 +158,8 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, cts.Token))
         {
             var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-            await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(replacedBytes), cts.Token);
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>(appendedBytes), cts.Token);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(replacedBytes), cts.Token);
+            await storage.AppendAsync(new ReadOnlySequence<byte>(appendedBytes), cts.Token);
         }
 
         await using var readerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, cts.Token);
@@ -186,7 +186,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         // Larger than one data row (15 x 64 KiB) so the append spans multiple rows in one transaction.
         var payload = new byte[1024 * 1024 + 3];
         Random.Shared.NextBytes(payload);
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>(payload), cts.Token);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(payload), cts.Token);
 
         var recoveredStorage = _storageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var recovered = new RecordingJournalStorageConsumer();
@@ -519,7 +519,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
 
             var valid = await CaptureStoredJournalAsync(storage, cts.Token);
             var bytesToRemove = string.Equals(journalFormatKey, JsonLinesJournalFormat.JournalFormatKey, StringComparison.Ordinal) ? 2 : 1;
-            await storage.ReplaceBytesAsync(
+            await storage.ReplaceAsync(
                 new ReadOnlySequence<byte>(valid.Bytes.AsMemory(0, valid.Bytes.Length - bytesToRemove)),
                 cts.Token);
         }

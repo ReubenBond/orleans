@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 using StackExchange.Redis;
 
@@ -532,13 +531,12 @@ internal sealed class RedisJournalStorage : IJournalStorage
         consumer.Read(GetSegments(data, _options.ReadChunkSize, cancellationToken), state.Metadata, complete: true);
     }
 
-    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var expectedContentETag = _contentETag;
         var newETag = CreateETag();
-        var sequence = value.AsReadOnlySequence();
-        RedisValue payload = sequence.IsSingleSegment ? sequence.First : sequence.ToArray();
+        RedisValue payload = value.IsSingleSegment ? value.First : value.ToArray();
         var result = await EvaluateArrayAsync(
             AppendOrCreateScript,
             _journalKeys,
@@ -557,13 +555,12 @@ internal sealed class RedisJournalStorage : IJournalStorage
         _appendLength = (long)result[1];
     }
 
-    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var expectedContentETag = _contentETag;
         var newETag = CreateETag();
-        var sequence = value.AsReadOnlySequence();
-        RedisValue payload = sequence.IsSingleSegment ? sequence.First : sequence.ToArray();
+        RedisValue payload = value.IsSingleSegment ? value.First : value.ToArray();
         var result = await EvaluateArrayAsync(
             ReplaceOrCreateScript,
             _journalKeys,

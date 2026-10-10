@@ -6,16 +6,15 @@ using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
+using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
-using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
-/// Tests that verify JSON and Orleans binary recovery and explicit format transitions.
+/// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.
 /// </summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -24,7 +23,7 @@ public class CodecRecoveryTests : JournalingTestBase
 {
     /// <summary>
     /// Writes data with the Orleans binary codec, then reads it back.
-    /// Verifies the current Orleans binary format round trip.
+    /// This is the baseline backward compatibility test.
     /// </summary>
     [Fact]
     public async Task OrleansBinaryCodec_WriteAndRecover()
@@ -441,7 +440,7 @@ public class CodecRecoveryTests : JournalingTestBase
         CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
 
@@ -472,13 +471,13 @@ public class CodecRecoveryTests : JournalingTestBase
     {
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.AppendAsync(value, cancellationToken);
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => inner.DeleteAsync(cancellationToken);
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)

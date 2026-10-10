@@ -129,20 +129,6 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.AppendAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.ReplaceAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.JournalId,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
@@ -158,20 +144,6 @@
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.JournalReplayContext.ResolveState(Orleans.Journaling.JournalStreamId)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.VolatileJournalStorage.AppendAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.VolatileJournalStorage.ReplaceAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -241,20 +213,6 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.AppendAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.ReplaceAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.JournalId,System.Threading.CancellationToken)</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
@@ -270,20 +228,6 @@
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.JournalReplayContext.ResolveState(Orleans.Journaling.JournalStreamId)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.VolatileJournalStorage.AppendAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0002</DiagnosticId>
-    <Target>M:Orleans.Journaling.VolatileJournalStorage.ReplaceAsync(System.Buffers.ReadOnlySequence{System.Byte},System.Threading.CancellationToken)</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -312,20 +256,6 @@
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone(Orleans.Journaling.JournalId)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.AppendAsync(Orleans.Serialization.Buffers.ArcBuffer,System.Threading.CancellationToken)</Target>
-    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.ReplaceAsync(Orleans.Serialization.Buffers.ArcBuffer,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -361,20 +291,6 @@
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone(Orleans.Journaling.JournalId)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.AppendAsync(Orleans.Serialization.Buffers.ArcBuffer,System.Threading.CancellationToken)</Target>
-    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
-    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorage.ReplaceAsync(Orleans.Serialization.Buffers.ArcBuffer,System.Threading.CancellationToken)</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
