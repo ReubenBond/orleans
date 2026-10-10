@@ -16,22 +16,21 @@ internal abstract partial class GrainTimer : IGrainTimer
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
     protected static readonly MethodInfo InvokableMethodInfo = typeof(IGrainTimerInvoker).GetMethod(nameof(IGrainTimerInvoker.InvokeCallbackAsync), BindingFlags.Instance | BindingFlags.Public)!;
     private readonly CancellationTokenSource _cts = new();
-    private ITimer? _timer;
+    private readonly ITimer _timer;
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
     private readonly bool _interleave;
     private readonly bool _keepAlive;
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
-    // The current arm until admission, then the next delay. Change replaces it in either phase.
+    // The current arm while idle; the next delay once a tick is queued. Change replaces it.
     private TimeSpan _dueTime;
     private TimeSpan _period;
 
     private enum TimerState : byte
     {
         Idle,
-        Queued,
-        Running,
+        Busy,
         Disposed
     }
 
@@ -47,6 +46,10 @@ internal abstract partial class GrainTimer : IGrainTimer
         _dueTime = Timeout.InfiniteTimeSpan;
         _period = Timeout.InfiniteTimeSpan;
         _invoker = new(this);
+        using (new ExecutionContextSuppressor())
+        {
+            _timer = _shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
     }
 
     protected IGrainContext GrainContext => _grainContext;
@@ -54,28 +57,13 @@ internal abstract partial class GrainTimer : IGrainTimer
     // Called with _cts locked, after Change or callback completion.
     private bool ScheduleNextTick()
     {
-        Debug.Assert(_state is TimerState.Idle or TimerState.Queued);
-        if (_dueTime != TimeSpan.Zero && _dueTime != Timeout.InfiniteTimeSpan)
+        Debug.Assert(_state == TimerState.Idle);
+        _timer.Change(_dueTime == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : _dueTime, Timeout.InfiniteTimeSpan);
+        if (_dueTime == TimeSpan.Zero)
         {
-            if (_timer is null)
-            {
-                using (new ExecutionContextSuppressor())
-                {
-                    _timer = _shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                }
-            }
-
-            _timer.Change(_dueTime, Timeout.InfiniteTimeSpan);
-        }
-        else
-        {
-            // Disarm an existing delayed timer, but never create one for an immediate or infinite arm.
-            _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            if (_dueTime == TimeSpan.Zero && _state == TimerState.Idle)
-            {
-                _state = TimerState.Queued;
-                return true;
-            }
+            _state = TimerState.Busy;
+            _dueTime = _period;
+            return true;
         }
 
         return false;
@@ -99,21 +87,14 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            // The provider owns delayed tick timing. A callback dispatched before Change can
-            // still arrive afterward; paused, immediate, running, and disposed timers ignore it.
-            if (_state is TimerState.Running or TimerState.Disposed
-                || _dueTime == TimeSpan.Zero || _dueTime == Timeout.InfiniteTimeSpan)
+            // Provider callbacks may race Change. A reserved tick stays busy until completion.
+            if (_state != TimerState.Idle || _dueTime == Timeout.InfiniteTimeSpan)
             {
                 return;
             }
 
-            _dueTime = TimeSpan.Zero;
-            if (_state == TimerState.Queued)
-            {
-                return;
-            }
-
-            _state = TimerState.Queued;
+            _state = TimerState.Busy;
+            _dueTime = _period;
         }
 
         QueueTickOnActivation();
@@ -121,7 +102,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     // The admission is reserved under _cts, but delivered outside it: activation shutdown disposes
     // timers under its own lock. Taking that lock while holding _cts would invert the lock order.
-    // Changes/disposal between reservation and delivery coalesce or invalidate this tick.
+    // Changes during delivery affect the following tick; disposal prevents callback admission.
     private void QueueTickOnActivation()
     {
         try
@@ -150,10 +131,8 @@ internal abstract partial class GrainTimer : IGrainTimer
                 if (_state != TimerState.Disposed)
                 {
                     _state = TimerState.Idle;
-                    if (_dueTime == TimeSpan.Zero)
-                    {
-                        _dueTime = Timeout.InfiniteTimeSpan;
-                    }
+                    // Release failed admission without immediately retrying the failed delivery.
+                    _timer.Change(_dueTime == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : _dueTime, Timeout.InfiniteTimeSpan);
                 }
             }
 
@@ -174,19 +153,12 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            Debug.Assert(_state is TimerState.Queued or TimerState.Disposed);
-            if (_state == TimerState.Disposed || _dueTime != TimeSpan.Zero)
+            if (_state == TimerState.Disposed)
             {
-                // Drain a disposed or invalidated message, preserving disposal and the new schedule.
-                if (_state == TimerState.Queued)
-                {
-                    _state = TimerState.Idle;
-                }
                 return new(Response.Completed);
             }
 
-            _state = TimerState.Running;
-            _dueTime = _period;
+            Debug.Assert(_state == TimerState.Busy);
         }
 
         try
@@ -230,7 +202,7 @@ internal abstract partial class GrainTimer : IGrainTimer
                 return;
             }
 
-            Debug.Assert(_state == TimerState.Running);
+            Debug.Assert(_state == TimerState.Busy);
             _state = TimerState.Idle;
             queueTick = ScheduleNextTick();
         }
@@ -286,9 +258,8 @@ internal abstract partial class GrainTimer : IGrainTimer
             _dueTime = dueTime;
             _period = period;
 
-            // Changes during an active callback take effect after completion. A queued message can
-            // instead be coalesced or invalidated now, without admitting a second invocation.
-            if (_state != TimerState.Running)
+            // A queued or running callback keeps its turn; changes schedule work after it completes.
+            if (_state == TimerState.Idle)
             {
                 queueTick = ScheduleNextTick();
             }
@@ -326,8 +297,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
             // Publish disposal before cancellation, whose registrations can reenter Change/Dispose.
             _state = TimerState.Disposed;
-            _timer?.Dispose();
-            _timer = null;
+            _timer.Dispose();
         }
 
         try

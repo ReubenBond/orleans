@@ -38,7 +38,7 @@ Timer callbacks are local-only messages addressed to their activation. They part
 
 A zero due time queues a callback directly on the activation. A zero period queues the next callback after the current callback completes. Both use the same activation scheduling, interleaving, and idle-lifetime rules as delayed ticks.
 
-Orleans coalesces repeated immediate changes into one pending callback and reuses the timer's invocation and cancellation scope. It creates a physical timer when a delayed arm is needed and reuses it for later delayed arms. The configured <xref:System.TimeProvider> controls delayed tick timing and resolution; Orleans queues the provider's tick notifications on the activation.
+The configured <xref:System.TimeProvider> controls delayed tick timing and resolution; Orleans queues the provider's tick notifications on the activation.
 
 ### Interleaving
 
@@ -54,9 +54,7 @@ With <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive> set to `true`, e
 
 ## Change or stop a timer
 
-Call <xref:Orleans.Runtime.IGrainTimer.Change*> to replace the due time and period. The new due time schedules the next callback, and the new period applies after that callback completes. Changes during a running callback take effect after it completes, with the latest change determining the next schedule.
-
-A change to a delayed or infinite due time invalidates a queued tick. The queued message drains according to activation scheduling, and the replacement schedule determines the next callback.
+Call <xref:Orleans.Runtime.IGrainTimer.Change*> to replace the due time and period. When a callback is already queued or running, it keeps its turn and the change takes effect after it completes. Repeated changes use the latest due time and period for the following schedule.
 
 A physical tick already dispatched by the provider can arrive after a change to another delayed schedule. Orleans admits that tick according to the activation's scheduling rules. After its callback completes, the configured period determines the next tick, or a change made during the callback supplies the next due time.
 
