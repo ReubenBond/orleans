@@ -86,6 +86,14 @@ returns in flight trim after publishing so the settled cache fits the current bu
 pinned readers retain ownership of active pages through their full lifetimes. Released large backing
 arrays return to the separately managed `ArrayPool<byte>.Shared`.
 
+Capacity planning includes live journal payloads, page rounding, journal count and lifetime, and
+concurrent read snapshots. A nonempty journal can retain a 16 KiB minimum page even for a small
+payload, and a copied-append writer can retain its current page until replacement or deletion.
+Readers keep retired pages alive through completion. The free-page cache budget applies after the
+last owner releases a page; stored journals and active readers contribute separately to live memory.
+The volatile provider retains stores for journal discovery, so delete journals when their contents
+are retired.
+
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,

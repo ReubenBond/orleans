@@ -595,7 +595,6 @@ internal sealed class ArcBufferPagePool
     private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
     private int _maximumRetainedBytes;
     private int _retainedBytes;
-    private int _retainedPages;
 
     internal ArcBufferPagePool(int maximumRetainedBytes = DefaultMaximumRetainedBytes)
     {
@@ -630,7 +629,7 @@ internal sealed class ArcBufferPagePool
     }
 
     internal int RetainedBytes => Volatile.Read(ref _retainedBytes);
-    internal int RetainedPages => Volatile.Read(ref _retainedPages);
+    internal int RetainedPages => _pages.Count + _largePages.Count;
 
     public ArcBufferPage Rent(int size = -1)
     {
@@ -641,7 +640,6 @@ internal sealed class ArcBufferPagePool
         }
 
         Interlocked.Add(ref _retainedBytes, -block.Array.Length);
-        Interlocked.Decrement(ref _retainedPages);
         if (size > MinimumPageSize)
         {
             block.ResizeLargeSegment(size);
@@ -653,6 +651,7 @@ internal sealed class ArcBufferPagePool
     internal void Return(ArcBufferPage block)
     {
         Debug.Assert(block.IsValid);
+        Debug.Assert(block.ReferenceCount == 0);
         if (TryReserve(block.Array.Length))
         {
             Publish(block);
@@ -666,6 +665,7 @@ internal sealed class ArcBufferPagePool
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryReserve(int size)
     {
+        Debug.Assert(size >= MinimumPageSize);
         if (size <= MaximumRetainedPageSize)
         {
             var retained = Volatile.Read(ref _retainedBytes);
@@ -674,7 +674,6 @@ internal sealed class ArcBufferPagePool
                 var observed = Interlocked.CompareExchange(ref _retainedBytes, retained + size, retained);
                 if (observed == retained)
                 {
-                    Interlocked.Increment(ref _retainedPages);
                     return true;
                 }
 
@@ -695,7 +694,6 @@ internal sealed class ArcBufferPagePool
         catch
         {
             Interlocked.Add(ref _retainedBytes, -block.Array.Length);
-            Interlocked.Decrement(ref _retainedPages);
             block.ReleaseArray();
             throw;
         }
@@ -725,7 +723,6 @@ internal sealed class ArcBufferPagePool
             }
 
             Interlocked.Add(ref _retainedBytes, -block.Array.Length);
-            Interlocked.Decrement(ref _retainedPages);
             block.ReleaseArray();
         }
     }

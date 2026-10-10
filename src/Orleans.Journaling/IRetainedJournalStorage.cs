@@ -11,6 +11,8 @@ namespace Orleans.Journaling;
 /// bytes and releases that slice on rejection or when the stored bytes are retired. A failed operation
 /// can still have committed: its retained reference then belongs to storage, independently of the
 /// caller's completion reference. Providers without this capability use the borrowed sequence contract.
+/// Retained bytes remain immutable while storage owns them; the originating writer can append new
+/// bytes or release its own pages independently.
 /// </remarks>
 internal interface IRetainedJournalStorage
 {

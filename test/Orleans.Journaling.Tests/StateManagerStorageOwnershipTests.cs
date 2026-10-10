@@ -22,13 +22,12 @@ public partial class StateManagerTests
             Assert.Equal(0, manager.PendingWriteByteCount);
         }
         Assert.Equal(500, storage.RetainedCalls);
-        Assert.Equal(0, storage.Inner.MemoryStatistics.CopiedBytes);
-        Assert.Equal(storage.TotalWrittenBytes, storage.Inner.MemoryStatistics.SharedBytes);
-        Assert.Equal(snapshot ? 1 : 500, storage.Inner.MemoryStatistics.Segments);
+        Assert.Same(storage.Observation.First, storage.Inner.Storage.Segments[^1].First);
+        Assert.Equal(snapshot ? 1 : 500, storage.Inner.GetMemoryStatistics().Segments);
         // A large number of captures must not imply a new 16KiB page per capture.
         var retainedPayload = storage.Inner.Segments.Sum(static segment => segment.Length);
         Assert.Equal((retainedPayload + ArcBufferWriter.MinimumPageSize - 1) / ArcBufferWriter.MinimumPageSize,
-            storage.Inner.MemoryStatistics.RetainedPages);
+            storage.Inner.GetMemoryStatistics().RetainedPages);
         await manager.DisposeAsync();
         await using (var recovered = CreateTestSystem(storage.Inner).Manager)
         {
@@ -38,7 +37,7 @@ public partial class StateManagerTests
         }
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, storage.Observation.First.ReferenceCount); // only the probe's independently owned pin
-        Assert.Equal(0, storage.Inner.MemoryStatistics.RetainedCapacity);
+        Assert.Equal(0, storage.Inner.GetMemoryStatistics().RetainedCapacity);
         storage.ReleaseObservation();
     }
 
@@ -81,10 +80,9 @@ public partial class StateManagerTests
             await recovered.InitializeAsync(TestContext.Current.CancellationToken);
             Assert.Equal(committed ? 2 : 1, recoveredValue.Value);
         }
-        Assert.Equal(0, storage.Inner.MemoryStatistics.ReaderReferences);
         await storage.Inner.DeleteAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, storage.Observation.First.ReferenceCount);
-        Assert.Equal(0, storage.Inner.MemoryStatistics.RetainedPages);
+        Assert.Equal(0, storage.Inner.GetMemoryStatistics().RetainedPages);
         storage.ReleaseObservation();
     }
 
@@ -213,7 +211,6 @@ public partial class StateManagerTests
         public TaskCompletionSource Release { get; } = NewSignal();
         public ArcBuffer Observation;
         public int RetainedCalls { get; private set; }
-        public long TotalWrittenBytes { get; private set; }
         private bool _hasObservation;
 
         public void ReleaseObservation()
@@ -240,7 +237,6 @@ public partial class StateManagerTests
             Observation = value.Slice(0);
             _hasObservation = true;
             RetainedCalls++;
-            TotalWrittenBytes += value.Length;
             Entered.TrySetResult();
             // Deliberately ignore cancellation after entry, as a real provider can complete/commit
             // after owner cancellation. Actual completion, not the cancellation request, is authoritative.

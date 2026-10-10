@@ -195,49 +195,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
         }
     }
 
-    internal (int Segments, int ReaderReferences, long CopiedBytes, long SharedBytes, long RetainedCapacity, int RetainedPages) MemoryStatistics
-    {
-        get
-        {
-            lock (_store.SyncRoot)
-            {
-                var pages = new HashSet<ArcBufferPage>();
-                foreach (var segment in _store.Segments)
-                {
-                    AddPages(segment, pages);
-                }
-
-                foreach (var snapshot in _store.ReadSnapshots)
-                {
-                    foreach (var segment in snapshot)
-                    {
-                        AddPages(segment, pages);
-                    }
-                }
-
-                if (_store.CopyWriter is { } writer)
-                {
-                    using var tail = writer.PeekSlice(0);
-                    pages.Add(tail.First);
-                }
-
-                return (_store.Segments.Count, _store.ReadSnapshots.Sum(static snapshot => snapshot.Count(static segment => segment.Length > 0)),
-                    _store.CopiedBytes, _store.SharedBytes, pages.Sum(static page => (long)page.Array.Length), pages.Count);
-            }
-        }
-    }
-
-    private static void AddPages(ArcBuffer segment, HashSet<ArcBufferPage> pages)
-    {
-        var remaining = segment.Length;
-        var offset = segment.Offset;
-        for (var page = segment.First; remaining > 0; page = page.Next!)
-        {
-            pages.Add(page);
-            remaining -= page.Length - offset;
-            offset = 0;
-        }
-    }
+    internal Store Storage => _store;
 
     internal string? StoredJournalFormatKey
     {
@@ -326,23 +284,14 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
         {
             metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
             segments = new ArcBuffer[_store.Segments.Count];
-            try
+            // The lock preserves each storage owner until the read acquires its independent pin.
+            for (var i = 0; i < segments.Length; i++)
             {
-                for (var i = 0; i < segments.Length; i++)
+                var segment = _store.Segments[i];
+                if (segment.Length > 0)
                 {
-                    var segment = _store.Segments[i];
-                    if (segment.Length > 0)
-                    {
-                        segments[i] = segment.Slice(0);
-                    }
+                    segments[i] = segment.Slice(0);
                 }
-
-                _store.ReadSnapshots.Add(segments);
-            }
-            catch
-            {
-                ReleaseSegments(segments);
-                throw;
             }
         }
 
@@ -353,15 +302,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
         }
         finally
         {
-            lock (_store.SyncRoot)
-            {
-                _store.ReadSnapshots.Remove(segments);
-                ReleaseSegments(segments);
-                if (_store.ReadSnapshots.Count == 0)
-                {
-                    _store.ReadSnapshots.TrimExcess();
-                }
-            }
+            ReleaseSegments(segments);
         }
     }
 
@@ -387,7 +328,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
             _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
             var retained = _store.Copy(segment);
             Publish(retained);
-            _store.CopiedBytes += segment.Length;
         }
 
         return default;
@@ -405,7 +345,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
             writer.Write(snapshot);
             var retained = snapshot.IsEmpty ? default : writer.PeekSlice(writer.Length);
             Publish(retained, replacement);
-            _store.CopiedBytes += snapshot.Length;
         }
 
         return default;
@@ -430,7 +369,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
 
             var retained = value.Length == 0 ? default : value.Slice(0);
             Publish(retained, replacement);
-            _store.SharedBytes += value.Length;
         }
 
         return default;
@@ -483,13 +421,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
 
         public List<ArcBuffer> Segments { get; set; } = [];
 
-        public HashSet<ArcBuffer[]> ReadSnapshots { get; } = [];
-
         public ArcBufferWriter? CopyWriter { get; private set; }
-
-        public long CopiedBytes { get; set; }
-
-        public long SharedBytes { get; set; }
 
         // Shared storage outlives its handles. Retire its pins when the entire store becomes unreachable.
         ~Store()

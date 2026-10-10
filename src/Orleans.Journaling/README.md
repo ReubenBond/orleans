@@ -167,27 +167,17 @@ Built-in durable state components use the configured JSON codec automatically. C
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
-## Journal buffer ownership
+## In-memory storage capacity
 
-The journal owner captures a pinned committed prefix and keeps that reference until the storage
-operation actually completes. A successful acknowledgement consumes that prefix and completes the
-state machines' write bookkeeping. Cancelling an individual caller ends its wait while the owned
-operation continues. Owner disposal drains storage I/O before releasing the writer and captured bytes.
+`VolatileJournalStorage` retains journal bytes on reference-counted pages across manager lifetimes.
+Replacement and deletion release retired storage references, while active readers retain stable
+bytes until completion. Each nonempty journal can retain a minimum 16 KiB page even for a small
+payload. Capacity planning includes the number and lifetime of stored journals and concurrent reads.
+`ArcBufferWriter.MaxRetainedPoolBytes` separately bounds the process-wide cache of free pages to
+4 MiB by default; zero releases free pages and disables caching.
 
-The in-memory `VolatileJournalStorage` acquires its own page references for retained journal batches.
-Read operations pin a stable snapshot of bytes and metadata through consumer completion, including
-when another handle replaces or deletes the journal. Replacement and deletion release retired storage
-references; active readers retain their own references until they finish. The shared store owns these
-references across manager and handle lifetimes and releases them when it becomes unreachable.
-Providers using `IJournalStorage`'s sequence-based methods consume or copy the borrowed bytes before
-their returned operation completes. Volatile storage coalesces copied append bytes on pooled pages.
-
-Consumed journal writers reuse minimum-sized pages for small batches and release an oversized idle
-tail after the active entry finishes. `ArcBufferWriter.MaxRetainedPoolBytes` bounds the process-wide
-cache of free pages to 4 MiB by default. Zero releases free pages and disables caching. Pages up to
-1 MiB are eligible; active writer and reader pages remain owned for their complete lifetime. Returns
-which race with a budget reduction trim after publication so the settled cache fits the current limit.
-Released large backing arrays go to the separately managed `ArrayPool<byte>.Shared`.
+See [Journaling runtime behavior](https://dotnet.github.io/orleans/docs/grains/journaling/runtime-behavior/)
+for captured-buffer ownership, cancellation, shutdown, and storage lifetime contracts.
 
 ## Custom state and standalone ownership
 
