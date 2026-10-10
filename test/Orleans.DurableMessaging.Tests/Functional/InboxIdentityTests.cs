@@ -293,11 +293,11 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var envelope = Create(rig, key, "valid.subject.v1", "missing-subject");
         var invalid = envelope with { Subject = subject! };
         var writes = Writes(rig);
-
-await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, invalid));
+        var bytes = envelope.Payload.ToArray();
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, invalid));
         Assert.Equal(writes, Writes(rig));
-
-Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
+        Assert.Equal(bytes, envelope.Payload);
+        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
         Assert.Empty(rig.Pending);
         Assert.Empty(rig.Processed);
         Assert.False(handler.Entered.Task.IsCompleted);
@@ -330,16 +330,14 @@ Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.Inb
         var envelope = Create(rig, key, subject, "oversized");
         var writes = Writes(rig);
         var bytes = envelope.Payload.ToArray();
-
-await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, envelope));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, envelope));
         Assert.Equal(writes, Writes(rig));
         Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
         Assert.Empty(rig.Pending);
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Grain.GetSnapshotForTest().Effects);
-        Assert.Equal(bytes, envelope.Payload.ToArray());
-
-Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        Assert.Equal(bytes, envelope.Payload);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         Assert.False(handler.Entered.Task.IsCompleted);
     }
 
@@ -424,7 +422,7 @@ Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
 
     private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(rig.Context.GrainId));
 
-private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
+    private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
     {
         var started = new TaskCompletionSource<Task<DeliveryResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Context.Scheduler.QueueAction(() =>
