@@ -1076,8 +1076,6 @@ namespace Orleans.Serialization.Buffers
 
         public void Skip(long count) { }
 
-        public bool TryReadArcBuffer(int length, out ArcBuffer value) { throw null; }
-
         public bool TryReadBytes(int length, out System.ReadOnlySpan<byte> bytes) { throw null; }
     }
 
