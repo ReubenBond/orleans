@@ -17,7 +17,7 @@ public static class DurableOutboxExtensions
     /// <remarks>
     /// Serialization finishes before staging begins. Compute fallible business results first,
     /// then send, apply the business state, and complete in one synchronous final block.
-    /// This method releases its local payload owner; durable state retains its independent slice.
+    /// The serialized array remains available through the staged envelope's ordinary managed references.
     /// </remarks>
     public static void Send<T>(
         this IDurableOutbox outbox, DurableMessageType<T> messageType,
@@ -25,7 +25,7 @@ public static class DurableOutboxExtensions
     {
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(messageType);
-        using var envelope = messageType.Create(messageId, outbox.SenderId, destination, body);
+        var envelope = messageType.Create(messageId, outbox.SenderId, destination, body);
         outbox.Send(envelope);
     }
 
@@ -51,8 +51,8 @@ public static class DurableOutboxExtensions
     /// <param name="messages">The application-defined identities, destinations, and bodies.</param>
     /// <remarks>
     /// Enumerates once and sends each command using the ordinary typed send helper.
-    /// Each send releases its temporary payload owner. If enumeration, encoding, or
-    /// staging fails, earlier messages remain staged under their original identities.
+    /// If enumeration, encoding, or staging fails, earlier messages remain staged
+    /// under their original identities with their serialized payload arrays.
     /// Retry with the same identities and content; persistence follows the grain's
     /// ordinary journal write.
     /// </remarks>

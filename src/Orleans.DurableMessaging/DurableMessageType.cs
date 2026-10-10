@@ -1,7 +1,6 @@
 using System;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.DurableMessaging;
 
@@ -31,8 +30,8 @@ public sealed class DurableMessageType<T>
     /// <summary>Gets the exact protocol subject.</summary>
     public string Subject { get; }
 
-    /// <summary>Decodes a borrowed envelope using this subject's payload contract.</summary>
-    /// <param name="envelope">The envelope, kept alive through decoding.</param>
+    /// <summary>Decodes an envelope using this subject's payload contract.</summary>
+    /// <param name="envelope">The envelope containing the serialized payload.</param>
     /// <returns>The nonnull decoded payload.</returns>
     /// <exception cref="ArgumentException">The envelope has a different subject or a serialized null payload.</exception>
     public T Decode(DurableEnvelope envelope)
@@ -47,16 +46,14 @@ public sealed class DurableMessageType<T>
             ?? throw new ArgumentException($"Durable message subject '{Subject}' requires a nonnull payload.", nameof(envelope));
     }
 
-    /// <summary>Encodes a typed body into an independently owned immutable envelope.</summary>
+    /// <summary>Encodes a typed body into an envelope with independently allocated payload bytes.</summary>
     /// <param name="messageId">The stable application command identity.</param>
     /// <param name="senderId">The sending grain identity.</param>
     /// <param name="receiverId">The destination inbox.</param>
     /// <param name="body">The nonnull body to serialize.</param>
-    /// <returns>An envelope which must be disposed by its owner.</returns>
+    /// <returns>An envelope containing ordinary GC-owned payload bytes.</returns>
     /// <remarks>
-    /// Encoding borrows a process-shared pooled buffer and transfers a slice to the result.
-    /// Repeated calls can share backing pages while retaining independent payload ownership.
-    /// Consuming the slice releases the writer's completed pages while retaining its writable tail for reuse.
+    /// Serialization creates a new byte array. Treat its contents as immutable after publication.
     /// </remarks>
     public DurableEnvelope Create(HierarchicalKey messageId, GrainId senderId, GrainId receiverId, T body)
     {
@@ -67,23 +64,9 @@ public sealed class DurableMessageType<T>
             SenderId = senderId,
             ReceiverId = receiverId,
             Subject = Subject,
-            Payload = default
+            Payload = Array.Empty<byte>()
         };
         DurableEnvelopeValidation.Validate(envelope);
-        var buffer = DurableMessageBuffers.Pool.Get();
-        try
-        {
-            _serializer.Serialize(body, buffer);
-            return envelope with { Payload = buffer.ConsumeSlice(buffer.Length) };
-        }
-        catch
-        {
-            buffer.Reset();
-            throw;
-        }
-        finally
-        {
-            DurableMessageBuffers.Pool.Return(buffer);
-        }
+        return envelope with { Payload = _serializer.SerializeToArray(body) };
     }
 }
