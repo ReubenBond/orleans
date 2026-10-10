@@ -97,7 +97,7 @@ and fan-out recipients use distinct deterministic child keys, with fixed-depth i
 from stable application facts.
 
 Each pending key denotes one immutable intent: sender, destination, ordinal subject, and opaque
-body bytes remain stable. Equivalent repeated staging retains the original message and payload
-owner. A conflicting destination, subject, or body fails before replacement, capture, or scheduling.
+body bytes remain stable. Equivalent repeated staging compares and retains the original durable
+intent and payload owner, whose lifetime remains independent of caller disposal. A conflicting destination, subject, or body fails before replacement, capture, or scheduling.
 After removal, the same command can be staged again; receiver completion supplies deduplication
 within its configured retention horizon.
