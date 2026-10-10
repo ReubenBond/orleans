@@ -15,12 +15,17 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `VolatileJournalStorageOptions.MaxAppendsBeforeSnapshot` (default 100) and
 `MaxBytesBeforeSnapshot` (default 1,048,576 bytes). The named-provider overload
 configures each provider independently. Both values must be positive.
+Providers capture the configured limits when constructed.
 
 Reaching either threshold requests a snapshot before the next journal write.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies
 over more updates; smaller limits reduce retained history and replay work.
+Counters belong to each journal and are shared by handles for the same journal
+within one provider.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and provider bookkeeping.
 
 ## Persistence hooks
 
