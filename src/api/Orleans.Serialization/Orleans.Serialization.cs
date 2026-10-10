@@ -1049,6 +1049,8 @@ namespace Orleans.Serialization.Buffers
 
         public byte PeekByte() { throw null; }
 
+        public ArcBuffer ReadArcBuffer(int length) { throw null; }
+
         public byte ReadByte() { throw null; }
 
         public void ReadBytes(scoped System.Span<byte> destination) { }

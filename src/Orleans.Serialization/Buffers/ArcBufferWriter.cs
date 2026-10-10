@@ -1137,9 +1137,9 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 /// Represents a reference-counted slice of raw bytes from an <see cref="ArcBufferWriter"/>.
 /// </summary>
 /// <remarks>
-/// An owned slice must be disposed when no longer needed. Copying this struct does not acquire another pin:
-/// such copies are borrowed views and must not be disposed independently. Use <see cref="Slice(int)"/>
-/// to obtain an independent owner. Referenced bytes must not be mutated while a slice is in use.
+/// An owned slice must be disposed when no longer needed. Copying this struct creates a borrowed view
+/// whose lifetime is bounded by the owner. Use <see cref="Slice(int)"/> to obtain an independent owner.
+/// Referenced bytes must remain unchanged while a slice is in use.
 /// The default value is a valid, owner-free empty buffer.
 /// </remarks>
 /// <param name="first">The first page in the sequence.</param>
@@ -1302,7 +1302,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     }
 
     /// <summary>
-    /// Throws if the buffer it no longer valid.
+    /// Throws if the buffer is no longer valid.
     /// </summary>
     internal readonly void CheckValidity()
     {
@@ -1583,7 +1583,6 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
             if (_page == First)
             {
                 Debug.Assert(_position == 0);
-                Slice.CheckValidity();
                 var offset = Offset;
                 var length = Math.Min(Length, _page.Length - offset);
                 _position += length;
