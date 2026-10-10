@@ -201,8 +201,8 @@ callbacks release it after the final active use finishes. Caller cancellation
 ends the wait while actual admission, serialization, and invocation retain their
 own pins.
 The handler borrows its context envelope through actual method completion. Release
-application-local envelopes after staging and decoded packages after use; use explicit
-`Retain()` when crossing those lifetimes. Typed send/reply helpers dispose their
+application-local envelopes after staging and decoded resource-bearing values after
+use; use explicit `Retain()` when crossing those lifetimes. Typed send/reply helpers dispose their
 temporary envelopes internally; independently owned slices keep their pages alive
 after pooled encoder reuse. Application-owned raw encoders have explicit scope disposal.
 See [Payload ownership](durable-messaging.md#own-and-borrow-payload-slices) for each

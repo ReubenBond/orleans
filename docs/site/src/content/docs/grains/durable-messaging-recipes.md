@@ -25,7 +25,7 @@ protocol operations; keyed <xref:Orleans.DurableMessaging.DurableMessageType`1>
 bindings select their ordinary serializers. Typed outbox `Send` and `SendReply`
 use private pooled encoders and release temporary envelopes internally after
 staging retains their payload pins. Handler context payloads are borrowed.
-Bulk preparation and raw/package protocols retain explicit local ownership.
+Explicitly created envelopes retain application-managed ownership.
 
 ## Run the stock-reservation sample
 
@@ -250,8 +250,8 @@ typed reservation acceptance, zero/negative-quantity rejections, shortages,
 polymorphic result round trips, reply-stage failure without stock mutation,
 permanent invalid-restock dead-lettering, checked restock overflow,
 provider-success/local-cancellation retry,
-out-of-order projections, typed multi-subject dispatch, and independently decoded
-package entries. Verify the original reply's actual journal acknowledgement and
+out-of-order projections, typed multi-subject dispatch, and ordinary composite-message
+round trips. Verify the original reply's actual journal acknowledgement and
 the exact completion-retention boundary when testing end-to-end resubmission.
 For runtime guarantees and operating controls, see
 [Durable messaging operations](durable-messaging-operations.md).
