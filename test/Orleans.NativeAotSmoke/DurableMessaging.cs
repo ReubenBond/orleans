@@ -27,6 +27,11 @@ var dispatcher = new DurableInboxDispatcher()
     })
     .Register(strings, new Offset(2), static (value, argument, context) =>
     {
+        if (value.Length == 0)
+        {
+            context.DeadLetter("Text is required.");
+            return;
+        }
         if (value.Length + argument.Value != 5) throw new InvalidOperationException("Struct handler state was lost.");
         context.Complete();
     });
@@ -50,9 +55,16 @@ using var text = strings.Create(key.CreateChildKey("text"), sender, receiver, "a
 var textContext = new SmokeContext(text);
 await dispatcher.HandleAsync(textContext, CancellationToken.None);
 if (!textContext.Completed) throw new InvalidOperationException("Typed struct-argument handler did not complete.");
+using var invalid = strings.Create(key.CreateChildKey("invalid"), sender, receiver, "");
+var rejected = new SmokeContext(invalid);
+await dispatcher.HandleAsync(rejected, CancellationToken.None);
+if (!rejected.Completed || rejected.DeadLetterReason != "Text is required." || outbox.Count != 1)
+{
+    throw new InvalidOperationException("Typed handler did not preserve its explicit permanent failure.");
+}
 outbox.Send(integers, key.CreateChildKey("send"), sender, 7);
 if (integers.Decode(outbox.Messages.Last()) != 7) throw new InvalidOperationException("Typed send failed.");
-Console.WriteLine("NativeAOT typed sends, deterministic replies, and static class/struct handler arguments passed.");
+Console.WriteLine("NativeAOT typed sends, deterministic replies, static handlers, and explicit permanent failures passed.");
 
 internal readonly record struct Offset(int Value);
 
@@ -72,7 +84,13 @@ internal sealed class SmokeContext(DurableEnvelope envelope) : IInboxHandlerCont
 {
     public DurableEnvelope Envelope { get; } = envelope;
     public bool Completed { get; private set; }
+    public string? DeadLetterReason { get; private set; }
     public void Complete() => Completed = true;
+    public void DeadLetter(string reason)
+    {
+        DeadLetterReason = reason;
+        Completed = true;
+    }
 }
 
 internal sealed class SmokeOutbox(GrainId senderId) : IDurableOutbox, IDisposable
