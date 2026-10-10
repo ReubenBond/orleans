@@ -6,9 +6,10 @@ using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
-using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
@@ -440,7 +441,7 @@ public class CodecRecoveryTests : JournalingTestBase
         CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
-        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
+        await storage.AppendBytesAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
 
@@ -471,13 +472,13 @@ public class CodecRecoveryTests : JournalingTestBase
     {
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
             => inner.AppendAsync(value, cancellationToken);
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => inner.DeleteAsync(cancellationToken);
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)

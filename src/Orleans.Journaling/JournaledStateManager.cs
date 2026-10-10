@@ -1,10 +1,9 @@
-using System.Buffers;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
-using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -942,48 +941,13 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            if (_storage is IRetainedJournalStorage retained)
+            if (replace)
             {
-                // The work loop keeps its pin until actual completion; storage acquires an independent owner.
-                if (replace)
-                {
-                    await retained.ReplaceRetainedAsync(value, cancellationToken).ConfigureAwait(true);
-                }
-                else
-                {
-                    await retained.AppendRetainedAsync(value, cancellationToken).ConfigureAwait(true);
-                }
+                await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
             }
             else
             {
-                var sequence = value.AsReadOnlySequence();
-#if DEBUG
-                // Poison the borrowed-provider copy after its consumption deadline.
-                var poisonLength = checked((int)sequence.Length);
-                var poisonBuffer = ArrayPool<byte>.Shared.Rent(poisonLength);
-#endif
-                try
-                {
-#if DEBUG
-                    sequence.CopyTo(poisonBuffer);
-                    sequence = new ReadOnlySequence<byte>(poisonBuffer, 0, poisonLength);
-#endif
-                    if (replace)
-                    {
-                        await _storage.ReplaceAsync(sequence, cancellationToken).ConfigureAwait(true);
-                    }
-                    else
-                    {
-                        await _storage.AppendAsync(sequence, cancellationToken).ConfigureAwait(true);
-                    }
-                }
-                finally
-                {
-#if DEBUG
-                    poisonBuffer.AsSpan(0, poisonLength).Fill(0x67);
-                    ArrayPool<byte>.Shared.Return(poisonBuffer);
-#endif
-                }
+                await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
             }
 
             _shared.Instruments.OnStorageOperation(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);

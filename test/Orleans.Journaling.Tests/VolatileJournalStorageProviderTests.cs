@@ -219,17 +219,17 @@ public sealed class VolatileJournalStorageProviderTests
 
         Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
 
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var appendProperties = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(appendProperties);
         Assert.NotNull(appendProperties.ETag);
 
-        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         var replaceProperties = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(replaceProperties);
         Assert.NotEqual(appendProperties.ETag, replaceProperties.ETag);
 
-        await storage.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
+        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
         var finalProperties = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(finalProperties);
         Assert.NotEqual(replaceProperties.ETag, finalProperties.ETag);

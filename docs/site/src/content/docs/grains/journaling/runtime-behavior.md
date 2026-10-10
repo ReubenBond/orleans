@@ -73,11 +73,13 @@ release the retired storage references; readers release their own references on 
 or cancellation. The shared store owns retained bytes across handle and manager lifetimes, and
 releases its remaining references when the store becomes unreachable.
 
-Sequence-based <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
-<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> consume or copy borrowed bytes before their
-returned operation completes. Volatile storage coalesces copied append bytes on pooled pages.
-An oversized drained journal-writer tail is released after its active entry completes; minimum-sized
-pages are reused for small batches.
+<xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
+<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> accept caller-owned
+<xref:Orleans.Serialization.Buffers.ArcBuffer> values. Callers keep their references pinned and
+the encoded bytes immutable through actual operation completion, including failure or cancellation.
+Storage which retains bytes takes an independent slice and releases it when those bytes are retired.
+Azure, S3, and Redis consume the buffer through the provider operation; volatile storage retains its
+own page references. Journal writers reuse their current page until an explicit reset or disposal.
 
 <xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> sets the process-wide
 free-page cache budget, with a default of 4 MiB. Setting zero releases free pages and disables caching.
@@ -88,7 +90,7 @@ arrays return to the separately managed `ArrayPool<byte>.Shared`.
 
 Capacity planning includes live journal payloads, page rounding, journal count and lifetime, and
 concurrent read snapshots. A nonempty journal can retain a 16 KiB minimum page even for a small
-payload, and a copied-append writer can retain its current page until replacement or deletion.
+payload. A journal writer can retain its current page until reset or disposal.
 Readers keep retired pages alive through completion. The free-page cache budget applies after the
 last owner releases a page; stored journals and active readers contribute separately to live memory.
 The volatile provider retains stores for journal discovery, so delete journals when their contents

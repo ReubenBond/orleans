@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -145,7 +144,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalStorage
+public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly Store _store;
     private string? _configuredJournalFormatKey;
@@ -320,43 +319,14 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
     }
 
     /// <inheritdoc/>
-    public ValueTask AppendAsync(ReadOnlySequence<byte> segment, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_store.SyncRoot)
-        {
-            _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
-            var retained = _store.Copy(segment);
-            Publish(retained);
-        }
-
-        return default;
-    }
+    public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => Write(value, replace: false, cancellationToken);
 
     /// <inheritdoc/>
-    public ValueTask ReplaceAsync(ReadOnlySequence<byte> snapshot, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_store.SyncRoot)
-        {
-            var replacement = new List<ArcBuffer>(1);
-            // Prepare the complete replacement before retiring the published journal.
-            using var writer = new ArcBufferWriter();
-            writer.Write(snapshot);
-            var retained = snapshot.IsEmpty ? default : writer.PeekSlice(writer.Length);
-            Publish(retained, replacement);
-        }
+    public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => Write(value, replace: true, cancellationToken);
 
-        return default;
-    }
-
-    ValueTask IRetainedJournalStorage.AppendRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
-        => WriteRetained(value, replace: false, cancellationToken);
-
-    ValueTask IRetainedJournalStorage.ReplaceRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
-        => WriteRetained(value, replace: true, cancellationToken);
-
-    private ValueTask WriteRetained(ArcBuffer value, bool replace, CancellationToken cancellationToken)
+    private ValueTask Write(ArcBuffer value, bool replace, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
@@ -421,8 +391,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
 
         public List<ArcBuffer> Segments { get; set; } = [];
 
-        public ArcBufferWriter? CopyWriter { get; private set; }
-
         // Shared storage outlives its handles. Retire its pins when the entire store becomes unreachable.
         ~Store()
         {
@@ -431,39 +399,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
             {
                 ReleaseSegments(segments);
             }
-
-            CopyWriter?.Dispose();
-        }
-
-        public ArcBuffer Copy(ReadOnlySequence<byte> input)
-        {
-            if (input.IsEmpty)
-            {
-                return default;
-            }
-
-            var length = checked((int)input.Length);
-            var hasCopyWriter = CopyWriter is not null;
-            var writer = CopyWriter ??= new ArcBufferWriter();
-            try
-            {
-                writer.Write(input);
-                return writer.ConsumeSlice(length);
-            }
-            catch
-            {
-                if (hasCopyWriter)
-                {
-                    writer.Truncate(0);
-                }
-                else
-                {
-                    writer.Dispose();
-                    CopyWriter = null;
-                }
-
-                throw;
-            }
         }
 
         public void ReleaseContents()
@@ -471,8 +406,6 @@ public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalSt
             ReleaseSegments(Segments);
             Segments.Clear();
             Segments.Capacity = 0;
-            CopyWriter?.Dispose();
-            CopyWriter = null;
         }
 
         public Dictionary<string, string> Properties { get; } = new(StringComparer.Ordinal);
