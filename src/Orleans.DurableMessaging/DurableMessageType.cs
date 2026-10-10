@@ -56,6 +56,7 @@ public sealed class DurableMessageType<T>
     /// <remarks>
     /// Encoding borrows a process-shared pooled buffer and transfers a slice to the result.
     /// Repeated calls can share backing pages while retaining independent payload ownership.
+    /// Consuming the slice releases the writer's completed pages while retaining its writable tail for reuse.
     /// </remarks>
     public DurableEnvelope Create(HierarchicalKey messageId, GrainId senderId, GrainId receiverId, T body)
     {

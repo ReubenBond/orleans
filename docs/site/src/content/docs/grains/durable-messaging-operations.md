@@ -194,6 +194,12 @@ live messages can share a page, and a retained slice can keep that page alive af
 other slices are released. Page retention depends on message sizes, encoder reuse,
 concurrency, and the overlap between durable state, readers, and delivery operations.
 
+Consuming a slice releases the encoder's pins on completed pages as its cursor
+passes them. A pooled encoder retains its writable tail for subsequent messages.
+Budget these writer-owned pages separately from the free-page cache: the encoder
+pool bounds the number of cached writers, while page capacity follows encoding
+size hints. Payload limits at ingress also bound this retained capacity.
+
 Outbox staging independently retains the caller's payload pin. Generated RPC request
 copying retains another pin, while ordinary persistence serialization is non-consuming.
 Serialization and invocation hold active uses of that request owner; terminal
