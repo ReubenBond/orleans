@@ -39,7 +39,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         await grain.SetValueAsync(41);
         var journal = JournalId.FromGrainId(grain.GetGrainId());
         using var handler = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
-        using var envelope = CreateEnvelope(grain);
+        var envelope = CreateEnvelope(grain);
         Assert.Equal(DeliveryStatus.Accepted, (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
         await handler.WaitUntilEnteredAsync();
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
@@ -61,7 +61,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Equal(42, await grain.GetValueAsync());
         Assert.Equal(0, first.Inbox.Count);
         Assert.Single(GetProcessed(first.Context));
-        using var output = Assert.Single(first.Outbox.Messages).Retain();
+        var output = Assert.Single(first.Outbox.Messages);
         Assert.Equal(1, state.HandlerCalls);
         Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
         Assert.Equal(1, state.HandlerCalls);

@@ -19,19 +19,19 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<HierarchicalKey> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
-    Task StageOutputAsync([DisposeOnCompletion] DurableEnvelope envelope);
-    Task<DeliveryResult> AcceptAndDeactivateAsync([DisposeOnCompletion] DurableEnvelope envelope);
+    Task StageOutputAsync(DurableEnvelope envelope);
+    Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
-    Task SeedInboxStateAsync([DisposeOnCompletion] DurableEnvelope envelope, string? ownershipId, DurableJob? job);
+    Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job);
     Task ConfigureHandlerAsync(bool enabled);
     Task<bool> RemoveInboxDeadLetterAsync(HierarchicalKey messageId);
     Task<bool> RemoveOutboxDeadLetterAsync(HierarchicalKey messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
-    Task SetControlEnvelopeAsync([DisposeOnCompletion] DurableEnvelope envelope);
+    Task SetControlEnvelopeAsync(DurableEnvelope envelope);
     Task DeleteStateAndDeactivateAsync();
     Task HoldPumpTurnAsync(string barrierRoute, bool deactivate);
-    Task HoldPumpTurnAsync(string barrierRoute, [DisposeOnCompletion] DurableEnvelope replacement, bool deactivate);
+    Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope replacement, bool deactivate);
 }
 
 [GenerateSerializer, Immutable]
@@ -154,7 +154,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task<HierarchicalKey> SendAsync(GrainId target, string route, DurableTestMessage message)
     {
-        using var envelope = CreateEnvelope(target, route, message);
+        var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         await WriteStateAsync();
         return envelope.MessageId;
@@ -162,7 +162,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task<HierarchicalKey> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
     {
-        using var envelope = CreateEnvelope(target, route, message);
+        var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         _outbox.Send(envelope);
         await WriteStateAsync();
@@ -178,7 +178,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public Task<HierarchicalKey> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
     {
-        using var envelope = CreateEnvelope(target, route, message);
+        var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         return Task.FromResult(envelope.MessageId);
     }
@@ -283,9 +283,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public Task SetControlEnvelopeAsync(DurableEnvelope envelope)
     {
-        var retained = envelope.Retain();
-        _controlEnvelope?.Dispose();
-        _controlEnvelope = retained;
+        _controlEnvelope = envelope;
         return Task.CompletedTask;
     }
 
@@ -353,7 +351,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnCompleted() { }
     public void Dispose()
     {
-        _controlEnvelope?.Dispose();
         _controlEnvelope = null;
         _lifecycleSubscription.Dispose();
     }
@@ -412,7 +409,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }
 
-            using var outgoing = message.ForwardTo is { } destination
+            var outgoing = message.ForwardTo is { } destination
                 ? TestApplicationProtocol.Create(_sessions, this.GetGrainId(), destination, "messages/forwarded",
                     message with { ForwardTo = null, ThrowDuringPreparation = false },
                     context.Envelope.MessageId.CreateChildKey("forwarded"))

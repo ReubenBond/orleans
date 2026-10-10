@@ -25,23 +25,23 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
     {
         var receiver = await StartBacklogAsync();
         var owner = (await receiver.GetSnapshotAsync()).InboxJobId;
-        using var old = CreateEnvelope(receiver, NewMessage(120, "old"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old.Value)).Status);
+        var old = CreateEnvelope(receiver, NewMessage(120, "old"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
         Fixture.Clock.Advance(TimeSpan.FromMinutes(5));
-        using var current = CreateEnvelope(receiver, NewMessage(121, "current"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, current.Value)).Status);
+        var current = CreateEnvelope(receiver, NewMessage(121, "current"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, current)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 2);
         _ = await receiver.GetSnapshotAsync();
         Fixture.Clock.Advance(TimeSpan.FromMinutes(5) - TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, old.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, old)).Status);
         var processed = GetProcessed(receiver);
         Assert.Equal(2, processed.Count);
 
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        using var fresh = CreateEnvelope(receiver, NewMessage(122, "fresh"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, fresh.Value)).Status);
+        var fresh = CreateEnvelope(receiver, NewMessage(122, "fresh"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, fresh)).Status);
         var maintained = await Fixture.WaitForEffectCountAsync(receiver, 3);
         _ = await receiver.GetSnapshotAsync();
 
@@ -49,18 +49,18 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         Assert.Equal(owner, maintained.InboxJobId);
         Assert.Empty(maintained.InboxDeadLetters);
         Assert.Equal(2, processed.Count);
-        Assert.False(processed.ContainsKey(old.Value.MessageId));
-        Assert.True(processed.ContainsKey(current.Value.MessageId));
-        Assert.True(processed.ContainsKey(fresh.Value.MessageId));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, current.Value)).Status);
+        Assert.False(processed.ContainsKey(old.MessageId));
+        Assert.True(processed.ContainsKey(current.MessageId));
+        Assert.True(processed.ContainsKey(fresh.MessageId));
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, current)).Status);
     }
 
     [Fact]
     public async Task FreshActivation_CompactsProcessedRecordsWithoutDeadLettersOrOwnerClear()
     {
         var receiver = await StartBacklogAsync();
-        using var old = CreateEnvelope(receiver, NewMessage(123, "initial-expiry"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old.Value)).Status);
+        var old = CreateEnvelope(receiver, NewMessage(123, "initial-expiry"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         var before = await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
         Fixture.Clock.Advance(TimeSpan.FromMinutes(10));
@@ -83,42 +83,42 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         var extension = context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         var counted = new CountingProcessedDictionary(GetProcessed(receiver));
         extension.GetType().GetField("_processed", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, counted);
-        using var oldest = CreateEnvelope(receiver, NewMessage(124, "oldest"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, oldest.Value)).Status);
+        var oldest = CreateEnvelope(receiver, NewMessage(124, "oldest"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, oldest)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        using var next = CreateEnvelope(receiver, NewMessage(125, "next"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, next.Value)).Status);
+        var next = CreateEnvelope(receiver, NewMessage(125, "next"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, next)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 2);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(0, counted.Enumerations);
         Fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
-        using var trigger = CreateEnvelope(receiver, NewMessage(126, "sweep"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, trigger.Value)).Status);
+        var trigger = CreateEnvelope(receiver, NewMessage(126, "sweep"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, trigger)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 3);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(1, counted.Enumerations);
-        Assert.False(counted.ContainsKey(oldest.Value.MessageId));
-        Assert.True(counted.ContainsKey(next.Value.MessageId));
+        Assert.False(counted.ContainsKey(oldest.MessageId));
+        Assert.True(counted.ContainsKey(next.MessageId));
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
         for (var i = 0; i < 8; i++)
         {
-            using var message = CreateEnvelope(receiver, NewMessage(130 + i, "within-cadence"));
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message.Value)).Status);
+            var message = CreateEnvelope(receiver, NewMessage(130 + i, "within-cadence"));
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
             await Fixture.WaitForEffectCountAsync(receiver, 4 + i);
             _ = await receiver.GetSnapshotAsync();
         }
         Assert.Equal(1, counted.Enumerations);
-        Assert.True(counted.ContainsKey(next.Value.MessageId));
+        Assert.True(counted.ContainsKey(next.MessageId));
         Fixture.Clock.Advance(TimeSpan.FromMinutes(2.5) - TimeSpan.FromTicks(1));
-        using var following = CreateEnvelope(receiver, NewMessage(140, "following-sweep"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, following.Value)).Status);
+        var following = CreateEnvelope(receiver, NewMessage(140, "following-sweep"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, following)).Status);
         var after = await Fixture.WaitForEffectCountAsync(receiver, 12);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(2, counted.Enumerations);
-        Assert.False(counted.ContainsKey(next.Value.MessageId));
-        Assert.True(counted.ContainsKey(trigger.Value.MessageId));
+        Assert.False(counted.ContainsKey(next.MessageId));
+        Assert.True(counted.ContainsKey(trigger.MessageId));
         Assert.Equal(1, after.InboxCount);
     }
 
@@ -126,8 +126,8 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
     public async Task PumpMaintenance_WritesOnlyWhenExpiredRecordsExist()
     {
         var receiver = await StartBacklogAsync();
-        using var old = CreateEnvelope(receiver, NewMessage(141, "pump-expiry"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old.Value)).Status);
+        var old = CreateEnvelope(receiver, NewMessage(141, "pump-expiry"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         var owned = await receiver.GetSnapshotAsync();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
@@ -153,8 +153,8 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
     public async Task MaintenanceWriteFailure_FencesOldStateAndFreshReplayRetriesCompaction()
     {
         var receiver = await StartBacklogAsync();
-        using var old = CreateEnvelope(receiver, NewMessage(142, "failed-maintenance"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old.Value)).Status);
+        var old = CreateEnvelope(receiver, NewMessage(142, "failed-maintenance"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
@@ -241,9 +241,9 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
     {
         var receiver = NewGrain();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/retained-backlog");
-        using var backlog = CreateEnvelope(receiver, NewMessage(119, "backlog") with { ThrowDuringPreparation = true }, "messages/retained-backlog");
+        var backlog = CreateEnvelope(receiver, NewMessage(119, "backlog") with { ThrowDuringPreparation = true }, "messages/retained-backlog");
         var rescheduled = Fixture.Metrics.GetCount("orleans-durablejobs-jobs-rescheduled");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, backlog.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, backlog)).Status);
         await handler.WaitUntilEnteredAsync();
         handler.Release();
         await Fixture.Metrics.WaitForCountAsync("orleans-durablejobs-jobs-rescheduled", rescheduled + 1);

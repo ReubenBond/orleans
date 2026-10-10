@@ -30,12 +30,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         };
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         RequestContext.Set("reusable-turn-parent", "first-call-chain");
-        EnvelopeLease first;
+        DurableEnvelope first;
         try { first = await DeliverAsync(rig); }
         finally { RequestContext.Remove("reusable-turn-parent"); }
-        using var firstLease = first;
         var timer = GetTimer(events, rig);
-        using var second = CreateEnvelope(rig.Receiver, NewMessage(502, "late-local"), "async/handler");
+        var second = CreateEnvelope(rig.Receiver, NewMessage(502, "late-local"), "async/handler");
         Task<DeliveryResult> accepted = null!;
         // The pump is deliberately non-interleaving. Inject the owned late admission on its
         // scheduler, as capture/hook tests do, rather than waiting on a blocked ordinary RPC.
@@ -45,7 +44,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             try
             {
                 var extension = (IDurableInboxExtension)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
-                accepted = extension.DeliverAsync(second.Value).AsTask();
+                accepted = extension.DeliverAsync(second).AsTask();
             }
             finally { RequestContext.Remove("reusable-turn-parent"); }
         });
@@ -81,7 +80,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Single(rig.Outbox);
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
@@ -89,13 +88,13 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         Assert.False(finished.IsCompleted);
         storage.Release();
         await WaitAsync(finished);
-        AssertSuccess(rig, input.Value, outputCount: 1);
+        AssertSuccess(rig, input, outputCount: 1);
         await DeactivateAsync(rig);
         var recovered = await rig.Receiver.GetSnapshotAsync();
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, recovered.OutboxCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var writes = Writes(rig);
         using var storage = Fixture.Storage.BlockWrite(rig.Journal);
         var preceding = OnTurnAsync(rig.Context, async () =>
@@ -125,7 +124,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             self.Mutate();
             rig.Outbox.Send(self.Output);
             self.Context.Complete();
-            AssertCompletedState(rig, input.Value);
+            AssertCompletedState(rig, input);
             staged.TrySetResult();
             await returnContinuation.Task;
         };
@@ -143,14 +142,14 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Equal(0, capturedEffects.InboxCount);
             Assert.Equal(1, capturedEffects.ProcessedMessageCount);
             Assert.Equal(1, capturedEffects.OutboxCount);
-            Assert.Equal(new DurableEffect(input.Value.MessageId, 1, 501, "async-handler"), Assert.Single(capturedEffects.Effects));
+            Assert.Equal(new DurableEffect(input.MessageId, 1, 501, "async-handler"), Assert.Single(capturedEffects.Effects));
         }
         finally
         {
             returnContinuation.TrySetResult();
         }
         await WaitAsync(finished);
-        AssertSuccess(rig, input.Value, outputCount: 1);
+        AssertSuccess(rig, input, outputCount: 1);
     }
 
     [Theory]
@@ -172,7 +171,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             }
             throw error;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var timer = GetTimer(events, rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
@@ -181,15 +180,15 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         if (completed)
         {
             Assert.Same(error, stop.Exception);
-            AssertSuccess(rig, input.Value, outputCount: 1);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+            AssertSuccess(rig, input, outputCount: 1);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
         }
         else
         {
             Assert.Null(stop.Exception);
             Assert.Empty(rig.Effects);
             Assert.Empty(rig.Outbox);
-            Assert.Equal(input.Value.MessageId, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).MessageId);
+            Assert.Equal(input.MessageId, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).MessageId);
         }
         await AssertHealthyAsync(rig);
         await DeactivateAsync(rig);
@@ -205,7 +204,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         handler.Body = (_, _) => ValueTask.CompletedTask;
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var writes = Writes(rig);
         handler.Release.TrySetResult();
         var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
@@ -215,7 +214,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         Assert.Empty(rig.Inbox);
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Effects);
-        await AssertFailureReplayAsync(rig, input.Value);
+        await AssertFailureReplayAsync(rig, input);
     }
 
     [Fact]
@@ -232,11 +231,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Equal(timestamp, Assert.Single(rig.Processed).Value);
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
-        AssertSuccess(rig, input.Value, outputCount: 0);
+        AssertSuccess(rig, input, outputCount: 0);
         await AssertHealthyAsync(rig);
     }
 
@@ -246,14 +245,14 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             OnTurnAsync(rig.Context, () => InvokeContextOperation(handler, operation)));
         Assert.Contains("inactive or different attempt", error.Message, StringComparison.Ordinal);
-        AssertSuccess(rig, input.Value, outputCount: 0);
+        AssertSuccess(rig, input, outputCount: 0);
         await AssertHealthyAsync(rig);
     }
 
@@ -263,7 +262,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     {
         var rig = await CreateAsync();
         using var first = rig.Handler;
-        using var one = await DeliverAsync(rig);
+        var one = await DeliverAsync(rig);
         var finished = await FinishedAsync(rig);
         first.Release.TrySetResult();
         await WaitAsync(finished);
@@ -277,8 +276,8 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         };
         await OnTurnAsync(rig.Context, () =>
             rig.Grain.HandlerOverride = second);
-        using var two = CreateEnvelope(rig.Receiver, NewMessage(502, "next"), "async/next");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, two.Value)).Status);
+        var two = CreateEnvelope(rig.Receiver, NewMessage(502, "next"), "async/next");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, two)).Status);
         await WaitAsync(second.Entered.Task);
         second.Release.TrySetResult();
         var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
@@ -295,7 +294,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var localEvents = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var localTimer = GetTimer(localEvents, rig);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -354,11 +353,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         Assert.Equal(snapshot.InboxJobId, rig.Grain.GetSnapshotForTest().InboxJobId);
         Assert.Same(snapshot.InboxJob, rig.Grain.GetSnapshotForTest().InboxJob);
         await AssertHealthyAsync(rig);
-        var duplicate = DeliverAsync(rig.Receiver, input.Value);
+        var duplicate = DeliverAsync(rig.Receiver, input);
         retry.TrySetResult();
         Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
-        AssertSuccess(rig, input.Value, outputCount: 0);
+        AssertSuccess(rig, input, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
     }
 
@@ -367,7 +366,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var snapshot = rig.Grain.GetSnapshotForTest();
         var writes = Writes(rig);
         var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
@@ -385,7 +384,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
-        AssertSuccess(rig, input.Value, outputCount: 0);
+        AssertSuccess(rig, input, outputCount: 0);
     }
 
     [Theory]
@@ -405,13 +404,13 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             self.Context.Complete();
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         timer = GetTimer(events, rig);
         using var storage = Fixture.Storage.BlockWrite(rig.Journal);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await storage.WaitUntilEnteredAsync();
-        AssertCompletedState(rig, input.Value);
+        AssertCompletedState(rig, input);
         Assert.False(finished.IsCompleted);
         var failure = new OperationCanceledException("Actual storage canceled.", new CancellationToken(canceled: true));
         if (failWrite) storage.Fail(failure);
@@ -420,11 +419,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         if (failWrite)
         {
             Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-            await AssertFailureReplayAsync(rig, input.Value);
+            await AssertFailureReplayAsync(rig, input);
         }
         else
         {
-            AssertSuccess(rig, input.Value, outputCount: 1);
+            AssertSuccess(rig, input, outputCount: 1);
             await AssertHealthyAsync(rig);
         }
     }
@@ -437,7 +436,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var error = new IOException("Journal hook failed.");
         await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new JournaledStateHook
         {
@@ -452,7 +451,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         {
             Assert.IsType<JournaledStatePostCommitException>(
                 ((GrainTimerEvents.TickStop)(await TimerStoppedAsync(events, timer)).Payload!).Exception);
-            AssertSuccess(rig, input.Value, outputCount: 0);
+            AssertSuccess(rig, input, outputCount: 0);
             await OnTurnAsync(rig.Context, rig.Manager.Hooks.Clear);
             await AssertHealthyAsync(rig);
         }
@@ -460,7 +459,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         {
             var failure = Assert.IsType<JournaledStatePreCommitException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
             Assert.Same(error, failure.InnerException);
-            await AssertFailureReplayAsync(rig, input.Value);
+            await AssertFailureReplayAsync(rig, input);
         }
     }
 
@@ -471,7 +470,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         using var handler = rig.Handler;
         var handlerError = new InvalidOperationException("After Complete.");
         handler.Body = (self, _) => { self.Mutate(); self.Context.Complete(); throw handlerError; };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         using var storage = Fixture.Storage.BlockWrite(rig.Journal);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
@@ -480,7 +479,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         storage.Fail(storageError);
         await WaitAsync(finished);
         Assert.Same(storageError, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        await AssertFailureReplayAsync(rig, input.Value);
+        await AssertFailureReplayAsync(rig, input);
     }
 
     private async Task<Rig> CreateAsync()
@@ -500,10 +499,10 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         return rig;
     }
 
-    private async Task<EnvelopeLease> DeliverAsync(Rig rig)
+    private async Task<DurableEnvelope> DeliverAsync(Rig rig)
     {
         var input = CreateEnvelope(rig.Receiver, NewMessage(501, "async-handler"), "async/handler");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input)).Status);
         await WaitAsync(rig.Handler.Entered.Task);
         return input;
     }
@@ -629,7 +628,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             Context = context;
-            Output.Dispose();
+
             Output = TestApplicationProtocol.Create(grainContext.ActivationServices.GetRequiredService<SerializerSessionPool>(), grainContext.GrainId, grainContext.GrainId, "output", 41);
             Entered.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
@@ -644,7 +643,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         public void Dispose()
         {
             Release.TrySetResult();
-            Output.Dispose();
+
         }
     }
     private sealed class JobContext(DurableJob job) : IJobRunContext

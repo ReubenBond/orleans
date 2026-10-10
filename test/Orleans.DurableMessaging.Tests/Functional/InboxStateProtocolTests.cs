@@ -18,8 +18,8 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         var receiver = NewGrain();
         const string route = "messages/local-preparation";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        using var envelope = CreateEnvelope(receiver, NewMessage(201, "local"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(201, "local"), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
@@ -52,8 +52,8 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         var receiver = NewGrain();
         const string route = "messages/no-earlier-write";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        using var envelope = CreateEnvelope(receiver, NewMessage(203, "no-earlier-write"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var envelope = CreateEnvelope(receiver, NewMessage(203, "no-earlier-write"), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
@@ -108,11 +108,11 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         Assert.True(stoppedToken.IsCancellationRequested);
         Assert.False(deleting.IsCompleted);
         Assert.False(context.Deactivated.IsCompleted);
-        using var envelope = CreateEnvelope(receiver, NewMessage(205, "after-delete"));
+        var envelope = CreateEnvelope(receiver, NewMessage(205, "after-delete"));
         Task<DeliveryResult> rejected = null!;
-        await OnTurnAsync(context, () => rejected = inbox.DeliverAsync(envelope.Value, TestContext.Current.CancellationToken).AsTask());
+        await OnTurnAsync(context, () => rejected = inbox.DeliverAsync(envelope, TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rejected);
-        Assert.Throws<InvalidOperationException>(() => outbox.Send(envelope.Value));
+        Assert.Throws<InvalidOperationException>(() => outbox.Send(envelope));
         Assert.Single(grain.GetSnapshotForTest().Effects);
         storage.Release();
         await deleting;
@@ -123,7 +123,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         var fresh = await receiver.GetSnapshotAsync();
         Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, fresh.ActivationId);
         Assert.Empty(fresh.Effects);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(fresh.ActivationId, completed.ActivationId);
         Assert.Equal("after-delete", Assert.Single(completed.Effects).Value);

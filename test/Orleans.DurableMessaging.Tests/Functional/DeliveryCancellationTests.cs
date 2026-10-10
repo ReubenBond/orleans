@@ -28,9 +28,9 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var extension = GetExtension(context);
         using var blocked = Block(receiver, phase);
-        using var envelope = CreateEnvelope(receiver, NewMessage(150, phase));
+        var envelope = CreateEnvelope(receiver, NewMessage(150, phase));
         using var cancellation = new CancellationTokenSource();
-        var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
+        var delivery = StartDelivery(proxy, receiver, context, extension, envelope, cancellation.Token);
         await blocked.Entered();
         cancellation.Cancel();
 
@@ -38,7 +38,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
 
         Assert.Equal(0, GetGate(extension).CurrentCount);
         Assert.Single(GetPendingOwners(extension));
-        var duplicate = StartDelivery(false, receiver, context, extension, envelope.Value, TestContext.Current.CancellationToken);
+        var duplicate = StartDelivery(false, receiver, context, extension, envelope, TestContext.Current.CancellationToken);
         await OnTurnAsync(context, static () => { });
         Assert.False(duplicate.IsCompleted);
         Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
@@ -68,12 +68,12 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var extension = GetExtension(context);
-        using var envelope = CreateEnvelope(receiver, NewMessage(151, phase));
-        using var logs = new DeliveryLogProbe(envelope.Value.MessageId);
+        var envelope = CreateEnvelope(receiver, NewMessage(151, phase));
+        using var logs = new DeliveryLogProbe(envelope.MessageId);
         Fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILoggerFactory>().AddProvider(logs);
         using var blocked = Block(receiver, phase);
         using var cancellation = new CancellationTokenSource();
-        var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
+        var delivery = StartDelivery(proxy, receiver, context, extension, envelope, cancellation.Token);
         await blocked.Entered();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
@@ -98,7 +98,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
             Assert.Equal(1, Assert.Single(completed.Effects).Count);
             Assert.Equal(1, completed.ProcessedMessageCount);
             Assert.Equal(0, completed.InboxCount);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         }
         else
         {
@@ -122,9 +122,9 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = shutdown.Token.Register(() => stopping.TrySetResult());
         using var blocked = Block(receiver, "storage");
-        using var envelope = CreateEnvelope(receiver, NewMessage(152, "deactivation"));
+        var envelope = CreateEnvelope(receiver, NewMessage(152, "deactivation"));
         using var cancellation = new CancellationTokenSource();
-        var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
+        var delivery = StartDelivery(proxy, receiver, context, extension, envelope, cancellation.Token);
         await blocked.Entered();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));

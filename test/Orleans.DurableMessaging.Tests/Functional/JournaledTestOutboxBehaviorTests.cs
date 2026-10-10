@@ -18,20 +18,20 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
     public async Task EquivalentDuplicates_BeforeAndAfterCommit_PreserveOneOutput()
     {
         var owner = NewGrain();
-        using var original = CreateOutput(owner);
-        using var copied = original with { Payload = original.Payload.Slice(0) };
+        var original = CreateOutput(owner);
+        var copied = original with { Payload = original.Payload };
         var serializer = Fixture.Client.ServiceProvider.GetRequiredService<Serializer<DurableEnvelope>>();
-        using var copy = serializer.Deserialize(serializer.SerializeToArray(original));
-        Assert.Same(original.Payload.First, copied.Payload.First);
-        Assert.NotSame(original.Payload.First, copy.Payload.First);
+        var copy = serializer.Deserialize(serializer.SerializeToArray(original));
+        Assert.Same(original.Payload, copied.Payload);
+        Assert.NotSame(original.Payload, copy.Payload);
 
         await owner.StageOutputAsync(original);
         var retained = Assert.Single(Fixture.GetStagedOutput(owner));
         await owner.StageOutputAsync(copied);
-        Assert.Same(retained.Payload.First, Assert.Single(Fixture.GetStagedOutput(owner)).Payload.First);
+        Assert.Same(retained.Payload, Assert.Single(Fixture.GetStagedOutput(owner)).Payload);
         await owner.RetryWriteStateAsync();
         await owner.StageOutputAsync(copy);
-        Assert.Same(retained.Payload.First, Assert.Single(Fixture.GetStagedOutput(owner)).Payload.First);
+        Assert.Same(retained.Payload, Assert.Single(Fixture.GetStagedOutput(owner)).Payload);
         var before = await owner.GetSnapshotAsync();
         await owner.RequestDeactivationAsync();
         var recovered = await owner.GetSnapshotAsync();
@@ -51,7 +51,7 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
     public async Task ConflictingDuplicate_RejectsChangedEnvelopeAndPreservesCommittedOutput(string difference)
     {
         var owner = NewGrain();
-        using var original = CreateOutput(owner);
+        var original = CreateOutput(owner);
         await owner.StageOutputAsync(original);
         await owner.RetryWriteStateAsync();
         var retained = Assert.Single(Fixture.GetStagedOutput(owner));
@@ -65,7 +65,7 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => owner.StageOutputAsync(conflicting));
 
         Assert.Contains(original.MessageId.ToString(), exception.Message, StringComparison.Ordinal);
-        Assert.Same(retained.Payload.First, Assert.Single(Fixture.GetStagedOutput(owner)).Payload.First);
+        Assert.Same(retained.Payload, Assert.Single(Fixture.GetStagedOutput(owner)).Payload);
         await owner.RetryWriteStateAsync();
         await owner.RequestDeactivationAsync();
         var recovered = await owner.GetSnapshotAsync();
@@ -82,12 +82,12 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
     {
         var receiver = NewGrain();
         var target = GrainId.Create("output-target", "handler");
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             NewMessage(97, "duplicate-output") with { ForwardTo = target },
             "messages/duplicate-output");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         var completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
             static snapshot => snapshot.InboxCount == 0 && (snapshot.Effects.Count > 0 || snapshot.InboxDeadLetters.Count > 0));
 

@@ -21,12 +21,12 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
-        using var template = CreateEnvelope(receiver, NewMessage(180, field));
+        var template = CreateEnvelope(receiver, NewMessage(180, field));
         var malformed = field switch
         {
-            "message" => template.Value with { MessageId = default },
-            "sender" => template.Value with { SenderId = default },
-            "payload" => template.Value with { Payload = default },
+            "message" => template with { MessageId = default },
+            "sender" => template with { SenderId = default },
+            "payload" => template with { Payload = default },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
         var context = Fixture.GetGrainContext(receiver);
@@ -63,8 +63,8 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
     public async Task DirectEnvelopeWithExplicitValidIdentity_PreservesDeliveryAndDedupe()
     {
         var receiver = NewGrain();
-        using var template = CreateEnvelope(receiver, NewMessage(187, "explicit-identity"));
-        var envelope = template.Value with { MessageId = HierarchicalKey.Parse("tenant/test/command/explicit", null) };
+        var template = CreateEnvelope(receiver, NewMessage(187, "explicit-identity"));
+        var envelope = template with { MessageId = HierarchicalKey.Parse("tenant/test/command/explicit", null) };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
