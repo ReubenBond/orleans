@@ -1,4 +1,4 @@
-using Orleans.Serialization.Buffers;
+using System.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -71,30 +71,22 @@ public interface IJournalStorage
     /// </summary>
     /// <remarks>
     /// Implementations should throw <see cref="Orleans.Storage.InconsistentStateException"/> when optimistic concurrency fails.
-    /// The caller keeps the buffer pinned and its bytes immutable until the returned operation completes,
-    /// including failure or cancellation. Storage which retains the bytes acquires its own slice using
-    /// <see cref="ArcBuffer.Slice(int)"/> and releases that reference when the stored bytes are retired.
-    /// The caller's reference remains caller-owned even when storage commits before reporting a failure.
     /// </remarks>
-    /// <param name="value">The caller-owned, pinned journal bytes to write.</param>
+    /// <param name="value">The encoded journal bytes to write. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken);
+    ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Appends the provided segment to the journal atomically.
     /// </summary>
     /// <remarks>
     /// Implementations should throw <see cref="Orleans.Storage.InconsistentStateException"/> when optimistic concurrency fails.
-    /// The caller keeps the buffer pinned and its bytes immutable until the returned operation completes,
-    /// including failure or cancellation. Storage which retains the bytes acquires its own slice using
-    /// <see cref="ArcBuffer.Slice(int)"/> and releases that reference when the stored bytes are retired.
-    /// The caller's reference remains caller-owned even when storage commits before reporting a failure.
     /// </remarks>
-    /// <param name="value">The caller-owned, pinned journal bytes to append.</param>
+    /// <param name="value">The encoded journal bytes to append. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken);
+    ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the journal atomically.

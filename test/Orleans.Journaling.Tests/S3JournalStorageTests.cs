@@ -1,10 +1,10 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
-using Amazon.Runtime;
-using Amazon.S3.Model;
-using Amazon.S3;
 using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Docker.DotNet;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
@@ -248,7 +248,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 $"wal/{basePrefix}journals/alpha",
                 $"wal/{basePrefix}journals/beta",
                 $"checkpoints/{basePrefix}journals/alpha/snapshot",
-                $"{basePrefix}journals/misplaced/wal",
+                $"{basePrefix}journals/legacy/wal",
                 "unrelated",
             ];
             var requests = new List<ListObjectsV2Request>();
@@ -594,7 +594,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     S3Objects =
                     [
                         new S3Object { Key = "wal/current/journals/alpha" },
-                        new S3Object { Key = "wal/alias/journals/alpha" },
+                        new S3Object { Key = "wal/legacy/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();
@@ -628,7 +628,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     IsTruncated = false,
                     S3Objects =
                     [
-                        new S3Object { Key = "wal/alias/journals/alpha" },
+                        new S3Object { Key = "wal/legacy/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();
@@ -743,7 +743,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
             var storage = CreateStorage(client, options);
             await storage.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-            await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1, 2]), cancellationToken);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>([1, 2]), cancellationToken);
 
             var baseKey = customMapping ? "tenant/journals/test" : "journals/test";
             Assert.Equal(3, requests.Count);
@@ -780,8 +780,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
 
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
+            await storage.AppendAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
 
             Assert.Equal(3, requests.Count);
             Assert.Equal("etag-1", requests[1].IfMatch);
@@ -836,8 +836,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await second.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);
 
             var errors = await Task.WhenAll(
-                CaptureExceptionAsync(() => first.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None)),
-                CaptureExceptionAsync(() => second.AppendBytesAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None)));
+                CaptureExceptionAsync(() => first.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None)),
+                CaptureExceptionAsync(() => second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None)));
 
             Assert.Single(errors, static error => error is null);
             Assert.Single(errors, static error => error is InconsistentStateException);
@@ -999,23 +999,29 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public async Task AppendAsync_WhenAppendExceedsSinglePutLimit_Throws()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            var first = new SparseSequenceSegment(new byte[] { 0 }, runningIndex: 0);
+            var last = first.Append(new byte[] { 0 }, nextRunningIndex: 5_000_000_000);
+            var oversized = new ReadOnlySequence<byte>(first, 0, last, 1);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => storage.AppendAsync(oversized, CancellationToken.None).AsTask());
+
+            Assert.Contains("appends larger than 5 GB", exception.Message);
+            await client.DidNotReceive().PutObjectAsync(
+                Arg.Any<PutObjectRequest>(),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task AppendAsync_WhenConditionalRewriteExceedsSinglePutLimit_ThrowsBeforeDownload()
         {
             var client = Substitute.For<IAmazonS3>();
             client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromException<PutObjectResponse>(
-                    new AmazonS3Exception("The WAL already exists.") { StatusCode = HttpStatusCode.PreconditionFailed }));
-            var properties = new GetObjectMetadataResponse
-            {
-                ETag = "etag-1",
-                ContentLength = 5_000_000_000,
-                PartsCount = 2,
-            };
-            properties.Metadata.Add(S3JournalStorage.WalGenerationMetadataKey, "generation");
-            properties.Metadata.Add(S3JournalStorage.MetadataVersionMetadataKey, "version");
-            properties.Metadata.Add(S3JournalStorage.CheckpointOffsetMetadataKey, "16");
-            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromResult(properties));
+                .Returns(Task.FromResult(new PutObjectResponse { ETag = "etag-1" }));
             var storage = CreateStorage(
                 client,
                 new S3JournalStorageOptions
@@ -1023,8 +1029,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     BucketName = BucketName,
                     UseS3ExpressAppend = false,
                 });
+            var first = new SparseSequenceSegment(new byte[] { 0 }, runningIndex: 0);
+            var last = first.Append(new byte[] { 0 }, nextRunningIndex: 4_999_999_984);
+            var oversizedCombinedValue = new ReadOnlySequence<byte>(first, 0, last, 1);
+
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([0]), CancellationToken.None).AsTask());
+                () => storage.AppendAsync(oversizedCombinedValue, CancellationToken.None).AsTask());
 
             Assert.Contains("cannot produce an object larger than 5 GB", exception.Message);
             await client.DidNotReceive().GetObjectAsync(
@@ -1079,7 +1089,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     UseS3ExpressAppend = false,
                 });
 
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
             Assert.Equal(typeof(FileStream), rewriteStreamType);
         }
@@ -1129,7 +1139,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.ClearReceivedCalls();
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+                () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
 
             Assert.Contains("payload offset 10", exception.Message);
             await client.DidNotReceive().PutObjectAsync(
@@ -1300,7 +1310,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
-            await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
             var properties = new GetObjectMetadataResponse
             {
@@ -1552,6 +1562,24 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 Arg.Any<CancellationToken>());
         }
 
+        [Fact]
+        public async Task ReplaceAsync_WhenCheckpointExceedsSinglePutLimit_Throws()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            var first = new SparseSequenceSegment(new byte[] { 0 }, runningIndex: 0);
+            var last = first.Append(new byte[] { 0 }, nextRunningIndex: 5_000_000_000);
+            var oversized = new ReadOnlySequence<byte>(first, 0, last, 1);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => storage.ReplaceAsync(oversized, CancellationToken.None).AsTask());
+
+            Assert.Contains("checkpoints larger than 5 GB", exception.Message);
+            await client.DidNotReceive().PutObjectAsync(
+                Arg.Any<PutObjectRequest>(),
+                Arg.Any<CancellationToken>());
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.PreconditionFailed)]
         [InlineData(HttpStatusCode.Conflict)]
@@ -1609,7 +1637,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await storage.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
             await Assert.ThrowsAsync<InconsistentStateException>(
-                () => storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1]), cancellationToken).AsTask());
+                () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), cancellationToken).AsTask());
 
             Assert.NotNull(checkpointName);
             Assert.NotNull(deleteRequest);
@@ -1681,7 +1709,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None);
 
             await Assert.ThrowsAsync<InconsistentStateException>(
-                () => storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+                () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
 
             Assert.NotNull(checkpointName);
             await client.DidNotReceive().DeleteObjectAsync(
@@ -1736,7 +1764,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None);
 
             await Assert.ThrowsAsync<AmazonS3Exception>(
-                () => storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+                () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
 
             Assert.NotNull(checkpointName);
             await client.DidNotReceive().DeleteObjectAsync(
@@ -1830,6 +1858,21 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             return properties;
         }
 
+        private sealed class SparseSequenceSegment : ReadOnlySequenceSegment<byte>
+        {
+            public SparseSequenceSegment(ReadOnlyMemory<byte> memory, long runningIndex)
+            {
+                Memory = memory;
+                RunningIndex = runningIndex;
+            }
+
+            public SparseSequenceSegment Append(ReadOnlyMemory<byte> nextMemory, long nextRunningIndex)
+            {
+                var segment = new SparseSequenceSegment(nextMemory, nextRunningIndex);
+                Next = segment;
+                return segment;
+            }
+        }
     }
 
     public async ValueTask InitializeAsync()
@@ -1879,16 +1922,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         Assert.Equal("json-lines", metadata.FormatKey);
         Assert.Equal("open", metadata.Properties["catalog"]);
 
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2]), CancellationToken.None);
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
 
         var consumer = new CapturingJournalStorageConsumer();
         await storage.ReadAsync(consumer, CancellationToken.None);
         Assert.Equal("json-lines", consumer.JournalFormatKey);
         Assert.Equal([1, 2, 3], consumer.Bytes.ToArray());
 
-        await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([6]), CancellationToken.None);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([6]), CancellationToken.None);
 
         var reloaded = CreateStorage("journals/test", journalFormatKey: "json-lines");
         var reloadedConsumer = new CapturingJournalStorageConsumer();
@@ -1907,7 +1950,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/metadata", journalFormatKey: "json-lines");
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var before = await storage.GetMetadataAsync(CancellationToken.None);
         Assert.NotNull(before);
@@ -1939,10 +1982,10 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var original = CreateStorage("journals/format-migration", journalFormatKey: "old-format");
-        await original.AppendBytesAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
+        await original.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
         var replacement = CreateStorage("journals/format-migration", journalFormatKey: "new-format");
-        await replacement.ReplaceBytesAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
+        await replacement.ReplaceAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
 
         var consumer = new CapturingJournalStorageConsumer();
         await CreateStorage("journals/format-migration", journalFormatKey: "new-format")
@@ -1957,9 +2000,9 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var provider = CreateProvider();
-        await CreateStorage("journals/zeta").AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage("journals/alpha").AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage("other/beta").AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await CreateStorage("journals/zeta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await CreateStorage("journals/alpha").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await CreateStorage("other/beta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var listed = new List<JournalCatalogEntry>();
         await foreach (var entry in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
@@ -1975,13 +2018,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/conflict");
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var other = CreateStorage("journals/conflict");
-        await other.AppendBytesAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await other.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendBytesAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
         Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1990,7 +2033,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/delete-conflict");
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var other = CreateStorage("journals/delete-conflict");
         var metadata = await other.GetMetadataAsync(CancellationToken.None);
@@ -2011,11 +2054,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var stale = CreateStorage("journals/recreated");
-        await stale.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await stale.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var replacement = CreateStorage("journals/recreated");
         await replacement.DeleteAsync(CancellationToken.None);
-        await replacement.AppendBytesAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => stale.DeleteAsync(CancellationToken.None).AsTask());

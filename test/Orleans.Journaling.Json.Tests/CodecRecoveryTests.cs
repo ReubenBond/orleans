@@ -6,16 +6,15 @@ using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
+using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
-using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
-/// Tests that verify JSON and Orleans binary recovery and explicit format transitions.
+/// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.
 /// </summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -24,7 +23,7 @@ public class CodecRecoveryTests : JournalingTestBase
 {
     /// <summary>
     /// Writes data with the Orleans binary codec, then reads it back.
-    /// Verifies the current Orleans binary format round trip.
+    /// This is the baseline backward compatibility test.
     /// </summary>
     [Fact]
     public async Task OrleansBinaryCodec_WriteAndRecover()
@@ -254,7 +253,7 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task Recovery_NonemptyMetadataLessJournal_RejectsBeforeApplyingState()
+    public async Task Recovery_MetadataLessJournal_UsesConfiguredFormat()
     {
         var storage = new VolatileJournalStorage(JsonLinesJournalFormat.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, JsonLinesJournalFormat.JournalFormatKey);
@@ -262,20 +261,20 @@ public class CodecRecoveryTests : JournalingTestBase
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
-        var before = Assert.Single(storage.Segments).ToArray();
         var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
         using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonLinesJournalFormat.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonLinesJournalFormat.JournalFormatKey);
-        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
-            recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken));
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Nonempty journal data requires stored journal format metadata.", exception.Message);
-        Assert.Empty(recoveredDict);
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            recovered.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Equal(1, recoveredDict["alpha"]);
+
+        recoveredDict.Add("beta", 2);
+        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+
         Assert.Equal(JsonLinesJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
-        Assert.Equal(before, Assert.Single(storage.Segments));
+        Assert.Equal(2, storage.Segments.Count);
+        Assert.Contains("""[8,["set","beta",2]]""", Encoding.UTF8.GetString(storage.Segments[^1]), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -441,7 +440,7 @@ public class CodecRecoveryTests : JournalingTestBase
         CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
 
@@ -472,13 +471,13 @@ public class CodecRecoveryTests : JournalingTestBase
     {
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.AppendAsync(value, cancellationToken);
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => inner.DeleteAsync(cancellationToken);
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)

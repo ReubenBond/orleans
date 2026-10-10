@@ -1,8 +1,8 @@
 using System.Buffers;
 using System.Diagnostics.Metrics;
 using System.Net;
-using Amazon.S3.Model;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -244,7 +244,7 @@ public sealed class S3JournalStorageInstrumentsTests
         await context.Provider.InitializeAsync(TestContext.Current.CancellationToken);
         var storage = context.Provider.CreateStorage(new("journals/a"));
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
-        await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var consumer = new CapturingConsumer();
         await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
 
@@ -318,7 +318,7 @@ public sealed class S3JournalStorageInstrumentsTests
         await context.Provider.InitializeAsync(TestContext.Current.CancellationToken);
         var storage = context.Provider.CreateStorage(new("journals/a"));
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
-        await storage.AppendBytesAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var consumer = new CapturingConsumer();
         await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
 
@@ -370,7 +370,7 @@ public sealed class S3JournalStorageInstrumentsTests
         await context.Client.Received(1).DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), cancellation.Token);
         context.AssertListing();
         Assert.Empty(context.Retries.GetMeasurementSnapshot());
-        Assert.True(context.StorageOperations.GetMeasurementSnapshot()[1].MatchesTags(
+        Assert.True(context.LegacyOperations.GetMeasurementSnapshot()[1].MatchesTags(
             new KeyValuePair<string, object?>[] { new("operation", "delete"), new("status", "error") }));
     }
 
@@ -401,7 +401,7 @@ public sealed class S3JournalStorageInstrumentsTests
             CatalogItems = new(meter.Meter, "orleans-journaling-provider-catalog-items");
             CatalogEntries = new(meter.Meter, "orleans-journaling-provider-catalog-entries");
             Retries = new(meter.Meter, "orleans-journaling-provider-retries");
-            StorageOperations = new(meter.Meter, "orleans-journaling-s3-operations");
+            LegacyOperations = new(meter.Meter, "orleans-journaling-s3-operations");
             Options = new() { BucketName = "private-bucket", S3Client = Client, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero };
             Provider = new(Microsoft.Extensions.Options.Options.Create(Options),
                 Microsoft.Extensions.Options.Options.Create(new JournaledStateManagerOptions
@@ -420,7 +420,7 @@ public sealed class S3JournalStorageInstrumentsTests
         public MetricCollector<long> CatalogItems { get; }
         public MetricCollector<long> CatalogEntries { get; }
         public MetricCollector<long> Retries { get; }
-        public MetricCollector<long> StorageOperations { get; }
+        public MetricCollector<long> LegacyOperations { get; }
         public Func<PutObjectRequest, Exception?>? PutFailure { get; set; }
         public Func<DeleteObjectRequest, Exception?>? DeleteFailure { get; set; }
 
@@ -545,7 +545,7 @@ public sealed class S3JournalStorageInstrumentsTests
 
         public void Dispose()
         {
-            StorageOperations.Dispose();
+            LegacyOperations.Dispose();
             Retries.Dispose();
             CatalogEntries.Dispose();
             CatalogItems.Dispose();

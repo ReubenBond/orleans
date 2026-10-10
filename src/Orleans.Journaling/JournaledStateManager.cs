@@ -1,11 +1,12 @@
+using System.Buffers;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
-using Orleans.Runtime.Internal;
 using Orleans.Serialization.Buffers;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
@@ -477,15 +478,29 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     if (hasCommittedBuffer)
                                     {
                                         recordQueueDuration = true;
+                                        var writeSequence = committedBuffer.AsReadOnlySequence();
+#if DEBUG
+                                        // Defensive: copy the sequence into a pooled buffer so we can poison it
+                                        // after the storage call returns. Any IJournalStorage implementation that
+                                        // retains the sequence past task completion (a violation of the documented
+                                        // contract on AppendAsync/ReplaceAsync) will read 0x67 bytes when it next
+                                        // touches the buffer, surfacing the bug loudly in tests instead of letting
+                                        // recycled pool data hide it.
+                                        var debugPoisonLength = checked((int)writeSequence.Length);
+                                        var debugPoisonBuffer = ArrayPool<byte>.Shared.Rent(debugPoisonLength);
+                                        writeSequence.CopyTo(debugPoisonBuffer);
+                                        writeSequence = new ReadOnlySequence<byte>(debugPoisonBuffer, 0, debugPoisonLength);
+#endif
+
                                         try
                                         {
                                             if (isSnapshot)
                                             {
-                                                await WriteStorageAsync(committedBuffer, replace: true, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                await ReplaceStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                             }
                                             else
                                             {
-                                                await WriteStorageAsync(committedBuffer, replace: false, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                await AppendStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                             }
 
                                             lock (_lock)
@@ -503,6 +518,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             {
                                                 bufferToConsume.Dispose();
                                             }
+#if DEBUG
+                                            debugPoisonBuffer.AsSpan(0, debugPoisonLength).Fill(0x67);
+                                            ArrayPool<byte>.Shared.Return(debugPoisonBuffer);
+#endif
                                         }
 
                                         // Notify all states that the operation completed.
@@ -1186,26 +1205,32 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    private async ValueTask WriteStorageAsync(ArcBuffer value, bool replace, CancellationToken cancellationToken)
+    private async ValueTask AppendStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
-        var operation = replace ? JournalingInstruments.OperationReplace : JournalingInstruments.OperationAppend;
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            if (replace)
-            {
-                await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
-            }
-            else
-            {
-                await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
-            }
-
-            _shared.Instruments.OnStorageOperation(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+            await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
         }
         catch
         {
-            _shared.Instruments.OnStorageOperation(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            throw;
+        }
+    }
+
+    private async ValueTask ReplaceStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+        }
+        catch
+        {
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
             throw;
         }
     }
@@ -1596,7 +1621,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         void IStateMachine.Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
         void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
     }
-
 
     [LoggerMessage(
         Level = LogLevel.Error,

@@ -1,15 +1,15 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Amazon.S3.Model;
 using Amazon.S3;
+using Amazon.S3.Model;
+using Azure;
 using Azure.Core;
-using Azure.Data.Tables.Models;
 using Azure.Data.Tables;
+using Azure.Data.Tables.Models;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
-using Azure.Storage.Blobs;
-using Azure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -1491,10 +1491,10 @@ public sealed class JournalStorageCatalogTests
                     await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
                     break;
                 case "Append":
-                    await storage.AppendBytesAsync(new ReadOnlySequence<byte>(new byte[] { 1 }), TestContext.Current.CancellationToken);
+                    await storage.AppendAsync(new ReadOnlySequence<byte>(new byte[] { 1 }), TestContext.Current.CancellationToken);
                     break;
                 case "Replace":
-                    await storage.ReplaceBytesAsync(new ReadOnlySequence<byte>(new byte[] { 2 }), TestContext.Current.CancellationToken);
+                    await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[] { 2 }), TestContext.Current.CancellationToken);
                     break;
             }
         }

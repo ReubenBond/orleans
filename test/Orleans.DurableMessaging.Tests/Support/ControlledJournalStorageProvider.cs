@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
@@ -235,7 +234,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             CancellationToken cancellationToken = default) =>
             inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
 
-        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             var instance = ReceiverTestServices.CurrentGrainContext?.GrainInstance;
             var grain = instance as DurableMessagingTestGrain;
@@ -251,7 +250,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             if (namedSnapshot is not null) named!.PublishStoredSnapshot(namedSnapshot);
         }
 
-        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             var instance = ReceiverTestServices.CurrentGrainContext?.GrainInstance;
             var grain = instance as DurableMessagingTestGrain;

@@ -59,43 +59,6 @@ Concurrent calls made while the same kind of write is queued can share that queu
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
 
-### Captured bytes and retained storage
-
-The journal owner pins the committed byte prefix through actual storage completion. A successful
-acknowledgement consumes that prefix and runs the state machines' completion bookkeeping.
-Cancelling a caller's wait leaves the owned storage operation running; owner disposal drains that
-operation before releasing its captured bytes and writer.
-
-<xref:Orleans.Journaling.VolatileJournalStorage> acquires independent page references for retained
-batches. Its reads pin a stable snapshot of journal bytes and metadata until the consumer finishes,
-including when another handle replaces, deletes, or recreates the journal. Replacement and deletion
-release the retired storage references; readers release their own references on completion, failure,
-or cancellation. The shared store owns retained bytes across handle and manager lifetimes, and
-releases its remaining references when the store becomes unreachable.
-
-<xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
-<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> accept caller-owned
-<xref:Orleans.Serialization.Buffers.ArcBuffer> values. Callers keep their references pinned and
-the encoded bytes immutable through actual operation completion, including failure or cancellation.
-Storage which retains bytes takes an independent slice and releases it when those bytes are retired.
-Azure, S3, and Redis consume the buffer through the provider operation; volatile storage retains its
-own page references. Journal writers reuse their current page until an explicit reset or disposal.
-
-<xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> sets the process-wide
-free-page cache budget, with a default of 4 MiB. Setting zero releases free pages and disables caching.
-Pages up to 1 MiB are eligible for retention. A reduction immediately trims already-free pages, and
-returns in flight trim after publishing so the settled cache fits the current budget. Writers and
-pinned readers retain ownership of active pages through their full lifetimes. Released large backing
-arrays return to the separately managed `ArrayPool<byte>.Shared`.
-
-Capacity planning includes live journal payloads, page rounding, journal count and lifetime, and
-concurrent read snapshots. A nonempty journal can retain a 16 KiB minimum page even for a small
-payload. A journal writer can retain its current page until reset or disposal.
-Readers keep retired pages alive through completion. The free-page cache budget applies after the
-last owner releases a page; stored journals and active readers contribute separately to live memory.
-The volatile provider retains stores for journal discovery, so delete journals when their contents
-are retired.
-
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
