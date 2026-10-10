@@ -4,8 +4,8 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime;
 
-// With a runtime logger, cleanup must not replace a call/transport failure or interrupt draining.
-// A missing logger must not hide a cleanup failure.
+// Runtime logging preserves the call's outcome and keeps draining after cleanup failures.
+// Without a logger, cleanup failures propagate to the caller.
 internal static partial class InvokableArgumentResources
 {
     internal static void Complete(IInvokableArgumentOwner? owner, ILogger? logger)

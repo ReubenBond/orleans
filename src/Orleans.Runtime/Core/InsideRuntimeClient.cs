@@ -205,7 +205,7 @@ namespace Orleans.Runtime
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
-                    message.Dispose();
+                    message.Dispose(logger);
                     return;
                 }
             }
@@ -215,7 +215,7 @@ namespace Orleans.Runtime
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
-                message.CompleteArgumentResources();
+                message.CompleteArgumentResources(logger);
                 return;
             }
 
@@ -313,11 +313,6 @@ namespace Orleans.Runtime
                         case IInvokable invokable:
                             {
                                 var owner = invokable as IInvokableArgumentOwner;
-                                if (owner is not null)
-                                {
-                                    message.ArgumentResourceLogger ??= this.logger;
-                                }
-
                                 if (owner is not null && !owner.TryRetainArgumentResources())
                                 {
                                     throw new OperationCanceledException("The request's owned arguments completed before invocation.");
@@ -409,7 +404,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                message.CompleteArgumentResources();
+                message.CompleteArgumentResources(logger);
                 // Expiry or a failure before body decoding still owns the raw receive buffer.
                 message.ReleaseBodyBuffer();
             }
@@ -489,7 +484,7 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
-                        message.Dispose();
+                        message.Dispose(logger);
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -515,7 +510,7 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
-                message.Dispose();
+                message.Dispose(logger);
             }
         }
 

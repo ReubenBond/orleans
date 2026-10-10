@@ -6,7 +6,6 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// Pending changes remain staged and safe to commit. The caller can restore the prerequisite
 /// and explicitly retry persistence, or retire its owner and recover from durable state.
-/// This outcome is distinct from an uncertain storage failure and from a completed operation.
 /// </remarks>
 [GenerateSerializer]
 public sealed class JournaledStatePreCommitException : Exception

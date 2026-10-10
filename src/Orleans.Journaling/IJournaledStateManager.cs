@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// The owner registers state machines and initializes the journal before using recovered state.
 /// State machine instances and their dependencies retain the lifetime assigned by their caller.
-/// Disposing this manager stops journal processing and releases its journal resources.
+/// Disposal drains owned storage and hook operations before releasing resources.
 /// </remarks>
 public interface IJournaledStateManager : IAsyncDisposable
 {
@@ -17,12 +17,14 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Inspect, add, remove, and deduplicate hooks on the owner's logical execution context while
-    /// no persistence operation is running. Ordinary before hooks and all after hooks execute in list
-    /// order. The optional single <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
-    /// Registration is independent
-    /// of state-machine registration and persists through recovery and deletion.
+    /// persistence is quiescent. Mutation during an operation is rejected. Ordinary before hooks
+    /// and all after hooks execute in list order. The optional single
+    /// <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
+    /// Registration is independent of state-machine registration and persists through recovery and deletion.
+    /// Custom owners implement this property to support hooks.
     /// </remarks>
-    IList<IJournaledStateHook> Hooks { get; }
+    /// <exception cref="NotSupportedException">The custom owner does not support hooks.</exception>
+    IList<IJournaledStateHook> Hooks => throw new NotSupportedException("This journal owner does not support operation hooks.");
 
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;
@@ -63,7 +65,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// Stage mutations only after establishing that they are safe to commit. Pending changes are shared
     /// by all callers using this manager. Storage acknowledgement establishes durability.
-    /// A failed journal operation fences the manager; recovery requires a new manager and state machine instances.
+    /// A storage or state-processing failure fences the manager; recovery requires a new manager and state machine instances.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
     /// Before-hook failure reports <see cref="JournaledStatePreCommitException"/> and retains pending
     /// changes for an explicit retry. After-hook failure reports
@@ -79,7 +81,10 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// The caller keeps other operations quiescent through completion: deletion resets every registered state machine.
     /// Cancellation ends the caller's wait; an already queued deletion continues to its storage and reset outcome.
-    /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
+    /// A storage or state-reset failure permanently fences the manager and requests deactivation of its owning grain.
+    /// Before-hook failure reports <see cref="JournaledStatePreCommitException"/> with state retained.
+    /// After-hook failure reports <see cref="JournaledStatePostCommitException"/> after storage deletion
+    /// and state reset succeed.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>

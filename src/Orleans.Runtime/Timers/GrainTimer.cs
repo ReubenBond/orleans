@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
@@ -47,8 +48,6 @@ internal abstract partial class GrainTimer : IGrainTimer
     }
 
     protected IGrainContext GrainContext => _grainContext;
-
-    internal void Start(TimeSpan dueTime, TimeSpan period) => Change(dueTime, period);
 
     // Called with _cts locked. There is at most one queued invocation and one active callback.
     private bool ChangeTimer(TimeSpan dueTime)
@@ -104,11 +103,13 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             // A callback from a previous physical arm can arrive after Change or Dispose. Only the
             // current elapsed deadline is eligible, and changing to zero/infinite invalidates it.
-            if (_disposed || !_scheduled || _firing)
+            if (!_scheduled)
             {
                 return;
             }
 
+            // An armed physical deadline belongs to a live timer awaiting callback admission.
+            Debug.Assert(!_disposed && !_firing && _timer is not null);
             var elapsed = _shared.TimeProvider.GetElapsedTime(_scheduledAt);
             if (elapsed < _scheduledDueTime)
             {
@@ -134,7 +135,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     // The admission is reserved under _cts, but delivered outside it: activation shutdown disposes
     // timers under its own lock. Taking that lock while holding _cts would invert the lock order.
-    // Changes/disposal between reservation and delivery coalesce, invalidate, or cancel this tick.
+    // Changes/disposal between reservation and delivery coalesce or invalidate this tick.
     private void QueueTickOnActivation()
     {
         try
@@ -184,8 +185,8 @@ internal abstract partial class GrainTimer : IGrainTimer
             _queued = false;
             if (!_pendingTick)
             {
-                // Change to a delayed/infinite arm invalidated this queued tick. It must not invoke
-                // user code, emit tick diagnostics, or replace the new schedule with the period.
+                // A changed schedule or disposal invalidated this tick. Drain the activation
+                // message while preserving the replacement schedule and callback diagnostics.
                 return new(Response.Completed);
             }
 
@@ -334,6 +335,8 @@ internal abstract partial class GrainTimer : IGrainTimer
             // Publish disposal before cancellation, whose registrations can reenter Change/Dispose.
             _disposed = true;
             _scheduled = false;
+            // Admission shares this lock, so queued ticks drain even while cancellation is pending.
+            _pendingTick = false;
             _timer?.Dispose();
             _timer = null;
         }

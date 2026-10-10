@@ -34,13 +34,16 @@ namespace Orleans.Metadata
         }
 
         /// <summary>
-        /// Returns the <see cref="GrainInterfaceType"/> for the provided interface.
+        /// Returns the cached <see cref="GrainInterfaceType"/> for the provided interface.
         /// </summary>
+        /// <remarks>
+        /// Identities are cached per resolver and CLR interface type, including closed generic arguments.
+        /// Configured providers define stable identities for the lifetime of the resolver.
+        /// </remarks>
         /// <param name="type">The grain interface.</param>
         /// <returns>The <see cref="GrainInterfaceType"/> for the provided interface.</returns>
         public GrainInterfaceType GetGrainInterfaceType(Type type)
         {
-            // Interface identities are stable for this resolver's configured providers and type converter.
             return _interfaceTypes.GetOrAdd(type, static (interfaceType, resolver) => resolver.ResolveGrainInterfaceType(interfaceType), this);
         }
 

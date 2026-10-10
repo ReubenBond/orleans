@@ -4,7 +4,7 @@ namespace Orleans.Serialization.Invocation;
 /// Coordinates the lifetime of independently owned arguments of an invokable request.
 /// </summary>
 /// <remarks>
-/// Only requests with explicitly owned arguments implement this interface. A request starts with one
+/// Requests with explicitly owned arguments implement this interface. A request starts with one
 /// owner. Serialization and invocation retain temporary uses before accessing its arguments.
 /// Completion ends the initial ownership and prevents new uses, but resources remain valid until
 /// all previously retained uses have been released. Implementations must be thread-safe, completion
@@ -20,7 +20,7 @@ public interface IInvokableArgumentOwner
     bool TryRetainArgumentResources();
 
     /// <summary>
-    /// Releases one successfully retained temporary use. Does not complete the initial ownership.
+    /// Releases one successfully retained temporary use, preserving the initial ownership until completion.
     /// </summary>
     void ReleaseArgumentResources();
 

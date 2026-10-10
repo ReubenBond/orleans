@@ -176,35 +176,48 @@ internal ref struct JsonCommandReader
     public (TFirst? First, TSecond? Second) ReadCurrentPair<TFirst, TSecond>(
         string operandName,
         JsonTypeInfo<TFirst> firstTypeInfo,
-        JsonTypeInfo<TSecond> secondTypeInfo)
+        JsonTypeInfo<TSecond> secondTypeInfo,
+        bool requireFirst = false)
     {
         if (_reader.TokenType is not JsonTokenType.StartArray)
         {
             throw new JsonException("JSON dictionary snapshot items must be [key,value] arrays.");
         }
 
-        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        // Validate the pair before deserialization can acquire resources for its values.
+        var validationReader = _reader;
+        if (!validationReader.Read() || validationReader.TokenType is JsonTokenType.EndArray)
         {
             throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Key}'.");
         }
 
-        var first = DeserializeCurrentAllowNull(JsonJournalEntryFields.Key, firstTypeInfo);
-        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        validationReader.Skip();
+        if (!validationReader.Read() || validationReader.TokenType is JsonTokenType.EndArray)
         {
             throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Value}'.");
         }
 
-        var second = DeserializeCurrentAllowNull(JsonJournalEntryFields.Value, secondTypeInfo);
-        if (!_reader.Read())
+        validationReader.Skip();
+        if (!validationReader.Read())
         {
             throw new JsonException($"JSON journal command operand '{operandName}' array is incomplete.");
         }
 
-        if (_reader.TokenType is not JsonTokenType.EndArray)
+        if (validationReader.TokenType is not JsonTokenType.EndArray)
         {
             throw new JsonException("JSON journal command contains unexpected extra elements.");
         }
 
+        _reader.Read();
+        var first = DeserializeCurrentAllowNull(JsonJournalEntryFields.Key, firstTypeInfo);
+        if (requireFirst && first is null)
+        {
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Key}' must not be null.");
+        }
+
+        _reader.Read();
+        var second = DeserializeCurrentAllowNull(JsonJournalEntryFields.Value, secondTypeInfo);
+        _reader.Read();
         return (first, second);
     }
 
@@ -213,18 +226,14 @@ internal ref struct JsonCommandReader
         JsonTypeInfo<TFirst> firstTypeInfo,
         JsonTypeInfo<TSecond> secondTypeInfo)
     {
-        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo);
-        if (first is null)
-        {
-            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Key}' must not be null.");
-        }
+        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo, requireFirst: true);
 
         if (second is null)
         {
             throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Value}' must not be null.");
         }
 
-        return (first, second);
+        return (first!, second);
     }
 
     public (TFirst First, TSecond? Second) ReadCurrentPairRequiredFirst<TFirst, TSecond>(
@@ -232,18 +241,14 @@ internal ref struct JsonCommandReader
         JsonTypeInfo<TFirst> firstTypeInfo,
         JsonTypeInfo<TSecond> secondTypeInfo)
     {
-        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo);
-        if (first is null)
-        {
-            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Key}' must not be null.");
-        }
+        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo, requireFirst: true);
 
         if (second is null && default(TSecond) is not null)
         {
             throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Value}' must not be null.");
         }
 
-        return (first, second);
+        return (first!, second);
     }
 
     public void EnsureEnd(int nextIndex)

@@ -253,7 +253,7 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task Recovery_NonemptyMetadataLessJournal_RejectsBeforeApplyingState()
+    public async Task Recovery_MetadataLessJournal_UsesConfiguredFormat()
     {
         var storage = new VolatileJournalStorage(JsonLinesJournalFormat.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, JsonLinesJournalFormat.JournalFormatKey);
@@ -261,20 +261,20 @@ public class CodecRecoveryTests : JournalingTestBase
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
-        var before = Assert.Single(storage.Segments).ToArray();
         var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
         using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonLinesJournalFormat.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonLinesJournalFormat.JournalFormatKey);
-        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
-            recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken));
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Nonempty journal data requires stored journal format metadata.", exception.Message);
-        Assert.Empty(recoveredDict);
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            recovered.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Equal(1, recoveredDict["alpha"]);
+
+        recoveredDict.Add("beta", 2);
+        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+
         Assert.Equal(JsonLinesJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
-        Assert.Equal(before, Assert.Single(storage.Segments));
+        Assert.Equal(2, storage.Segments.Count);
+        Assert.Contains("""[8,["set","beta",2]]""", Encoding.UTF8.GetString(storage.Segments[^1]), StringComparison.Ordinal);
     }
 
     [Fact]

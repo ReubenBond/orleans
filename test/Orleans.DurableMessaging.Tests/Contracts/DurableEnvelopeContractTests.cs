@@ -82,6 +82,63 @@ public sealed class DurableEnvelopeContractTests
     }
 
     [Theory]
+    [InlineData("DurableEnvelope", false)]
+    [InlineData("InboxDeadLetter", false)]
+    [InlineData("OutboxDeadLetter", false)]
+    [InlineData("DurableEnvelope", true)]
+    [InlineData("InboxDeadLetter", true)]
+    [InlineData("OutboxDeadLetter", true)]
+    public void OwnedValueLifecycleAndCopier_RetainIndependentPayloadAndReleaseExactlyOnce(string contract, bool copy)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 0, 255, 128 });
+        using var envelope = Envelope(writer.PeekSlice(writer.Length));
+        object original = envelope;
+        if (contract != "DurableEnvelope")
+        {
+            var type = typeof(DurableEnvelope).Assembly.GetType($"Orleans.DurableMessaging.{contract}", throwOnError: true)!;
+            original = Activator.CreateInstance(type, nonPublic: true)!;
+            type.GetProperty("Envelope")!.SetValue(original, envelope);
+            type.GetProperty("DeadLetteredAt")!.SetValue(original, DateTimeOffset.UnixEpoch);
+            type.GetProperty("Reason")!.SetValue(original, "retained failure");
+            type.GetProperty("AttemptCount")!.SetValue(original, 3);
+        }
+        var lifecycleType = typeof(DurableEnvelope).Assembly.GetType(
+            $"Orleans.DurableMessaging.{contract}Lifecycle", throwOnError: true)!;
+        var lifecycle = Activator.CreateInstance(lifecycleType)!;
+        var references = typeof(ArcBufferPage).GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var initial = Assert.IsType<int>(references.GetValue(envelope.Payload.First));
+        var retained = copy ? services.GetRequiredService<DeepCopier>().Copy(original)!
+            : lifecycleType.GetMethod("Retain")!.Invoke(lifecycle, [original])!;
+        try
+        {
+            var actual = contract == "DurableEnvelope" ? Assert.IsType<DurableEnvelope>(retained)
+                : Assert.IsType<DurableEnvelope>(retained.GetType().GetProperty("Envelope")!.GetValue(retained));
+            Assert.Same(envelope.Payload.First, actual.Payload.First);
+            Assert.Equal(initial + 1, Assert.IsType<int>(references.GetValue(envelope.Payload.First)));
+            Assert.Equal(envelope.MessageId, actual.MessageId);
+            Assert.Equal(envelope.SenderId, actual.SenderId);
+            Assert.Equal(envelope.ReceiverId, actual.ReceiverId);
+            Assert.Equal(envelope.Subject, actual.Subject);
+            Assert.Equal(new byte[] { 0, 255, 128 }, actual.Payload.ToArray());
+            if (contract != "DurableEnvelope")
+            {
+                Assert.NotSame(original, retained);
+                Assert.Equal(DateTimeOffset.UnixEpoch, retained.GetType().GetProperty("DeadLetteredAt")!.GetValue(retained));
+                Assert.Equal("retained failure", retained.GetType().GetProperty("Reason")!.GetValue(retained));
+                Assert.Equal(3, retained.GetType().GetProperty("AttemptCount")!.GetValue(retained));
+            }
+        }
+        finally
+        {
+            lifecycleType.GetMethod("Release")!.Invoke(lifecycle, [retained]);
+        }
+        Assert.Equal(initial, Assert.IsType<int>(references.GetValue(envelope.Payload.First)));
+        Assert.Equal(new byte[] { 0, 255, 128 }, envelope.Payload.ToArray());
+    }
+
+    [Theory]
     [InlineData("DurableEnvelope")]
     [InlineData("InboxDeadLetter")]
     [InlineData("OutboxDeadLetter")]

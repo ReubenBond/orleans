@@ -25,7 +25,7 @@ During <xref:Orleans.Runtime.GrainLifecycleStage.SetupState>, the manager:
 1. Resets and replays each registered durable state.
 1. Completes activation setup after replay finishes.
 
-Nonempty journals require stored format metadata. A missing format key fails recovery and leaves the journal unchanged. New empty journals use the configured write format.
+Recovery uses the configured format when stored format metadata is absent. New empty journals use the configured write format.
 
 <xref:Orleans.Grain.OnActivateAsync*> and requests observe recovered durable state after setup succeeds, whether the grain derives directly from <xref:Orleans.Grain>, from an application-owned base, or from <xref:Orleans.Journaling.DurableGrain>. A storage read, format, codec, or malformed-data failure fails activation and preserves the stored journal for diagnosis and recovery.
 
@@ -82,6 +82,41 @@ captured references when their reads finish.
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
 
+### Captured bytes and retained storage
+
+The journal owner pins the committed byte prefix through actual storage completion. A successful
+acknowledgement consumes that prefix and runs the state machines' completion bookkeeping.
+Cancelling a caller's wait leaves the owned storage operation running; owner disposal drains that
+operation before releasing its captured bytes and writer.
+
+<xref:Orleans.Journaling.VolatileJournalStorage> acquires independent page references for retained
+batches. Its reads pin a stable snapshot of journal bytes and metadata until the consumer finishes,
+including when another handle replaces, deletes, or recreates the journal. Replacement and deletion
+release the retired storage references; readers release their own references on completion, failure,
+or cancellation. The shared store owns retained bytes across handle and manager lifetimes, and
+releases its remaining references when the store becomes unreachable.
+
+Sequence-based <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
+<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> consume or copy borrowed bytes before their
+returned operation completes. Volatile storage coalesces copied append bytes on pooled pages.
+An oversized drained journal-writer tail is released after its active entry completes; minimum-sized
+pages are reused for small batches.
+
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> sets the process-wide
+free-page cache budget, with a default of 4 MiB. Setting zero releases free pages and disables caching.
+Pages up to 1 MiB are eligible for retention. A reduction immediately trims already-free pages, and
+returns in flight trim after publishing so the settled cache fits the current budget. Writers and
+pinned readers retain ownership of active pages through their full lifetimes. Released large backing
+arrays return to the separately managed `ArrayPool<byte>.Shared`.
+
+Capacity planning includes live journal payloads, page rounding, journal count and lifetime, and
+concurrent read snapshots. A nonempty journal can retain a 16 KiB minimum page even for a small
+payload, and a copied-append writer can retain its current page until replacement or deletion.
+Readers keep retired pages alive through completion. The free-page cache budget applies after the
+last owner releases a page; stored journals and active readers contribute separately to live memory.
+The volatile provider retains stores for journal discovery, so delete journals when their contents
+are retired.
+
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
@@ -90,6 +125,43 @@ preconditions and apply the complete safe-to-commit update synchronously, then r
 Orleans executes that synchronous block on a single activation thread. Another grain turn can run when
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
+
+## Journal operation hooks
+
+Activation-scoped features coordinate prerequisites and completion through
+<xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
+allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Inspect and
+deduplicate feature registrations on the owner's logical execution context while persistence
+is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
+mutation throughout each operation.
+
+Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
+the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
+final prerequisite. Its before callback runs last, and the work loop awaits it directly before
+synchronous capture or storage deletion. Prerequisites cover changes staged during asynchronous
+preparation, including the final hook's own I/O wait. Preserve operation-local bookkeeping for
+the captured batch separately from changes staged later.
+
+Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
+All after callbacks run in list order, including for successful zero-byte writes. Coalesced callers
+share callbacks for the actual operation. <xref:Orleans.Journaling.JournaledStateHook> adapts delegates,
+executing the synchronous delegate before the asynchronous delegate in each phase.
+
+A failed prerequisite reports <xref:Orleans.Journaling.JournaledStatePreCommitException> with pending
+state retained for an explicit persistence retry after the prerequisite is restored. A failed after
+callback reports <xref:Orleans.Journaling.JournaledStatePostCommitException> with persistence completed.
+Remaining after callbacks run, multiple failures are aggregated, and the manager stays usable.
+The feature's durable recovery protocol resumes interrupted post-persistence work. Storage and
+state-processing failures retain the manager's fencing and fresh-recovery behavior.
+
+Hook callbacks receive the owner's shutdown token. Cancelling a caller's wait leaves the owned
+operation running through its actual outcome. Disposal drains owned hooks and storage before releasing
+journal resources, including when cancellation callbacks or cleanup fail. Concurrent disposal callers
+share this completion. Recursive initialization, persistence, or disposal on the same owner from a
+hook is rejected. Shutdown closes work admission and cancels queued operations while the current
+operation drains to its actual storage and hook outcome. For deletion, the feature owner stops
+admission and drains feature operations before
+queuing the whole-journal reset.
 
 ## Consistency and competing writers
 

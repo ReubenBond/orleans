@@ -6,7 +6,7 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs;
 
-/// <summary>Serializes raw Arc bytes without consuming or releasing the source.</summary>
+/// <summary>Serializes raw Arc bytes while preserving the source's ownership and contents.</summary>
 [RegisterSerializer]
 public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
 {
@@ -32,22 +32,7 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
             throw new IndexOutOfRangeException($"The declared ArcBuffer length, {encodedLength}, exceeds {int.MaxValue}.");
         }
 
-        reader.EnsureAvailable(encodedLength);
-        var length = (int)encodedLength;
-        if (reader.TryReadArcBuffer(length, out var value)) return value;
-        if (length == 0) return ArcBuffer.Empty;
-
-        // Other inputs do not promise an independently pinnable lifetime. Copy directly into pooled pages.
-        using var output = new ArcBufferWriter();
-        while (length > 0)
-        {
-            var count = Math.Min(length, 4096);
-            reader.ReadBytes(output.GetSpan(count)[..count]);
-            output.AdvanceWriter(count);
-            length -= count;
-        }
-
-        return output.ConsumeSlice(output.Length);
+        return reader.ReadArcBuffer((int)encodedLength);
     }
 }
 
