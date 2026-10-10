@@ -205,7 +205,6 @@ namespace Orleans.Runtime
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
-                    message.Dispose(logger);
                     return;
                 }
             }
@@ -215,7 +214,6 @@ namespace Orleans.Runtime
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
-                message.CompleteArgumentResources(logger);
                 return;
             }
 
@@ -312,45 +310,23 @@ namespace Orleans.Runtime
                     {
                         case IInvokable invokable:
                             {
-                                var owner = invokable as IInvokableArgumentOwner;
-                                if (owner is not null && !owner.TryRetainArgumentResources())
+                                invokable.SetTarget(target);
+
+                                CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
+                                if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
-                                    throw new OperationCanceledException("The request's owned arguments completed before invocation.");
+                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
+                                    await invoker.Invoke();
+                                    response = invoker.Response!;
+                                }
+                                else
+                                {
+                                    response = await invokable.Invoke();
+                                    // The copier preserves the null state of its input.
+                                    response = this.responseCopier.Copy(response)!;
                                 }
 
-                                try
-                                {
-                                    invokable.SetTarget(target);
-
-                                    CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
-                                    if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
-                                    {
-                                        var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
-                                        await invoker.Invoke();
-                                        response = invoker.Response!;
-                                    }
-                                    else
-                                    {
-                                        response = await invokable.Invoke();
-                                        // The copier preserves the null state of its input.
-                                        response = this.responseCopier.Copy(response)!;
-                                    }
-
-                                    // Preserve existing disposal semantics for ordinary requests.
-                                    if (owner is null)
-                                    {
-                                        invokable.Dispose();
-                                    }
-                                }
-                                finally
-                                {
-                                    if (owner is not null)
-                                    {
-                                        InvokableArgumentResources.Dispose(invokable, this.logger);
-                                        InvokableArgumentResources.Release(owner, this.logger);
-                                    }
-                                }
-
+                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -401,12 +377,6 @@ namespace Orleans.Runtime
                 {
                     SafeSendExceptionResponse(message, exc2);
                 }
-            }
-            finally
-            {
-                message.CompleteArgumentResources(logger);
-                // Expiry or a failure before body decoding still owns the raw receive buffer.
-                message.ReleaseBodyBuffer();
             }
         }
 
@@ -484,7 +454,7 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
-                        message.Dispose(logger);
+                        message.Dispose();
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -510,7 +480,7 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
-                message.Dispose(logger);
+                message.Dispose();
             }
         }
 

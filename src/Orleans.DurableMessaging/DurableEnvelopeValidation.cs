@@ -33,6 +33,10 @@ internal static class DurableEnvelopeValidation
             throw new ArgumentException($"The envelope message ID exceeds {MaxMessageIdBytes} UTF-8 bytes.", nameof(envelope));
         }
         ValidateSubject(envelope.Subject);
+        if (envelope.Payload is null)
+        {
+            throw new ArgumentException("The envelope payload must not be null.", nameof(envelope));
+        }
     }
 
     public static void ValidateSubject(string subject)

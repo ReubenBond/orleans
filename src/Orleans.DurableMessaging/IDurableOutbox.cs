@@ -29,16 +29,15 @@ public interface IDurableOutbox
     /// <summary>
     /// Gets pending messages in unspecified order.
     /// </summary>
-    /// <remarks>Values are borrowed from durable state until removal or scope disposal.
-    /// Do not dispose them; use <see cref="DurableEnvelope.Retain"/> for a longer lifetime.</remarks>
+    /// <remarks>Values expose stored payload arrays. Keep their command contents unchanged; copy arrays for independent mutation.</remarks>
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
-    /// Synchronously stages an immutable envelope for the grain's next journal write.
+    /// Synchronously stages an command envelope for the grain's next journal write.
     /// </summary>
-    /// <param name="envelope">The fully prepared, borrowed outgoing envelope.</param>
+    /// <param name="envelope">The fully prepared outgoing envelope.</param>
     /// <remarks>
-    /// Send does not consume the caller's ownership. Durable state retains an independent slice.
+    /// Direct sends share the caller's GC-owned array. Keep its bytes unchanged after publication.
     /// The sender identity must match this outbox's grain. Equivalent repeated identities retain
     /// the original intent; subject, destination, sender, and body must match that intent. Conflicts fail explicitly.
     /// Inbox handlers stage outgoing
@@ -56,7 +55,7 @@ public interface IDurableOutbox
     /// Looks up a pending outbound message.
     /// </summary>
     /// <param name="messageId">The message identifier.</param>
-    /// <param name="envelope">The borrowed matching envelope when found.</param>
+    /// <param name="envelope">The matching stored envelope when found.</param>
     /// <returns>Whether the message is pending.</returns>
     bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
 }

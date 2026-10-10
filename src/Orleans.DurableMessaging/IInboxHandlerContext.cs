@@ -9,9 +9,8 @@ public interface IInboxHandlerContext
     /// Gets the received transport envelope and immutable application bytes.
     /// </summary>
     /// <remarks>
-    /// This envelope is borrowed until the handler method actually completes, including
-    /// after Complete removes the pending message. Do not dispose it. Use
-    /// <see cref="DurableEnvelope.Retain"/> for an independently owned longer lifetime.
+    /// The context keeps the envelope available through actual handler completion, including
+    /// after Complete removes the pending message. Keep its payload unchanged while handling the command.
     /// </remarks>
     DurableEnvelope Envelope { get; }
 

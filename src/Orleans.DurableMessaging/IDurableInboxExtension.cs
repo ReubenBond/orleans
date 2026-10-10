@@ -19,8 +19,8 @@ public interface IDurableInboxExtension : IGrainExtension
     /// <param name="envelope">The command envelope with an application identity and ordinal subject.</param>
     /// <param name="cancellationToken">Cancels the caller's wait for delivery.</param>
     /// <remarks>
-    /// Direct calls borrow the envelope and retain admission ownership before their first wait.
-    /// RPC invocations own and dispose their separately copied or decoded argument.
+    /// Direct admission shares the supplied GC-owned array under the immutable-publication contract.
+    /// RPC copying and deserialization isolate payload arrays using ordinary Orleans serialization.
     /// Once delivery owns inbox admission, it retains its gate and ownership reservation until
     /// its operation completes. Caller cancellation leaves that operation running to its durable outcome.
     /// The grain owner keeps delivery quiescent during journal deletion and resumes delivery
@@ -33,5 +33,5 @@ public interface IDurableInboxExtension : IGrainExtension
     /// or identifies a receiver other than the grain handling the call.
     /// </exception>
     [Alias("DeliverAsync")]
-    ValueTask<DeliveryResult> DeliverAsync([DisposeOnCompletion] DurableEnvelope envelope, CancellationToken cancellationToken = default);
+    ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, CancellationToken cancellationToken = default);
 }

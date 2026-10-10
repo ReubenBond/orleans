@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization.Invocation;
 
@@ -22,12 +21,6 @@ namespace Orleans.Runtime
         public CoarseStopwatch _timeToExpiry;
 
         internal object? _bodyObject;
-        private static readonly object CompletedArgumentResources = new();
-
-        internal bool IsDisposedWithOwnedArguments => ReferenceEquals(_bodyObject, CompletedArgumentResources);
-
-        // Do not deserialize an unread body solely for cleanup: its raw buffer already owns it.
-        internal void CompleteArgumentResources(ILogger? logger = null) => InvokableArgumentResources.Complete(_bodyObject as IInvokableArgumentOwner, logger);
 
         public object? BodyObject
         {
@@ -38,16 +31,11 @@ namespace Orleans.Runtime
                     DeserializeRequestBody(readRequest);
                 }
 
-                return IsDisposedWithOwnedArguments ? null : _bodyObject;
+                return _bodyObject;
             }
 
             set
             {
-                if (!ReferenceEquals(_bodyObject, value))
-                {
-                    CompleteArgumentResources();
-                }
-
                 (_bodyObject as MessageReadRequest)?.Reset();
                 _bodyObject = value;
             }
@@ -89,7 +77,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            return IsDisposedWithOwnedArguments ? null : _bodyObject;
+            return _bodyObject;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -140,22 +128,10 @@ namespace Orleans.Runtime
             }
         }
 
-        public void Dispose() => Dispose(logger: null);
-
-        internal void Dispose(ILogger? logger)
+        public void Dispose()
         {
-            var body = _bodyObject;
-            if (body is IInvokableArgumentOwner owner)
-            {
-                // Preserve the terminal state in the existing body slot while active users retain the request.
-                Volatile.Write(ref _bodyObject, CompletedArgumentResources);
-                InvokableArgumentResources.Complete(owner, logger);
-            }
-            else if (!ReferenceEquals(body, CompletedArgumentResources))
-            {
-                (body as MessageReadRequest)?.Reset();
-                _bodyObject = null;
-            }
+            (_bodyObject as MessageReadRequest)?.Reset();
+            _bodyObject = null;
         }
 
         public PackedHeaders _headers;

@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -20,7 +19,7 @@ public sealed class HandlerRoutingContractTests
     public void HandlerContext_Complete_ForwardsToOwnerSynchronously(int calls)
     {
         var count = 0;
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
 
         for (var i = 0; i < calls; i++)
@@ -38,7 +37,7 @@ public sealed class HandlerRoutingContractTests
     {
         var sentinel = new InvalidOperationException("owner failure");
         var count = 0;
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var context = CreateContext(envelope, () =>
         {
             count++;
@@ -56,15 +55,13 @@ public sealed class HandlerRoutingContractTests
     public void HandlerContext_Envelope_PreservesIdentityAndPayload()
     {
         byte[] source = [0x00, 0xff, 0x80];
-        using var writer = new ArcBufferWriter();
-        writer.Write(source);
-        using var envelope = Envelope(writer.PeekSlice(writer.Length));
+        var envelope = Envelope(source.ToArray());
         var count = 0;
         var context = CreateContext(envelope, () => count++);
         Array.Fill(source, (byte)0x42);
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
 
-        using var decoded = services.GetRequiredService<Serializer<DurableEnvelope>>()
+        var decoded = services.GetRequiredService<Serializer<DurableEnvelope>>()
             .Deserialize(services.GetRequiredService<Serializer<DurableEnvelope>>().SerializeToArray(context.Envelope));
         context.Complete();
 
@@ -74,15 +71,15 @@ public sealed class HandlerRoutingContractTests
         Assert.Equal(envelope.Subject, decoded.Subject);
         Assert.Equal(envelope.SenderId, decoded.SenderId);
         Assert.Equal(envelope.ReceiverId, decoded.ReceiverId);
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, decoded.Payload.ToArray());
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, context.Envelope.Payload.ToArray());
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, decoded.Payload);
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, context.Envelope.Payload);
     }
 
     [Fact]
     public async Task HandleAsync_SynchronousHandling_PreservesContextTokenAndExplicitCompletion()
     {
         var count = 0;
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         using var cancellation = new CancellationTokenSource();
         var handler = Substitute.For<IInboxHandler>();
@@ -107,7 +104,7 @@ public sealed class HandlerRoutingContractTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var count = 0;
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         using var cancellation = new CancellationTokenSource();
         var handler = Substitute.For<IInboxHandler>();
@@ -135,7 +132,7 @@ public sealed class HandlerRoutingContractTests
     public async Task HandleAsync_ReturnWithoutComplete_DoesNotInvokeCompletion()
     {
         var count = 0;
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         var handler = Substitute.For<IInboxHandler>();
         handler.HandleAsync(context, CancellationToken.None).Returns(ValueTask.CompletedTask);
@@ -173,7 +170,7 @@ public sealed class HandlerRoutingContractTests
     [Fact]
     public void HandlerContext_Constructor_RequiresCompletionCallback()
     {
-        using var envelope = Envelope();
+        var envelope = Envelope();
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
         var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
         Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
@@ -189,19 +186,14 @@ public sealed class HandlerRoutingContractTests
         return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete));
     }
 
-    private static DurableEnvelope Envelope(ArcBuffer? payload = null)
+    private static DurableEnvelope Envelope(byte[]? payload = null) => new()
     {
-        using var writer = new ArcBufferWriter();
-        writer.Write(new byte[] { 0x00, 0xff, 0x80 });
-        return new()
-        {
-            MessageId = HierarchicalKey.Create("44444444-4444-4444-4444-444444444444"),
-            SenderId = GrainId.Create("sender", "handler"),
-            ReceiverId = GrainId.Create("receiver", "handler"),
-            Subject = "handler.v1",
-            Payload = payload ?? writer.PeekSlice(writer.Length)
-        };
-    }
+        MessageId = HierarchicalKey.Create("44444444-4444-4444-4444-444444444444"),
+        SenderId = GrainId.Create("sender", "handler"),
+        ReceiverId = GrainId.Create("receiver", "handler"),
+        Subject = "handler.v1",
+        Payload = payload ?? [0x00, 0xff, 0x80]
+    };
 
     private static void AssertEnvelope(DurableEnvelope expected, DurableEnvelope actual)
     {
@@ -209,7 +201,7 @@ public sealed class HandlerRoutingContractTests
         Assert.Equal(expected.Subject, actual.Subject);
         Assert.Equal(expected.SenderId, actual.SenderId);
         Assert.Equal(expected.ReceiverId, actual.ReceiverId);
-        Assert.Same(expected.Payload.First, actual.Payload.First);
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, actual.Payload.ToArray());
+        Assert.Same(expected.Payload, actual.Payload);
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, actual.Payload);
     }
 }
