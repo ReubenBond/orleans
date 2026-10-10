@@ -739,7 +739,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             if (!IsPendingAcknowledgement(envelope.MessageId) && IsReadyForAttempt(envelope, now))
             {
-                var candidate = new DeliveryCandidate(envelope.Retain(),
+                var candidate = new DeliveryCandidate(envelope,
                     _messageStates.TryGetValue(envelope.MessageId, out var state) ? CopyState(state) : null);
                 if (count++ == 0)
                 {
@@ -762,11 +762,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         LogDeliveringMessages(_logger, count);
         return candidates is null ? new(first) : new(candidates.ToArray());
-    }
-
-    private static void ReleaseCandidates(Items<DeliveryCandidate> candidates)
-    {
-        for (var index = 0; index < candidates.Count; index++) candidates[index].Envelope.Dispose();
     }
 
     private static OutboxMessageState CopyState(OutboxMessageState state) => new()
@@ -855,7 +850,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
-            ReleaseCandidates(candidates);
             _deliveryGate.Release();
         }
     }
@@ -904,7 +898,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             var cancellation = attemptCancellationToken == _shutdown.Token || !attemptCancellationToken.CanBeCanceled
                 ? CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token)
                 : CancellationTokenSource.CreateLinkedTokenSource(attemptCancellationToken, _shutdown.Token);
-            var pending = new PendingDeliveryBatch(owner, cancellation, candidates);
+            var pending = new PendingDeliveryBatch(owner, cancellation);
             try
             {
                 for (var index = 0; index < candidates.Count; index++)
@@ -1662,7 +1656,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private sealed class OwnershipWrite(long generation) : OutboxWrite(generation);
     private sealed class CompactWrite(long generation) : OutboxWrite(generation);
 
-    private sealed class PendingDeliveryBatch(PumpOwner owner, CancellationTokenSource cancellation, Items<DeliveryCandidate> candidates) : IDisposable
+    private sealed class PendingDeliveryBatch(PumpOwner owner, CancellationTokenSource cancellation) : IDisposable
     {
         private bool _disposed;
         private Task? _drain;
@@ -1746,7 +1740,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             if (!_disposed)
             {
                 _disposed = true;
-                ReleaseCandidates(candidates);
                 Cancellation.Dispose();
             }
         }
