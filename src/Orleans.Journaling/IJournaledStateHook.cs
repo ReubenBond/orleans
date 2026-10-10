@@ -19,13 +19,12 @@ public enum JournaledStateOperation
 /// Participates in the prerequisites and completion of actual journal operations.
 /// </summary>
 /// <remarks>
-/// Ordinary before hooks run in registration order on the owner's logical execution context, outside its lock.
+/// Ordinary before hooks run in list order on the owner's logical execution context, outside its lock.
 /// An optional <see cref="IJournaledStateCaptureHook"/> runs last immediately before capture or deletion.
-/// Before hooks finish before synchronous capture begins. Their prerequisites must remain valid for
-/// changes staged during asynchronous preparation. After hooks run after storage acknowledgement and
-/// state acknowledgement or reset, including successful writes which produce no storage bytes.
-/// Hooks retain operation-local data across those boundaries and keep later pending changes separate.
-/// Awaiting another operation on the same journal owner from a hook is rejected.
+/// Prerequisites must cover changes staged during asynchronous preparation. After hooks run after
+/// storage acknowledgement and state acknowledgement or reset, including successful writes which
+/// produce no storage bytes. Hooks retain operation-local data across these boundaries and keep later
+/// pending changes separate. Recursive operations on the same journal owner are rejected.
 /// </remarks>
 public interface IJournaledStateHook
 {
@@ -36,10 +35,9 @@ public interface IJournaledStateHook
     /// <param name="cancellationToken">The token for the owned operation's lifetime.</param>
     /// <returns>A completion representing the prerequisite work.</returns>
     /// <remarks>
-    /// Failure reports <see cref="JournaledStatePreCommitException"/>, prevents the storage operation,
-    /// and retains pending changes for an explicit retry.
-    /// All staged changes must remain safe to commit. Full deletion requires the owner to stop
-    /// admission and drain feature operations before queuing deletion.
+    /// Failure reports <see cref="JournaledStatePreCommitException"/> and retains pending changes
+    /// for an explicit retry. All staged changes remain safe to commit. Full deletion requires the
+    /// owner to stop admission and drain feature operations before queuing deletion.
     /// </remarks>
     ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken) => default;
 

@@ -25,8 +25,6 @@ During <xref:Orleans.Runtime.GrainLifecycleStage.SetupState>, the manager:
 1. Resets and replays each registered durable state.
 1. Completes activation setup after replay finishes.
 
-Recovery uses the configured format when stored format metadata is absent. New empty journals use the configured write format.
-
 <xref:Orleans.Grain.OnActivateAsync*> and requests observe recovered durable state after setup succeeds, whether the grain derives directly from <xref:Orleans.Grain>, from an application-owned base, or from <xref:Orleans.Journaling.DurableGrain>. A storage read, format, codec, or malformed-data failure fails activation and preserves the stored journal for diagnosis and recovery.
 
 Provider registration makes Journaling services available. Per-grain journal I/O begins only for activations which resolve the manager, directly or through durable-state dependencies. Grains which use other persistence models keep their existing activation behavior.
@@ -51,36 +49,12 @@ Standalone journal owners orchestrate manually registered components and never c
 
 Durable collections encode their operation before applying it to the in-memory collection. A codec failure therefore leaves both the journal buffer and collection unchanged.
 
-<xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> queues a storage operation.
-When that operation executes, the manager establishes registered prerequisites and
-gathers pending entries from all named states. The protected `DurableGrain.WriteStateAsync`
-helper forwards to that same manager:
+<xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> gathers pending entries from all named states and queues one storage operation. The protected `DurableGrain.WriteStateAsync` helper forwards to that same manager:
 
 - **Append** adds the encoded operation batch atomically.
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
 
 Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
-
-### Serialized buffer ownership
-
-The journal owner pins each captured serialized batch through the storage
-operation's actual completion. A successful acknowledgement consumes the captured
-prefix; entries staged during I/O remain pending for a later capture.
-
-The <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
-<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> contracts lend their
-serialized input until the returned operation completes. Storage implementations
-finish consuming or copying that input within this lifetime. The built-in volatile
-provider additionally supports an internal retained-buffer contract: it acquires
-independent page references before publication. Stored bytes and active reader
-snapshots retain their own references after the manager releases its capture.
-
-Ownership follows the actual provider outcome. If a provider commits and then
-reports an error, its stored references still represent that committed outcome,
-which a fresh owner replays. Caller cancellation ends the caller's wait while
-the capture and actual I/O remain owned. Snapshot replacement or deletion releases
-the storage generation's references, and overlapping readers release their
-captured references when their reads finish.
 
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
@@ -94,50 +68,42 @@ Orleans executes that synchronous block on a single activation thread. Another g
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
 
-## Persistence operation hooks
+## Journal operation hooks
 
-The advanced owner exposes <xref:Orleans.Journaling.IJournaledStateManager.Hooks>,
-a mutable list of <xref:Orleans.Journaling.IJournaledStateHook> objects with a lazily
-allocated backing list. Features can inspect their registrations, compare custom
-hook identity, and add an equivalent hook once. Change list membership on the
-owner's logical execution context between persistence operations.
+Activation-scoped features coordinate prerequisites and completion through
+<xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
+allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Inspect and
+deduplicate feature registrations on the owner's logical execution context while persistence
+is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
+mutation throughout each operation.
 
-<xref:Orleans.Journaling.JournaledStateHook> adapts synchronous token-aware delegates
-and asynchronous delegates returning <xref:System.Threading.Tasks.ValueTask>.
-Each adapter invokes its synchronous delegate before its asynchronous delegate.
-Custom hook objects can retain feature identity and operation-local prerequisites.
+Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
+the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
+final prerequisite. Its before callback runs last, and the work loop awaits it directly before
+synchronous capture or storage deletion. Prerequisites cover changes staged during asynchronous
+preparation, including the final hook's own I/O wait. Preserve operation-local bookkeeping for
+the captured batch separately from changes staged later.
 
-:::code source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journal_operation_hooks" language="csharp":::
+Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
+All after callbacks run in list order, including for successful zero-byte writes. Coalesced callers
+share callbacks for the actual operation. <xref:Orleans.Journaling.JournaledStateHook> adapts delegates,
+executing the synchronous delegate before the asynchronous delegate in each phase.
 
-The manager invokes ordinary before hooks in registration order around actual
-coalesced append, snapshot, and delete operations. An optional single
-<xref:Orleans.Journaling.IJournaledStateCaptureHook> runs last, directly in the work
-loop before capture or deletion. Its prerequisite covers changes arriving while
-earlier callbacks awaited and during its own I/O. Inspect and deduplicate this
-registration through the same list; multiple final capture hooks are rejected
-before callbacks or storage work begins. All after hooks retain list order.
-Before callbacks complete before synchronous
-state capture or storage deletion. Their prerequisites cover the changes entering
-that capture, including changes staged while asynchronous preparation awaited.
-After storage succeeds, the manager acknowledges captured state or resets deleted
-state, then invokes after callbacks. Successful zero-byte writes also invoke the
-operation hooks, while state-machine acknowledgement remains tied to stored bytes.
+A failed prerequisite reports <xref:Orleans.Journaling.JournaledStatePreCommitException> with pending
+state retained for an explicit persistence retry after the prerequisite is restored. A failed after
+callback reports <xref:Orleans.Journaling.JournaledStatePostCommitException> with persistence completed.
+Remaining after callbacks run, multiple failures are aggregated, and the manager stays usable.
+The feature's durable recovery protocol resumes interrupted post-persistence work. Storage and
+state-processing failures retain the manager's fencing and fresh-recovery behavior.
 
-Hook cancellation tokens follow the owned operation's shutdown lifetime. A caller
-which cancels its wait leaves callbacks and storage running to their actual outcome.
-A before-hook failure reports <xref:Orleans.Journaling.JournaledStatePreCommitException>,
-prevents storage execution, and leaves safe pending state available for an explicit
-retry. A post-persistence failure is reported as
-<xref:Orleans.Journaling.JournaledStatePostCommitException>, identifies the completed
-operation, and keeps the owner usable. Remaining after hooks execute, and multiple
-failures are aggregated. Feature recovery reconciles interrupted post-persistence
-effects using committed state.
-
-Callbacks execute outside the manager lock. Calling another persistence operation
-on the same owner from a callback is rejected, preserving progress of its serialized
-work loop. Full deletion starts with stopping admission and draining feature work
-before queuing deletion. An after-delete callback can release the exact resources
-associated with the completed deletion.
+Hook callbacks receive the owner's shutdown token. Cancelling a caller's wait leaves the owned
+operation running through its actual outcome. Disposal drains owned hooks and storage before releasing
+journal resources, including when cancellation callbacks or cleanup fail. Concurrent disposal callers
+share this completion. Recursive initialization, persistence, or disposal on the same owner from a
+hook is rejected. Shutdown closes work admission and cancels queued operations while the current
+operation drains to its actual storage and hook outcome. For deletion, the feature owner stops
+admission and drains feature operations before
+queuing the whole-journal reset.
 
 ## Consistency and competing writers
 
@@ -200,7 +166,7 @@ The journal owner keeps feature operations quiescent through deletion's storage 
 including when a caller cancels its wait. Successful deletion calls <xref:Orleans.Journaling.IStateMachine.Reset*>
 before completing deletion waiters.
 
-The manager records the first storage write or delete failure, fences further persistence, faults current
+The manager records the first write or delete failure, fences further persistence, faults current
 and queued manager waiters, and requests grain deactivation. Features observe their write failures and
 complete their own operation waiters and resource cleanup through their operation and lifecycle ownership.
 Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage
