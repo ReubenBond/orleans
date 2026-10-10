@@ -224,6 +224,18 @@ Built-in durable state components use the configured JSON codec automatically. C
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
+## In-memory storage capacity
+
+`VolatileJournalStorage` retains journal bytes on reference-counted pages across manager lifetimes.
+Replacement and deletion release retired storage references, while active readers retain stable
+bytes until completion. Each nonempty journal can retain a minimum 16 KiB page even for a small
+payload. Capacity planning includes the number and lifetime of stored journals and concurrent reads.
+`ArcBufferWriter.MaxRetainedPoolBytes` separately bounds the process-wide cache of free pages to
+4 MiB by default; zero releases free pages and disables caching.
+
+See [Journaling runtime behavior](https://dotnet.github.io/orleans/docs/grains/journaling/runtime-behavior/)
+for captured-buffer ownership, cancellation, shutdown, and storage lifetime contracts.
+
 ## Custom state and standalone ownership
 
 Register `IDurableDictionaryValueLifecycle<TValue>` for dictionary values with explicitly owned

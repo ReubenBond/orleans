@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -170,7 +171,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public sealed class VolatileJournalStorage : IJournalStorage
+public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalStorage
 {
     private readonly Store _store;
     private readonly int _maxAppendsBeforeSnapshot;
@@ -225,7 +226,18 @@ public sealed class VolatileJournalStorage : IJournalStorage
         }
     }
 
-    internal IReadOnlyList<byte[]> Segments => _store.Segments;
+    internal IReadOnlyList<byte[]> Segments
+    {
+        get
+        {
+            lock (_store.SyncRoot)
+            {
+                return _store.Segments.Select(static segment => segment.Length == 0 ? [] : segment.ToArray()).ToArray();
+            }
+        }
+    }
+
+    internal Store Storage => _store;
 
     internal string? StoredJournalFormatKey
     {
@@ -306,25 +318,46 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        byte[][] segments;
+        ArcBuffer[] segments;
         IJournalMetadata metadata;
         lock (_store.SyncRoot)
         {
             metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
-            segments = _store.Segments.ToArray();
+            segments = new ArcBuffer[_store.Segments.Count];
+            // The lock preserves each storage owner until the read acquires its independent pin.
+            for (var i = 0; i < segments.Length; i++)
+            {
+                var segment = _store.Segments[i];
+                if (segment.Length > 0)
+                {
+                    segments[i] = segment.Slice(0);
+                }
+            }
         }
 
-        consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
-        return default;
+        try
+        {
+            consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
+            return default;
+        }
+        finally
+        {
+            ReleaseSegments(segments);
+        }
     }
 
-    private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(IEnumerable<byte[]> segments, CancellationToken cancellationToken)
+    private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(ArcBuffer[] segments, CancellationToken cancellationToken)
     {
         foreach (var segment in segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return segment;
+            foreach (var memory in segment.MemorySegments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return memory;
+            }
         }
     }
 
@@ -334,12 +367,9 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
-            _store.Exists = true;
-            _store.StoredJournalFormatKey = _configuredJournalFormatKey;
-            _store.Segments.Add(segment.ToArray());
-            _store.AppendedBytes += segment.Length;
-            _store.AppendCount++;
-            _store.RefreshETag();
+            _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
+            var retained = _store.Copy(segment);
+            Publish(retained);
         }
 
         return default;
@@ -349,19 +379,73 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask ReplaceAsync(ReadOnlySequence<byte> snapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var data = snapshot.ToArray();
         lock (_store.SyncRoot)
         {
-            _store.Exists = true;
-            _store.StoredJournalFormatKey = _configuredJournalFormatKey;
-            _store.Segments.Clear();
-            _store.Segments.Add(data);
-            _store.AppendedBytes = 0;
-            _store.AppendCount = 0;
-            _store.RefreshETag();
+            var replacement = new List<ArcBuffer>(1);
+            // Prepare the complete replacement before retiring the published journal.
+            using var writer = new ArcBufferWriter();
+            writer.Write(snapshot);
+            var retained = snapshot.IsEmpty ? default : writer.PeekSlice(writer.Length);
+            Publish(retained, replacement);
         }
 
         return default;
+    }
+
+    ValueTask IRetainedJournalStorage.AppendRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => WriteRetained(value, replace: false, cancellationToken);
+
+    ValueTask IRetainedJournalStorage.ReplaceRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => WriteRetained(value, replace: true, cancellationToken);
+
+    private ValueTask WriteRetained(ArcBuffer value, bool replace, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_store.SyncRoot)
+        {
+            var replacement = replace ? new List<ArcBuffer>(1) : null;
+            if (!replace)
+            {
+                _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
+            }
+
+            var retained = value.Length == 0 ? default : value.Slice(0);
+            Publish(retained, replacement);
+        }
+
+        return default;
+    }
+
+    // Called under the store lock. The preallocated list takes ownership of the independent pin.
+    private void Publish(ArcBuffer retained, List<ArcBuffer>? replacement = null)
+    {
+        if (replacement is not null)
+        {
+            _store.ReleaseContents();
+            _store.Segments = replacement;
+        }
+
+        _store.Exists = true;
+        _store.StoredJournalFormatKey = _configuredJournalFormatKey;
+        _store.Segments.Add(retained);
+        if (replacement is null)
+        {
+            _store.AppendedBytes += retained.Length;
+            _store.AppendCount++;
+        }
+        _store.RefreshETag();
+    }
+
+    private static void ReleaseSegments(IReadOnlyList<ArcBuffer> segments)
+    {
+        for (var i = 0; i < segments.Count; i++)
+        {
+            var segment = segments[i];
+            if (segment.Length > 0)
+            {
+                segment.Dispose();
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -382,12 +466,68 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
         public object SyncRoot { get; } = new();
 
-        public List<byte[]> Segments { get; } = [];
+        public List<ArcBuffer> Segments { get; set; } = [];
 
         public long AppendCount { get; set; }
 
-        // List count and each stored array length fit in int, so their total fits in long.
+        // List count and each retained slice length fit in int, so their total fits in long.
         public long AppendedBytes { get; set; }
+
+        public ArcBufferWriter? CopyWriter { get; private set; }
+
+        // Shared storage outlives its handles. Retire its pins when the entire store becomes unreachable.
+        ~Store()
+        {
+            // Finalization also runs when construction failed partway through allocating the store.
+            if (Segments is { } segments)
+            {
+                ReleaseSegments(segments);
+            }
+
+            CopyWriter?.Dispose();
+        }
+
+        public ArcBuffer Copy(ReadOnlySequence<byte> input)
+        {
+            if (input.IsEmpty)
+            {
+                return default;
+            }
+
+            var length = checked((int)input.Length);
+            var hasCopyWriter = CopyWriter is not null;
+            var writer = CopyWriter ??= new ArcBufferWriter();
+            try
+            {
+                writer.Write(input);
+                return writer.ConsumeSlice(length);
+            }
+            catch
+            {
+                if (hasCopyWriter)
+                {
+                    writer.Truncate(0);
+                }
+                else
+                {
+                    writer.Dispose();
+                    CopyWriter = null;
+                }
+
+                throw;
+            }
+        }
+
+        public void ReleaseContents()
+        {
+            ReleaseSegments(Segments);
+            Segments.Clear();
+            Segments.Capacity = 0;
+            AppendCount = 0;
+            AppendedBytes = 0;
+            CopyWriter?.Dispose();
+            CopyWriter = null;
+        }
 
         public Dictionary<string, string> Properties { get; } = new(StringComparer.Ordinal);
 
@@ -402,9 +542,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         public void Create(IReadOnlyDictionary<string, string>? properties)
         {
             Exists = true;
-            Segments.Clear();
-            AppendCount = 0;
-            AppendedBytes = 0;
+            ReleaseContents();
             Properties.Clear();
             StoredJournalFormatKey = null;
             if (properties is not null)
@@ -421,9 +559,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         public void Delete()
         {
             Exists = false;
-            Segments.Clear();
-            AppendCount = 0;
-            AppendedBytes = 0;
+            ReleaseContents();
             Properties.Clear();
             StoredJournalFormatKey = null;
             ETag = null;
