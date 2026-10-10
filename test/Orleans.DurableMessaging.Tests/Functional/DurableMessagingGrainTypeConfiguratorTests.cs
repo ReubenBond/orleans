@@ -143,7 +143,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
         var journal = JournalId.FromGrainId(grain.GetGrainId());
         using var scheduling = Fixture.JobManagerProbe.BlockNext(BootstrapOutboxServices.JobName);
-        using var handler = new SynchronousHandler(observation);
+        var handler = new SynchronousHandler(observation);
         Task operation;
         if (handlerSend)
         {
@@ -152,7 +152,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
                 observation.Context.ActivationServices.GetRequiredService<BootstrapState>().HandlerOverride = handler;
                 return Task.CompletedTask;
             });
-            using var input = CreateEnvelope(grain);
+            var input = CreateEnvelope(grain);
             operation = grain.AsReference<IDurableInboxExtension>().DeliverAsync(input, Cancellation).AsTask();
         }
         else operation = grain.SendSynchronousValueAsync(42);
@@ -225,14 +225,14 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var grain = CreateGrain(typeof(PlainBootstrapGrain));
         await grain.SetValueAsync(11);
         var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
-        using var handler = new SynchronousHandler(observation);
+        var handler = new SynchronousHandler(observation);
         await OnOwnerTurnAsync(observation.Context, () =>
         {
             observation.Context.ActivationServices.GetRequiredService<BootstrapState>().HandlerOverride = handler;
             return Task.CompletedTask;
         });
         Fixture.JobManagerProbe.FailNext(BootstrapOutboxServices.JobName);
-        using var input = CreateEnvelope(grain);
+        var input = CreateEnvelope(grain);
         Assert.Equal(DeliveryStatus.Accepted, (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(input, Cancellation)).Status);
         await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(1, handler.Applied);
@@ -274,7 +274,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             });
             return Task.CompletedTask;
         });
-        using var envelope = CreateEnvelope(grain);
+        var envelope = CreateEnvelope(grain);
         var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() =>
             grain.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, Cancellation).AsTask());
         Assert.IsType<IOException>(error.InnerException);
@@ -308,7 +308,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var grain = CreateGrain(typeof(PlainBootstrapGrain));
         await grain.SetValueAsync(11);
         var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
-        using var handler = new SynchronousHandler(observation);
+        var handler = new SynchronousHandler(observation);
         var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failHook = true;
@@ -331,7 +331,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             observation.Manager!.Hooks.Add(hook);
             return Task.CompletedTask;
         });
-        using var envelope = CreateEnvelope(grain);
+        var envelope = CreateEnvelope(grain);
         var delivery = grain.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, Cancellation).AsTask();
         if (acceptance)
         {
@@ -361,7 +361,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.False(observation.Context.Deactivated.IsCompleted);
     }
 
-    private sealed class SynchronousHandler(BootstrapObservation observation) : IInboxHandler, IDisposable
+    private sealed class SynchronousHandler(BootstrapObservation observation) : IInboxHandler
     {
         public IInboxHandlerContext? Context { get; private set; }
         public DurableEnvelope Output { get; private set; }
@@ -371,7 +371,6 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         {
             cancellationToken.ThrowIfCancellationRequested();
             Context = context;
-            Output.Dispose();
             Output = TestApplicationProtocol.Create(observation.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), observation.Context.GrainId, BootstrapState.OutputTarget, "output", 42, context.Envelope.MessageId.CreateChildKey("output"));
             Applied++;
             observation.Value!.Value = 42;
@@ -379,7 +378,6 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             context.Complete();
             return ValueTask.CompletedTask;
         }
-        public void Dispose() => Output.Dispose();
     }
 
     private static Task OnOwnerTurnAsync(IGrainContext context, Func<Task> action)
