@@ -1633,6 +1633,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
     }
 
+
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
