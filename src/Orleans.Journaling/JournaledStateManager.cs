@@ -1635,11 +1635,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     [LoggerMessage(
         Level = LogLevel.Error,
-        Message = "Journal shutdown cancellation callback failed; owned operations are drained before resources are released.")]
-    private static partial void LogShutdownCancellationFailed(ILogger logger, Exception exception);
-
-    [LoggerMessage(
-        Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
 
