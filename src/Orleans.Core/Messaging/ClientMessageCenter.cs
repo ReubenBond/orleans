@@ -177,7 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
-                msg.Dispose(logger);
+                msg.Dispose();
                 return;
             }
 
@@ -375,7 +375,7 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                msg.Dispose(logger);
+                msg.Dispose();
                 return;
             }
 
@@ -391,7 +391,7 @@ namespace Orleans.Messaging
                 DispatchLocalMessage(error);
             }
 
-            msg.Dispose(logger);
+            msg.Dispose();
         }
 
         internal void OnGatewayConnectionOpen()

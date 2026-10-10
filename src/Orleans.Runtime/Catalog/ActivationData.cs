@@ -1646,7 +1646,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
-            message.Dispose(Shared.Logger);
+            message.Dispose();
             return;
         }
 
@@ -2424,28 +2424,19 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            if (message is not null && wasWaiting)
-            {
-                // Removing a waiting request transfers its lifetime from the queue to this terminal path.
-                try
-                {
-                    if (message.Direction != Message.Directions.OneWay)
-                    {
-                        _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    }
-                }
-                finally
-                {
-                    message.Dispose(Shared.Logger);
-                }
-
-                return true;
-            }
-
             var didCancel = false;
             if (message is not null && message.BodyObject is IInvokable request)
             {
-                didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                if (wasWaiting)
+                {
+                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
+                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                    didCancel = true;
+                }
+                else
+                {
+                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                }
             }
 
             return didCancel;

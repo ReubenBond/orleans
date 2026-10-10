@@ -168,7 +168,7 @@ namespace Orleans.Runtime.Messaging
                 MessagingMetrics.OnDroppedSentMessage(msg);
             }
 
-            msg.Dispose(Log);
+            msg.Dispose();
         }
 
         [LoggerMessage(
