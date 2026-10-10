@@ -26,9 +26,9 @@ limits: **100 appends or 1 MiB**, whichever is reached first.
 
 The outbox retains an idle recovery handle for the default 100 ms grace, amortizing
 job-provider work over a burst. Local delivery wakes remain immediate. Activation
-pumps reuse timer/state infrastructure, one-message delivery uses scalar
-accounting, and built-in volatile storage retains independently pinned journal
-pages. Record the grace and storage settings when comparing earlier builds.
+pumps reuse timer/state infrastructure and one-message delivery uses scalar
+accounting. Journal storage manages its own buffering independently of message
+payload arrays. Record the grace and storage settings when comparing earlier builds.
 
 Iteration setup recreates the cluster and warms one complete chain. Each iteration
 contains one measured invocation, keeping journal and deduplication history bounded
@@ -43,8 +43,8 @@ The dispatcher decodes `SequentialMessage` using a keyed
 `DurableMessageType<SequentialMessage>` binding for `benchmarks.sequential-hop.v1`.
 Its registration stores the grain as state and invokes a static synchronous
 delegate. Typed outbox `Send` encodes and stages the next hop before business
-counter updates, then disposes its temporary owner internally. Each envelope contains a command ID, subject, sender,
-receiver, and read-only Arc payload. Normal inbox/outbox delivery traverses the
+counter updates. Each envelope contains a command ID, subject, sender,
+receiver, and independently allocated GC-owned `byte[]` payload. Normal inbox/outbox delivery traverses the
 production pipeline, and the journal hook observes every actual acknowledgement.
 
 Each invocation assigns a run ID once. Hop IDs are fixed-depth
@@ -53,21 +53,16 @@ All 1,024 hops have distinct command IDs, and retries retain the same hop ID. Th
 next hop constructs its key from the run and hop rather than extending a parent
 chain. The warm-up invocation uses its own run ID.
 
-Typed encoding rents `ArcBufferWriter` instances from a private shared pool.
-`ConsumeSlice` returns
-owned, disjoint slices of freshly encoded messages; small messages can occupy shared
-pages. The helper disposes each temporary envelope after staging, and the durable outbox
-dictionary retains its own pin. Handler context envelopes are borrowed until the
-actual handler method ends. Independently retained slices keep their pages alive
-after encoder reuse.
-Ordinary payload serialization is non-consuming, so journal capture and repeated
-sends preserve the owning pins. Generated RPC request copying separately retains
-the request clone for the extension to release on every path.
+Typed encoding uses the ordinary serializer to allocate one payload array per hop.
+Outbox dictionaries, handler contexts, and admission operations keep managed
+references while their work is active. Payload contents remain immutable through
+retries. Ordinary serialization preserves the original bytes and reconstructs
+managed arrays at decoded boundaries.
 
-Budget logical payload bytes, retained pages and their occupancy, and overlapping
-state/reader/delivery lifetimes separately. Page retention depends on message sizes,
-encoder reuse, and live slices. Journal storage and transient serialization buffers
-have independent lifetimes and remain part of the retained-memory budget.
+Budget payload-array allocations and live pending payload bytes separately from
+journal storage, serialization buffers, and application state. The measurement
+includes per-hop array allocation and GC costs; the live-memory budget includes
+overlapping state, handler, admission, and delivery lifetimes.
 
 Compare revisions on the same machine with matching workload and retention settings.
 

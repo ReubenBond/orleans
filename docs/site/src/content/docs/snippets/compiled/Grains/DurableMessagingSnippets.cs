@@ -4,6 +4,7 @@ using Orleans.DurableMessaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 #pragma warning disable ORLEANSEXP005
 
@@ -148,3 +149,19 @@ public sealed class ShipmentSenderGrain(
     }
 }
 // </messaging_shipment>
+
+// <messaging_byte_payload>
+internal static class ShipmentEnvelope
+{
+    internal static DurableEnvelope Create(
+        Serializer<Shipment> serializer, HierarchicalKey commandId,
+        GrainId sender, GrainId receiver, Shipment shipment) => new()
+    {
+        MessageId = commandId,
+        Subject = MessagingSubjects.Shipment,
+        SenderId = sender,
+        ReceiverId = receiver,
+        Payload = serializer.SerializeToArray(shipment)
+    };
+}
+// </messaging_byte_payload>

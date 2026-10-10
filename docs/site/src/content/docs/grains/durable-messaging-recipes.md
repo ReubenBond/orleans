@@ -1,7 +1,7 @@
 ---
 title: Durable messaging practical recipes
 description: Implement stock reservation, idempotent payment, ordered projections, and durable notification fan-out.
-ms.date: 10/09/2026
+ms.date: 10/10/2026
 ms.topic: how-to
 ---
 
@@ -23,9 +23,9 @@ write. Ordinary methods explicitly await their application's journal write. Regi
 non-generic handler per inbox and inject the outbox directly. Exact subjects identify
 protocol operations; keyed <xref:Orleans.DurableMessaging.DurableMessageType`1>
 bindings select their ordinary serializers. Typed outbox `Send` and `SendReply`
-use private pooled encoders and release temporary envelopes internally after
-staging retains their payload pins. Handler context payloads are borrowed.
-Explicitly created envelopes retain application-managed ownership.
+encode each body into an independently allocated GC-owned `byte[]` and stage an
+ordinary envelope. Handler contexts and asynchronous operations keep the payload
+reachable for as long as they use it. Published payload bytes remain immutable.
 
 ## Run the stock-reservation sample
 
@@ -57,7 +57,7 @@ the envelope's command ID using
 [OrderOperationKeys](durable-messaging-idempotency.md#hierarchical-business-operation-keys),
 and places the quantity and response destination in `ReserveStock`. The
 [typed send helper](durable-messaging.md#encode-ordinary-application-values) encodes the
-record under `inventory.reserve.v1` into an owning, read-only Arc slice.
+record under `inventory.reserve.v1` into an independently allocated payload array.
 
 The inventory registers typed methods through
 <xref:Orleans.DurableMessaging.DurableInboxExtensions.RegisterHandlers*>.
@@ -161,12 +161,11 @@ The campaign record and every outgoing intent are captured in the same sender
 journal write. The typed batch
 <xref:Orleans.DurableMessaging.DurableOutboxExtensions.Send*> helper enumerates the
 recipient commands and sends each through the ordinary typed send helper.
-Each message is encoded and staged independently, with temporary ownership managed
-inside its send call.
+Each message is encoded into its own array and staged independently.
 The campaign record is added after all sends succeed. A later send failure leaves
 earlier intents staged, and a repeated submission uses the same recipient command
 identities and content.
-The outbox keeps its independently retained pins through acknowledgement and delivery.
+The outbox keeps the envelopes and their arrays reachable through acknowledgement and delivery.
 Each destination commits independently through the
 [notification handler](durable-messaging.md#deployment-requirements). Each envelope's
 ID is a stable recipient child under the campaign root, with literal grain identity
@@ -231,9 +230,10 @@ records, using the durable inbox/outbox commit boundary for outgoing intent:
 | Related records and attachments | Put application records and `byte[]` attachments in one serializable message and use the typed send and handler helpers. |
 
 Preserve command identity and recorded outcomes when moving application workflows.
-Typed subject bindings and outbox send/reply helpers carry ordinary records in Arc payloads.
+Typed subject bindings and outbox send/reply helpers carry ordinary records in
+GC-owned payload arrays.
 Applications own subject contracts, reply routing, authorization, and ID construction.
-Choose explicit retain/release at each ownership boundary. See
+Preserve payload contents through retries and use ordinary managed lifetimes. See
 [Application payload evolution](durable-messaging-operations.md#evolve-application-payload-records)
 for rolling application-record changes.
 

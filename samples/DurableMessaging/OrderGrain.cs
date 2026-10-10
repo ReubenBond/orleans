@@ -42,7 +42,7 @@ public sealed class OrderGrain(
 
     public async Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
-        using var request = reserve.Create(commandId, outbox.SenderId, stock,
+        var request = reserve.Create(commandId, outbox.SenderId, stock,
             new ReserveStock(quantity, this.GetGrainId()));
         // Explicit admission exposes the duplicate result after the original reply's ACK.
         return await GrainFactory.GetGrain<IDurableInboxExtension>(stock).DeliverAsync(request);

@@ -1,7 +1,7 @@
 ---
 title: Operate durable messaging
 description: Configure capacity and retention, diagnose delivery, replay dead letters, and measure throughput.
-ms.date: 10/09/2026
+ms.date: 10/10/2026
 ms.topic: how-to
 ---
 
@@ -127,14 +127,15 @@ models accepted and rejected reservation outcomes explicitly.
 Retrieve these records through the grain's injected diagnostics service. For
 remote inspection, expose an application-authorized grain method which copies the
 record's identity, subject, reason, timestamps, and relevant payload fields into
-an application DTO. The envelope returned by diagnostics is borrowed from durable
-state; retain it for longer local use.
+an application DTO. Diagnostics exposes ordinary envelopes with managed payload
+arrays. Treat their contents as immutable; copy bytes when an application needs
+an independently mutable working buffer.
 
 The processed-ID record supplies duplicate suppression. Retained failure records
 provide bounded operational evidence: identify incompatible subjects or payloads,
 reconcile external effects, repair the producer or handler, and authorize a corrected
-submission. Removing a diagnostic record releases its payload and preserves the
-processed-ID record. Applications choose the retention budget and the operational
+submission. Removing a diagnostic record removes its payload reference from that
+collection and preserves the processed-ID record. Applications choose the retention budget and the operational
 access policy for this evidence.
 
 Capture the evidence before age/count retention removes it. Preserve original
@@ -184,35 +185,23 @@ records, business-query outcomes, and retained dead letters. Snapshot and storag
 costs depend on these retained sets. Measure activation replay time and storage
 throughput alongside steady-state handling.
 
-### Budget allocations and owned memory
+<a id="budget-allocations-and-owned-memory"></a>
 
-Payloads are owned Arc slices. Typed encoding rents reusable Arc encoders from a
-private shared pool. These encoders can
-pack small messages into disjoint regions of shared pages using `ConsumeSlice`.
-Measure retained pages and their occupancy alongside logical payload length: several
-live messages can share a page, and a retained slice can keep that page alive after
-other slices are released. Page retention depends on message sizes, encoder reuse,
-concurrency, and the overlap between durable state, readers, and delivery operations.
+### Budget allocations and managed memory
 
-Consuming a slice releases the encoder's pins on completed pages as its cursor
-passes them. A pooled encoder retains its writable tail for subsequent messages.
-Budget these writer-owned pages separately from the free-page cache: the encoder
-pool bounds the number of cached writers, while page capacity follows encoding
-size hints. Payload limits at ingress also bound this retained capacity.
+Each typed body is encoded into its own independently allocated GC-owned `byte[]`.
+Message size and rate therefore contribute directly to managed allocation rate.
+Budget pending payload bytes, array overhead, and GC activity alongside messaging
+records and application results. Apply payload-size and submission limits at
+ingress according to the journal capacity and latency budget.
 
-Outbox staging independently retains the caller's payload pin. Generated RPC request
-copying retains another pin, while ordinary persistence serialization is non-consuming.
-Serialization and invocation hold active uses of that request owner; terminal
-callbacks release it after the final active use finishes. Caller cancellation
-ends the wait while actual admission, serialization, and invocation retain their
-own pins.
-The handler borrows its context envelope through actual method completion. Release
-application-local envelopes after staging and decoded resource-bearing values after
-use; use explicit `Retain()` when crossing those lifetimes. Typed send/reply helpers dispose their
-temporary envelopes internally; independently owned slices keep their pages alive
-after pooled encoder reuse. Application-owned raw encoders have explicit scope disposal.
-See [Payload ownership](durable-messaging.md#own-and-borrow-payload-slices) for each
-borrow/retain/release boundary.
+Outbox state, inbox state, handler contexts, and asynchronous operations hold
+ordinary array references while they use them. Persistence and RPC serialize the
+bytes through ordinary managed-buffer support. Caller cancellation ends the wait;
+an admitted delivery can still hold its payload through its actual result.
+Removing a state record makes its array eligible for collection after other active
+references end. Preserve published payload contents through all these lifetimes.
+See [Payload arrays](durable-messaging.md#use-gc-owned-payload-arrays).
 
 Track allocation rate and retained memory separately. A processing-rate budget
 expressed as bytes per acknowledged message describes how much garbage the
@@ -224,14 +213,14 @@ command completion facts, pending deliveries, serialization metadata, and storag
 | Processing allocations | Managed bytes allocated across the process divided by actually acknowledged messages, after warm-up. |
 | Pending work | Inbox/outbox depth, active preparation and delivery counts, and serialized payload bytes. |
 | Retained data | Completed command IDs and query/audit outcomes over their configured retention, plus append history and snapshots. |
-| Supporting memory | Serialization-metadata cardinality, reusable pump state, buffer capacity, and outstanding reader/operation ownership. |
+| Supporting memory | Serialization-metadata cardinality, reusable pump state, serialization-buffer capacity, and active operation references. |
 | Persistence and recovery work | Journal appends/snapshots and durable job scheduling, retries, and retirement per completed workflow. |
 
 Measure a sequential chain for latency and a many-destination workload for
 pending-work capacity. Include cancellation, shutdown, and snapshot
-replacement while work or readers remain active. The ownership protocol keeps
-their resources live until the actual operation or read finishes; capacity
-planning includes that overlapping lifetime.
+replacement while work or readers remain active. Managed references keep payloads
+available until the actual operations finish; capacity planning includes that
+overlapping lifetime.
 
 Allocation-stack traces attribute costs to their producing paths. Compare warmed
 runs with the same payload, chain length, providers, and retention settings.
@@ -267,9 +256,9 @@ handler delegate with the grain as its state argument. Typed outbox `Send` encod
 and stages each next hop before the grain updates its business counters. Each invocation assigns a root once;
 every hop uses a fixed-depth `runs/{invocation}/hops/{hop}` command ID with invariant
 numeric formatting. Retries preserve that hop's ID. Normal inbox/outbox pumps and
-real time drive progress. Typed encoding rents internal pooled encoders and
-releases temporary output owners after staging. The payload serializer borrows
-bytes during serialization, so journal capture leaves owners intact. The journal hook
+real time drive progress. Each hop allocates its own GC-owned payload array using
+ordinary typed serialization. Journal capture and delivery read immutable array
+contents while normal managed references keep them available. The journal hook
 observes actual acknowledgements independently of handler
 return, and cleanup checks exact total and per-grain business-effect counts.
 

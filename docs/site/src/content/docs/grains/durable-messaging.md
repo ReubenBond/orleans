@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 10/09/2026
+ms.date: 10/10/2026
 ms.topic: conceptual
 ---
 
@@ -24,8 +24,9 @@ Use this page for the payload, commit, execution, and recovery model. Continue w
 
 Each <xref:Orleans.DurableMessaging.DurableEnvelope> carries an application-supplied
 `MessageId` (<xref:Orleans.DurableMessaging.HierarchicalKey>), `SenderId` and `ReceiverId`
-(<xref:Orleans.Runtime.GrainId>), an exact ordinal `Subject`, and an owning `Payload`
-(<xref:Orleans.Serialization.Buffers.ArcBuffer>). The receiving grain verifies its
+(<xref:Orleans.Runtime.GrainId>), an exact ordinal `Subject`, and a GC-owned
+`byte[] Payload`. Each encoded body has its own independently allocated array.
+The receiving grain verifies its
 destination before deduplication or persistence. Admission requires a nondefault
 command ID of at most 1,024 UTF-8 bytes and 32 segments and a nonempty subject of at
 most 256 UTF-8 bytes. Both send and admission validate these bounds before durable mutation.
@@ -49,15 +50,15 @@ Register <xref:Orleans.DurableMessaging.DurableMessageType`1> using
 singleton binds one explicit subject to the ordinary
 <xref:Orleans.Serialization.Serializer`1>. Inject it using `FromKeyedServices` and
 decode with <xref:Orleans.DurableMessaging.DurableMessageType`1.Decode*>; the binding
-verifies the envelope's subject before reading the borrowed payload.
+verifies the envelope's subject before reading its payload bytes.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_payload" language="csharp":::
 
 Use the typed outbox `Send` extension with a binding, stable command ID, destination,
 and body. The destination can be a <xref:Orleans.Runtime.GrainId> or an
 <xref:Orleans.Runtime.IAddressable> grain reference. The helper encodes the body,
-assigns <xref:Orleans.DurableMessaging.IDurableOutbox.SenderId> as sender, stages
-the envelope, and releases its temporary owner after the outbox retains its pin.
+assigns <xref:Orleans.DurableMessaging.IDurableOutbox.SenderId> as sender, and stages
+the envelope with its GC-owned array.
 
 The typed `SendReply` extension takes the binding, inbox context, explicit
 destination, and result body. It derives the reply ID by appending the literal
@@ -69,9 +70,9 @@ first outbox mutation; serialization errors propagate with no outgoing intent st
 
 For explicit admission,
 <xref:Orleans.DurableMessaging.DurableMessageType`1.Create*> accepts the command ID,
-sender ID, destination ID, and body and returns an owning envelope. Use `using` or
-`finally` for these explicitly created owners. The typed outbox helpers manage
-their envelopes internally.
+sender ID, destination ID, and body and returns an ordinary envelope with an
+independently allocated payload array. The array remains valid for the lifetime of
+references to it, including an asynchronous admission call.
 
 Subjects use exact ordinal spelling, for example `inventory.reserve.v1`. Register
 each subject once; separate subjects can bind the same CLR type. Define supported
@@ -104,51 +105,46 @@ the method. These short synchronous methods proceed through explicit `Complete()
 and return in the same turn. Asynchronous preparation receives the token and checks
 it after awaited work and before outgoing staging or business mutation.
 
-### Own and borrow payload slices
+<a id="own-and-borrow-payload-slices"></a>
 
-An envelope is a disposable readonly struct containing an owned
-<xref:Orleans.Serialization.Buffers.ArcBuffer> slice. Treat its bytes as read-only.
-<xref:Orleans.Serialization.Buffers.ArcBuffer.Empty> represents an owner-free empty
-payload. A struct assignment copies the view, not its ownership: use
-<xref:Orleans.DurableMessaging.DurableEnvelope.Retain*> to obtain an independent
-payload pin, and dispose each owning envelope exactly once.
+### Use GC-owned payload arrays
 
-Typed encoding rents an <xref:Orleans.Serialization.Buffers.ArcBufferWriter>
-from a private shared pool for the synchronous serialization call.
-<xref:Orleans.Serialization.Buffers.ArcBufferWriter.ConsumeSlice*> returns an owned
-slice of the newly written bytes; subsequent messages occupy disjoint regions and
-can share backing pages. Consuming a slice advances the writer's readable range;
-the returned slice independently keeps its pages alive after the encoder returns
-to the pool. Failed encoding clears partial output before returning the encoder.
+An envelope is an ordinary readonly struct containing a managed `byte[]` reference.
+Typed encoding uses <xref:Orleans.Serialization.Serializer`1.SerializeToArray*>
+to produce an independently allocated array for each body. Empty bodies can use
+`Array.Empty<byte>()`. Treat published payload bytes as immutable: preserve the
+same bytes through staging, delivery retries, diagnostics, and completion.
 
-| Boundary | Ownership and release |
-| --- | --- |
-| Application constructs a slice or envelope | The caller owns it. Use `using` and dispose after staging or handing it to a delivery call which acquires independent ownership. |
-| Typed outbox `Send` or `SendReply` | Encodes and stages synchronously, then disposes its temporary envelope. Durable state owns the independently retained pin. |
-| `IDurableOutbox.Send(envelope)` | Borrows the envelope during the call. Durable dictionary state retains its own pin, so the caller can dispose its local owner immediately after staging. |
-| `IInboxHandlerContext.Envelope` | Borrowed until the actual handler method ends, including asynchronous preparation. Do not dispose the context envelope or its payload. Retain explicitly when keeping it longer. |
-| Direct `IDurableInboxExtension.DeliverAsync` call | Borrows the caller's envelope and retains an admission pin before its first asynchronous wait. The caller can dispose its local owner after initiating the call. Admission retains its pin until the actual acceptance operation finishes, including when the caller cancels its wait. |
-| `IDurableInboxExtension` RPC request | The generated proxy synchronously copies the envelope with an independent pin; the receiving request owns its decoded slice. The caller can dispose its local owner after initiating the call. Serialization and invocation retain active uses; terminal responses, rejection, cancellation, and shutdown release request ownership after those uses finish. |
-| Ordinary persistence or networking serialization | Borrows the payload and leaves its pin intact. Repeated serialization is non-consuming. Operation buffers and decoded owners have their own lifetimes. |
+Struct assignment copies the array reference. Outgoing state, admission operations,
+and handler contexts keep the array reachable while they use it. Garbage collection
+reclaims its storage after the last reference becomes unreachable. Persistence and
+RPC use ordinary byte-array serialization; decoding reconstructs managed bytes.
+Repeated serialization leaves the original array available for application use.
+
+For a raw protocol, allocate the complete encoded body before constructing the
+envelope and set an explicit subject. Use an independently allocated array for each
+body and preserve its contents after publication. Subject-specific raw handlers
+read those bytes in the agreed encoding.
+
+The same envelope shape supports explicit application encoding. This example
+uses the ordinary typed serializer to allocate a shipment's complete body:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_byte_payload" language="csharp":::
 
 Compute reply bodies and proposed state locally before shared mutations. Typed
 `SendReply` serializes and stages the reply before applying that state. Continue
 through `Complete()` and actual handler return synchronously. Ordinary fan-out
-methods call typed `Send` once per destination; each call manages its temporary
-owner. If a later send fails, earlier messages remain staged for the next journal
-write. Retrying uses the same identities and content. In-flight operations retain their own payload pins through actual
-completion independently of the caller's wait or local owner.
+methods call typed `Send` once per destination; each call allocates and stages its
+payload array. If a later send fails, earlier messages remain staged for the next
+journal write. Retrying uses the same identities and content. In-flight operations
+keep their payload references through actual completion independently of the caller's wait.
 
-Messaging registers
-<xref:Orleans.Journaling.IDurableDictionaryValueLifecycle`1> for envelopes and
-dead letters. Live dictionary mutations retain values before encoding them.
-Replay transfers already-owned decoded values into state. Replacement, removal,
-reset, journal deletion, and scoped dictionary disposal release the corresponding
-state owners. Handler and delivery-batch pins keep borrowed payloads readable
-through their actual outcomes even when a preceding writer captures completion
-and removes a state owner earlier.
+Inbox and outbox dictionaries store ordinary envelopes and dead letters. Replay
+restores their managed payload arrays. Replacement, removal, reset, and journal
+deletion remove the relevant state references; active handlers and delivery batches
+keep their own references until their operations finish.
 
-The runtime's serializer reads directly from the retained payload. Application
+The runtime's serializer reads the array bytes. Application
 handlers receive ordinary decoded records through their registered method groups.
 
 <a id="carry-independently-encoded-items"></a>

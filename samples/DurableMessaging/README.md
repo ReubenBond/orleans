@@ -71,8 +71,9 @@ will not replace its declared versions.
    carry the command ID, original quantity, and remaining stock.
    Rejections distinguish `InvalidQuantity` from `InsufficientStock` using
    `ReservationRejectionReason`; callers dispatch on the concrete outcome type.
-   Typed helpers serialize these records and carry the command ID, subject,
-   sender, and receiver with the message.
+   Typed helpers serialize each record into an independently allocated GC-owned
+   `byte[]` and carry it with the command ID, subject, sender, and receiver in an
+   ordinary envelope. Published payload bytes retain their contents through retries.
 3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
    registers separate typed reservation and restocking methods; the order registers
    its typed outcome method. Registrations use method groups such as
@@ -88,11 +89,11 @@ will not replace its declared versions.
    its handler calls `context.Fail("Restock quantity must be positive.")`
    and returns before mutation. Checked stock overflow still throws and uses
    the ordinary bounded processing retry policy.
-   Typed outbox `Send` and `SendReply` handle serialization and temporary message
-   ownership, so the handlers work with ordinary records.
-   The explicit duplicate-admission call uses `DurableMessageType<T>.Create` and
-   a local `using` owner. Handlers borrow inbox envelopes through actual method
-   completion.
+   Typed outbox `Send` and `SendReply` handle serialization, so the handlers work
+   with ordinary records. The explicit duplicate-admission call uses
+   `DurableMessageType<T>.Create` to construct another ordinary envelope with the
+   same command ID and encoded content. Arrays remain available for the lifetime
+   of references held by state, admission calls, and handlers.
 4. The stock handler runs once per command. Its inbox completion fact recognizes the same
    command ID across senders and subjects during retention. The result reply uses
    the deterministic child `orders/order-1042/reserve-stock/result`; inventory
