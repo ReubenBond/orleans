@@ -503,7 +503,7 @@ namespace Orleans.Serialization.Buffers
         /// </remarks>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
         /// <exception cref="IndexOutOfRangeException">The input contains fewer than <paramref name="length"/> unread bytes.</exception>
-        public ArcBuffer ReadArcBuffer(int length)
+        public ArcBuffer ReadOwnedBuffer(int length)
         {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             EnsureAvailable((uint)length);
