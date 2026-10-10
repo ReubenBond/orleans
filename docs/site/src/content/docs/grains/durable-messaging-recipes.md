@@ -91,7 +91,7 @@ within its configured delivery policy.
 
 `Restock` has no business reply protocol. A nonpositive increment is permanently
 unusable, so the handler calls
-<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*> with a clear reason
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Fail*> with a clear reason
 and returns before mutation. A positive increment computes the checked new stock
 value before mutation, then commits that update with inbox completion. Checked
 overflow still throws and follows the ordinary bounded processing retry policy.
@@ -158,9 +158,14 @@ recipient set.
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_fanout" language="csharp":::
 
 The campaign record and every outgoing intent are captured in the same sender
-journal write. Fan-out uses the type binding's owning `Create` method to prepare
-all envelopes locally before changing shared state,
-then disposes every local owner in `finally`, including partial preparation on failure.
+journal write. The typed batch
+<xref:Orleans.DurableMessaging.DurableOutboxExtensions.Send*> helper enumerates the
+recipient commands and sends each through the ordinary typed send helper.
+Each message is encoded and staged independently, with temporary ownership managed
+inside its send call.
+The campaign record is added after all sends succeed. A later send failure leaves
+earlier intents staged, and a repeated submission uses the same recipient command
+identities and content.
 The outbox keeps its independently retained pins through acknowledgement and delivery.
 Each destination commits independently through the
 [notification handler](durable-messaging.md#deployment-requirements). Each envelope's
@@ -222,7 +227,7 @@ records, using the durable inbox/outbox commit boundary for outgoing intent:
 | Request/reply grain method | Put the stable command ID and subject in the envelope and the response destination in its body; the handler stages a deterministic typed reply with completion. |
 | Business update followed by a remote call | Stage the outgoing envelope with the business update; acknowledged outbox state drives delivery and retry. |
 | External provider call | Prepare the provider outcome using the canonical command ID, then commit its local query state, reply, and inbox completion together. |
-| Notification loop | Prepare a bounded batch using the type binding's owning `Create` method, stage all intents with the campaign record, and release local pins before awaiting the write. |
+| Notification loop | Call typed `Send` for each stable recipient identity, record the campaign after successful staging, and await the journal write. |
 | Multiple encoded attachments | Build one disposable keyed package; decode only needed borrowed entries while retaining its owner. |
 
 Preserve command identity and recorded outcomes when moving application workflows.

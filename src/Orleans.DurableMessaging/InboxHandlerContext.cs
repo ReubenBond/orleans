@@ -11,5 +11,5 @@ internal sealed class InboxHandlerContext(DurableEnvelope envelope, Action compl
 
     public void Complete() => _complete();
 
-    public void DeadLetter(string reason) => _deadLetter(reason);
+    public void Fail(string reason) => _deadLetter(reason);
 }

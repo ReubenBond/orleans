@@ -489,13 +489,13 @@ internal sealed partial class DurableInboxExtension :
 
             execution.Active = true;
             await handler!.HandleAsync(new InboxHandlerContext(
-                operation.Envelope, execution.Complete, execution.DeadLetter),
+                operation.Envelope, execution.Complete, execution.Fail),
                 combinedToken).ConfigureAwait(true);
             ThrowIfHandlerOperationRejected(execution);
             if (!operation.Completed)
             {
                 execution.RejectOperation(new InvalidOperationException(
-                    "Inbox handlers must call Complete or DeadLetter before returning successfully."));
+                    "Inbox handlers must call Complete or Fail before returning successfully."));
             }
         }
         catch (Exception exception) when (operation.Completed)
@@ -852,7 +852,7 @@ internal sealed partial class DurableInboxExtension :
             }
         }
 
-        public void DeadLetter(string reason)
+        public void Fail(string reason)
         {
             ValidateAttempt();
             ArgumentException.ThrowIfNullOrWhiteSpace(reason);

@@ -138,7 +138,7 @@ public sealed class InventoryGrain(
     {
         if (request.Quantity <= 0)
         {
-            context.DeadLetter("Restock quantity must be positive.");
+            context.Fail("Restock quantity must be positive.");
             return;
         }
         var next = checked(available.Value + request.Quantity);
@@ -191,11 +191,8 @@ public sealed class PaymentGrain(
 
     public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId)
     {
-        if (results.TryGetValue(commandId, out var outcome))
-        {
-            return new(outcome);
-        }
-        return new((PaymentResult?)null);
+        results.TryGetValue(commandId, out var outcome);
+        return new(outcome);
     }
 
     private async ValueTask HandleChargeAsync(
@@ -290,11 +287,8 @@ public sealed class CampaignGrain(
 {
     public ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId)
     {
-        if (campaigns.TryGetValue(campaignId, out var campaign))
-        {
-            return new(campaign);
-        }
-        return new((NotificationCampaign?)null);
+        campaigns.TryGetValue(campaignId, out var campaign);
+        return new(campaign);
     }
 
     public async Task PublishAsync(Guid campaignId, string text, GrainId[] recipients)
@@ -323,28 +317,10 @@ public sealed class CampaignGrain(
 
         var campaign = new NotificationCampaign(text, recipients.ToArray());
         var root = HierarchicalKey.Create("campaigns", campaignId.ToString("N"));
-        var messages = new List<DurableEnvelope>(campaign.Recipients.Length);
-        try
-        {
-            foreach (var recipient in campaign.Recipients)
-            {
-                messages.Add(notification.Create(root.CreateChildKey(recipient.ToString()),
-                    outbox.SenderId, recipient, new Notify(text)));
-            }
-
-            campaigns.Add(campaignId, campaign);
-            foreach (var message in messages)
-            {
-                outbox.Send(message);
-            }
-        }
-        finally
-        {
-            foreach (var message in messages)
-            {
-                message.Dispose();
-            }
-        }
+        var message = new Notify(text);
+        outbox.Send(notification, campaign.Recipients.Select(recipient =>
+            (root.CreateChildKey(recipient.ToString()), recipient, message)));
+        campaigns.Add(campaignId, campaign);
         await state.WriteStateAsync();
     }
 }
@@ -376,11 +352,8 @@ public sealed class OrderOutcomesGrain(
 
     public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId)
     {
-        if (outcomes.TryGetValue(replyId, out var outcome))
-        {
-            return new(outcome);
-        }
-        return new((OrderOutcome?)null);
+        outcomes.TryGetValue(replyId, out var outcome);
+        return new(outcome);
     }
 
     private void Record(OrderOutcome outcome, IInboxHandlerContext context)

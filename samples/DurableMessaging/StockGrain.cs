@@ -74,7 +74,7 @@ public sealed class StockGrain(
     {
         if (request.Quantity <= 0)
         {
-            context.DeadLetter("Restock quantity must be positive.");
+            context.Fail("Restock quantity must be positive.");
             return;
         }
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");

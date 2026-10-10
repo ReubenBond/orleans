@@ -85,7 +85,7 @@ will not replace its declared versions.
    The console run exercises reservation and outcome subjects; `Restock` supplies
    the additional positive-stock-increment protocol for the same stock inbox.
    Because it has no reply protocol, a nonpositive restock is permanently unusable:
-   its handler calls `context.DeadLetter("Restock quantity must be positive.")`
+   its handler calls `context.Fail("Restock quantity must be positive.")`
    and returns before mutation. Checked stock overflow still throws and uses
    the ordinary bounded processing retry policy.
    Typed outbox `Send` and `SendReply` rent internal pooled encoders, stage the

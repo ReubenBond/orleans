@@ -23,6 +23,128 @@ public sealed class TypedOutboxExtensionsTests
     private static GrainId Destination => GrainId.Create("audit", "explicit-destination");
     private static HierarchicalKey CommandId => HierarchicalKey.Create("orders", "42", "reserve");
 
+    [Fact]
+    public void SendBatch_EnumeratesOnceAndStagesEachMessageBeforeAdvancing()
+    {
+        using var services = CreateServices();
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        using var outbox = new RetainingOutbox(Owner);
+        var enumerations = 0;
+        IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
+        {
+            Assert.Equal(1, ++enumerations);
+            yield return (CommandId, Destination, "first");
+            Assert.Equal(1, outbox.RawSendCalls);
+            Assert.Equal("first", type.Decode(Assert.Single(outbox.Messages)));
+            yield return (CommandId.CreateChildKey("second"), ReceivedSender, "second");
+        }
+
+        outbox.Send(type, Messages());
+
+        Assert.Equal(1, enumerations);
+        Assert.Equal(2, outbox.RawSendCalls);
+        Assert.Equal(new[] { CommandId, CommandId.CreateChildKey("second") }, outbox.Messages.Select(value => value.MessageId));
+        Assert.Equal(new[] { Destination, ReceivedSender }, outbox.Messages.Select(value => value.ReceiverId));
+        Assert.All(outbox.Messages, value => Assert.Equal(Owner, value.SenderId));
+        Assert.All(outbox.Messages, value => Assert.Equal(Subject, value.Subject));
+        Assert.Equal(new[] { "first", "second" }, outbox.Messages.Select(type.Decode));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SendBatch_PreparationFailurePreservesEarlierIntentAndOriginalError(bool encodingFailure)
+    {
+        using var services = CreateServices();
+        var sessions = services.GetRequiredService<SerializerSessionPool>();
+        var codec = new FailingCodec(sessions.CodecProvider.GetCodec<string>());
+        var type = new DurableMessageType<string>(Subject, new Serializer<string>(codec, sessions));
+        using var outbox = new RetainingOutbox(Owner);
+        var sentinel = new InvalidDataException("later preparation failed");
+        IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
+        {
+            yield return (CommandId, Destination, "first");
+            if (!encodingFailure) throw sentinel;
+            codec.NextFailure = sentinel;
+            yield return (CommandId.CreateChildKey("second"), Destination, "second");
+        }
+
+        Assert.Same(sentinel, Assert.Throws<InvalidDataException>(() => outbox.Send(type, Messages())));
+        Assert.Equal(1, outbox.RawSendCalls);
+        var earlier = Assert.Single(outbox.Messages);
+        Assert.Equal(CommandId, earlier.MessageId);
+        Assert.Equal("first", type.Decode(earlier));
+        Assert.Equal(encodingFailure ? 2 : 1, codec.Writes);
+        outbox.Send(type, CommandId.CreateChildKey("second"), Destination, "recovered");
+        Assert.Equal(new[] { "first", "recovered" }, outbox.Messages.Select(type.Decode));
+        Assert.Equal(2, outbox.RawSendCalls);
+    }
+
+    [Theory]
+    [InlineData("outbox")]
+    [InlineData("messageType")]
+    [InlineData("messages")]
+    public void SendBatch_RejectsNullArgumentsBeforeEncodingOrStaging(string variation)
+    {
+        using var services = CreateServices();
+        using var actual = new RetainingOutbox(Owner);
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        IDurableOutbox outbox = actual;
+        IEnumerable<(HierarchicalKey, GrainId, string)> messages = [(CommandId, Destination, "body")];
+        switch (variation)
+        {
+            case "outbox": outbox = null!; break;
+            case "messageType": type = null!; break;
+            case "messages": messages = null!; break;
+        }
+
+        Assert.Equal(variation, Assert.Throws<ArgumentNullException>(() => outbox.Send(type, messages)).ParamName);
+        Assert.Equal(0, actual.RawSendCalls);
+        Assert.Empty(actual.Messages);
+    }
+
+    [Fact]
+    public void SendBatch_EmptyBatchStagesNothing()
+    {
+        using var services = CreateServices();
+        using var outbox = new RetainingOutbox(Owner);
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+
+        outbox.Send(type, []);
+
+        Assert.Equal(0, outbox.RawSendCalls);
+        Assert.Empty(outbox.Messages);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SendBatch_RawFailureReleasesLocalOwnerAndPreservesRetainedPayload(bool retainBeforeFailure)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<byte[]>>();
+        var type = new DurableMessageType<byte[]>(Subject, serializer);
+        var body = new byte[3_145_728];
+        body[body.Length / 2] = 17;
+        var sentinel = new IOException("raw staging failed");
+        using var outbox = new RetainingOutbox(Owner) { Failure = sentinel, RetainBeforeFailure = retainBeforeFailure };
+        (HierarchicalKey, GrainId, byte[])[] messages =
+        [
+            (CommandId, Destination, body),
+            (CommandId.CreateChildKey("second"), Destination, body)
+        ];
+
+        Assert.Same(sentinel, Assert.Throws<IOException>(() => outbox.Send(type, messages)));
+        Assert.Equal(1, outbox.RawSendCalls);
+        if (retainBeforeFailure)
+        {
+            Assert.Equal(body, serializer.Deserialize(Assert.Single(outbox.Messages).Payload));
+            outbox.ReleaseMessages();
+        }
+        Assert.Empty(outbox.Messages);
+        Assert.Throws<InvalidOperationException>(() => outbox.InteriorBorrowed!.Value.ToArray());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -368,7 +490,7 @@ public sealed class TypedOutboxExtensionsTests
         public DurableEnvelope Envelope { get; } = envelope;
         public int CompletionCount { get; private set; }
         public void Complete() => CompletionCount++;
-        public void DeadLetter(string reason) => throw new InvalidOperationException("Unexpected dead letter.");
+        public void Fail(string reason) => throw new InvalidOperationException("Unexpected dead letter.");
     }
 
     private sealed class RetainingOutbox(GrainId senderId) : IDurableOutbox, IDisposable

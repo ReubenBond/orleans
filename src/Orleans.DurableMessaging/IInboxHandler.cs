@@ -28,7 +28,7 @@ public interface IInboxHandler
     /// Apply complete, safe-to-commit business changes, stage outgoing messages through
     /// <see cref="IDurableOutbox.Send"/>, call <see cref="IInboxHandlerContext.Complete"/>, and return.
     /// This final block includes the method's return after Complete and relies on the trusted
-    /// handler contract. Every successful return stages Complete or DeadLetter, including outcomes
+    /// handler contract. Every successful return stages Complete or Fail, including outcomes
     /// with no business effects.
     /// </para>
     /// <para>
@@ -36,7 +36,7 @@ public interface IInboxHandler
     /// and outgoing intents. The runtime owns the subsequent journal write, persistence acknowledgement,
     /// and retirement. Failures during local preparation follow the inbox retry and dead-letter policy.
     /// Use a typed rejection reply and Complete for business rejection. Use
-    /// <see cref="IInboxHandlerContext.DeadLetter"/> for a permanent processing failure, which stages
+    /// <see cref="IInboxHandlerContext.Fail"/> for a permanent processing failure, which stages
     /// a retained diagnostic message and deduplication in the current attempt.
     /// An error after either terminal operation preserves its logical outcome and is reported by the runtime.
     /// </para>

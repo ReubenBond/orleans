@@ -26,7 +26,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         handler.Body = (self, _) =>
         {
             calls++;
-            self.Context.DeadLetter("unsupported input");
+            self.Context.Fail("unsupported input");
             AssertCompletedState(rig, self.Context.Envelope);
             var retained = Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
             Assert.Equal("unsupported input", retained.Reason);
@@ -35,7 +35,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Equal(new DurableTestMessage(self.Context.Envelope.MessageId, 501, "async-handler"),
                 Assert.IsType<DurableTestMessage>(TestApplicationProtocol.Read(
                     rig.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), self.Context.Envelope).Body));
-            self.Context.DeadLetter("unsupported input");
+            self.Context.Fail("unsupported input");
             self.Context.Complete();
             Assert.Equal(retained, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters));
             return ValueTask.CompletedTask;
@@ -140,7 +140,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
                 {
                     throw new ArgumentException("preparation failed");
                 }
-                context.DeadLetter("permanent input");
+                context.Fail("permanent input");
                 return ValueTask.CompletedTask;
             }
         }
@@ -167,7 +167,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         using var handler = rig.Handler;
         handler.Body = (self, _) =>
         {
-            var error = Assert.ThrowsAny<ArgumentException>(() => self.Context.DeadLetter(reason!));
+            var error = Assert.ThrowsAny<ArgumentException>(() => self.Context.Fail(reason!));
             Assert.Equal("reason", error.ParamName);
             Assert.Single(rig.Inbox);
             Assert.Empty(rig.Processed);
@@ -196,8 +196,8 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         handler.Body = (self, _) =>
         {
             if (completeFirst) self.Context.Complete();
-            else self.Context.DeadLetter("original reason");
-            expected = Assert.Throws<InvalidOperationException>(() => self.Context.DeadLetter("different reason"));
+            else self.Context.Fail("original reason");
+            expected = Assert.Throws<InvalidOperationException>(() => self.Context.Fail("different reason"));
             return ValueTask.CompletedTask;
         };
         using var input = await DeliverAsync(rig);
@@ -230,7 +230,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         {
             timer.Dispose();
             Assert.True(token.IsCancellationRequested);
-            self.Context.DeadLetter("permanent input failure");
+            self.Context.Fail("permanent input failure");
             throw handlerError;
         };
         using var input = await DeliverAsync(rig);
@@ -761,7 +761,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         switch (operation)
         {
             case "complete": handler.Context.Complete(); break;
-            case "dead-letter": handler.Context.DeadLetter("unusable input"); break;
+            case "dead-letter": handler.Context.Fail("unusable input"); break;
             default: throw new ArgumentException(nameof(operation));
         }
     }

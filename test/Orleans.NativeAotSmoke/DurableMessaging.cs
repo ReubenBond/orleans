@@ -29,7 +29,7 @@ var dispatcher = new DurableInboxDispatcher()
     {
         if (value.Length == 0)
         {
-            context.DeadLetter("Text is required.");
+            context.Fail("Text is required.");
             return;
         }
         if (value.Length + argument.Value != 5) throw new InvalidOperationException("Struct handler state was lost.");
@@ -62,6 +62,15 @@ if (!rejected.Completed || rejected.DeadLetterReason != "Text is required." || o
 {
     throw new InvalidOperationException("Typed handler did not preserve its explicit permanent failure.");
 }
+outbox.Send(integers,
+[
+    (key.CreateChildKey("batch-first"), sender, 8),
+    (key.CreateChildKey("batch-second"), sender, 9)
+]);
+if (outbox.Count != 3 || integers.Decode(outbox.Messages.Last()) != 9)
+{
+    throw new InvalidOperationException("Typed batch send failed.");
+}
 outbox.Send(integers, key.CreateChildKey("send"), sender, 7);
 if (integers.Decode(outbox.Messages.Last()) != 7) throw new InvalidOperationException("Typed send failed.");
 Console.WriteLine("NativeAOT typed sends, deterministic replies, static handlers, and explicit permanent failures passed.");
@@ -86,7 +95,7 @@ internal sealed class SmokeContext(DurableEnvelope envelope) : IInboxHandlerCont
     public bool Completed { get; private set; }
     public string? DeadLetterReason { get; private set; }
     public void Complete() => Completed = true;
-    public void DeadLetter(string reason)
+    public void Fail(string reason)
     {
         DeadLetterReason = reason;
         Completed = true;

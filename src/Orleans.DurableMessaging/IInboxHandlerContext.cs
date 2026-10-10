@@ -10,7 +10,7 @@ public interface IInboxHandlerContext
     /// </summary>
     /// <remarks>
     /// This envelope is borrowed until the handler method actually completes, including
-    /// after Complete or DeadLetter removes the pending message. Do not dispose it. Use
+    /// after Complete or Fail removes the pending message. Do not dispose it. Use
     /// <see cref="DurableEnvelope.Retain"/> for an independently owned longer lifetime.
     /// </remarks>
     DurableEnvelope Envelope { get; }
@@ -49,5 +49,5 @@ public interface IInboxHandlerContext
     /// The context is retired or belongs to another activation or attempt, or a different
     /// terminal outcome has already been staged.
     /// </exception>
-    void DeadLetter(string reason);
+    void Fail(string reason);
 }

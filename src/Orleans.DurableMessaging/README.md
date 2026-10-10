@@ -57,7 +57,8 @@ The protocol and runtime provide:
   Serialize packages normally and release them after use, including decoded packages.
 - `DurableMessageType<T>` binds an exact subject to ordinary `Serializer<T>` and verifies
   the subject before decoding. `AddDurableMessageType<T>` registers a keyed singleton binding.
-  The scoped `DurableMessageWriter` prepares an owned envelope before shared mutation.
+  Typed outbox `Send` and `SendReply` encode using a shared bounded pool and manage
+  temporary payload ownership internally. `Create` exposes an owned envelope for explicit admission.
   `DurableInboxDispatcher` optionally selects typed delegates by exact subject.
   `inbox.RegisterHandlers` configures and installs that dispatcher once, freezes
   its subject routes, and delivers decoded bodies to synchronous or task-returning methods.
@@ -75,7 +76,7 @@ The protocol and runtime provide:
 - `IInboxHandler` has only `ValueTask HandleAsync(IInboxHandlerContext,
   CancellationToken)`. The inbox has a single `RegisterHandler(handler)` registration.
   Use one application dispatcher for multiple message kinds. Its context exposes
-  `Envelope`, `Complete()`, and `DeadLetter(reason)`; inject `IDurableOutbox` directly to stage messages.
+  `Envelope`, `Complete()`, and `Fail(reason)`; inject `IDurableOutbox` directly to stage messages.
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
@@ -203,7 +204,7 @@ completion retain the staged logical outcome through actual persistence and clea
 then surface the original error.
 
 For business rejection, send a typed rejection result and call `Complete()`.
-For diagnosed permanent processing failure, `DeadLetter(reason)` synchronously stages
+For diagnosed permanent processing failure, `Fail(reason)` synchronously stages
 the original envelope, reason, current attempt count, and terminal timestamp in
 dead-letter storage alongside the completion/deduplication record. Return from the
 handler synchronously; the runtime owns the subsequent journal write and acknowledgement.
@@ -216,7 +217,7 @@ under the trusted local-preparation contract. Attempt cancellation retains the c
 inbox and owner for another attempt on the same activation. The runtime owns admitted
 persistence operations through their actual outcomes.
 
-After `Complete()` or `DeadLetter(reason)`, a handler exception is logged and retained while the ordinary
+After `Complete()` or `Fail(reason)`, a handler exception is logged and retained while the ordinary
 owned write persists the completed logical outcome. The exception is reported after
 acknowledgement and cleanup. Subsequent wakeups observe completion and deduplication.
 Actual persistence failure remains authoritative and terminal; any earlier handler

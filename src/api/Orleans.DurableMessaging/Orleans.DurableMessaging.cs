@@ -111,6 +111,8 @@ namespace Orleans.DurableMessaging
 
         public static void Send<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, HierarchicalKey messageId, Runtime.IAddressable destination, T body) { }
 
+        public static void Send<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, System.Collections.Generic.IEnumerable<(HierarchicalKey MessageId, Runtime.GrainId Destination, T Body)> messages) { }
+
         public static void SendReply<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, IInboxHandlerContext context, Runtime.GrainId destination, T body) { }
 
         public static void SendReply<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, IInboxHandlerContext context, Runtime.IAddressable destination, T body) { }
@@ -237,7 +239,7 @@ namespace Orleans.DurableMessaging
         DurableEnvelope Envelope { get; }
 
         void Complete();
-        void DeadLetter(string reason);
+        void Fail(string reason);
     }
 }
 

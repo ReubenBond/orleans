@@ -92,9 +92,9 @@ correlated reply for end-to-end business confirmation.
 
 | Symptom | Boundary and remedy |
 | --- | --- |
-| Repeated handler errors | Validate subject registration, body compatibility, command ID, response destination, and preparation dependencies. Send typed business rejection replies and call `Complete()`; use `DeadLetter(reason)` for diagnosed permanent processing failures. Unhandled preparation exceptions use the bounded retry policy. |
+| Repeated handler errors | Validate subject registration, body compatibility, command ID, response destination, and preparation dependencies. Send typed business rejection replies and call `Complete()`; use `Fail(reason)` for diagnosed permanent processing failures. Unhandled preparation exceptions use the bounded retry policy. |
 | Conflicting pending command reuse | Preserve the original command ID, subject, destination, and encoded body. Authorize a distinct ID for a genuinely new command. |
-| Successful return without a terminal operation | A handler contract error retires the owner. Ensure every successful branch, including no-effect outcomes, stages `Complete()` or `DeadLetter(reason)` and returns synchronously. |
+| Successful return without a terminal operation | A handler contract error retires the owner. Ensure every successful branch, including no-effect outcomes, stages `Complete()` or `Fail(reason)` and returns synchronously. |
 | Handler error after a terminal operation | The runtime persists the staged completion or dead letter and output, cleans up, then reports the error. Diagnose the original error using committed state. |
 | `JournaledStatePreCommitException` | A persistence prerequisite failed before storage. Complete changes remain staged. Choose explicit persistence retry or retire the owner and reconcile fresh replay. |
 | Storage failure or ambiguous append | The owner is fenced and deactivated. A new activation replays the actual committed journal outcome, including any acknowledged ownership and message cohort. |
@@ -115,7 +115,7 @@ Expose application-authorized diagnostic methods which inspect
 and <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.OutboxDeadLetters>.
 Each record includes its envelope, attempt count, failure reason, and terminal time.
 
-<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*> creates an inbox
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Fail*> creates an inbox
 record in the current attempt for a diagnosed permanent processing failure.
 The runtime commits that record and the command's deduplication fact together.
 The processed-message counter reports `dead_lettered`. Repeated commands recognize
@@ -123,6 +123,19 @@ the retained completion even after the diagnostic dead letter is removed.
 Normal business rejections are typed application replies committed with `Complete()`;
 the [inventory recipe](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
 models accepted and rejected reservation outcomes explicitly.
+
+Retrieve these records through the grain's injected diagnostics service. For
+remote inspection, expose an application-authorized grain method which copies the
+record's identity, subject, reason, timestamps, and relevant payload fields into
+an application DTO. The envelope returned by diagnostics is borrowed from durable
+state; retain it for longer local use.
+
+The processed-ID record supplies duplicate suppression. Retained failure records
+provide bounded operational evidence: identify incompatible subjects or payloads,
+reconcile external effects, repair the producer or handler, and authorize a corrected
+submission. Removing a diagnostic record releases its payload and preserves the
+processed-ID record. Applications choose the retention budget and the operational
+access policy for this evidence.
 
 Capture the evidence before age/count retention removes it. Preserve original
 command IDs, subjects, and enough immutable request data to reconcile business outcomes.

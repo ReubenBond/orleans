@@ -82,7 +82,7 @@ to register typed methods for one or several subjects. It installs one
 and decodes each body with its subject's binding before invoking the selected method.
 Configuration requires at least one route and rejects duplicate subjects before
 installing the handler. The dispatcher returns the actual handler outcome;
-each successful handler explicitly stages `Complete()` or `DeadLetter(reason)` and returns synchronously
+each successful handler explicitly stages `Complete()` or `Fail(reason)` and returns synchronously
 after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
 and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
@@ -134,10 +134,10 @@ Application-owned raw encoders have explicit scope disposal and synchronous usag
 
 Compute reply bodies and proposed state locally before shared mutations. Typed
 `SendReply` serializes and stages the reply before applying that state. Continue
-through `Complete()` and actual handler return synchronously. For a batch of outputs,
-create every owning envelope before staging any shared changes, then stage the
-prepared envelopes and release all local owners, including partial preparation
-on failure. In-flight operations retain their own payload pins through actual
+through `Complete()` and actual handler return synchronously. Ordinary fan-out
+methods call typed `Send` once per destination; each call manages its temporary
+owner. If a later send fails, earlier messages remain staged for the next journal
+write. Retrying uses the same identities and content. In-flight operations retain their own payload pins through actual
 completion independently of the caller's wait or local owner.
 
 Messaging registers
@@ -282,7 +282,7 @@ for scheduling and recovery-budget guidance.
 
 The single registered handler receives the envelope through
 <xref:Orleans.DurableMessaging.IInboxHandlerContext.Envelope>. Its context exposes
-the envelope, `Complete()`, and `DeadLetter(reason)`. Inject
+the envelope, `Complete()`, and `Fail(reason)`. Inject
 <xref:Orleans.DurableMessaging.IDurableOutbox> directly for outgoing messages.
 Application dispatch, validation, authorization, and decoding run inside the handler.
 
@@ -293,8 +293,7 @@ relevant preconditions after asynchronous preparation and observe cancellation
 before the first shared mutation. Synchronous typed routes receive the dispatcher's
 boundary cancellation check. Compute the complete business update locally, stage
 typed outgoing messages before applying it, and call
-<xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>. For several outgoing
-messages, encode every envelope before staging the prepared batch.
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>.
 From the first shared-state mutation until the handler method completes, perform
 these operations without an intervening await, including after `Complete()`.
 This is the handler's coding contract; ordinary journaled collections remain the
@@ -312,12 +311,11 @@ for dispatch.
 The journal owner's final capture hook establishes a durable wakeup for outgoing
 intents before capture. Applications compute results locally and use typed outbox
 helpers to encode before their first outgoing mutation, followed by synchronous
-business changes and completion. Bulk output prepares all envelopes before the
-final block. Earlier journal writes can complete during
+business changes and completion. Earlier journal writes can complete during
 asynchronous local preparation because proposed business effects are still local.
 
 Every successful handler stages `Complete()` or
-<xref:Orleans.DurableMessaging.IInboxHandlerContext.DeadLetter*>, including handlers
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Fail*>, including handlers
 which produce no business or outgoing-message changes. A successful return which omits a terminal operation reports
 a handler contract error and retires the owner. Context operations retain their actual
 attempt, activation and resource lifetimes. Completion ends that attempt; the received
@@ -327,7 +325,7 @@ Business rejection is a completed application outcome: send a typed rejection re
 with a reason, then call `Complete()`. The reply, any business changes, and receiver
 deduplication become durable together.
 
-For a permanent processing failure, call `DeadLetter(reason)` and return synchronously.
+For a permanent processing failure, call `Fail(reason)` and return synchronously.
 It stages the original envelope, a nonblank reason, the current attempt count and
 terminal time in inbox dead-letter storage, removes pending input and retry metadata,
 and records the command ID for deduplication. The runtime persists that terminal
@@ -422,7 +420,7 @@ journal write.
 
 Unhandled subject lookup, payload decoding, and validation exceptions follow the
 processing retry and dead-letter path. An application handler can diagnose a
-permanent failure during preparation and use `DeadLetter(reason)` to terminate
+permanent failure during preparation and use `Fail(reason)` to terminate
 the current attempt. Typed decoding precedes business mutation; later envelopes
 remain available for recovery and processing.
 

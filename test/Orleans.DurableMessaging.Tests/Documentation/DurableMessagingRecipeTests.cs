@@ -1,9 +1,15 @@
+using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Documentation.Grains.DurableMessaging;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Documentation;
@@ -120,7 +126,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Equal(new ReservationRejected(quantity, available, reason),
             Assert.IsType<ReservationRejected>(ReadBody<ReservationResult>(reply)));
         Assert.Equal(new[] { "send", "complete" }, attempt.Events);
-        attempt.Context.DidNotReceive().DeadLetter(Arg.Any<string>());
+        attempt.Context.DidNotReceive().Fail(Arg.Any<string>());
     }
 
     [Theory]
@@ -229,7 +235,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Equal(10, stock.Value);
         Assert.Empty(attempt.Output);
         Assert.Equal(new[] { "dead-letter" }, attempt.Events);
-        attempt.Context.Received(1).DeadLetter("Restock quantity must be positive.");
+        attempt.Context.Received(1).Fail("Restock quantity must be positive.");
         attempt.Context.DidNotReceive().Complete();
     }
 
@@ -494,6 +500,120 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Campaign_InvalidLaterCommandPreservesEarlierStagedIntent()
+    {
+        var campaigns = new TestDictionary<Guid, NotificationCampaign>();
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
+        var state = Substitute.For<IDurableStateManager>();
+        var context = Substitute.For<IGrainContext>();
+        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), context);
+        var output = new List<DurableEnvelope>();
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+            output.Add(Own(call.Arg<DurableEnvelope>().Retain())));
+        var id = Guid.NewGuid();
+        GrainId[] recipients =
+        [
+            GrainId.Create("notification", "alice"),
+            GrainId.Create("notification", new string('x', 1024))
+        ];
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            grain.PublishAsync(id, "campaign text", recipients));
+
+        Assert.Empty(campaigns);
+        var earlier = Assert.Single(output);
+        Assert.Equal(recipients[0], earlier.ReceiverId);
+        Assert.Equal(HierarchicalKey.Create("campaigns", id.ToString("N")).CreateChildKey(recipients[0].ToString()),
+            earlier.MessageId);
+        Assert.Equal(new Notify("campaign text"), ReadBody<Notify>(earlier));
+        outbox.Received(1).Send(Arg.Any<DurableEnvelope>());
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Campaign_RawSendFailureLeavesCampaignStateUnchanged()
+    {
+        var campaigns = new TestDictionary<Guid, NotificationCampaign>();
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
+        var state = Substitute.For<IDurableStateManager>();
+        var context = Substitute.For<IGrainContext>();
+        var sentinel = new IOException("staging failed");
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(_ => throw sentinel);
+        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), context);
+
+        Assert.Same(sentinel, await Assert.ThrowsAsync<IOException>(() =>
+            grain.PublishAsync(Guid.NewGuid(), "campaign text", [GrainId.Create("notification", "alice")])));
+
+        Assert.Empty(campaigns);
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Campaign_LaterEncodingFailureRetriesOriginalRecipientIdentities()
+    {
+        var campaigns = new TestDictionary<Guid, NotificationCampaign>();
+        var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
+        var state = Substitute.For<IDurableStateManager>();
+        var context = Substitute.For<IGrainContext>();
+        var sentinel = new IOException("second encoding failed");
+        var sessions = _services.GetRequiredService<SerializerSessionPool>();
+        var codec = new SecondEncodingFailure(sessions.CodecProvider.GetCodec<Notify>(), sentinel);
+        var type = new DurableMessageType<Notify>("notification", new Serializer<Notify>(codec, sessions));
+        var grain = new CampaignGrain(outbox, state, campaigns, type, context);
+        var output = new Dictionary<HierarchicalKey, DurableEnvelope>();
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+        {
+            var envelope = call.Arg<DurableEnvelope>();
+            if (output.TryGetValue(envelope.MessageId, out var existing))
+            {
+                Assert.Equal(existing.ReceiverId, envelope.ReceiverId);
+                Assert.Equal(existing.Payload.ToArray(), envelope.Payload.ToArray());
+            }
+            else output.Add(envelope.MessageId, Own(envelope.Retain()));
+        });
+        var id = Guid.NewGuid();
+        GrainId[] recipients = [GrainId.Create("notification", "alice"), GrainId.Create("notification", "bob")];
+
+        Assert.Same(sentinel, await Assert.ThrowsAsync<IOException>(() =>
+            grain.PublishAsync(id, "campaign text", recipients)));
+        Assert.Equal(recipients[0], Assert.Single(output).Value.ReceiverId);
+        Assert.Empty(campaigns);
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
+
+        await grain.PublishAsync(id, "campaign text", recipients);
+
+        Assert.Equal(2, output.Count);
+        var root = HierarchicalKey.Create("campaigns", id.ToString("N"));
+        foreach (var recipient in recipients)
+        {
+            var message = output[root.CreateChildKey(recipient.ToString())];
+            Assert.Equal(recipient, message.ReceiverId);
+            Assert.Equal(new Notify("campaign text"), type.Decode(message));
+        }
+        Assert.Equal(4, codec.Writes);
+        Assert.Equal(recipients, Assert.Single(campaigns).Value.Recipients);
+        await state.Received(1).WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    private sealed class SecondEncodingFailure(IFieldCodec<Notify> inner, Exception failure) : IFieldCodec<Notify>
+    {
+        public int Writes { get; private set; }
+
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [AllowNull] Type expectedType, [AllowNull] Notify value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (++Writes == 2) throw failure;
+            inner.WriteField(ref writer, fieldIdDelta, expectedType, value);
+        }
+
+        [return: MaybeNull]
+        public Notify ReadValue<TInput>(ref Reader<TInput> reader, Field field) => inner.ReadValue(ref reader, field);
+    }
+
     private (IInboxHandlerContext Context, List<DurableEnvelope> Output, List<string> Events) CreateContext<T>(T body, HierarchicalKey key)
     {
         var envelope = Own(Type<T>().Create(key, Sender, Receiver, body));
@@ -506,7 +626,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             return envelope;
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        context.When(value => value.DeadLetter(Arg.Any<string>())).Do(_ => events.Add("dead-letter"));
+        context.When(value => value.Fail(Arg.Any<string>())).Do(_ => events.Add("dead-letter"));
         return (context, output, events);
     }
 

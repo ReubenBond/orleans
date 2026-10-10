@@ -141,7 +141,7 @@ public sealed class DurableEnvelopeContractTests
             Method("HandleAsync", typeof(ValueTask), typeof(IInboxHandlerContext), typeof(CancellationToken)));
         AssertSurface(typeof(IInboxHandlerContext),
             Property("Envelope", typeof(DurableEnvelope)), Method("Complete", typeof(void)),
-            Method("DeadLetter", typeof(void), typeof(string)));
+            Method("Fail", typeof(void), typeof(string)));
         AssertSurface(typeof(IDurableInbox),
             Property("Count", typeof(int)), Property("Capacity", typeof(int)),
             Property("Messages", typeof(IEnumerable<DurableEnvelope>)),

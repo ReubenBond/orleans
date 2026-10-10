@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
@@ -41,6 +42,31 @@ public static class DurableOutboxExtensions
     {
         ArgumentNullException.ThrowIfNull(destination);
         outbox.Send(messageType, messageId, destination.GetGrainId(), body);
+    }
+
+    /// <summary>Encodes and synchronously stages typed commands in enumeration order.</summary>
+    /// <typeparam name="T">The body contract.</typeparam>
+    /// <param name="outbox">The owning grain's outbox.</param>
+    /// <param name="messageType">The subject and serializer binding.</param>
+    /// <param name="messages">The application-defined identities, destinations, and bodies.</param>
+    /// <remarks>
+    /// Enumerates once and sends each command using the ordinary typed send helper.
+    /// Each send releases its temporary payload owner. If enumeration, encoding, or
+    /// staging fails, earlier messages remain staged under their original identities.
+    /// Retry with the same identities and content; persistence follows the grain's
+    /// ordinary journal write.
+    /// </remarks>
+    public static void Send<T>(
+        this IDurableOutbox outbox, DurableMessageType<T> messageType,
+        IEnumerable<(HierarchicalKey MessageId, GrainId Destination, T Body)> messages)
+    {
+        ArgumentNullException.ThrowIfNull(outbox);
+        ArgumentNullException.ThrowIfNull(messageType);
+        ArgumentNullException.ThrowIfNull(messages);
+        foreach (var (messageId, destination, body) in messages)
+        {
+            outbox.Send(messageType, messageId, destination, body);
+        }
     }
 
     /// <summary>Encodes and stages a reply under the received command's deterministic result child.</summary>

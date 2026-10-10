@@ -285,7 +285,7 @@ public sealed class HandlerRoutingContractTests
         var reasons = new List<string>();
         var context = CreateContext(envelope, () => throw new InvalidOperationException("Unexpected completion."), reasons.Add);
 
-        context.DeadLetter("unsupported input");
+        context.Fail("unsupported input");
 
         Assert.Equal(new[] { "unsupported input" }, reasons);
         AssertEnvelope(envelope, context.Envelope);
@@ -298,7 +298,7 @@ public sealed class HandlerRoutingContractTests
         var sentinel = new InvalidOperationException("owner failure");
         var context = CreateContext(envelope, () => { }, _ => throw sentinel);
 
-        Assert.Same(sentinel, Assert.Throws<InvalidOperationException>(() => context.DeadLetter("unusable input")));
+        Assert.Same(sentinel, Assert.Throws<InvalidOperationException>(() => context.Fail("unusable input")));
         AssertEnvelope(envelope, context.Envelope);
     }
 
