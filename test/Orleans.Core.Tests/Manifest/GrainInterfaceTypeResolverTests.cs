@@ -19,12 +19,24 @@ public sealed class GrainInterfaceTypeResolverTests(ITestOutputHelper output)
         var resolver = CreateResolver();
         var type = typeof(ITestInterface<List<int>>);
         var expected = resolver.GetGrainInterfaceType(type);
-        for (var i = 0; i < 100; i++) _ = resolver.GetGrainInterfaceType(type);
+        for (var i = 0; i < 100; i++)
+        {
+            _ = resolver.GetGrainInterfaceType(type);
+        }
+
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) _ = resolver.GetGrainInterfaceType(type);
+        for (var i = 0; i < 1000; i++)
+        {
+            _ = resolver.GetGrainInterfaceType(type);
+        }
+
         var cachedBytes = GC.GetAllocatedBytesForCurrentThread() - before;
         before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) _ = resolver.GetGrainInterfaceTypeByConvention(type);
+        for (var i = 0; i < 1000; i++)
+        {
+            _ = resolver.GetGrainInterfaceTypeByConvention(type);
+        }
+
         var conventionBytes = GC.GetAllocatedBytesForCurrentThread() - before;
         output.WriteLine($"1000 lookups: cached={cachedBytes} bytes; uncached convention={conventionBytes} bytes");
         Assert.Equal(0, cachedBytes);
@@ -48,11 +60,15 @@ public sealed class GrainInterfaceTypeResolverTests(ITestOutputHelper output)
             Assert.Equal(firstIdentity, first.GetGrainInterfaceType(type));
             Assert.Equal(secondIdentity, second.GetGrainInterfaceType(type));
         }
+
         Assert.Equal(1, firstProvider.Calls);
         Assert.Equal(1, secondProvider.Calls);
         Assert.True(GenericGrainInterfaceType.TryParse(firstIdentity, out var generic));
         Assert.Equal([typeof(int)], generic.GetArguments(CreateConverter()));
-        Assert.NotEqual(firstIdentity, first.GetGrainInterfaceType(typeof(ITestInterface<string>)));
+        var stringIdentity = first.GetGrainInterfaceType(typeof(ITestInterface<string>));
+        Assert.NotEqual(firstIdentity, stringIdentity);
+        Assert.True(GenericGrainInterfaceType.TryParse(stringIdentity, out generic));
+        Assert.Equal([typeof(string)], generic.GetArguments(CreateConverter()));
     }
 
     [Fact]
@@ -88,24 +104,33 @@ public sealed class GrainInterfaceTypeResolverTests(ITestOutputHelper output)
     {
         var resolver = CreateResolver();
         var results = await Task.WhenAll(Enumerable.Range(0, 32).Select(_ => Task.Run(
-            () => resolver.GetGrainInterfaceType(typeof(ITestInterface<List<int>>)))));
+            () => resolver.GetGrainInterfaceType(typeof(ITestInterface<List<int>>)), TestContext.Current.CancellationToken)));
         Assert.All(results, identity => Assert.Equal(results[0], identity));
+        Assert.True(GenericGrainInterfaceType.TryParse(results[0], out var generic));
+        Assert.Equal([typeof(List<int>)], generic.GetArguments(CreateConverter()));
     }
 
     private static GrainInterfaceTypeResolver CreateResolver(params IGrainInterfaceTypeProvider[] providers) => new(providers, CreateConverter());
+
     private static TypeConverter CreateConverter() => new(
         Array.Empty<ITypeConverter>(), Array.Empty<ITypeNameFilter>(), Array.Empty<ITypeFilter>(),
         Options.Create(new TypeManifestOptions { AllowAllTypes = true }), new CachedTypeResolver());
 
     private interface ITestInterface<T> { }
+
     private sealed class IdentityProvider(string identity) : IGrainInterfaceTypeProvider
     {
         public int Calls;
         public bool Fail;
+
         public bool TryGetGrainInterfaceType(Type type, out GrainInterfaceType result)
         {
             Interlocked.Increment(ref Calls);
-            if (Fail) throw new InvalidOperationException("Injected identity resolution failure");
+            if (Fail)
+            {
+                throw new InvalidOperationException("Injected identity resolution failure");
+            }
+
             result = GrainInterfaceType.Create(identity);
             return true;
         }
