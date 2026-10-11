@@ -439,11 +439,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var input = await DeliverAsync(rig);
         var error = new IOException("Journal hook failed.");
-        await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new JournaledStateHook
-        {
-            BeforeOperation = postCommit ? null : (_, _) => throw error,
-            AfterOperation = postCommit ? (_, _) => throw error : null
-        }));
+        await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new FailingHook(postCommit, error)));
         var timer = GetTimer(events, rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
@@ -652,6 +648,21 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         public DurableJob Job { get; } = job;
         public string RunId { get; } = Guid.NewGuid().ToString("N");
         public int DequeueCount => 1;
+    }
+
+    private sealed class FailingHook(bool postCommit, Exception error) : IJournaledStateHook
+    {
+        public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            if (!postCommit) throw error;
+            return default;
+        }
+
+        public ValueTask AfterOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            if (postCommit) throw error;
+            return default;
+        }
     }
 
     private sealed class StartAtTimerStop(Rig rig, IGrainTimer preceding, IDurableJobFeatureHandler feature,
