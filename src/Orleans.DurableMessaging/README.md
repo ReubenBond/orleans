@@ -1,6 +1,7 @@
 # Microsoft Orleans Durable Messaging
 
-This intermediate project supplies durable command identities, subjects, envelopes, and handler contracts.
+This intermediate project supplies durable command identities, subjects, envelopes, handler contracts,
+and journaled inbox processing.
 
 `DurableEnvelope` carries an application-supplied `HierarchicalKey MessageId`, `SenderId`, `ReceiverId`,
 ordinal `Subject`, and a non-null, garbage-collected `byte[] Payload`. Struct assignment shares the array;
@@ -32,3 +33,20 @@ existing outcome; application results remain in business state or the original r
 
 This project remains non-packable while runtime and hosting layers assemble the eventual
 `Microsoft.Orleans.DurableMessaging` package.
+
+The inbox accepts a command after DurableJobs confirms its wakeup and the journal commits the
+envelope alongside its logical generation and exact returned physical job handle. Pending duplicates
+compare ordinal subject and payload bytes while permitting a changed immediate sender. Conflicts
+preserve the original pending command and fail before scheduling or mutation. Retained completed
+commands acknowledge their existing outcome across valid sender, subject, and payload changes.
+
+Admission and handler operations keep ordinary references to the published payload through their
+actual outcomes, independently of caller-wait cancellation. `Complete()` stages inbox removal and
+deduplication beside safe business changes; the handler continues to access its envelope after removal.
+The runtime owns the subsequent journal write and acknowledgement. Preparation failures follow
+bounded retry and dead-letter policy. Errors after Complete preserve the logical outcome through
+persistence and are reported after acknowledgement.
+
+Reusable non-interleaving timer turns carry immutable owner and operation snapshots. Stop closes
+admission and drains actual operations before full deletion or scope disposal. Actual storage failures
+retain their first cause; a fresh activation restores the persisted outcome.
