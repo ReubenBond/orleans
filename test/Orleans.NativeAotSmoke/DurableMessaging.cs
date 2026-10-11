@@ -16,7 +16,7 @@ var strings = services.GetRequiredKeyedService<DurableMessageType<string>>("aot.
 var sender = GrainId.Create("aot", "sender");
 var receiver = GrainId.Create("aot", "receiver");
 var key = HierarchicalKey.Create("aot", "command", "1");
-using var outbox = new SmokeOutbox(receiver);
+var outbox = new SmokeOutbox(receiver);
 var state = new SmokeState(outbox, strings, sender);
 var dispatcher = new DurableInboxDispatcher()
     .Register(integers, state, static (value, target, context) =>
@@ -36,7 +36,7 @@ var dispatcher = new DurableInboxDispatcher()
         context.Complete();
     });
 
-using var input = integers.Create(key, sender, receiver, 42);
+var input = integers.Create(key, sender, receiver, 42);
 var context = new SmokeContext(input);
 await dispatcher.HandleAsync(context, CancellationToken.None);
 if (!context.Completed || state.Value != 42 || outbox.Count != 1)
@@ -51,11 +51,11 @@ if (reply.MessageId != key.CreateChildKey("result") || reply.SenderId != receive
     throw new InvalidOperationException("Typed reply identity, destination, or body was lost.");
 }
 
-using var text = strings.Create(key.CreateChildKey("text"), sender, receiver, "abc");
+var text = strings.Create(key.CreateChildKey("text"), sender, receiver, "abc");
 var textContext = new SmokeContext(text);
 await dispatcher.HandleAsync(textContext, CancellationToken.None);
 if (!textContext.Completed) throw new InvalidOperationException("Typed struct-argument handler did not complete.");
-using var invalid = strings.Create(key.CreateChildKey("invalid"), sender, receiver, "");
+var invalid = strings.Create(key.CreateChildKey("invalid"), sender, receiver, "");
 var rejected = new SmokeContext(invalid);
 await dispatcher.HandleAsync(rejected, CancellationToken.None);
 if (!rejected.Completed || rejected.DeadLetterReason != "Text is required." || outbox.Count != 1)
@@ -102,13 +102,13 @@ internal sealed class SmokeContext(DurableEnvelope envelope) : IInboxHandlerCont
     }
 }
 
-internal sealed class SmokeOutbox(GrainId senderId) : IDurableOutbox, IDisposable
+internal sealed class SmokeOutbox(GrainId senderId) : IDurableOutbox
 {
     private readonly List<DurableEnvelope> _messages = [];
     public GrainId SenderId { get; } = senderId;
     public int Count => _messages.Count;
     public IEnumerable<DurableEnvelope> Messages => _messages;
-    public void Send(DurableEnvelope envelope) => _messages.Add(envelope.Retain());
+    public void Send(DurableEnvelope envelope) => _messages.Add(envelope);
     public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
         foreach (var message in _messages)
@@ -119,10 +119,5 @@ internal sealed class SmokeOutbox(GrainId senderId) : IDurableOutbox, IDisposabl
         }
         envelope = default;
         return false;
-    }
-
-    public void Dispose()
-    {
-        foreach (var envelope in _messages) envelope.Dispose();
     }
 }
