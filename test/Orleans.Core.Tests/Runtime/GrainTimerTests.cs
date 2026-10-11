@@ -27,8 +27,9 @@ public sealed class GrainTimerTests
         using var fixture = new TimerFixture();
         using var reentrancy = RequestContext.AllowCallChainReentrancy();
         var state = new object();
+        var parent = new UncopyableContextValue();
         var calls = 0;
-        RequestContext.Set("parent", "request-data");
+        RequestContext.Set("parent", parent);
         try
         {
             using var timer = fixture.Register((value, token) =>
@@ -50,6 +51,7 @@ public sealed class GrainTimerTests
             Assert.True(message.IsLocalOnly);
             Assert.Null(message.TimeToLive);
             Assert.Null(message.RequestContextData);
+            Assert.Same(parent, RequestContext.Get("parent"));
             Assert.Equal(fixture.Grain.GrainId, message.TargetGrain);
             Assert.Equal(message.SendingGrain, message.TargetGrain);
             Assert.Equal(message.SendingSilo, message.TargetSilo);
@@ -57,6 +59,34 @@ public sealed class GrainTimerTests
             fixture.Time.Advance(TimeSpan.FromDays(1));
             Assert.Equal(1, calls);
             Assert.Single(fixture.Messages);
+        }
+        finally
+        {
+            RequestContext.Remove("parent");
+        }
+    }
+
+    [Fact]
+    public void MessageFactory_DefaultContextIsCopiedWhileExplicitContextSkipsExport()
+    {
+        using var fixture = new TimerFixture();
+        var value = new List<int> { 1, 2 };
+        RequestContext.Set("parent", value);
+        try
+        {
+            var message = fixture.MessageFactory.CreateMessage(null, Orleans.CodeGeneration.InvokeMethodOptions.OneWay);
+            var copied = Assert.IsType<List<int>>(message.RequestContextData!["parent"]);
+            Assert.Equal(value, copied);
+            Assert.NotSame(value, copied);
+            value.Add(3);
+            Assert.Equal(new[] { 1, 2 }, copied);
+
+            RequestContext.Set("parent", new UncopyableContextValue());
+            Assert.Throws<CodecNotFoundException>(() =>
+                fixture.MessageFactory.CreateMessage(null, Orleans.CodeGeneration.InvokeMethodOptions.OneWay));
+            var independent = fixture.MessageFactory.CreateMessage(null, Orleans.CodeGeneration.InvokeMethodOptions.OneWay, requestContextData: null);
+            Assert.Null(independent.RequestContextData);
+            Assert.IsType<UncopyableContextValue>(RequestContext.Get("parent"));
         }
         finally
         {
@@ -408,9 +438,10 @@ public sealed class GrainTimerTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task AdmissionFailure_LogsErrorAndReleasesBusyTurn(bool changeDuringDelivery)
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(2000)]
+    public async Task AdmissionFailure_LogsErrorWithoutImplicitImmediateRetry(int replacementMilliseconds)
     {
         using var fixture = new TimerFixture();
         var exception = new InvalidOperationException("Admission failed");
@@ -422,9 +453,9 @@ public sealed class GrainTimerTests
         }, 0, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         fixture.BeforeReceive = () =>
         {
-            if (changeDuringDelivery)
+            if (replacementMilliseconds >= 0)
             {
-                timer.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+                timer.Change(TimeSpan.FromMilliseconds(replacementMilliseconds), Timeout.InfiniteTimeSpan);
             }
             throw exception;
         };
@@ -432,12 +463,14 @@ public sealed class GrainTimerTests
         Assert.Empty(fixture.Messages);
         Assert.Same(exception, fixture.SingleLoggedError());
         fixture.BeforeReceive = null;
-        if (changeDuringDelivery)
+        if (replacementMilliseconds > 0)
         {
             fixture.Time.Advance(TimeSpan.FromSeconds(2));
         }
         else
         {
+            fixture.Time.Advance(TimeSpan.FromDays(1));
+            Assert.Empty(fixture.Messages);
             timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         }
         await fixture.InvokeAsync(Assert.Single(fixture.Messages));
@@ -467,6 +500,8 @@ public sealed class GrainTimerTests
 
     private static TaskCompletionSource NewCompletion() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private sealed class UncopyableContextValue { }
+
     private static async Task VerifyFollowingTickAsync(TimerFixture fixture, int milliseconds)
     {
         if (milliseconds > 0)
@@ -495,6 +530,7 @@ public sealed class GrainTimerTests
         public List<Message> Messages { get; } = [];
         public List<GrainTimerEvents.TimerEvent> Events { get; } = [];
         public Action? BeforeReceive { get; set; }
+        public MessageFactory MessageFactory { get; }
         public TimerRegistry Registry { get; }
 
         public TimerFixture()
@@ -510,8 +546,8 @@ public sealed class GrainTimerTests
             });
             var details = Substitute.For<ILocalSiloDetails>();
             details.SiloAddress.Returns(SiloAddress.New(System.Net.IPAddress.Loopback, 11111, 1));
-            var factory = new MessageFactory(_services.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, null!);
-            Registry = new(loggerFactory, Time, factory, details);
+            MessageFactory = new(_services.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, null!);
+            Registry = new(loggerFactory, Time, MessageFactory, details);
             _subscription = GrainTimerEvents.AllEvents.Subscribe(this);
         }
 

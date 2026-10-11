@@ -107,9 +107,8 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         try
         {
-            var msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay);
             // Timer requests start a new call chain, including ticks queued immediately during registration.
-            msg.RequestContextData = null;
+            var msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay, requestContextData: null);
             msg.SetInfiniteTimeToLive();
             msg.SendingGrain = _grainContext.GrainId;
             msg.TargetGrain = _grainContext.GrainId;
