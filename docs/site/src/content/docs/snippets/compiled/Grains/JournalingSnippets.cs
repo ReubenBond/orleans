@@ -4,7 +4,6 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Metadata;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
 
 #pragma warning disable ORLEANSEXP005
 
