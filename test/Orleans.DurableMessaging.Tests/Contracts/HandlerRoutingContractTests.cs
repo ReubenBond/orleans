@@ -172,10 +172,10 @@ public sealed class HandlerRoutingContractTests
     {
         var envelope = Envelope();
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
-        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
+        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null, (Action<string>)(_ => { })]));
         Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
         var parameters = Assert.Single(type.GetConstructors()).GetParameters();
-        Assert.Equal(2, parameters.Length);
+        Assert.Equal(3, parameters.Length);
         Assert.Equal(typeof(Action), parameters[1].ParameterType);
         Assert.False(parameters[1].IsOptional);
     }
@@ -183,7 +183,7 @@ public sealed class HandlerRoutingContractTests
     private static IInboxHandlerContext CreateContext(DurableEnvelope envelope, Action complete)
     {
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
-        return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete));
+        return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete, (Action<string>)(_ => { })));
     }
 
     private static DurableEnvelope Envelope(byte[]? payload = null) => new()
