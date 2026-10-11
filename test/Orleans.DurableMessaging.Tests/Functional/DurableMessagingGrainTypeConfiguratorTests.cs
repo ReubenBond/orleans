@@ -268,7 +268,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
         await OnOwnerTurnAsync(observation.Context, () =>
         {
-            observation.Manager!.Hooks.Add(new JournaledStateHook
+            observation.Manager!.Hooks.Add(new TestJournaledStateHook
             {
                 BeforeOperation = (_, _) => throw new IOException("Acceptance prerequisite failed.")
             });
@@ -313,7 +313,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var handled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failHook = true;
         var failure = new IOException("Post-persistence hook failed.");
-        var hook = new JournaledStateHook
+        var hook = new TestJournaledStateHook
         {
             AfterOperation = (_, _) =>
             {
