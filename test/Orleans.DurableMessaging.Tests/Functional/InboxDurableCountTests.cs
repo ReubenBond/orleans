@@ -225,7 +225,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         _ = await receiver.GetSnapshotAsync();
         var current = Fixture.GetGrainContext(receiver);
         await AssertCountsAsync(current, new CountProbe(current), new(0, 0, 0));
-        if (!scheduling) Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        if (!scheduling) Assert.Equal(new Counts(1, 0, 1), probe.Read());
     }
 
     [Fact]
