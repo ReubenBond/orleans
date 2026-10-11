@@ -78,7 +78,7 @@ try
         Console.WriteLine($"RESUBMITTED: {command.Id}, admission={duplicate.Status}");
     }
     Console.WriteLine("VERIFIED: remaining stock=8, reservations=1, processed requests=3.");
-    Console.WriteLine("Volatile storage is for this demonstration only; stopping the host discards all journals and jobs.");
+    Console.WriteLine("Volatile storage keeps journals and jobs in memory for the host's lifetime.");
 }
 finally
 {
