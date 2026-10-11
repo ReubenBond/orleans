@@ -27,6 +27,45 @@ within one provider.
 Retained memory includes the latest snapshot, appended encoded bytes up to and
 including the crossing append, and provider bookkeeping.
 
+## Persistence hooks
+
+`IJournaledStateManager.Hooks` exposes a mutable list of `IJournaledStateHook`
+objects. Its backing list is allocated on first access. Features can inspect the
+list and add a hook only when an equivalent registration is absent. Modify list
+membership on the owner's logical execution context between persistence operations.
+
+`JournaledStateHook` adapts synchronous `Action<JournaledStateOperation,
+CancellationToken>` callbacks and asynchronous
+`Func<JournaledStateOperation, CancellationToken, ValueTask>` callbacks. A custom
+hook object can carry feature identity and operation-local state. Within each
+delegate adapter, the synchronous callback precedes the asynchronous callback.
+
+Hooks surround actual coalesced writes, snapshots, and deletion. Ordinary before
+callbacks run in list order. An optional single `IJournaledStateCaptureHook` runs
+last, directly in the work loop before capture or deletion. Its prerequisite
+covers changes staged while ordinary callbacks awaited, and changes arriving
+during its own I/O. The same list supports inspecting and deduplicating this
+registration; multiple final capture hooks produce a prerequisite error before
+any callback or storage work. After
+callbacks run after storage acknowledgement and state acknowledgement or reset.
+Successful zero-byte writes also complete their callbacks. Prerequisites must cover
+changes which arrive during an asynchronous before callback; captured changes and
+later pending changes retain their separate acknowledgement boundaries.
+
+The token passed to hooks belongs to the owned operation and is canceled by owner
+shutdown. Caller cancellation ends that caller's wait while owned callbacks and
+storage work continue. A before-hook failure is reported as
+`JournaledStatePreCommitException` and preserves pending state for an explicit
+retry. An after-hook failure is reported as `JournaledStatePostCommitException`,
+identifies the completed operation, and leaves the manager usable. Remaining after
+hooks still execute, and multiple failures are aggregated. Feature recovery
+reconciles interrupted post-persistence effects using durable state.
+
+Hook callbacks execute outside the manager lock. Enqueuing another operation on
+the same owner from its callback is rejected to preserve work-loop progress.
+For full deletion, stop feature admission and drain owned work before queuing
+deletion; the after callback can release resources associated with the deleted owner.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
@@ -92,7 +131,7 @@ Recovery reads the selected provider's physical namespace using the existing
 journal identity. Changing the selection for a grain type with existing journals
 requires a deliberate data migration or cutover strategy, including rollback.
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. When stored format metadata is absent, recovery uses the configured format. New empty journals use the configured write format.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -264,6 +303,41 @@ the operation's token before use, or deliberately supply them through a registra
 lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent
 of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle.
 
+## Journal operation hooks
+
+`IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
+registrations. Features inspect and deduplicate their registrations on the owner's logical
+execution context while persistence is quiescent. Registration persists through recovery and
+whole-journal deletion. The standard manager rejects mutation of the list throughout an
+operation and admits at most one `IJournaledStateCaptureHook`.
+
+For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
+the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously
+captures the registered states or starts deletion. Prerequisites cover all changes staged during
+asynchronous preparation, including changes arriving while the capture hook awaits its own I/O.
+Keep operation-local bookkeeping for the captured batch separate from later pending changes.
+
+After hooks run in list order after storage acknowledgement and state acknowledgement or reset.
+They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
+operation. `JournaledStateHook` adapts synchronous and asynchronous delegates; within each phase
+the synchronous delegate executes first.
+
+| Outcome | Owner and caller behavior |
+| --- | --- |
+| Before hook fails | `JournaledStatePreCommitException` retains pending state for an explicit retry after restoring the prerequisite. |
+| Storage or state processing fails | The original failure fences the manager; create a fresh owner and recover the durable outcome. |
+| After hook fails | `JournaledStatePostCommitException` reports successful persistence. Every remaining after hook runs, failures are aggregated, and the manager stays usable. The feature's durable recovery protocol resumes interrupted post-persistence work. |
+
+Hooks receive the owner's shutdown token. Caller cancellation ends the caller's wait while
+the owned prerequisite, capture, storage, and completion phases continue. Disposal cancels the
+owner token and drains owned work before releasing journal resources, including when cancellation
+callbacks or after-hook cleanup fail. Concurrent disposal callers share that drain and its outcome.
+Shutdown closes work admission and cancels queued operations while an already running operation
+drains to its actual storage and hook outcome.
+Recursive initialization, persistence, or disposal on the same owner from a hook is rejected.
+Before whole-journal deletion, the feature owner stops admission and drains its own operations;
+deletion completion follows storage deletion and registered-state reset.
+
 ## State identity and retirement
 
 Preserve state names across activations and deployments. A stream absent from the setup declarations
@@ -312,7 +386,7 @@ Each record contains the state id as element 0 and the durable operation payload
 
 Inside the operation payload array, element 0 is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
+Existing data is read using its stored format key, or the configured format when metadata is absent, and migrated to the configured write format by the next snapshot write.
 
 ## Catalog enumeration
 
