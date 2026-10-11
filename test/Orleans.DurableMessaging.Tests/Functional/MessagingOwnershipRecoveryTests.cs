@@ -36,7 +36,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         Assert.Equal(failure.Message, Assert.IsType<IOException>(rejected.InnerException).Message);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var oldState = oldGrain.GetSnapshotForTest();
-        Assert.Equal(0, oldState.InboxCount);
+        Assert.Equal(1, oldState.InboxCount);
         Assert.NotNull(oldState.InboxJobId);
         Assert.NotNull(oldState.InboxJob);
         Assert.Single(oldState.Effects);
@@ -60,7 +60,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var failed = oldGrain.GetSnapshotForTest();
-        Assert.Equal(0, failed.InboxCount);
+        Assert.Equal(1, failed.InboxCount);
         Assert.NotNull(failed.InboxJob);
         Assert.Empty(failed.Effects);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);

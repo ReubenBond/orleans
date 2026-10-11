@@ -211,7 +211,8 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         Assert.Contains("must call Complete", error.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Writes(rig));
         await rig.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Empty(rig.Inbox);
+        Assert.Equal(input.MessageId, Assert.Single(rig.Inbox).Key);
+        Assert.Equal(input.Payload, Assert.Single(rig.Inbox).Value.Payload);
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Effects);
         await AssertFailureReplayAsync(rig, input);

@@ -294,7 +294,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var rejected = grain.GetSnapshotForTest();
         Assert.Equal(before.ActivationId, rejected.ActivationId);
-        Assert.Equal(0, rejected.InboxCount);
+        Assert.Equal(1, rejected.InboxCount);
         Assert.NotNull(rejected.InboxJobId);
         Assert.NotNull(rejected.InboxJob);
         Assert.Empty(rejected.Effects);

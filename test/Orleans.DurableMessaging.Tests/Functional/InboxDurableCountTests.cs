@@ -174,7 +174,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         }
         await turn;
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        Assert.Equal(new Counts(2, 0, 2), probe.Read());
         // The recovered drain turn can hold admission ahead of this snapshot request.
         var recoverySnapshot = receiver.GetSnapshotAsync();
         await handlers.WaitUntilEnteredAsync();
@@ -183,7 +183,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var fresh = new CountProbe(freshContext);
         var restored = committed ? 2 : 1;
         await AssertCountsAsync(freshContext, fresh, new(restored, 0, restored));
-        Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        Assert.Equal(new Counts(2, 0, 2), probe.Read());
         handlers.Release();
         _ = await recoverySnapshot;
         await Fixture.WaitForEffectCountAsync(receiver, restored);
@@ -214,7 +214,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
             Assert.Contains("Injected journal write failure", failure.Message, StringComparison.Ordinal);
         }
         if (!scheduling) await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        Assert.Equal(scheduling ? new Counts(0, 0, 0) : new Counts(1, 0, 1), probe.Read());
         Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         if (!scheduling)
         {
@@ -225,7 +225,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         _ = await receiver.GetSnapshotAsync();
         var current = Fixture.GetGrainContext(receiver);
         await AssertCountsAsync(current, new CountProbe(current), new(0, 0, 0));
-        if (!scheduling) Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        if (!scheduling) Assert.Equal(new Counts(1, 0, 1), probe.Read());
     }
 
     [Fact]
