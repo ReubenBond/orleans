@@ -77,7 +77,8 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         Assert.Empty(outbox.Messages);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
+        // Entry encoding precedes dictionary insertion; snapshot encoding observes staged values.
+        Assert.Equal(snapshot ? 1 : 0, grain.GetSnapshotForTest().InboxCount);
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var recovered = await receiver.GetSnapshotAsync();
