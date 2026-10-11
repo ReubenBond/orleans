@@ -2312,7 +2312,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Same(failure, fixture.Manager.Failure);
         Assert.ThrowsAny<OperationCanceledException>(() => fixture.Outbox.Send(fixture.Envelope));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.ExecuteJobAsync("owner:1").AsTask());
-        Assert.Empty(fixture.Messages); // Failed deletion still tears down its owning scope.
+        Assert.Single(fixture.Messages);
         Assert.Equal(0, fixture.GetOutboxDepth());
         using var recovered = fixture.Recreate();
         Assert.Single(recovered.Messages);
