@@ -787,7 +787,8 @@ public sealed class DurableOutboxDeliveryBatchTests
         var callbacks = 0;
         var callbackFailure = new InvalidOperationException("Remote callback during loopback retirement.");
         using var fixture = new OutboxFixture(token => new(DeliverControlledAsync(token)), durableJobId: "owner:1");
-        { var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId(); with { ReceiverId = fixture.SenderId }) await fixture.SendAsync(newEnvelope); }
+        var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()) with { ReceiverId = fixture.SenderId };
+        await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         using var timer = new CancellationTokenSource();
         await fixture.ExecuteJobAsync("owner:1");
