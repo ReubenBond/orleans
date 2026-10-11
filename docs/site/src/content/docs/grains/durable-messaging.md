@@ -347,8 +347,8 @@ ownership-clear write follows the same boundary; fresh replay determines whether
 previous owner remains responsible or cleanup was committed.
 
 A failed journal prerequisite hook reports
-<xref:Orleans.Journaling.JournaledStatePreCommitException>. Storage has not been
-attempted, and complete safe-to-commit changes remain pending for explicit persistence
+<xref:Orleans.Journaling.JournaledStatePreCommitException> before capture and storage.
+Complete safe-to-commit changes remain pending for explicit persistence
 retry or owner retirement and fresh replay. An explicit persistence retry commits
 the already-staged changes; fresh-owner recovery determines subsequent handler work.
 A post-persistence hook failure reports

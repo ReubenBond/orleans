@@ -36,7 +36,7 @@ quantity. For each command, the host arms an explicit journal-acknowledgement
 observer before submission, awaits the typed reply's acknowledgement, and resubmits
 the same immutable command. It verifies `Duplicate` admission for successful and
 rejected commands, one handler execution per ID, unchanged stock for rejections,
-and one stock decrement, without sleeps or polling.
+and one stock decrement using acknowledged replies and state snapshots.
 
 From the repository root:
 
@@ -85,12 +85,11 @@ sealed `ReservationAccepted` and `ReservationRejected` records distinguish the
 valid business result types and carry the original quantity and remaining stock.
 A nonpositive quantity sends `ReservationRejected` with `InvalidQuantity`;
 a shortage sends it with `InsufficientStock`. Both complete with unchanged stock.
-Invalid immutable reservation commands are normal durable business rejections,
-not exceptions to retry. The original outbox intent delivers the reply
+Invalid immutable reservation commands complete as durable business rejections.
+The original outbox intent delivers the reply
 within its configured delivery policy.
 
-`Restock` has no business reply protocol. A nonpositive increment is permanently
-unusable, so the handler calls
+For a nonpositive `Restock` increment, the handler calls
 <xref:Orleans.DurableMessaging.IInboxHandlerContext.Fail*> with a clear reason
 and returns before mutation. A positive increment computes the checked new stock
 value before mutation, then commits that update with inbox completion. Checked
