@@ -245,7 +245,7 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(1, handler.Applied);
         Assert.Equal(42, observation.Value!.Value);
-        Assert.Single(observation.Outbox!.Messages);
+        Assert.Equal(handler.Output.MessageId, Assert.Single(observation.Outbox!.Messages).MessageId);
         using var recovery = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
         var activation = grain.GetValueAsync();
         await recovery.WaitUntilEnteredAsync();
@@ -288,7 +288,7 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         Assert.IsType<IOException>(error.InnerException);
         await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Equal(1, observation.Inbox!.Count);
+        Assert.Equal(envelope.MessageId, Assert.Single(observation.Inbox!.Messages).MessageId);
         Assert.Equal(11, await grain.GetValueAsync());
         var recovered = Probe.Get(grain.GetGrainId())[^1];
         Assert.NotSame(observation.Context, recovered.Context);
