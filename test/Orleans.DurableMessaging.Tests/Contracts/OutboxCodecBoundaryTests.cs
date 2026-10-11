@@ -12,6 +12,7 @@ using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
@@ -199,7 +200,7 @@ public sealed class OutboxCodecBoundaryTests
             "message" => valid with { MessageId = default },
             "sender" => valid with { SenderId = default },
             "receiver" => valid with { ReceiverId = default },
-            "payload" => valid with { Payload = default },
+            "payload" => valid with { Payload = null! },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
