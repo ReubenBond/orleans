@@ -828,7 +828,7 @@ public sealed class OutboxCodecBoundaryTests
         await using var fixture = await CodecFixture.CreateAsync();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Manager.Hooks.Add(new JournaledStateHook
+        fixture.Manager.Hooks.Add(new TestJournaledStateHook
         {
             BeforeOperationAsync = async (_, _) =>
             {
@@ -863,7 +863,7 @@ public sealed class OutboxCodecBoundaryTests
             staged ??= Task.Factory.StartNew(() => fixture.Outbox.Send(envelope), TestContext.Current.CancellationToken,
                 TaskCreationOptions.None, TaskScheduler.Current);
         });
-        fixture.Manager.Hooks.Add(new JournaledStateHook { BeforeOperationAsync = async (_, _) => await Task.Yield() });
+        fixture.Manager.Hooks.Add(new TestJournaledStateHook { BeforeOperationAsync = async (_, _) => await Task.Yield() });
         using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.WaitUntilEnteredAsync();
@@ -1010,7 +1010,7 @@ public sealed class OutboxCodecBoundaryTests
         var next = fixture.CreateEnvelope();
         if (beforeCapture)
         {
-            fixture.Manager.Hooks.Insert(0, new JournaledStateHook { BeforeOperation = (_, _) => fixture.Outbox.Send(next) });
+            fixture.Manager.Hooks.Insert(0, new TestJournaledStateHook { BeforeOperation = (_, _) => fixture.Outbox.Send(next) });
         }
         using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         var retirement = fixture.PumpAsync(old).AsTask();
@@ -1048,7 +1048,7 @@ public sealed class OutboxCodecBoundaryTests
         { var newEnvelope = fixture.CreateEnvelope(); fixture.Outbox.Send(newEnvelope); }
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var failure = new IOException("After hook failed after acknowledged delivery removal.");
-        var hook = new JournaledStateHook { AfterOperation = (_, _) => throw failure };
+        var hook = new TestJournaledStateHook { AfterOperation = (_, _) => throw failure };
         fixture.Manager.Hooks.Add(hook);
         var error = await Assert.ThrowsAsync<JournaledStatePostCommitException>(() => fixture.DeliverAsync());
         Assert.Same(failure, error.InnerException);
@@ -1070,7 +1070,7 @@ public sealed class OutboxCodecBoundaryTests
         fixture.Outbox.Send(envelope);
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var failure = new IOException("Blocked prerequisite on an owned delivery write.");
-        fixture.Manager.Hooks.Add(new JournaledStateHook { BeforeOperation = (_, _) => throw failure });
+        fixture.Manager.Hooks.Add(new TestJournaledStateHook { BeforeOperation = (_, _) => throw failure });
         var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => fixture.DeliverAsync());
         Assert.Same(failure, error.InnerException);
         Assert.Empty(fixture.Messages);
@@ -1090,7 +1090,7 @@ public sealed class OutboxCodecBoundaryTests
         await using var fixture = await CodecFixture.CreateAsync();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Manager.Hooks.Insert(0, new JournaledStateHook
+        fixture.Manager.Hooks.Insert(0, new TestJournaledStateHook
         {
             BeforeOperationAsync = async (_, _) =>
             {

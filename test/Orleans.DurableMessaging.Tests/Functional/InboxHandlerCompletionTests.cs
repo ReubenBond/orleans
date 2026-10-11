@@ -686,7 +686,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var input = await DeliverAsync(rig);
         var error = new IOException("Journal hook failed.");
-        await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new JournaledStateHook
+        await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new TestJournaledStateHook
         {
             BeforeOperation = postCommit ? null : (_, _) => throw error,
             AfterOperation = postCommit ? (_, _) => throw error : null

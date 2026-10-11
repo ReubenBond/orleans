@@ -52,7 +52,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         _processed = processed;
         _handlers = handlers;
         inbox.RegisterHandler(this);
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new TestJournaledStateHook
         {
             AfterOperation = (operation, _) =>
             {

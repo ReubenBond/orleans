@@ -22,14 +22,6 @@ internal static class VolatileJournalConfiguration
 }
 // </volatile_journal_thresholds>
 
-// <arc_buffer_pool_budget>
-internal static class JournalBufferConfiguration
-{
-    internal static void ConfigureProcess() =>
-        ArcBufferWriter.MaxRetainedPoolBytes = 8 * 1024 * 1024;
-}
-// </arc_buffer_pool_budget>
-
 // <journal_operation_hooks>
 internal static class JournalHookRegistration
 {
@@ -41,15 +33,6 @@ internal static class JournalHookRegistration
             hooks.Add(featureHook);
         }
     }
-
-    internal static IJournaledStateHook Create(
-        Func<JournaledStateOperation, CancellationToken, ValueTask> establishPrerequisites,
-        Func<JournaledStateOperation, CancellationToken, ValueTask> completeCommittedWork) =>
-        new JournaledStateHook
-        {
-            BeforeOperationAsync = establishPrerequisites,
-            AfterOperationAsync = completeCommittedWork
-        };
 }
 // </journal_operation_hooks>
 
