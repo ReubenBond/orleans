@@ -15,8 +15,10 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
     [Theory]
     [InlineData("message", false)]
     [InlineData("sender", false)]
+    [InlineData("payload", false)]
     [InlineData("message", true)]
     [InlineData("sender", true)]
+    [InlineData("payload", true)]
     public async Task MalformedEnvelope_RejectsBeforeAcceptanceOrDuplicate(string field, bool existingKey)
     {
         var receiver = NewGrain();

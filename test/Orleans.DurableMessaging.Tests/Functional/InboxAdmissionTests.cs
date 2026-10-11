@@ -122,11 +122,11 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var feature = (IDurableJobFeatureHandler)attempt.Context.ActivationServices.GetRequiredService(
             ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         DurableJobRunResult result = null!;
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
         await OnTurnTaskAsync(attempt.Context, async () =>
             result = await feature.ExecuteJobAsync(new CallbackContext(mismatched), TestContext.Current.CancellationToken));
         Assert.Same(DurableJobRunResult.Completed, result);
         Assert.Same(previous, value.Value);
-        var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
         var pending = attempt.Grain.GetSnapshotForTest();
         Assert.Empty(pending.Effects);
