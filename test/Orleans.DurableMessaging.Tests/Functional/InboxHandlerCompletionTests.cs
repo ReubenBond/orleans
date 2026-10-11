@@ -40,20 +40,20 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Equal(retained, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters));
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await storage.WaitUntilEnteredAsync();
         Assert.False(finished.IsCompleted);
-        AssertCompletedState(rig, input.Value);
+        AssertCompletedState(rig, input);
         Assert.Empty(rig.Effects);
         Assert.Empty(rig.Outbox);
         storage.Release();
         await WaitAsync(finished);
         Assert.Equal(1, calls);
         Assert.Equal(1, Fixture.Metrics.GetCount("orleans-durable-messaging-inbox-messages-processed", "dead_lettered"));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
         Assert.Equal(1, calls);
         await AssertHealthyAsync(rig);
         await DeactivateAsync(rig);
@@ -61,25 +61,25 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var letter = Assert.Single(recovered.InboxDeadLetters);
         Assert.Equal("unsupported input", letter.Reason);
         Assert.Equal(1, letter.AttemptCount);
-        Assert.Equal(input.Value.MessageId, letter.MessageId);
+        Assert.Equal(input.MessageId, letter.MessageId);
         Assert.Empty(recovered.Effects);
         Assert.Equal(0, recovered.InboxCount);
         Assert.Equal(1, recovered.ProcessedMessageCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
         var recoveredContext = Fixture.GetGrainContext(rig.Receiver);
         await OnTurnAsync(recoveredContext, async () =>
         {
             var diagnostics = recoveredContext.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>();
             var retained = Assert.Single(diagnostics.InboxDeadLetters);
-            Assert.Equal(input.Value.Payload.ToArray(), retained.Message.Payload.ToArray());
-            Assert.Equal(input.Value.Subject, retained.Message.Subject);
-            Assert.Equal(input.Value.SenderId, retained.Message.SenderId);
-            Assert.Equal(input.Value.ReceiverId, retained.Message.ReceiverId);
-            Assert.True(diagnostics.RemoveInboxDeadLetter(input.Value.MessageId));
+            Assert.Equal(input.Payload, retained.Message.Payload);
+            Assert.Equal(input.Subject, retained.Message.Subject);
+            Assert.Equal(input.SenderId, retained.Message.SenderId);
+            Assert.Equal(input.ReceiverId, retained.Message.ReceiverId);
+            Assert.True(diagnostics.RemoveInboxDeadLetter(input.MessageId));
             await recoveredContext.ActivationServices.GetRequiredService<IJournaledStateManager>().WriteStateAsync();
             Assert.Empty(diagnostics.InboxDeadLetters);
         });
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
     }
 
     [Collection(DurableMessagingClusterCollection.Name)]
@@ -103,17 +103,17 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
                 installed.SetResult();
             });
             await installed.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-            using var input = CreateEnvelope(receiver, NewMessage(901, "permanent input"), "permanent/input");
+            var input = CreateEnvelope(receiver, NewMessage(901, "permanent input"), "permanent/input");
             const string counter = "orleans-durable-messaging-inbox-messages-processed";
             var retried = Fixture.Metrics.WaitForCountAsync(counter, 1, "retry");
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, input.Value)).Status);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, input)).Status);
             await retried;
             Assert.Equal(1, handler.Attempts);
             Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
 
             var terminated = Fixture.Metrics.WaitForCountAsync(counter, 1, "dead_lettered");
             Fixture.Clock.Advance(TimeSpan.FromHours(1));
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input.Value)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input)).Status);
             await terminated;
             var snapshot = await receiver.GetSnapshotAsync();
             Assert.Equal(2, handler.Attempts);
@@ -121,12 +121,12 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             Assert.Equal(1, snapshot.ProcessedMessageCount);
             Assert.Empty(snapshot.Effects);
             var deadLetter = Assert.Single(snapshot.InboxDeadLetters);
-            Assert.Equal(input.Value.MessageId, deadLetter.MessageId);
+            Assert.Equal(input.MessageId, deadLetter.MessageId);
             Assert.Equal("permanent input", deadLetter.Reason);
             Assert.Equal(2, deadLetter.AttemptCount);
             Assert.Equal(1, Fixture.Metrics.GetCount(counter, "retry"));
             Assert.Equal(1, Fixture.Metrics.GetCount(counter, "dead_lettered"));
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input.Value)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, input)).Status);
             Assert.Equal(2, handler.Attempts);
         }
 
@@ -176,11 +176,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             self.Context.Complete();
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
-        AssertSuccess(rig, input.Value, outputCount: 0);
+        AssertSuccess(rig, input, outputCount: 0);
         await AssertHealthyAsync(rig);
     }
 
@@ -200,14 +200,14 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             expected = Assert.Throws<InvalidOperationException>(() => self.Context.Fail("different reason"));
             return ValueTask.CompletedTask;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         var timer = GetTimer(events, rig);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
         Assert.Same(expected, Assert.IsType<GrainTimerEvents.TickStop>(
             (await TimerStoppedAsync(events, timer)).Payload).Exception);
-        AssertCompletedState(rig, input.Value);
+        AssertCompletedState(rig, input);
         var letters = rig.Grain.GetSnapshotForTest().InboxDeadLetters;
         if (completeFirst) Assert.Empty(letters);
         else Assert.Equal("original reason", Assert.Single(letters).Reason);
@@ -233,13 +233,13 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             self.Context.Fail("permanent input failure");
             throw handlerError;
         };
-        using var input = await DeliverAsync(rig);
+        var input = await DeliverAsync(rig);
         timer = GetTimer(events, rig);
         using var storage = Fixture.Storage.BlockWrite(rig.Journal);
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await storage.WaitUntilEnteredAsync();
-        AssertCompletedState(rig, input.Value);
+        AssertCompletedState(rig, input);
         Assert.Equal("permanent input failure", Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).Reason);
         var storageError = new IOException("actual persistence failure");
         if (failWrite) storage.Fail(storageError);
@@ -248,14 +248,14 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         if (failWrite)
         {
             Assert.Same(storageError, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-            await AssertFailureReplayAsync(rig, input.Value);
+            await AssertFailureReplayAsync(rig, input);
             Assert.NotEqual("permanent input failure", Assert.Single((await rig.Receiver.GetSnapshotAsync()).InboxDeadLetters).Reason);
         }
         else
         {
             Assert.Same(handlerError, Assert.IsType<GrainTimerEvents.TickStop>(
                 (await TimerStoppedAsync(events, timer)).Payload).Exception);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input)).Status);
             Assert.Empty(rig.Effects);
             Assert.Empty(rig.Outbox);
             await AssertHealthyAsync(rig);

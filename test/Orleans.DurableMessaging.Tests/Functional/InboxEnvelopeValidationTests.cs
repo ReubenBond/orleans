@@ -26,7 +26,7 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
         {
             "message" => template with { MessageId = default },
             "sender" => template with { SenderId = default },
-            "payload" => template with { Payload = default },
+            "payload" => template with { Payload = null! },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
         var context = Fixture.GetGrainContext(receiver);
