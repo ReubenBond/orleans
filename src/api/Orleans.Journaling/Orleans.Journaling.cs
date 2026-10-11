@@ -75,12 +75,6 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface IDurableDictionaryValueLifecycle<TValue>
-    {
-        void Release(TValue value);
-        TValue Retain(TValue value);
-    }
-
     public partial interface IDurableDictionary<TKey, TValue> : System.Collections.Generic.IDictionary<TKey, TValue>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.IEnumerable
     {
     }
@@ -277,12 +271,12 @@ namespace Orleans.Journaling
     {
         bool IsCompactionRequested { get; }
 
-        System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<IJournalMetadata?> GetMetadataAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask ReadAsync(IJournalStorageConsumer consumer, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default);
     }
 
@@ -432,21 +426,6 @@ namespace Orleans.Journaling
         public JournalId MinId { get { throw null; } set { } }
 
         public JournalId Prefix { get { throw null; } set { } }
-    }
-
-    public sealed partial class JournaledStateHook : IJournaledStateHook
-    {
-        public System.Action<JournaledStateOperation, System.Threading.CancellationToken>? AfterOperation { get { throw null; } init { } }
-
-        public System.Func<JournaledStateOperation, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? AfterOperationAsync { get { throw null; } init { } }
-
-        public System.Action<JournaledStateOperation, System.Threading.CancellationToken>? BeforeOperation { get { throw null; } init { } }
-
-        public System.Func<JournaledStateOperation, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? BeforeOperationAsync { get { throw null; } init { } }
-
-        System.Threading.Tasks.ValueTask IJournaledStateHook.AfterOperationAsync(JournaledStateOperation operation, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        System.Threading.Tasks.ValueTask IJournaledStateHook.BeforeOperationAsync(JournaledStateOperation operation, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public sealed partial class JournaledStateManagerOptions
@@ -661,7 +640,7 @@ namespace Orleans.Journaling
 
         public bool IsCompactionRequested { get { throw null; } }
 
-        public System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
@@ -671,7 +650,7 @@ namespace Orleans.Journaling
 
         public System.Threading.Tasks.ValueTask ReadAsync(IJournalStorageConsumer consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }

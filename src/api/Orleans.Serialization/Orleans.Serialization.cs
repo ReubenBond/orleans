@@ -608,16 +608,12 @@ namespace Orleans.Serialization.Buffers
     public partial struct ArcBuffer : System.IDisposable
     {
         private int _dummyPrimitive;
-        public readonly ArcBufferPage? First;
+        public readonly ArcBufferPage First;
         public readonly int Length;
         public readonly int Offset;
-        public ArcBuffer(ArcBufferPage? first, int token, int offset, int length) { }
+        public ArcBuffer(ArcBufferPage first, int token, int offset, int length) { }
 
         public ArraySegmentEnumerator ArraySegments { get { throw null; } }
-
-        public static ArcBuffer Empty { get { throw null; } }
-
-        public bool IsEmpty { get { throw null; } }
 
         public MemoryEnumerator MemorySegments { get { throw null; } }
 
@@ -803,8 +799,6 @@ namespace Orleans.Serialization.Buffers
     {
         public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
-
-        public static int MaxRetainedPoolBytes { get { throw null; } set { } }
 
         public ArcBufferReader Reader { get { throw null; } }
 
@@ -1061,8 +1055,6 @@ namespace Orleans.Serialization.Buffers
         public int ReadInt32() { throw null; }
 
         public long ReadInt64() { throw null; }
-
-        public ArcBuffer ReadOwnedBuffer(int length) { throw null; }
 
         public uint ReadUInt32() { throw null; }
 
@@ -1428,21 +1420,6 @@ namespace Orleans.Serialization.Cloning
 
 namespace Orleans.Serialization.Codecs
 {
-    [RegisterSerializer]
-    public sealed partial class ArcBufferCodec : IFieldCodec<Buffers.ArcBuffer>, IFieldCodec
-    {
-        public Buffers.ArcBuffer ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
-
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.ArcBuffer value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [RegisterCopier]
-    public sealed partial class ArcBufferCopier : Cloning.IDeepCopier<Buffers.ArcBuffer>, Cloning.IDeepCopier
-    {
-        public Buffers.ArcBuffer DeepCopy(Buffers.ArcBuffer input, Cloning.CopyContext context) { throw null; }
-    }
-
     [RegisterSerializer]
     public sealed partial class ArrayCodec<T> : IFieldCodec<T[]>, IFieldCodec
     {
@@ -3504,17 +3481,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     public static partial class OrleansGeneratedCodeHelper
     {
-        public static void CompleteArgumentResourcesOnFailure(Invocation.IInvokableArgumentOwner request, System.Exception cause, System.IServiceProvider services) { }
-
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
 
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
-
-        public static void DisposeOwnedArgument<TArgument>(ref TArgument argument)
-            where TArgument : System.IDisposable { }
 
         public static System.Reflection.MethodInfo? GetMethodInfoOrDefault(System.Type? interfaceType, string methodName, System.Type[]? methodTypeParameters, System.Type[]? parameterTypes) { throw null; }
 
@@ -3612,13 +3584,6 @@ namespace Orleans.Serialization.Invocation
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();
-    }
-
-    public partial interface IInvokableArgumentOwner
-    {
-        void CompleteArgumentResources();
-        void ReleaseArgumentResources();
-        bool TryRetainArgumentResources();
     }
 
     public static partial class InvokablePool
