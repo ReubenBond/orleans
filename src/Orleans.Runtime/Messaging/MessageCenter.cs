@@ -34,7 +34,9 @@ namespace Orleans.Runtime.Messaging
         private bool stopped;
         private HostedClient? hostedClient;
         private Action<Message>? sniffIncomingMessageHandler;
-        private readonly AdmissionGate _incomingApplicationWork = new();
+        // Retirement drains these in order. Each stage can admit work into the next stage before that stage closes.
+        // Work which arrives after its stage closes proceeds untracked, through the ordinary shutdown paths.
+        private readonly AdmissionGate _incomingWork = new();
         private readonly AdmissionGate _addressingWork = new();
         private readonly AdmissionGate _outboundApplicationWork = new();
         private int _retirementStarted;
@@ -42,11 +44,9 @@ namespace Orleans.Runtime.Messaging
 
         internal void BeginRetirement() => Volatile.Write(ref _retirementStarted, 1);
 
-        internal bool TryAdmitApplicationSend(out AdmissionGate.Admission admission)
-        {
-            admission = _outboundApplicationWork.TryEnter();
-            return admission.Entered;
-        }
+        internal AdmissionGate.Admission TryAdmitIncomingDispatch() => _incomingWork.TryEnter();
+
+        internal AdmissionGate.Admission TryAdmitApplicationSend() => _outboundApplicationWork.TryEnter();
 
         internal void RecordRetirementSendFailure(Message message)
         {
@@ -58,21 +58,9 @@ namespace Orleans.Runtime.Messaging
 
         internal async Task DrainRetirementAsync(CancellationToken cancellationToken)
         {
-            await connectionManager.DrainIncomingApplicationDispatchAsync(cancellationToken);
-            if (Gateway is { } incomingGateway)
-            {
-                await incomingGateway.DrainIncomingAsync(cancellationToken);
-            }
-
-            await _incomingApplicationWork.CloseAsync().WaitAsync(cancellationToken);
+            await _incomingWork.CloseAsync().WaitAsync(cancellationToken);
             await _addressingWork.CloseAsync().WaitAsync(cancellationToken);
             await _outboundApplicationWork.CloseAsync().WaitAsync(cancellationToken);
-            if (Gateway is { } outgoingGateway)
-            {
-                await outgoingGateway.DrainOutboundAsync(cancellationToken);
-            }
-
-            await connectionManager.DrainAsync(cancellationToken);
             if (Volatile.Read(ref _retirementSendFailed) != 0)
             {
                 throw new ConnectionClosedException("Retirement disposition includes unsuccessful outbound work.");
@@ -127,13 +115,6 @@ namespace Orleans.Runtime.Messaging
             var admission = msg.RequiresApplicationDrain ? _outboundApplicationWork.TryEnter() : default;
             try
             {
-                if (msg.RequiresApplicationDrain && !admission.Entered)
-                {
-                    messagingTrace.OnDropBlockedApplicationMessage(msg);
-                    msg.Dispose();
-                    return true;
-                }
-
                 return TryDeliverToProxy(msg, ref admission);
             }
             finally
@@ -220,13 +201,6 @@ namespace Orleans.Runtime.Messaging
             if (msg.RequiresApplicationDrain && !admission.Entered)
             {
                 admission = _outboundApplicationWork.TryEnter();
-            }
-
-            if (msg.RequiresApplicationDrain && !admission.Entered)
-            {
-                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
-                msg.Dispose();
-                return;
             }
 
             try
@@ -352,7 +326,6 @@ namespace Orleans.Runtime.Messaging
                                     var sender = await connectionTask;
                                     sender.Send(msg, ref admission);
                                 }
-
                                 catch (Exception exception)
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
@@ -629,13 +602,6 @@ namespace Orleans.Runtime.Messaging
         internal Task AddressAndSendMessage(Message message, bool notifyForwarding = false)
         {
             var admission = message.RequiresApplicationDrain ? _addressingWork.TryEnter() : default;
-            if (message.RequiresApplicationDrain && !admission.Entered)
-            {
-                messagingTrace.OnDropBlockedApplicationMessage(message);
-                message.Dispose();
-                return Task.CompletedTask;
-            }
-
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
@@ -704,16 +670,6 @@ namespace Orleans.Runtime.Messaging
 
         public void ReceiveMessage(Message msg)
         {
-            var applicationRequest = !msg.IsSystemMessage && msg.Direction is Message.Directions.Request or Message.Directions.OneWay;
-            using var admission = applicationRequest
-                ? _incomingApplicationWork.TryEnter() : default;
-            if (applicationRequest && !admission.Entered)
-            {
-                messagingTrace.OnDropBlockedApplicationMessage(msg);
-                msg.Dispose();
-                return;
-            }
-
             Debug.Assert(!msg.IsLocalOnly);
             try
             {

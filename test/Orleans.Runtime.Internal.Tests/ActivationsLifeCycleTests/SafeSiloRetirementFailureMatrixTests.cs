@@ -65,7 +65,6 @@ public sealed partial class SafeSiloRetirementTests
         // Fail an actually accepted MessageWriteRequest bound to the real DI
         // SiloConnection. No message flag or direct retry/reroute invocation.
         await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
-        await connection.DrainAsync().WaitAsync(Timeout, TestCancellation);
         Assert.False(control.TransportRejectionObserved.Task.IsCompleted);
         Assert.Null(accepted.BodyObject);
         Assert.Equal(original.Id, accepted.Id);
@@ -133,21 +132,20 @@ public sealed partial class SafeSiloRetirementTests
             TargetGrain = systemCaller,
             TargetSilo = fixture.A.SiloAddress,
             BodyObject = Response.FromResult(174),
+            // Limit the outcome to the initial accepted write: the reroute drops the exhausted response.
+            RetryCount = MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES,
         };
         Assert.True(reply.TargetGrain.IsSystemTarget());
         Assert.Equal(origin != "system", reply.RequiresApplicationDrain);
         if (beginBeforeFailure) center.BeginRetirement();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply, default);
+        write.WriteMessage(reply, reply.RequiresApplicationDrain ? center.TryAdmitApplicationSend() : default);
         write.CompleteWriting();
         await using var transport = new BoundaryWriteTransport();
         Assert.True(transport.EnqueueWrite(write));
-        // Exercise the accepted-write exception and concrete accounting hook. Response
-        // traffic retains its normal reroute behavior, but the initial failure preceded
-        // the connection's drain and must be remembered only by the silo phase boundary.
+        // Exercise the accepted-write exception and concrete accounting hook. Only failures within the retirement phase are recorded.
         await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
         if (!beginBeforeFailure) center.BeginRetirement();
-        await connection.DrainAsync().WaitAsync(Timeout, TestCancellation);
         // Remove every live connection before drain: MessageCenter must retain the earlier
         // phase failure rather than relying on the ConnectionManager's current snapshot.
         await manager.Close(TestCancellation).WaitAsync(Timeout, TestCancellation);
@@ -164,66 +162,8 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Empty(fixture.Control.Executions);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task FailureMatrix_GatewayIncomingDrainSealsConnectionsRegisteredDuringOrAfterDrain(bool finishBeforeRegistration)
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        var services = fixture.B.ServiceProvider;
-        var center = services.GetRequiredService<MessageCenter>();
-        var gateway = center.Gateway!;
-        await using var existingTransport = new BoundaryWriteTransport();
-        await using var lateTransport = new BoundaryWriteTransport();
-        var existing = CreateConnection(existingTransport);
-        var late = CreateConnection(lateTransport);
-        gateway.RecordOpenedConnection(existing, ClientGrainId.Create());
-        var admitted = existing.TryAdmitIncomingApplicationDispatch();
-        Assert.True(admitted.Entered);
-        try
-        {
-            var drain = gateway.DrainIncomingAsync(TestCancellation);
-            Assert.False(drain.IsCompleted);
-            if (finishBeforeRegistration)
-            {
-                admitted.Dispose();
-                admitted = default;
-                await drain.WaitAsync(Timeout, TestCancellation);
-            }
-
-            gateway.RecordOpenedConnection(late, ClientGrainId.Create());
-            Assert.True(late.IsValid);
-            using var rejected = late.TryAdmitIncomingApplicationDispatch();
-            Assert.False(rejected.Entered);
-            using var existingRejected = existing.TryAdmitIncomingApplicationDispatch();
-            Assert.False(existingRejected.Entered);
-            if (!finishBeforeRegistration)
-            {
-                Assert.False(drain.IsCompleted);
-                admitted.Dispose();
-                admitted = default;
-            }
-
-            await drain.WaitAsync(Timeout, TestCancellation);
-            await gateway.DrainIncomingAsync(TestCancellation).WaitAsync(Timeout, TestCancellation);
-        }
-        finally
-        {
-            admitted.Dispose();
-            gateway.RecordClosedConnection(existing);
-            gateway.RecordClosedConnection(late);
-            await Task.WhenAll(existing.CloseAsync(null), late.CloseAsync(null)).WaitAsync(Timeout, TestCancellation);
-        }
-
-        GatewayInboundConnection CreateConnection(MessageTransport transport) => new(
-            transport, gateway, services.GetRequiredService<OverloadDetector>(),
-            services.GetRequiredService<ILocalSiloDetails>(), services.GetRequiredService<IOptions<ConnectionOptions>>().Value,
-            center, services.GetRequiredService<ConnectionCommon>(), services.GetRequiredService<ConnectionPreambleHelper>(),
-            new GatewayInstruments(services.GetRequiredService<OrleansInstruments>()));
-    }
-
     [Fact]
-    public async Task FailureMatrix_GatewayApplicationReplyFailureIsRecordedBeforeConnectionDrain()
+    public async Task FailureMatrix_GatewayApplicationReplyFailureIsRecordedForRetirement()
     {
         await using var fixture = await Fixture.CreateAsync();
         var services = fixture.B.ServiceProvider;
@@ -253,12 +193,10 @@ public sealed partial class SafeSiloRetirementTests
         Assert.True(reply.RequiresApplicationDrain);
         center.BeginRetirement();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply, default);
+        write.WriteMessage(reply, center.TryAdmitApplicationSend());
         write.CompleteWriting();
         Assert.True(transport.EnqueueWrite(write));
         await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
-        // The concrete gateway hook records the failure before this local drain begins.
-        await connection.DrainAsync().WaitAsync(Timeout, TestCancellation);
         await connection.CloseAsync(null).WaitAsync(Timeout, TestCancellation);
         var error = await Assert.ThrowsAsync<ConnectionClosedException>(
             () => center.DrainRetirementAsync(TestCancellation).WaitAsync(Timeout, TestCancellation));

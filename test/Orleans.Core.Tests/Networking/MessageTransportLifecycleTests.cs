@@ -738,16 +738,6 @@ public class MessageTransportLifecycleTests
         Assert.False(drain.IsCompleted);
         transport.CompleteWrite();
         await drain.WaitAsync(TestContext.Current.CancellationToken);
-        using var late = new Message
-        {
-            Direction = message.Direction,
-            IsSystemMessage = message.IsSystemMessage,
-            SendingGrain = message.SendingGrain,
-            TargetGrain = message.TargetGrain,
-            BodyObject = "late",
-        };
-        connection.Send(late);
-        Assert.Null(late.BodyObject);
         Assert.Equal(1, transport.WriteCount);
     }
 
@@ -860,8 +850,6 @@ public class MessageTransportLifecycleTests
         Assert.True(transport.EnqueueWrite(write));
         Assert.Same(message, write.GetMessage(0));
         await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
-        // Failure preceded the local drain: it must not poison a later connection drain.
-        await connection.DrainAsync().WaitAsync(TestContext.Current.CancellationToken);
         Assert.Same(message, callback.Message);
         Assert.False(callback.IsCompleted);
         Assert.Null(completion.Response);
@@ -935,7 +923,6 @@ public class MessageTransportLifecycleTests
         var error = new ConnectionClosedException();
         await transport.CloseAsync(error, TestContext.Current.CancellationToken);
         var retry = await connection.Retries.Reader.ReadAsync(TestContext.Current.CancellationToken);
-        await connection.DrainAsync().WaitAsync(TestContext.Current.CancellationToken);
         Assert.Same(message, retry.Message);
         Assert.Same(error, retry.Error);
         Assert.Equal("nonrelocatable", message.BodyObject);
@@ -956,10 +943,12 @@ public class MessageTransportLifecycleTests
             shared.MessageCenter, TestContext.Current.CancellationToken);
         using var second = new BlockingReceiveConnection(secondTransport, CreateConnectionCommon(services, shared),
             shared.MessageCenter, TestContext.Current.CancellationToken);
+        // Connections share the message center's incoming gate.
+        second.IncomingWork = first.IncomingWork;
         ReadFrame(first, new CorrelationId(123));
         ReadFrame(second, new CorrelationId(456));
         await Task.WhenAll(first.Decoded, second.Decoded).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var drain = Task.WhenAll(first.DrainIncomingApplicationDispatchAsync(), second.DrainIncomingApplicationDispatchAsync());
+        var drain = first.DrainIncomingAsync();
         Assert.False(drain.IsCompleted);
         first.Release();
         Assert.False(drain.IsCompleted);
@@ -1026,7 +1015,7 @@ public class MessageTransportLifecycleTests
             read.SetConnection(connection);
             Assert.True(read.OnRead(new ArcBufferReader(frame)));
             close = connection.CloseAsync(null);
-            drain = connection.DrainIncomingApplicationDispatchAsync();
+            drain = connection.DrainIncomingAsync();
             Assert.False(drain.IsCompleted);
             Assert.Equal(0, connection.DispatchCount);
         }
@@ -1038,14 +1027,14 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public async Task MessageReadRequest_ClosedDispatchAdmissionDropsOnlyOrdinaryRequests()
+    public async Task MessageReadRequest_ClosedDispatchAdmissionStillDispatchesEveryMessage()
     {
         using var services = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(services);
         using var serializer = services.GetRequiredService<MessageSerializer>();
         await using var transport = new TrackingTransport();
         var connection = new RecordingReceiveConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
-        await connection.DrainIncomingApplicationDispatchAsync();
+        await connection.DrainIncomingAsync();
 
         foreach (var direction in new[] { Message.Directions.Request, Message.Directions.OneWay, Message.Directions.Response })
             foreach (var systemMessage in new[] { false, true })
@@ -1073,9 +1062,8 @@ public class MessageTransportLifecycleTests
                 Assert.Equal(message.Id, connection.RecordedId);
                 Assert.Equal(direction, connection.RecordedDirection);
                 Assert.Equal(systemMessage, connection.RecordedSystemMessage);
-                var dispatched = systemMessage || direction == Message.Directions.Response;
-                Assert.Equal(receivedBefore + (dispatched ? 1 : 0), connection.DispatchCount);
-                if (dispatched) Assert.Equal(message.Id, connection.ReceivedId);
+                Assert.Equal(receivedBefore + 1, connection.DispatchCount);
+                Assert.Equal(message.Id, connection.ReceivedId);
                 var reused = shared.GetReceiveMessageHandler();
                 Assert.Same(read, reused);
                 Assert.Equal(0, reused.Headers.Length);
@@ -1111,7 +1099,7 @@ public class MessageTransportLifecycleTests
         }
         else
         {
-            connection.RerouteMessage(message);
+            connection.RerouteMessage(message, admission: connection.OutgoingWork.TryEnter());
             drain = connection.DrainAsync();
         }
 
@@ -1121,31 +1109,6 @@ public class MessageTransportLifecycleTests
         await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Null(message.BodyObject);
         Assert.Equal(1, connection.RerouteCount);
-    }
-
-    [Fact]
-    public async Task RetirementDrain_PreservesSystemTrafficAfterApplicationSeal()
-    {
-        using var services = CreateServiceProvider();
-        using var shared = CreateMessageHandlerShared(services);
-        await using var transport = new CapturingTransport();
-        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
-        await connection.DrainAsync();
-        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
-        using var message = new Message
-        {
-            Direction = Message.Directions.Response,
-            IsSystemMessage = true,
-            SendingGrain = SystemTargetGrainId.Create(Constants.CatalogType, silo).GrainId,
-            TargetGrain = SystemTargetGrainId.Create(Constants.CatalogType, silo).GrainId,
-            BodyObject = "membership",
-        };
-        Assert.False(message.RequiresApplicationDrain);
-        connection.Send(message);
-        var bytes = await transport.Writes.Reader.ReadAsync(TestContext.Current.CancellationToken);
-        Assert.True(bytes.Length > Message.LENGTH_HEADER_SIZE);
-        Assert.Equal(1, connection.SentMessageCount);
-        Assert.Null(message.BodyObject);
     }
 
     [Fact]
@@ -1170,9 +1133,9 @@ public class MessageTransportLifecycleTests
         };
         var expiry = message._timeToExpiry.GetRawTimestamp();
         var outboundWork = new AdmissionGate();
-        var sendAdmission = outboundWork.TryEnter();
-        source.Send(message, ref sendAdmission);
-        Assert.False(sendAdmission.Entered);
+        var admission = outboundWork.TryEnter();
+        source.Send(message, ref admission);
+        Assert.False(admission.Entered);
         await source.RetryEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var drain = outboundWork.CloseAsync();
         Assert.False(drain.IsCompleted);
@@ -1180,7 +1143,6 @@ public class MessageTransportLifecycleTests
         source.Release();
         await replacement.PrepareEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var bytes = await replacementTransport.Writes.Reader.ReadAsync(TestContext.Current.CancellationToken);
-        await replacement.DrainAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(bytes.Length > Message.LENGTH_HEADER_SIZE);
         Assert.Equal(new CorrelationId(123), message.Id);
@@ -1229,8 +1191,6 @@ public class MessageTransportLifecycleTests
         var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
         Assert.Same(second, retried.Message);
         Assert.Same(error, retried.Error);
-        // Drain the queued reroute producer before asserting there was no request replay.
-        await connection.DrainAsync().WaitAsync(cancellationToken);
 
         Assert.False(connection.Retries.Reader.TryRead(out _));
         Assert.Equal(0, connection.SentMessageCount);
@@ -1742,11 +1702,21 @@ public class MessageTransportLifecycleTests
             new NoOpMessageStatisticsSink());
     }
 
+    private abstract class GatedConnection(MessageTransport transport, ConnectionCommon shared) : Connection(transport, shared)
+    {
+        public AdmissionGate IncomingWork { get; set; } = new();
+        public AdmissionGate OutgoingWork { get; } = new();
+        public Task DrainIncomingAsync() => IncomingWork.CloseAsync();
+        public Task DrainAsync() => OutgoingWork.CloseAsync();
+        internal override AdmissionGate.Admission TryAdmitIncomingDispatch() => IncomingWork.TryEnter();
+        protected override AdmissionGate.Admission TryAdmitApplicationSend() => OutgoingWork.TryEnter();
+    }
+
     private sealed class BlockingSendConnection(
         MessageTransport transport,
         ConnectionCommon shared,
         IMessageCenter messageCenter,
-        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+        CancellationToken cancellationToken) : GatedConnection(transport, shared), IDisposable
     {
         private readonly TaskCompletionSource _prepareEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ManualResetEventSlim _releaseSend = new();
@@ -1765,7 +1735,7 @@ public class MessageTransportLifecycleTests
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission) => msg.Dispose();
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission admission) => msg.Dispose();
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
@@ -1776,7 +1746,7 @@ public class MessageTransportLifecycleTests
         MessageTransport transport,
         ConnectionCommon shared,
         IMessageCenter messageCenter,
-        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+        CancellationToken cancellationToken) : GatedConnection(transport, shared), IDisposable
     {
         private readonly TaskCompletionSource _decoded = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ManualResetEventSlim _release = new();
@@ -1788,7 +1758,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message)
         {
             ReceivedId = message.Id;
@@ -1806,7 +1776,7 @@ public class MessageTransportLifecycleTests
     private sealed class RecordingReceiveConnection(
         MessageTransport transport,
         ConnectionCommon shared,
-        IMessageCenter messageCenter) : Connection(transport, shared)
+        IMessageCenter messageCenter) : GatedConnection(transport, shared)
     {
         public int DispatchCount { get; private set; }
         public int RecordCount { get; private set; }
@@ -1818,7 +1788,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message)
         {
             DispatchCount++;
@@ -1839,7 +1809,7 @@ public class MessageTransportLifecycleTests
         MessageTransport transport,
         ConnectionCommon shared,
         IMessageCenter messageCenter,
-        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+        CancellationToken cancellationToken) : GatedConnection(transport, shared), IDisposable
     {
         private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ManualResetEventSlim _release = new();
@@ -1850,7 +1820,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission)
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission)
         {
             _entered.TrySetResult();
             _release.Wait(cancellationToken);
@@ -1872,7 +1842,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) { _prepareEntered.TrySetResult(); return true; }
-        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
@@ -1890,11 +1860,11 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission)
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission)
         {
             _retryEntered.TrySetResult();
             _release.Wait(cancellationToken);
-            replacement.Send(message, ref sendAdmission);
+            replacement.Send(message, ref admission);
         }
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
@@ -2002,7 +1972,7 @@ public class MessageTransportLifecycleTests
     }
 
     private sealed class RetryTrackingConnection(MessageTransport transport, ConnectionCommon shared, IMessageCenter messageCenter)
-        : Connection(transport, shared)
+        : GatedConnection(transport, shared)
     {
         public Channel<(Message Message, Exception? Error)> Retries { get; } =
             Channel.CreateUnbounded<(Message, Exception?)>();
@@ -2013,7 +1983,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message msg) => true;
-        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission) => Retries.Writer.TryWrite((msg, ex));
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission admission) => Retries.Writer.TryWrite((msg, ex));
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) => SentMessageCount++;

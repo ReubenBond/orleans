@@ -114,7 +114,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         Debug.Assert(_headers.Length == _headerLength);
         Debug.Assert(_body.Length == _bodyLength);
 
-        _incomingDispatch = _connection.TryAdmitIncomingApplicationDispatch();
+        _incomingDispatch = _connection.TryAdmitIncomingDispatch();
         _connection.EnqueueRead();
         ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
         return true;
@@ -136,8 +136,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         {
             messageSerializer = Shared.GetMessageSerializer();
             messageSerializer.ReadHeaders(this, out message);
-            var applicationRequest = !message.IsSystemMessage
-                && message.Direction is Message.Directions.Request or Message.Directions.OneWay;
             connection.MarkMessageReceived();
             connection.RecordMessageReceive(message, PayloadLength, HeaderLength);
 
@@ -149,15 +147,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 message.SetMessageReadRequest(this);
                 shouldReset = false;
             }
-            if (applicationRequest && !admission.Entered)
-            {
-                Shared.MessagingTrace.OnDropBlockedApplicationMessage(message);
-                message.Dispose();
-            }
-            else
-            {
-                connection.OnReceivedMessage(message);
-            }
+            connection.OnReceivedMessage(message);
         }
         catch (Exception exception)
         {

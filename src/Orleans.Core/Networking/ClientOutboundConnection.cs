@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Messaging
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                         NodeIdentity = this.messageCenter.ClientId.GrainId,
                         SiloAddress = null,
-                        ClusterId = myClusterId,
+                        ClusterId = myClusterId
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
@@ -122,9 +122,10 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission)
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission admission)
         {
             if (msg == null) return;
+
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;

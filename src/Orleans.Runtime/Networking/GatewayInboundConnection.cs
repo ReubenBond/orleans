@@ -51,8 +51,9 @@ namespace Orleans.Runtime.Messaging
 
         internal override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
 
-        protected override bool TryAdmitApplicationSend(out AdmissionGate.Admission admission)
-            => messageCenter.TryAdmitApplicationSend(out admission);
+        internal override AdmissionGate.Admission TryAdmitIncomingDispatch() => messageCenter.TryAdmitIncomingDispatch();
+
+        protected override AdmissionGate.Admission TryAdmitApplicationSend() => messageCenter.TryAdmitApplicationSend();
 
         internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes)
         {
@@ -138,7 +139,7 @@ namespace Orleans.Runtime.Messaging
                     NodeIdentity = Constants.SiloDirectConnectionId,
                     NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                     SiloAddress = this.myAddress,
-                    ClusterId = this.myClusterId,
+                    ClusterId = this.myClusterId
                 });
 
             if (!ClientGrainId.TryParse(preamble.NodeIdentity, out var clientId))
@@ -201,13 +202,14 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission)
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission admission)
         {
             if (msg == null) return;
+
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;
-                this.messageCenter.SendMessage(msg, ref sendAdmission);
+                this.messageCenter.SendMessage(msg, ref admission);
             }
             else
             {
