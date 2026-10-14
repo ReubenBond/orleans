@@ -240,9 +240,14 @@ public class ConnectionManagerTests
     public async Task SiloConnection_Shutdown_InvalidatesRequestsAndReleasesBufferedBodies(int direction)
     {
         await using var rig = new TestRig();
-        var responses = new List<Message>();
+        var responses = new ConcurrentQueue<Message>();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sender = rig.CreateConnection();
-        sender.SendObserver = responses.Add;
+        sender.SendObserver = response =>
+        {
+            responses.Enqueue(response);
+            sent.TrySetResult();
+        };
         rig.Manager.OnConnected(rig.Address, sender);
         var (connection, _) = rig.CreateSiloConnection(blockApplicationMessages: true);
         using var body = new ArcBufferWriter();
@@ -268,6 +273,8 @@ public class ConnectionManagerTests
             Assert.Equal(0, readRequest.Body.Length);
             if (message.Direction is Message.Directions.Request)
             {
+                // The connection's send worker hands the rejection to the observer asynchronously.
+                await sent.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
                 var response = Assert.Single(responses);
                 Assert.Equal(Message.Directions.Response, response.Direction);
                 Assert.Equal(Message.ResponseTypes.Rejection, response.Result);
@@ -893,31 +900,16 @@ public class ConnectionManagerTests
             }
         }
 
-        protected override bool PrepareMessageForSend(Message message) => true;
-        public override void Send(Message message)
+        protected override bool PrepareMessageForSend(Message message)
         {
             if (SendObserver is { } observer)
             {
+                // The observer takes the message instead of the transport.
                 observer(message);
+                return false;
             }
-            else
-            {
-                base.Send(message);
-            }
-        }
 
-        internal override void Send(Message message, ref AdmissionGate.Admission admission)
-        {
-            if (SendObserver is { } observer)
-            {
-                observer(message);
-                admission.Dispose();
-                admission = default;
-            }
-            else
-            {
-                base.Send(message, ref admission);
-            }
+            return true;
         }
 
         protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission admission)

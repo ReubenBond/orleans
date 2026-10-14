@@ -41,9 +41,9 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     public void WriteMessage(Message message, AdmissionGate.Admission admission)
     {
         var startLength = _buffer.Length;
+        var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
         try
         {
-            var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
             // Reserve space for framing
             var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
             _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
@@ -62,10 +62,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         catch
         {
             _buffer.Truncate(startLength);
-            if (message.RequiresApplicationDrain)
-            {
-                _connection?.OnApplicationWriteFailure(message);
-            }
             throw;
         }
     }
@@ -117,10 +113,9 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             var message = _messages[i].Message;
             if (message.IsRelocatableRequest)
             {
-                connection.OnApplicationWriteFailure(message);
-                // An accepted write can have reached the receiver. The original callback awaits its outcome.
+                // An accepted write can have reached the receiver, so the request is not retried. The original callback awaits its outcome.
                 _shared.MessagingInstruments.OnFailedSentMessage(message);
-                message.Dispose();
+                message.ReleaseBodyBuffer();
             }
             else
             {
@@ -135,11 +130,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     {
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
         var (message, totalLength, headerLength, admission) = _messages[index];
-        if (message.RequiresApplicationDrain)
-        {
-            connection.OnApplicationWriteFailure(message);
-        }
-
         _messages[index] = (message, totalLength, headerLength, default);
         connection.RerouteMessage(message, error, admission);
     }

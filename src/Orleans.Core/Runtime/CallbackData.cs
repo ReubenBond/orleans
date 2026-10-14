@@ -11,9 +11,8 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
-        private const int StateRouteUpdateReceived = 8;
-        private const int StateCancellationRequested = 16;
-        private const int StateCancellable = 32;
+        private const int StateCancellationRequested = 8;
+        private const int StateRouteUpdated = 16;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
@@ -22,8 +21,6 @@ namespace Orleans.Runtime
         private int _state;
         private StatusResponse? lastKnownStatus;
         private CancellationTokenRegistration _cancellationTokenRegistration;
-        private readonly TimeSpan _responseTimeout;
-        private readonly long _responseTimeoutTicks;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -33,13 +30,9 @@ namespace Orleans.Runtime
         {
             this.shared = shared;
             this.context = ctx;
-            _startTimestamp = shared.TimeProvider.GetTimestamp();
-            var invokable = msg.BodyObject as IInvokable;
-            _responseTimeout = invokable?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
-            _responseTimeoutTicks = shared.GetTimestampTicks(_responseTimeout);
-            _state = invokable?.IsCancellable == true ? StateCancellable : StateNone;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
+            _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -53,14 +46,12 @@ namespace Orleans.Runtime
                 return;
             }
 
-            lock (Message)
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted | StateCancellationRegistrationPending | StateCancellationRegistrationPublished,
+                clearFlags: StateNone,
+                setFlags: StateCancellationRegistrationPending))
             {
-                if ((_state & (StateCompleted | StateCancellationRegistrationPending | StateCancellationRegistrationPublished)) != StateNone)
-                {
-                    return;
-                }
-
-                _state |= StateCancellationRegistrationPending;
+                return;
             }
 
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
@@ -69,65 +60,104 @@ namespace Orleans.Runtime
                 callbackData.OnCancellation(token);
             }, this);
 
-            lock (Message)
+            _cancellationTokenRegistration = registration;
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted,
+                clearFlags: StateCancellationRegistrationPending,
+                setFlags: StateCancellationRegistrationPublished))
             {
-                if (!IsCompleted)
+                registration.Dispose();
+            }
+        }
+
+        private bool TryUpdateState(int blockingFlags, int clearFlags, int setFlags)
+        {
+            var state = Volatile.Read(ref _state);
+            while ((state & blockingFlags) == 0)
+            {
+                var observed = Interlocked.CompareExchange(ref _state, (state & ~clearFlags) | setFlags, state);
+                if (observed == state)
                 {
-                    _cancellationTokenRegistration = registration;
-                    _state = (_state & ~StateCancellationRegistrationPending) | StateCancellationRegistrationPublished;
-                    return;
+                    return true;
                 }
+
+                state = observed;
             }
 
-            registration.Dispose();
+            return false;
         }
 
         private void SignalCancellation()
         {
-            if ((Volatile.Read(ref _state) & StateCancellable) != 0)
+            // Only cancel requests which honor cancellation token.
+            // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
+            // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
+            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
         }
 
-        public bool OnStatusUpdate(StatusResponse status, int forwardingGeneration)
+        /// <summary>
+        /// Records a status update. A route update moves the request's target to the silo which the request was forwarded to.
+        /// </summary>
+        /// <returns><see langword="true"/> if the update was applied; <see langword="false"/> if it was superseded or the call has completed.</returns>
+        public bool OnStatusUpdate(StatusResponse status, int forwardCount)
         {
+            if (IsCompleted)
+            {
+                return false;
+            }
+
+            if (status.ForwardedTo is not { } forwardedTo)
+            {
+                this.lastKnownStatus = status;
+                return true;
+            }
+
+            // Route updates are rare. The lock keeps the target and its forward count consistent when updates race.
             lock (Message)
             {
-                if (IsCompleted)
+                // Apply the first route update for each forward count. Later notices for the same forward are duplicates or delayed.
+                var routed = (Volatile.Read(ref _state) & StateRouteUpdated) != 0;
+                if (forwardCount < Message.ForwardCount || (routed && forwardCount == Message.ForwardCount))
                 {
                     return false;
                 }
 
-                if (status.IsRouteUpdate)
-                {
-                    if ((_state & StateRouteUpdateReceived) != 0 && forwardingGeneration <= Message.ForwardCount)
-                    {
-                        return false;
-                    }
-
-                    Message.ForwardCount = forwardingGeneration;
-                    Message.TargetSilo = status.ForwardedTo;
-                    _state |= StateRouteUpdateReceived;
-                    if ((_state & StateCancellationRequested) != 0)
-                    {
-                        SignalCancellation();
-                    }
-                }
-                else
-                {
-                    this.lastKnownStatus = status;
-                }
-
-                return true;
+                Message.ForwardCount = forwardCount;
+                Message.TargetSilo = forwardedTo;
+                Interlocked.Or(ref _state, StateRouteUpdated);
             }
+
+            // Publish the new target before observing cancellation, so either this or OnCancellation signals the new target.
+            Interlocked.MemoryBarrier();
+            if ((Volatile.Read(ref _state) & StateCancellationRequested) != 0)
+            {
+                SignalCancellation();
+            }
+
+            return true;
         }
 
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - _startTimestamp;
-            return duration > _responseTimeoutTicks;
+            return duration > GetResponseTimeoutTimestampTicks();
         }
+
+        private long GetResponseTimeoutTimestampTicks()
+        {
+            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
+            if (defaultResponseTimeout.HasValue)
+            {
+                return shared.GetTimestampTicks(defaultResponseTimeout.Value);
+            }
+
+            return shared.ResponseTimeoutTimestampTicks;
+        }
+
+        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {
@@ -137,10 +167,8 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
-            lock (Message)
-            {
-                _state |= StateCancellationRequested;
-            }
+            Interlocked.Or(ref _state, StateCancellationRequested);
+
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -187,7 +215,7 @@ namespace Orleans.Runtime
             var msg = this.Message; // Local working copy
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            var timeout = _responseTimeout;
+            var timeout = GetResponseTimeout();
             LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
@@ -196,6 +224,7 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
+            // The receiver forwards relocatable requests, so they complete via a response, cancellation, or their deadline.
             if (Message.IsRelocatableRequest)
             {
                 return;
@@ -238,7 +267,6 @@ namespace Orleans.Runtime
         {
             if (!TryComplete())
             {
-                response.Dispose();
                 return;
             }
 
@@ -247,23 +275,11 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             DisposeCancellationRegistration();
 
+            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-            response.Dispose();
         }
 
-        private bool TryComplete()
-        {
-            lock (Message)
-            {
-                if (IsCompleted)
-                {
-                    return false;
-                }
-
-                _state |= StateCompleted;
-                return true;
-            }
-        }
+        private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
 
         private void RecordElapsedTime()
         {

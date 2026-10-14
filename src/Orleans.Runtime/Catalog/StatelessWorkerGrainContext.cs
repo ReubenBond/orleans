@@ -35,9 +35,9 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private bool _terminated;
     private bool _retiring;
-    private readonly AdmissionGate _messageAdmissions = new();
 
-    internal Task DrainRequestsAsync() => _messageAdmissions.CloseAsync();
+    // Tracks messages queued for the message loop, so that retirement can await their disposition.
+    private readonly AdmissionGate _messageAdmissions = new();
 
     // Idle worker removal fields
     private Timer? _inspectionTimer;
@@ -416,6 +416,11 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             }
 
             await Task.WhenAll(tasks);
+            if (_retiring)
+            {
+                await _messageAdmissions.CloseAsync();
+            }
+
             completion.TrySetResult();
         }
         catch (Exception exception)

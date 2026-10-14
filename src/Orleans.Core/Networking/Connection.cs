@@ -41,8 +41,6 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         protected virtual AdmissionGate.Admission TryAdmitApplicationSend() => default;
 
-        internal virtual void OnApplicationWriteFailure(Message message) { }
-
         protected Connection(
             MessageTransport transport,
             ConnectionCommon shared)
@@ -235,17 +233,13 @@ namespace Orleans.Runtime.Messaging
 
         }
 
-        public virtual void Send(Message message)
-        {
-            Debug.Assert(!message.IsLocalOnly);
-            _sendWorker.Schedule(message, default);
-        }
-
-        internal virtual void Send(Message message, ref AdmissionGate.Admission admission)
+        /// <summary>
+        /// Queues a message for sending, taking ownership of its retirement <paramref name="admission"/>.
+        /// </summary>
+        internal void Send(Message message, AdmissionGate.Admission admission = default)
         {
             Debug.Assert(!message.IsLocalOnly);
             _sendWorker.Schedule(message, admission);
-            admission = default;
         }
 
         private sealed class UnknownEndPoint : EndPoint
@@ -506,7 +500,8 @@ namespace Orleans.Runtime.Messaging
                     message.Result = Message.ResponseTypes.Error;
                     message.BodyObject = Response.FromException(exception);
                     ++message.RetryCount;
-                    Send(message, ref admission);
+                    Send(message, admission);
+                    admission = default;
                 }
                 else
                 {

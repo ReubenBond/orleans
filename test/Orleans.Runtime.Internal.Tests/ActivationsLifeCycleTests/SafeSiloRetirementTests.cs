@@ -367,7 +367,7 @@ public sealed partial class SafeSiloRetirementTests
             retirementCancellation.Cancel();
         }
 
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(
             () => originalTask.WaitAsync(Timeout, TestCancellation));
         Assert.Contains("Canceled shutdown deactivation boundary.", exception.Message);
@@ -448,7 +448,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.False(fixture.CatalogRetirement.IsCompleted);
 
         control.ReleaseUnregister.TrySetResult();
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => originalTask.WaitAsync(Timeout, TestCancellation));
         Assert.Contains("This process is terminating.", exception.Message);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
@@ -628,12 +628,7 @@ public sealed partial class SafeSiloRetirementTests
         public Task? Retirement { get; private set; }
         public Task CatalogRetirement => _catalogRetirement ??= _catalog.DeactivateAllActivations(TestCancellation);
 
-        public async Task AssertCatalogRetirementFailedAsync()
-        {
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => CatalogRetirement.WaitAsync(Timeout, TestCancellation));
-            Assert.Contains("retirement drains were unsuccessful", error.Message);
-        }
+
 
         public static async Task<Fixture> CreateAsync(
             bool holdCancellationDelivery = false,

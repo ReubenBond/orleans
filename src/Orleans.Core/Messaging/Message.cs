@@ -119,7 +119,14 @@ namespace Orleans.Runtime
             _bodyObject = request;
         }
 
-        internal void ReleaseBodyBuffer() => Dispose();
+        internal void ReleaseBodyBuffer()
+        {
+            if (_bodyObject is MessageReadRequest readRequest)
+            {
+                _bodyObject = null;
+                readRequest.Reset();
+            }
+        }
 
         public void Dispose()
         {

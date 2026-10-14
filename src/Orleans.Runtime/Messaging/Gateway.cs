@@ -448,7 +448,6 @@ namespace Orleans.Runtime.Messaging
                     exception ??= new ClientNotAvailableException(Id.GrainId);
                     using (admission)
                     {
-                        _gateway.messageCenter.RecordRetirementSendFailure(message);
                         _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
                     }
                 }
@@ -463,7 +462,8 @@ namespace Orleans.Runtime.Messaging
 
                 try
                 {
-                    connection.Send(message, ref admission);
+                    connection.Send(message, admission);
+                    admission = default;
                     return true;
                 }
                 catch (Exception exception)

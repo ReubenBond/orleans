@@ -71,8 +71,6 @@ internal sealed partial class ActivationData :
 #pragma warning restore IDE0052 // Remove unread private members
 
     private Activity? _activationActivity;
-    private bool _registrationRetired;
-    private bool _ownsRetirementAdmission;
 
     /// <summary>
     /// Constants for activity error event names used during activation lifecycle.
@@ -319,6 +317,39 @@ internal sealed partial class ActivationData :
             {
                 _extras ??= new();
                 _extras.IsStuckDeactivating = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether queued requests are rejected instead of forwarded, because this activation retired without removing its registration.
+    /// Forwarding those requests would resolve back to this silo.
+    /// </summary>
+    private bool RejectsQueuedRequests
+    {
+        get => _extras?.RejectsQueuedRequests ?? false;
+        set
+        {
+            lock (_lock)
+            {
+                _extras ??= new();
+                _extras.RejectsQueuedRequests = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the catalog awaits this deactivation during retirement.
+    /// </summary>
+    private bool HoldsDeactivationAdmission
+    {
+        get => _extras?.HoldsDeactivationAdmission ?? false;
+        set
+        {
+            lock (_lock)
+            {
+                _extras ??= new();
+                _extras.HoldsDeactivationAdmission = value;
             }
         }
     }
@@ -754,10 +785,10 @@ internal sealed partial class ActivationData :
 
                     _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                     SetState(ActivationState.Deactivating);
-                    _ownsRetirementAdmission = _shared.InternalRuntime.Catalog.TryAdmitRetirement();
+                    HoldsDeactivationAdmission = _shared.InternalRuntime.Catalog.TryAdmitDeactivation();
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity, cancellationToken));
+                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity));
                 }
                 else
                 {
@@ -796,7 +827,6 @@ internal sealed partial class ActivationData :
         // application bug, perhaps a deadlock)
         UnregisterMessageTarget();
         _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
-        CompleteRetirementDrain(RetirementDrainResult.Incomplete);
     }
 
     void IGrainTimerRegistry.OnTimerCreated(IGrainTimer timer)
@@ -1293,17 +1323,7 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            if (DeactivationException is null || ForwardingAddress is { })
-            {
-                // Either this was a duplicate activation or it was at some point successfully activated
-                // Forward all pending messages
-                RerouteAllQueuedMessages();
-            }
-            else
-            {
-                // Reject all pending messages
-                RejectAllQueuedMessages();
-            }
+            RerouteOrRejectQueuedMessages();
         }
 
         void AbandonStuckDeactivatingActivation()
@@ -1317,8 +1337,7 @@ internal sealed partial class ActivationData :
             ForwardingAddress = null;
             UnregisterMessageTarget();
             _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
-            CompleteRetirementDrain(RetirementDrainResult.Incomplete);
-            GetDeactivationCompletionSource().TrySetResult(true);
+            CompleteDeactivation();
         }
 
         bool MayInvokeRequest(Message incoming)
@@ -1693,24 +1712,32 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
+            _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
             if (State == ActivationState.Invalid)
             {
-                DispositionRetirementRequest(message);
+                // Deactivation has completed, so dispose of the request now instead of via the message loop.
+                RerouteOrRejectQueuedMessages();
                 return;
             }
-
-            _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
         }
 
         _workSignal.Signal();
     }
 
-    private void DispositionRetirementRequest(Message message)
+
+    private void RerouteOrRejectQueuedMessages()
     {
-        _shared.InternalRuntime.MessageCenter.ProcessRequestToInvalidActivation(message, Address, ForwardingAddress,
-            DeactivationReason.Description, DeactivationException,
-            rejectMessages: (!_registrationRetired && DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown)
-                || (DeactivationException is not null && ForwardingAddress is null));
+        if (!RejectsQueuedRequests && (DeactivationException is null || ForwardingAddress is { }))
+        {
+            // Either this was a duplicate activation or it was at some point successfully activated
+            // Forward all pending messages
+            RerouteAllQueuedMessages();
+        }
+        else
+        {
+            // Reject all pending messages
+            RejectAllQueuedMessages();
+        }
     }
 
     /// <summary>
@@ -2078,8 +2105,8 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        var unregistered = !IsUsingGrainDirectory;
         var encounteredError = false;
-        var registrationRetired = !IsUsingGrainDirectory;
         try
         {
             try
@@ -2162,11 +2189,10 @@ internal sealed partial class ActivationData :
                     try
                     {
                         await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).WaitAsync(cancellationToken);
-                        registrationRetired = true;
+                        unregistered = true;
                     }
                     catch (Exception exception)
                     {
-                        encounteredError = true;
                         if (!cancellationToken.IsCancellationRequested)
                         {
                             LogFailedToUnregisterActivation(_shared.Logger, exception, this);
@@ -2176,7 +2202,6 @@ internal sealed partial class ActivationData :
             }
             catch (Exception ex)
             {
-                encounteredError = true;
                 SetActivityError(deactivateCommand.Activity, ex, "Error in FinishDeactivating");
                 LogErrorDeactivating(_shared.Logger, ex, this);
             }
@@ -2202,13 +2227,11 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            var canceledAtRetirement = cancellationToken.IsCancellationRequested;
-            lock (_lock)
+            // A retiring silo forwards queued requests only after a complete deactivation removed this activation's registration.
+            if (DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown && !migrating
+                && (!unregistered || cancellationToken.IsCancellationRequested))
             {
-                _registrationRetired = registrationRetired && !migrating
-                    && DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown
-                    && !canceledAtRetirement
-                    && !IsStuckDeactivating && !IsStuckProcessingMessage;
+                RejectsQueuedRequests = true;
             }
 
             UnregisterMessageTarget();
@@ -2221,7 +2244,6 @@ internal sealed partial class ActivationData :
             {
                 SetActivityError(deactivateCommand.Activity, exception, "Error in FinishDeactivating");
                 LogExceptionDisposing(_shared.Logger, exception, this);
-                encounteredError = true;
             }
 
             if (DeactivationStartTime is not null)
@@ -2231,31 +2253,15 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            List<Message> retirementRequests;
-            lock (_lock)
-            {
-                retirementRequests = DequeueAllWaitingRequests();
-            }
+            // Forward queued requests before signaling deactivation, so that callers awaiting deactivation also observe their disposition.
+            RerouteOrRejectQueuedMessages();
 
-            GetDeactivationCompletionSource().TrySetResult(true);
-            foreach (var request in retirementRequests)
-            {
-                DispositionRetirementRequest(request);
-            }
-
-            var drainResult = canceledAtRetirement || deactivateCommand.UpstreamCancellationToken.IsCancellationRequested
-                ? RetirementDrainResult.Canceled
-                : IsStuckDeactivating || IsStuckProcessingMessage
-                    ? RetirementDrainResult.Incomplete
-                    : encounteredError || (!registrationRetired && !migrating)
-                        ? RetirementDrainResult.Failed
-                        : RetirementDrainResult.Succeeded;
-            CompleteRetirementDrain(drainResult);
+            // Signal deactivation
+            CompleteDeactivation();
             _workSignal.Signal();
         }
         finally
         {
-            CompleteRetirementDrain(RetirementDrainResult.Incomplete);
             deactivationMetrics.RecordIfNeeded();
         }
 
@@ -2295,17 +2301,11 @@ internal sealed partial class ActivationData :
         }
     }
 
-    private void CompleteRetirementDrain(RetirementDrainResult result)
+    private void CompleteDeactivation()
     {
-        lock (_lock)
+        if (GetDeactivationCompletionSource().TrySetResult(true) && HoldsDeactivationAdmission)
         {
-            if (_ownsRetirementAdmission)
-            {
-                _ownsRetirementAdmission = false;
-                _shared.InternalRuntime.Catalog.CompleteRetirement(
-                    result,
-                    DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown);
-            }
+            _shared.InternalRuntime.Catalog.CompleteDeactivation();
         }
     }
 
@@ -2538,6 +2538,8 @@ internal sealed partial class ActivationData :
         private const int IsStuckProcessingMessageFlag = 1 << 0;
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
+        private const int RejectsQueuedRequestsFlag = 1 << 3;
+        private const int HoldsDeactivationAdmissionFlag = 1 << 4;
         private byte _flags;
 
         public HashSet<IGrainTimer>? Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
@@ -2579,6 +2581,8 @@ internal sealed partial class ActivationData :
         public bool IsStuckProcessingMessage { get => GetFlag(IsStuckProcessingMessageFlag); set => SetFlag(IsStuckProcessingMessageFlag, value); }
         public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
         public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
+        public bool RejectsQueuedRequests { get => GetFlag(RejectsQueuedRequestsFlag); set => SetFlag(RejectsQueuedRequestsFlag, value); }
+        public bool HoldsDeactivationAdmission { get => GetFlag(HoldsDeactivationAdmissionFlag); set => SetFlag(HoldsDeactivationAdmissionFlag, value); }
 
         private void SetFlag(int flag, bool value)
         {
@@ -2657,12 +2661,10 @@ internal sealed partial class ActivationData :
             GC.SuppressFinalize(this);
         }
 
-        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, Activity? activity,
-            CancellationToken upstreamCancellationToken) : Command(cts)
+        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, Activity? activity) : Command(cts)
         {
             public ActivationState PreviousState { get; } = previousState;
             public Activity? Activity { get; } = activity;
-            public CancellationToken UpstreamCancellationToken { get; } = upstreamCancellationToken;
         }
 
         public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, CatalogInstruments.ActivationMetricTracker metrics) : Command(cts)

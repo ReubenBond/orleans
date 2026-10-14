@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -12,7 +11,6 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 using Orleans.Internal;
-using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -39,32 +37,17 @@ namespace Orleans.Runtime.Messaging
         private readonly AdmissionGate _incomingWork = new();
         private readonly AdmissionGate _addressingWork = new();
         private readonly AdmissionGate _outboundApplicationWork = new();
-        private int _retirementStarted;
-        private int _retirementSendFailed;
-
-        internal void BeginRetirement() => Volatile.Write(ref _retirementStarted, 1);
 
         internal AdmissionGate.Admission TryAdmitIncomingDispatch() => _incomingWork.TryEnter();
 
         internal AdmissionGate.Admission TryAdmitApplicationSend() => _outboundApplicationWork.TryEnter();
 
-        internal void RecordRetirementSendFailure(Message message)
-        {
-            if (Volatile.Read(ref _retirementStarted) != 0 && message.RequiresApplicationDrain)
-            {
-                Volatile.Write(ref _retirementSendFailed, 1);
-            }
-        }
 
         internal async Task DrainRetirementAsync(CancellationToken cancellationToken)
         {
             await _incomingWork.CloseAsync().WaitAsync(cancellationToken);
             await _addressingWork.CloseAsync().WaitAsync(cancellationToken);
             await _outboundApplicationWork.CloseAsync().WaitAsync(cancellationToken);
-            if (Volatile.Read(ref _retirementSendFailed) != 0)
-            {
-                throw new ConnectionClosedException("Retirement disposition includes unsuccessful outbound work.");
-            }
         }
 
         public MessageCenter(
@@ -287,7 +270,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
-                        existingConnection.Send(msg, ref admission);
+                        existingConnection.Send(msg, admission);
+                        admission = default;
                         return;
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
@@ -311,7 +295,8 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
-                            sender.Send(msg, ref admission);
+                            sender.Send(msg, admission);
+                            admission = default;
                         }
                         else
                         {
@@ -324,15 +309,12 @@ namespace Orleans.Runtime.Messaging
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    sender.Send(msg, ref admission);
+                                    sender.Send(msg, admission);
                                 }
                                 catch (Exception exception)
                                 {
-                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
-                                }
-                                finally
-                                {
                                     admission.Dispose();
+                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
                                 }
                             }
                         }
@@ -528,10 +510,8 @@ namespace Orleans.Runtime.Messaging
         /// <param name="message"></param>
         internal void RerouteMessage(Message message)
         {
-            var targetSilo = message.IsRelocatableRequest
-                && message.TargetSilo is { } hint
-                && !siloStatusOracle.IsDeadSilo(hint)
-                    ? hint : null;
+            var hint = message.IsRelocatableRequest ? message.TargetSilo : null;
+            var targetSilo = hint is not null && !siloStatusOracle.IsDeadSilo(hint) ? hint : null;
             // Preserve gateway placement updates when the client still carries an older hint.
             if (targetSilo is not null && _grainLocator.TryLookupInCache(message.TargetGrain, out var cached)
                 && cached.SiloAddress is { } cachedTarget && !siloStatusOracle.IsDeadSilo(cachedTarget))
@@ -539,7 +519,8 @@ namespace Orleans.Runtime.Messaging
                 targetSilo = cachedTarget;
             }
 
-            ResendMessageImpl(message, targetSilo);
+            // Notify the sender of the grain's location only when its hint is missing or stale.
+            ResendMessageImpl(message, targetSilo, notifyForwarding: targetSilo is null || !targetSilo.Equals(hint));
         }
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
@@ -553,7 +534,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null)
+        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null, bool notifyForwarding = true)
         {
             LogDebugResend(log, message);
 
@@ -565,13 +546,17 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetSilo = forwardingAddress;
-                SendForwardingNotice(message);
+                if (notifyForwarding)
+                {
+                    SendForwardingNotice(message);
+                }
+
                 SendMessage(message);
             }
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message, notifyForwarding: true);
+                _ = AddressAndSendMessage(message, notifyForwarding);
             }
         }
 
@@ -648,7 +633,6 @@ namespace Orleans.Runtime.Messaging
 
             void OnAddressingFailure(Message m, Exception ex)
             {
-                RecordRetirementSendFailure(m);
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
@@ -746,7 +730,6 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
-            RecordRetirementSendFailure(msg);
             try
             {
                 _messagingInstruments.OnRejectedMessage(msg);

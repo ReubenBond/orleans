@@ -49,8 +49,6 @@ namespace Orleans.Runtime.Messaging
 
         protected override MessageCenter MessageCenter => this.messageCenter;
 
-        internal override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
-
         internal override AdmissionGate.Admission TryAdmitIncomingDispatch() => messageCenter.TryAdmitIncomingDispatch();
 
         protected override AdmissionGate.Admission TryAdmitApplicationSend() => messageCenter.TryAdmitApplicationSend();

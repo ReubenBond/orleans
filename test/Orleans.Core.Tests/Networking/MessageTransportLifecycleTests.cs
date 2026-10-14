@@ -519,7 +519,7 @@ public class MessageTransportLifecycleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void MessageWriteRequest_SuccessClearsBufferedAndLocalBodiesWithoutDoubleReturn(bool buffered)
+    public void MessageWriteRequest_SuccessReleasesBufferedBodyOnce(bool buffered)
     {
         using var services = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(services);
@@ -544,7 +544,9 @@ public class MessageTransportLifecycleTests
         Assert.NotNull(message._bodyObject);
         Assert.True(write.Length > Message.LENGTH_HEADER_SIZE);
         write.SetResult();
-        Assert.Null(message._bodyObject);
+        // Buffered bodies are released after the write. Local bodies remain available to the caller's callback.
+        if (buffered) Assert.Null(message._bodyObject);
+        else Assert.Equal(173, Assert.IsType<Response>(message._bodyObject, exactMatch: false).GetResult<int>());
         Assert.Equal(0, read.BodyLength);
         Assert.Equal(0, read.Body.Length);
         Assert.Equal(1, connection.SentMessageCount);
@@ -761,11 +763,10 @@ public class MessageTransportLifecycleTests
         Assert.False(drain.IsCompleted);
         await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
         await drain.WaitAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, connection.ApplicationWriteFailures);
         Assert.Equal(0, connection.SentMessageCount);
         Assert.False(connection.Retries.Reader.TryRead(out _));
         shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
-        Assert.Null(message.BodyObject);
+        Assert.Equal("retirement", message.BodyObject);
         Assert.Equal(0, message.RetryCount);
         Assert.Equal(1, transport.WriteCount);
     }
@@ -803,12 +804,9 @@ public class MessageTransportLifecycleTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task MessageWriteRequest_AcceptedGrainFailurePreservesCallbackAndReleasesBodyOnce(
-        bool buffered, bool expireDeadline)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_AcceptedGrainFailurePreservesCallback(bool expireDeadline)
     {
         using var services = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(services);
@@ -832,18 +830,7 @@ public class MessageTransportLifecycleTests
             clock, TimeSpan.FromMinutes(1), false, false, null), completion, message,
             new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>()));
         var expiry = message._timeToExpiry.GetRawTimestamp();
-        MessageReadRequest? read = null;
-        using var encoded = new ArcBufferWriter();
-        if (buffered)
-        {
-            using var serializer = services.GetRequiredService<MessageSerializer>();
-            var (headerLength, bodyLength) = serializer.Write(encoded, message);
-            using var headers = encoded.ConsumeSlice(headerLength);
-            read = shared.GetReceiveMessageHandler();
-            read.Body = encoded.ConsumeSlice(bodyLength);
-            typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(read, bodyLength);
-            message.SetMessageReadRequest(read);
-        }
+        var invokable = message.BodyObject;
         var write = shared.GetSendMessageHandler(connection);
         write.WriteMessage(message, default);
         write.CompleteWriting();
@@ -854,7 +841,8 @@ public class MessageTransportLifecycleTests
         Assert.False(callback.IsCompleted);
         Assert.Null(completion.Response);
         Assert.Equal(0, unregisters);
-        Assert.Null(message._bodyObject);
+        // The callback retains the request body, which determines its timeout and cancellation behavior.
+        Assert.Same(invokable, message.BodyObject);
         Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
         Assert.Equal(new CorrelationId(173), message.Id);
         Assert.Equal(GrainId.Create("test", "caller"), message.SendingGrain);
@@ -863,18 +851,6 @@ public class MessageTransportLifecycleTests
         Assert.False(connection.Retries.Reader.TryRead(out _));
         shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
         Assert.Equal(1, Assert.Single(failed.GetMeasurementSnapshot()).Value);
-        if (read is not null)
-        {
-            Assert.Equal(0, read.BodyLength);
-            Assert.Equal(0, read.Body.Length);
-            var first = shared.GetReceiveMessageHandler();
-            Assert.Same(read, first);
-            message.Dispose();
-            var second = shared.GetReceiveMessageHandler();
-            Assert.NotSame(first, second);
-            first.Reset();
-            second.Reset();
-        }
         if (expireDeadline)
         {
             clock.Advance(TimeSpan.FromSeconds(7));
@@ -1134,8 +1110,7 @@ public class MessageTransportLifecycleTests
         var expiry = message._timeToExpiry.GetRawTimestamp();
         var outboundWork = new AdmissionGate();
         var admission = outboundWork.TryEnter();
-        source.Send(message, ref admission);
-        Assert.False(admission.Entered);
+        source.Send(message, admission);
         await source.RetryEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var drain = outboundWork.CloseAsync();
         Assert.False(drain.IsCompleted);
@@ -1150,7 +1125,7 @@ public class MessageTransportLifecycleTests
         Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
         Assert.Equal(0, message.ForwardCount);
         Assert.Equal(1, rejectedTransport.Attempts);
-        Assert.Null(message.BodyObject);
+        Assert.Equal("original payload", message.BodyObject);
         await source.CloseAsync(null).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
@@ -1194,7 +1169,7 @@ public class MessageTransportLifecycleTests
 
         Assert.False(connection.Retries.Reader.TryRead(out _));
         Assert.Equal(0, connection.SentMessageCount);
-        Assert.Null(first.BodyObject);
+        Assert.Equal(new byte[] { 1 }, Assert.IsType<byte[]>(first.BodyObject));
         shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
         Assert.Equal(new byte[] { 2 }, Assert.IsType<byte[]>(second.BodyObject));
         var reused = shared.GetSendMessageHandler();
@@ -1864,7 +1839,8 @@ public class MessageTransportLifecycleTests
         {
             _retryEntered.TrySetResult();
             _release.Wait(cancellationToken);
-            replacement.Send(message, ref admission);
+            replacement.Send(message, admission);
+            admission = default;
         }
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
@@ -1977,8 +1953,6 @@ public class MessageTransportLifecycleTests
         public Channel<(Message Message, Exception? Error)> Retries { get; } =
             Channel.CreateUnbounded<(Message, Exception?)>();
         public int SentMessageCount { get; private set; }
-        public int ApplicationWriteFailures { get; private set; }
-        internal override void OnApplicationWriteFailure(Message message) => ApplicationWriteFailures++;
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;

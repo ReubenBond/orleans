@@ -297,20 +297,16 @@ namespace Orleans
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
             message.TargetGrain = targetGrainId;
+
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
-            else if (message.IsRelocatableRequest)
+            else if (message.IsRelocatableRequest && _grainLocations.TryGet(targetGrainId, out var targetSilo))
             {
-                lock (_grainLocations)
-                {
-                    if (_grainLocations.TryGet(targetGrainId, out var targetSilo))
-                    {
-                        message.TargetSilo = targetSilo;
-                    }
-                }
+                // A location hint lets the gateway route the request directly to the grain's silo.
+                message.TargetSilo = targetSilo;
             }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
@@ -359,23 +355,9 @@ namespace Orleans
 
             if (response.CacheInvalidationHeader is { } updates)
             {
-                lock (_grainLocations)
+                foreach (var update in updates)
                 {
-                    foreach (var update in updates)
-                    {
-                        if (!_grainLocations.TryGet(update.GrainId, out var cached)
-                            || cached.Equals(update.InvalidSiloAddress))
-                        {
-                            if (update.ValidGrainAddress?.SiloAddress is { } validSilo)
-                            {
-                                _grainLocations.AddOrUpdate(update.GrainId, validSilo);
-                            }
-                            else
-                            {
-                                _grainLocations.TryRemove(update.GrainId);
-                            }
-                        }
-                    }
+                    ReplaceGrainLocation(update.GrainId, update.InvalidSiloAddress, update.ValidGrainAddress?.SiloAddress);
                 }
             }
 
@@ -387,15 +369,10 @@ namespace Orleans
                 var request = callback?.Message;
                 if (request is not null)
                 {
-                    lock (_grainLocations)
+                    var previousTarget = request.TargetSilo;
+                    if (callback!.OnStatusUpdate(status, response.ForwardCount) && status.ForwardedTo is { } forwardedTo)
                     {
-                        var previousTarget = request.TargetSilo;
-                        if (callback!.OnStatusUpdate(status, response.ForwardCount) && request.IsRelocatableRequest
-                            && status.ForwardedTo is { } forwardedTo
-                            && (!_grainLocations.TryGet(request.TargetGrain, out var cached) || cached.Equals(previousTarget)))
-                        {
-                            _grainLocations.AddOrUpdate(request.TargetGrain, forwardedTo);
-                        }
+                        ReplaceGrainLocation(request.TargetGrain, previousTarget, forwardedTo);
                     }
 
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
@@ -426,17 +403,10 @@ namespace Orleans
             }
 
             CallbackData? callbackData;
-            if (response.Result is Message.ResponseTypes.Rejection
-                && callbacks.TryGetValue(response.Id, out var pending)
-                && pending.Message.IsRelocatableRequest)
+            if (response.Result is Message.ResponseTypes.Rejection && !response.HasCacheInvalidationHeader && response.SendingSilo is { } rejectedSilo)
             {
-                if (!response.HasCacheInvalidationHeader)
-                {
-                    lock (_grainLocations)
-                    {
-                        _grainLocations.TryRemove(response.SendingGrain, static (cached, rejectedSilo) => cached.Equals(rejectedSilo), response.SendingSilo);
-                    }
-                }
+                // The rejecting silo no longer hosts the grain.
+                ReplaceGrainLocation(response.SendingGrain, rejectedSilo, replacement: null);
             }
 
             var found = callbacks.TryRemove(response.Id, out callbackData);
@@ -451,6 +421,23 @@ namespace Orleans
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
                 response.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Replaces a cached grain location only if the cache holds the superseded location or none,
+        /// so that delayed updates cannot overwrite a newer location.
+        /// </summary>
+        private void ReplaceGrainLocation(GrainId grainId, SiloAddress? superseded, SiloAddress? replacement)
+        {
+            if (superseded is not null)
+            {
+                _grainLocations.TryRemove(grainId, static (cached, superseded) => cached.Equals(superseded), superseded);
+            }
+
+            if (replacement is not null)
+            {
+                _grainLocations.TryAdd(grainId, replacement);
             }
         }
 

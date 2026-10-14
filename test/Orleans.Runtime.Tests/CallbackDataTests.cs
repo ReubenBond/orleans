@@ -21,22 +21,6 @@ namespace Tester;
 public class CallbackDataTests
 {
     [Fact, TestCategory("BVT")]
-    public async Task RetirementInvalidationPreservesKnownSameSiloReplacement()
-    {
-        await using var cache = new LruGrainDirectoryCache(16, TimeSpan.FromMinutes(1), TimeProvider.System);
-        var id = GrainId.Create("test", "replacement");
-        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
-        var old = new GrainAddress { GrainId = id, SiloAddress = silo, ActivationId = ActivationId.NewId() };
-        var replacement = new GrainAddress { GrainId = id, SiloAddress = silo, ActivationId = ActivationId.NewId() };
-        cache.AddOrUpdate(replacement, 1);
-        Assert.False(cache.Remove(old));
-        Assert.True(cache.LookUp(id, out var current, out _));
-        Assert.Equal(replacement, current);
-        Assert.True(cache.Remove(new GrainAddress { GrainId = id, SiloAddress = silo }));
-        Assert.False(cache.LookUp(id, out _, out _));
-    }
-
-    [Fact, TestCategory("BVT")]
     public void PhysicalTargetDeathPreservesRelocatableInvocation()
     {
         using var services = CreateServiceProvider();
@@ -213,42 +197,6 @@ public class CallbackDataTests
         Assert.Equal(1, completion.CompletionCount);
     }
 
-    [Theory, TestCategory("BVT")]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ClearedBodyCancellationUsesCachedCapability(bool cancellable)
-    {
-        using var services = CreateServiceProvider();
-        using var cancellation = new CancellationTokenSource();
-        using var request = CreateRequest();
-        var body = new CancellableTestInvokable { Cancellable = cancellable };
-        request.BodyObject = body;
-        var manager = new RecordingCancellationManager();
-        var shared = CreateSharedCallbackData(_ => { }, TimeProvider.System, TimeSpan.FromMinutes(1));
-        shared.CancellationManager = manager;
-        var completion = new TestResponseCompletionSource();
-        var callback = new CallbackData(shared, completion, request, CreateInstruments(services));
-        Assert.Same(body, callback.Message.BodyObject);
-        request.ReleaseBodyBuffer();
-        callback.SubscribeForCancellation(cancellation.Token);
-        cancellation.Cancel();
-        Assert.True(callback.IsCompleted);
-        var exception = Assert.IsType<OperationCanceledException>(completion.Response.Exception);
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(1, completion.CompletionCount);
-        Assert.Equal(0, body.Disposals);
-        Assert.Null(request.BodyObject);
-        if (cancellable)
-        {
-            var signal = Assert.Single(manager.Signals);
-            Assert.Equal(request.TargetSilo, signal.Silo);
-            Assert.Equal(request.Id, signal.Id);
-            Assert.Equal(request.TargetGrain, signal.Target);
-            Assert.Equal(request.SendingGrain, signal.Caller);
-        }
-        else Assert.Empty(manager.Signals);
-    }
-
     [Fact, TestCategory("BVT")]
     public async Task ConcurrentDuplicateRouteUpdatesAcceptExactlyOneStatus()
     {
@@ -273,7 +221,7 @@ public class CallbackDataTests
     }
 
     [Fact, TestCategory("BVT")]
-    public void CancellationTracksNewestRouteAfterSuccessfulWriteClearsOriginalBody()
+    public void CancellationTracksNewestRoute()
     {
         using var services = CreateServiceProvider();
         using var cancellation = new CancellationTokenSource();
@@ -292,9 +240,6 @@ public class CallbackDataTests
         var callback = new CallbackData(shared, completion, message, CreateInstruments(services));
         Assert.Same(message, callback.Message);
         var body = Assert.IsType<CancellableTestInvokable>(message.BodyObject);
-        message.ReleaseBodyBuffer();
-        Assert.Null(message.BodyObject);
-        Assert.Equal(0, body.Disposals);
         var initialRoute = new StatusResponse(false, false, [])
         {
             ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
@@ -326,29 +271,6 @@ public class CallbackDataTests
         Assert.Equal(1, completion.CompletionCount);
         Assert.IsType<OperationCanceledException>(completion.Response!.Exception);
         message.Dispose();
-    }
-
-    [Fact, TestCategory("BVT")]
-    public void ClearedBodyRetainsMethodSpecificResponseTimeout()
-    {
-        using var services = CreateServiceProvider();
-        var clock = new FakeTimeProvider();
-        var completion = new TestResponseCompletionSource();
-        using var message = CreateRequest();
-        var body = new CancellableTestInvokable();
-        message.BodyObject = body;
-        var callback = CreateRouteCallback(services, completion, clock, message);
-        message.ReleaseBodyBuffer();
-        clock.Advance(TimeSpan.FromSeconds(7));
-        Assert.False(callback.IsExpired(clock.GetTimestamp()));
-        clock.Advance(TimeSpan.FromTicks(1));
-        Assert.True(callback.IsExpired(clock.GetTimestamp()));
-        callback.OnTimeout();
-        Assert.True(callback.IsCompleted);
-        Assert.Contains("00:00:07", Assert.IsType<TimeoutException>(completion.Response.Exception).Message);
-        Assert.Null(message.BodyObject);
-        Assert.Equal(0, body.Disposals);
-        Assert.Equal(1, completion.CompletionCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -461,7 +383,7 @@ public class CallbackDataTests
     }
 
     [Fact, TestCategory("BVT")]
-    public void CancellationAwaitingAcknowledgementTracksAcceptedRouteAfterBodyRelease()
+    public void CancellationAwaitingAcknowledgementTracksAcceptedRoute()
     {
         using var services = CreateServiceProvider();
         using var cancellation = new CancellationTokenSource();
@@ -472,7 +394,6 @@ public class CallbackDataTests
         using var request = CreateRequest();
         request.BodyObject = new CancellableTestInvokable();
         var callback = new CallbackData(shared, completion, request, CreateInstruments(services));
-        request.ReleaseBodyBuffer();
         callback.SubscribeForCancellation(cancellation.Token);
         cancellation.Cancel();
         Assert.False(callback.IsCompleted);

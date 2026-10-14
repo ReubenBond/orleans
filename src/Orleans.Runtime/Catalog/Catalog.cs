@@ -20,21 +20,13 @@ namespace Orleans.Runtime
         private readonly CatalogInstruments _catalogInstruments;
         private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private ISiloStatusOracle _siloStatusOracle = null!;
-        private readonly AdmissionGate _retirementProducers = new();
-        private int _retirementFailed;
-        private int _retirementDraining;
 
-        internal bool TryAdmitRetirement() => _retirementProducers.TryEnterUnscoped();
-        internal void CompleteRetirement(RetirementDrainResult result, bool explicitlyRetiring)
-        {
-            if (result != RetirementDrainResult.Succeeded
-                && (explicitlyRetiring || Volatile.Read(ref _retirementDraining) != 0))
-            {
-                Volatile.Write(ref _retirementFailed, 1);
-            }
+        // Activations leave the catalog before their deactivation completes, so retirement also awaits deactivations which are already underway.
+        private readonly AdmissionGate _deactivations = new();
 
-            _retirementProducers.Exit();
-        }
+        internal bool TryAdmitDeactivation() => _deactivations.TryEnterUnscoped();
+
+        internal void CompleteDeactivation() => _deactivations.Exit();
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -321,7 +313,6 @@ namespace Orleans.Runtime
 
         public async Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
-            Volatile.Write(ref _retirementDraining, 1);
             LogDebugDeactivateAllActivations();
             LogDebugDeactivateActivations(activations.Count);
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating.");
@@ -330,37 +321,18 @@ namespace Orleans.Runtime
                 CancellationToken = CancellationToken.None,
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 512
             };
-            try
+            await Parallel.ForEachAsync(activations, options, (kv, _) =>
             {
-                await Parallel.ForEachAsync(activations, options, (kv, _) =>
+                if (kv.Key.IsSystemTarget())
                 {
-                    if (kv.Key.IsSystemTarget())
-                    {
-                        return ValueTask.CompletedTask;
-                    }
-
-                    var activation = kv.Value;
-                    activation.Deactivate(reason, cancellationToken);
-                    return activation is ActivationData ? ValueTask.CompletedTask : new(AwaitRetirement(activation));
-                }).WaitAsync(cancellationToken);
-            }
-            finally
-            {
-                await _retirementProducers.CloseAsync().WaitAsync(cancellationToken);
-                if (Volatile.Read(ref _retirementFailed) != 0)
-                {
-                    throw new InvalidOperationException("One or more activation retirement drains were unsuccessful.");
+                    return ValueTask.CompletedTask;
                 }
-            }
 
-            static async Task AwaitRetirement(IGrainContext activation)
-            {
-                await activation.Deactivated;
-                if (activation is StatelessWorkerGrainContext workers)
-                {
-                    await workers.DrainRequestsAsync();
-                }
-            }
+                var activation = kv.Value;
+                activation.Deactivate(reason, cancellationToken);
+                return new(activation.Deactivated);
+            }).WaitAsync(cancellationToken);
+            await _deactivations.CloseAsync().WaitAsync(cancellationToken);
         }
 
         public Task DeleteActivations(

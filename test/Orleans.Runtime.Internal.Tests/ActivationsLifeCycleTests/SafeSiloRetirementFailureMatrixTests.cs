@@ -66,7 +66,7 @@ public sealed partial class SafeSiloRetirementTests
         // SiloConnection. No message flag or direct retry/reroute invocation.
         await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
         Assert.False(control.TransportRejectionObserved.Task.IsCompleted);
-        Assert.Null(accepted.BodyObject);
+        Assert.Equal("must never replay this transport payload", accepted.BodyObject);
         Assert.Equal(original.Id, accepted.Id);
         Assert.Equal(original.SendingGrain, accepted.SendingGrain);
         Assert.Equal(original.TargetGrain, accepted.TargetGrain);
@@ -99,111 +99,6 @@ public sealed partial class SafeSiloRetirementTests
             Assert.Single(control.Admissions);
             Assert.Equal(0, fixture.RunningTargetRequests);
         }
-    }
-
-    [Theory]
-    [InlineData(false, "grain", false)]
-    [InlineData(true, "grain", true)]
-    [InlineData(false, "client", false)]
-    [InlineData(true, "client", true)]
-    [InlineData(false, "system", false)]
-    [InlineData(true, "system", false)]
-    public async Task FailureMatrix_RetirementPhaseRecordsApplicationWriteFailuresAcrossRemovedConnections(
-        bool beginBeforeFailure, string origin, bool expectedFailure)
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        var center = fixture.B.ServiceProvider.GetRequiredService<MessageCenter>();
-        var manager = fixture.B.ServiceProvider.GetRequiredService<ConnectionManager>();
-        var connection = await manager.GetConnection(fixture.A.SiloAddress);
-        var shared = fixture.B.ServiceProvider.GetRequiredService<MessageHandlerShared>();
-        var systemCaller = SystemTargetGrainId.Create(Constants.CatalogType, fixture.A.SiloAddress).GrainId;
-        using var reply = new Message
-        {
-            Direction = Message.Directions.Response,
-            IsSystemMessage = true,
-            Id = new CorrelationId(173),
-            SendingSilo = fixture.B.SiloAddress,
-            SendingGrain = origin switch
-            {
-                "grain" => fixture.Control.GrainId,
-                "client" => GrainId.Create("sys.client", "observer"),
-                _ => SystemTargetGrainId.Create(Constants.CatalogType, fixture.B.SiloAddress).GrainId,
-            },
-            TargetGrain = systemCaller,
-            TargetSilo = fixture.A.SiloAddress,
-            BodyObject = Response.FromResult(174),
-            // Limit the outcome to the initial accepted write: the reroute drops the exhausted response.
-            RetryCount = MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES,
-        };
-        Assert.True(reply.TargetGrain.IsSystemTarget());
-        Assert.Equal(origin != "system", reply.RequiresApplicationDrain);
-        if (beginBeforeFailure) center.BeginRetirement();
-        var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply, reply.RequiresApplicationDrain ? center.TryAdmitApplicationSend() : default);
-        write.CompleteWriting();
-        await using var transport = new BoundaryWriteTransport();
-        Assert.True(transport.EnqueueWrite(write));
-        // Exercise the accepted-write exception and concrete accounting hook. Only failures within the retirement phase are recorded.
-        await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
-        if (!beginBeforeFailure) center.BeginRetirement();
-        // Remove every live connection before drain: MessageCenter must retain the earlier
-        // phase failure rather than relying on the ConnectionManager's current snapshot.
-        await manager.Close(TestCancellation).WaitAsync(Timeout, TestCancellation);
-        Assert.Equal(0, manager.ConnectionCount);
-        Assert.True(manager.Closed.IsCompletedSuccessfully);
-        if (expectedFailure)
-        {
-            var error = await Assert.ThrowsAsync<ConnectionClosedException>(
-                () => center.DrainRetirementAsync(TestCancellation).WaitAsync(Timeout, TestCancellation));
-            Assert.Contains("unsuccessful", error.Message, StringComparison.OrdinalIgnoreCase);
-        }
-        else await center.DrainRetirementAsync(TestCancellation).WaitAsync(Timeout, TestCancellation);
-        Assert.Equal(1, transport.AcceptedWrites);
-        Assert.Empty(fixture.Control.Executions);
-    }
-
-    [Fact]
-    public async Task FailureMatrix_GatewayApplicationReplyFailureIsRecordedForRetirement()
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        var services = fixture.B.ServiceProvider;
-        var center = services.GetRequiredService<MessageCenter>();
-        var shared = services.GetRequiredService<MessageHandlerShared>();
-        await using var transport = new BoundaryWriteTransport();
-        var connection = new GatewayInboundConnection(
-            transport, center.Gateway!, services.GetRequiredService<OverloadDetector>(),
-            services.GetRequiredService<ILocalSiloDetails>(), services.GetRequiredService<IOptions<ConnectionOptions>>().Value,
-            center, services.GetRequiredService<ConnectionCommon>(),
-            services.GetRequiredService<ConnectionPreambleHelper>(), new GatewayInstruments(services.GetRequiredService<OrleansInstruments>()));
-        using var reply = new Message
-        {
-            Direction = Message.Directions.Response,
-            IsSystemMessage = true,
-            SendingGrain = GrainId.Create("sys.client", "observer"),
-            SendingSilo = fixture.B.SiloAddress,
-            TargetGrain = SystemTargetGrainId.Create(Constants.CatalogType, fixture.A.SiloAddress).GrainId,
-            TargetSilo = fixture.A.SiloAddress,
-            BodyObject = Response.FromResult(174),
-            // Exercise the failure hook without admitting another physical write during
-            // the nonrelocatable response's normal reroute/drop handling.
-            RetryCount = MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES,
-        };
-        Assert.True(reply.SendingGrain.IsClient());
-        Assert.True(reply.TargetGrain.IsSystemTarget());
-        Assert.True(reply.RequiresApplicationDrain);
-        center.BeginRetirement();
-        var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply, center.TryAdmitApplicationSend());
-        write.CompleteWriting();
-        Assert.True(transport.EnqueueWrite(write));
-        await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
-        await connection.CloseAsync(null).WaitAsync(Timeout, TestCancellation);
-        var error = await Assert.ThrowsAsync<ConnectionClosedException>(
-            () => center.DrainRetirementAsync(TestCancellation).WaitAsync(Timeout, TestCancellation));
-        Assert.Contains("unsuccessful", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(1, transport.AcceptedWrites);
-        Assert.Null(reply.BodyObject);
-        Assert.Empty(fixture.Control.Executions);
     }
 
     private sealed class BoundaryWriteTransport : MessageTransport
@@ -362,7 +257,7 @@ public sealed partial class SafeSiloRetirementTests
         budget.Cancel();
         await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
         Assert.True(control.MatrixHookToken.IsCancellationRequested);
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(activation.Address, control.Directory.Registration);
         Assert.Empty(control.RouteUpdates);
         Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
@@ -485,7 +380,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.False(activation.Deactivated.IsCompleted);
         Assert.False(fixture.CatalogRetirement.IsCompleted);
         control.ReleaseDisposal.TrySetResult();
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
         Assert.True(activation.Deactivated.IsCompletedSuccessfully);
         Assert.Empty(control.Executions);
@@ -524,7 +419,7 @@ public sealed partial class SafeSiloRetirementTests
         var waitingTask = fixture.InvokeMatrixAsync(Argument, "stuck-waiting", TestCancellation);
         var waiting = await MatrixSentAsync(control, "stuck-waiting");
         Assert.NotEqual(running.Id, waiting.Id);
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.True(activation.Deactivated.IsCompletedSuccessfully);
         Assert.Equal(ActivationState.Deactivating, activation.State);
         Assert.True(activation.IsCurrentlyExecuting);
@@ -670,7 +565,7 @@ public sealed partial class SafeSiloRetirementTests
         await fixture.CrashSiloAsync(fixture.A).WaitAsync(Timeout, TestCancellation);
         Assert.False(fixture.A.IsActive);
         Assert.True(owner.IsCancellationRequested);
-        await fixture.AssertCatalogRetirementFailedAsync();
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(activation.Address, control.Directory.Registration);
         Assert.Empty(control.RouteUpdates);
         Assert.Empty(control.Executions);
@@ -837,18 +732,9 @@ public sealed partial class SafeSiloRetirementTests
 
         Assert.False(producerDrain.IsCompleted);
         control.MatrixReleaseDestination.TrySetResult();
-        try
-        {
-            // Do not expire the caller while the very first placement is still held: that
-            // would test cancellation of queued work again instead of destination loss.
-            await producerDrain.WaitAsync(Timeout, TestCancellation);
-        }
-        catch (ConnectionClosedException error)
-        {
-            // A's receiver-owned forwarding can have a failed write. Drain reports
-            // uncertainty, never permission for B to replay the application invocation.
-            Assert.Contains("unsuccessful", error.Message, StringComparison.OrdinalIgnoreCase);
-        }
+        // Do not expire the caller while the very first placement is still held: that
+        // would test cancellation of queued work again instead of destination loss.
+        await producerDrain.WaitAsync(Timeout, TestCancellation);
 
         fixture.Caller.BreakOutstandingMessagesToSilo(fixture.C.SiloAddress);
         fixture.ExpireOriginalDeadline();
@@ -887,7 +773,7 @@ public sealed partial class SafeSiloRetirementTests
         {
             budget.Cancel();
             await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
-            await fixture.AssertCatalogRetirementFailedAsync();
+            await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
             Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
             Assert.Empty(control.Executions);
             Assert.Empty(control.Admissions);
@@ -966,7 +852,6 @@ public sealed partial class SafeSiloRetirementTests
 
         await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await parent.Deactivated.WaitAsync(Timeout, TestCancellation);
-        await parent.DrainRequestsAsync().WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.BreakOutstandingToA();
         Assert.False(invocation.IsCompleted);

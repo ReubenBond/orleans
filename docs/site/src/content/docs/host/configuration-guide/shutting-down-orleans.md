@@ -50,11 +50,11 @@ If the external grace period expires first, the process is killed and graceful s
 
 Grains can move or reactivate elsewhere after a silo leaves. The catalog waits for admitted deactivation work, including disposition of waiting-request queues, before draining transport work. The retiring receiver forwards waiting requests after registration retirement, preserving their original identities and deadlines. Already-running invocations finish through their established execution and cancellation paths.
 
-Retirement failure accounting starts before activation deactivation, so application send failures during that phase contribute to the drain outcome. Application replies to system-target callers participate in draining according to their application origin.
+Application replies to system-target callers participate in draining according to their application origin.
 
 The configured <xref:Orleans.Configuration.SiloMessagingOptions.WaitForMessageToBeQueuedForOutboundTime> provides an additional outbound queueing window after activation deactivation. Shutdown then drains messaging in three stages: received frames through dispatch, placement and disposition producers, then outbound application messages. Each admitted outbound message carries its admission through send queueing, gateway buffering, transport completion, and asynchronous rerouting, so retries of admitted work finish within the drain. Messages which arrive after a stage closes continue through the ordinary shutdown paths, and once the silo blocks application messages it rejects new application requests with cache invalidation. Successful transport completion establishes local write progress. The destination's runtime admission and the caller's response are separate completion boundaries.
 
-Directory failures, canceled deactivation, stuck activations, failed writes, and budget expiration produce unsuccessful or incomplete drain outcomes. The forced-stop path remains bounded by the shutdown token. Application-wide work draining requires an application-owned coordination boundary across the remaining silos.
+When deactivation is canceled or leaves the activation's directory registration in place, the retiring silo rejects queued requests with cache invalidation, because forwarding them would resolve back to the retiring silo. The forced-stop path remains bounded by the shutdown token. Application-wide work draining requires an application-owned coordination boundary across the remaining silos.
 
 ## Containers and orchestrators
 
