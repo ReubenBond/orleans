@@ -32,7 +32,8 @@ namespace Orleans.Runtime.Messaging
         private bool stopped;
         private HostedClient? hostedClient;
         private Action<Message>? sniffIncomingMessageHandler;
-        // Retirement drains these in order. Each stage can admit work into the next stage before that stage closes.
+        // Retirement drains these in order. Each stage tracks application messages while they wait for asynchronous work,
+        // and can admit them into the next stage before that stage closes.
         // Work which arrives after its stage closes proceeds untracked, through the ordinary shutdown paths.
         private readonly AdmissionGate _incomingWork = new();
         private readonly AdmissionGate _addressingWork = new();
@@ -94,16 +95,8 @@ namespace Orleans.Runtime.Messaging
 
         public bool TryDeliverToProxy(Message msg)
         {
-            if (!msg.TargetGrain.IsClient()) return false;
-            var admission = msg.RequiresApplicationDrain ? _outboundApplicationWork.TryEnter() : default;
-            try
-            {
-                return TryDeliverToProxy(msg, ref admission);
-            }
-            finally
-            {
-                admission.Dispose();
-            }
+            AdmissionGate.Admission admission = default;
+            return TryDeliverToProxy(msg, ref admission);
         }
 
         private bool TryDeliverToProxy(Message msg, ref AdmissionGate.Admission admission)
@@ -179,13 +172,11 @@ namespace Orleans.Runtime.Messaging
             SendMessage(msg, ref admission);
         }
 
+        /// <summary>
+        /// Sends a message, transferring any retirement <paramref name="admission"/> it already holds to the asynchronous work which sends it.
+        /// </summary>
         internal void SendMessage(Message msg, ref AdmissionGate.Admission admission)
         {
-            if (msg.RequiresApplicationDrain && !admission.Entered)
-            {
-                admission = _outboundApplicationWork.TryEnter();
-            }
-
             try
             {
                 SendMessageCore(msg, ref admission);
@@ -300,6 +291,12 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
+                            // The message reaches its connection asynchronously, so retirement tracks it until then.
+                            if (msg.RequiresApplicationDrain && !admission.Entered)
+                            {
+                                admission = _outboundApplicationWork.TryEnter();
+                            }
+
                             var transferredAdmission = admission;
                             admission = default;
                             _ = SendAsync(this, connectionTask, msg, transferredAdmission);
@@ -586,12 +583,13 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         internal Task AddressAndSendMessage(Message message, bool notifyForwarding = false)
         {
-            var admission = message.RequiresApplicationDrain ? _addressingWork.TryEnter() : default;
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
+                    // Addressing completes asynchronously, so retirement tracks the message until it is sent.
+                    var admission = message.RequiresApplicationDrain ? _addressingWork.TryEnter() : default;
                     return SendMessageAsync(messageAddressingTask, message, admission);
                 }
 
@@ -607,7 +605,6 @@ namespace Orleans.Runtime.Messaging
                 OnAddressingFailure(message, ex);
             }
 
-            admission.Dispose();
             return Task.CompletedTask;
 
             async Task SendMessageAsync(Task addressMessageTask, Message m, AdmissionGate.Admission admission)

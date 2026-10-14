@@ -390,6 +390,11 @@ namespace Orleans.Runtime.Messaging
 
             public void Send(Message msg, ref AdmissionGate.Admission admission)
             {
+                if (msg.RequiresApplicationDrain && !admission.Entered)
+                {
+                    admission = _gateway.messageCenter.TryAdmitApplicationSend();
+                }
+
                 _pendingToSend.Enqueue((msg, admission));
                 admission = default;
                 _signal.Signal();
