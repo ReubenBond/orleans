@@ -43,7 +43,6 @@ namespace Orleans.Runtime.Messaging
 
         internal AdmissionGate.Admission TryAdmitApplicationSend() => _outboundApplicationWork.TryEnter();
 
-
         internal async Task DrainRetirementAsync(CancellationToken cancellationToken)
         {
             await _incomingWork.CloseAsync().WaitAsync(cancellationToken);

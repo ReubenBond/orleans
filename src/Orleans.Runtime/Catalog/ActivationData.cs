@@ -1724,7 +1724,6 @@ internal sealed partial class ActivationData :
         _workSignal.Signal();
     }
 
-
     private void RerouteOrRejectQueuedMessages()
     {
         if (!RejectsQueuedRequests && (DeactivationException is null || ForwardingAddress is { }))
@@ -2253,11 +2252,16 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Forward queued requests before signaling deactivation, so that callers awaiting deactivation also observe their disposition.
-            RerouteOrRejectQueuedMessages();
-
-            // Signal deactivation
-            CompleteDeactivation();
+            try
+            {
+                // Forward queued requests before signaling deactivation, so that callers awaiting deactivation also observe their disposition.
+                RerouteOrRejectQueuedMessages();
+            }
+            finally
+            {
+                // Signal deactivation
+                CompleteDeactivation();
+            }
             _workSignal.Signal();
         }
         finally

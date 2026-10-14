@@ -409,7 +409,7 @@ namespace Orleans.Runtime
                 await Task.Delay(waitForMessageToBeQueuedForOutbound, ct).SuppressThrowing();
 
                 // Wait for messages which were admitted before retirement to be dispatched, addressed, and sent.
-                await messageCenter.DrainRetirementAsync(ct);
+                await messageCenter.DrainRetirementAsync(ct).SuppressThrowing();
             }
             catch (Exception exc)
             {
