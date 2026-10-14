@@ -101,7 +101,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Records a status update. A route update moves the request's target to the silo which the request was forwarded to.
         /// </summary>
-        /// <returns><see langword="true"/> if the update was applied; <see langword="false"/> if it was superseded or the call has completed.</returns>
+        /// <returns><see langword="true"/> if the update was applied; <see langword="false"/> if it was superseded or the call had completed.</returns>
+        /// <remarks>
+        /// Completion does not take the route lock, so an update which races with completion can still be applied.
+        /// That is harmless: a completed call is no longer registered, and the update records a forward which did occur.
+        /// </remarks>
         public bool OnStatusUpdate(StatusResponse status, int forwardCount)
         {
             if (IsCompleted)
