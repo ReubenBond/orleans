@@ -152,7 +152,7 @@ Durable tasks distinguish two kinds of cancellation:
 | Exception which durable operations throw | `OperationCanceledException` from the canceled work | <xref:Orleans.DurableTasks.DurableTaskAttemptCanceledException>, with its `Reason` |
 
 Once an attempt is canceled, every durable operation of its code throws
-`DurableTaskAttemptCanceledException`: `DurableTask.Once`, starting or awaiting children,
+`DurableTaskAttemptCanceledException`: `DurableTask.RunInline`, starting or awaiting children,
 including shielded and detached ones, `Post`, `ScheduleAsync`, signal sends and waits,
 delays, subscriptions, and combinators. Changes to the grain's journaled state throw it
 too, before they change memory: durable values and collections,
