@@ -46,9 +46,9 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     {
         get
         {
-            if (!_hasState)
+            if (!_hasState || _value is null)
             {
-                // Reading absent state creates it, which the next journal write records.
+                // Reading absent or null state initializes it, which the next journal write records.
                 JournaledStateMutationFence.ThrowIfClosed();
                 _hasState = true;
             }

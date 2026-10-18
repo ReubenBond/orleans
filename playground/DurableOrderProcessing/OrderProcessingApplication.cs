@@ -121,8 +121,10 @@ public static class OrderProcessingApplication
         // Receives the webhooks which order starts register with an Operation-Callback header.
         api.MapPost("/webhooks/orders", (DurableOperation operation, ILoggerFactory loggers) =>
         {
+            var orderId = operation.Id.Replace("\r", "\\r").Replace("\n", "\\n");
+            var outcome = ((object?)operation.Result ?? operation.Error)?.ToString()?.Replace("\r", "\\r").Replace("\n", "\\n");
             loggers.CreateLogger("DurableOrderProcessing.Webhooks").LogInformation(
-                "Order {OrderId} is {Status}: {Outcome}", operation.Id, operation.Status, (object?)operation.Result ?? operation.Error);
+                "Order {OrderId} is {Status}: {Outcome}", orderId, operation.Status, outcome);
             return Results.Ok();
         });
 

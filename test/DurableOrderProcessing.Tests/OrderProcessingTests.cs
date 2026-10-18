@@ -19,6 +19,28 @@ public sealed class OrderProcessingTests(OrderProcessingFixture fixture)
 {
     private HttpClient Http => fixture.Http;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WebhookLogsEscapeLineBreaksInIdentifiersAndOutcomes(bool failed)
+    {
+        var id = Guid.NewGuid().ToString();
+        var operation = new DurableOperation(
+            id + "\r\nforged-id",
+            failed ? DurableOperationStatus.Failed : DurableOperationStatus.Succeeded,
+            failed ? null : JsonSerializer.SerializeToElement("result\r\nforged-result"),
+            failed ? new DurableOperationError("code\r\nforged-code", "message\r\nforged-message") : null);
+
+        using var response = await Http.PostAsJsonAsync("/api/webhooks/orders", operation, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var entry = Assert.Single(fixture.WebhookLogs.AllEntries, entry => entry.Message.StartsWith($"Order {id}", StringComparison.Ordinal));
+        var expected = failed
+            ? $"Order {id}\\r\\nforged-id is Failed: DurableOperationError {{ Code = code\\r\\nforged-code, Message = message\\r\\nforged-message }}"
+            : $"Order {id}\\r\\nforged-id is Succeeded: result\\r\\nforged-result";
+        Assert.Equal(expected, entry.Message);
+    }
+
     [Fact]
     public async Task ConcurrentCheckoutsWithOneKeyPlaceOneOrderAndAuthorizeOnePayment()
     {

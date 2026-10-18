@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks.Http;
 using Orleans.Hosting;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Logging;
 using Xunit;
 
 namespace DurableOrderProcessing.Tests;
@@ -52,6 +54,8 @@ public sealed class OrderProcessingFixture : IAsyncLifetime
 
     public PaymentGateway Gateway => _app!.Services.GetRequiredService<PaymentGateway>();
 
+    public InMemoryLogBuffer WebhookLogs { get; } = new();
+
     private TestServer Server => _server ?? throw new InvalidOperationException("The test server has not started.");
 
     public async ValueTask InitializeAsync()
@@ -60,6 +64,8 @@ public sealed class OrderProcessingFixture : IAsyncLifetime
 
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
+        builder.Logging.AddProvider(new InMemoryLoggerProvider(WebhookLogs));
+        builder.Logging.AddFilter<InMemoryLoggerProvider>(static (category, _) => category == "DurableOrderProcessing.Webhooks");
         builder.Services.AddSingleton<IGrainFactory>(_cluster.Client);
         builder.Services.AddOrderProcessingApi();
         _app = builder.Build();

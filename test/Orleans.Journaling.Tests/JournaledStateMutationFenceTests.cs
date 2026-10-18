@@ -105,6 +105,55 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
         recovered.AssertSeeded();
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task NullPersistentStateIsNotInitializedWithinClosedFence(bool recover) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new VolatileJournalStorage();
+        var (manager, state, other) = await CreateAsync();
+        state.State = null!;
+        await manager.WriteStateAsync(CancellationToken);
+        if (recover)
+        {
+            (manager, state, other) = await CreateAsync();
+        }
+
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            fence.Close();
+            AssertFenced(() => _ = state.State);
+        }
+
+        other.Value = 1;
+        await manager.WriteStateAsync(CancellationToken);
+        var (_, recoveredState, recoveredOther) = await CreateAsync();
+        Assert.Equal(1, recoveredOther.Value);
+        Assert.True(recoveredState.RecordExists);
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            AssertFenced(() => _ = recoveredState.State);
+        }
+
+        var initialized = recoveredState.State;
+        Assert.Empty(initialized);
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            Assert.Same(initialized, recoveredState.State);
+        }
+
+        async Task<(IJournaledStateManager Manager, IPersistentState<List<int>> State, DurableValue<int> Other)> CreateAsync()
+        {
+            var sut = CreateTestSystem(storage);
+            var persistentState = new JournaledPersistentState<List<int>>(
+                "state", sut.Manager, new OrleansBinaryPersistentStateCommandCodec<List<int>>(Codec<List<int>>(), SessionPool), CodecProvider.GetActivator<List<int>>());
+            var otherValue = new DurableValue<int>("other", sut.Manager, new OrleansBinaryDurableValueCommandCodec<int>(Codec<int>(), SessionPool));
+            await sut.Lifecycle.OnStart(CancellationToken);
+            return (sut.Manager, persistentState, otherValue);
+        }
+    });
+
     [Fact]
     public Task Fence_FollowsAsynchronousFlowAndAppliesOnceClosed() => RunOnActivationSchedulerAsync(async () =>
     {
