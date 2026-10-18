@@ -25,7 +25,7 @@ public sealed class CatalogItemIdempotencyTests : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         var catalog = _fixture.Client.GetGrain<ICatalogItemGrain>(1);
         var orderId = Guid.NewGuid();
-        var initial = await catalog.GetAsync();
+        var initial = Assert.IsType<CatalogItem>(await catalog.GetAsync());
 
         Assert.True(await ReserveAsync("reserve"));
         Assert.True(await ReserveAsync("duplicate-reserve"));
@@ -63,7 +63,7 @@ public sealed class CatalogItemIdempotencyTests : IAsyncLifetime
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var catalog = _fixture.Client.GetGrain<ICatalogItemGrain>(1);
-        var initial = await catalog.GetAsync();
+        var initial = Assert.IsType<CatalogItem>(await catalog.GetAsync());
         var holdingOrder = Guid.NewGuid();
         var rejectedOrder = Guid.NewGuid();
         Assert.True(await (await catalog.ReserveAsync(holdingOrder, initial.AvailableStock).WithId("hold").ScheduleAsync(cancellationToken)).WaitAsync(cancellationToken));
