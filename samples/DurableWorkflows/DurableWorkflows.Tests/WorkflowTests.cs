@@ -90,6 +90,16 @@ public sealed class WorkflowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task FanOutRejectsNullItems()
+    {
+        var id = UniqueId();
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            RunAsync(Client.GetGrain<IWorkflowGrain>(id).RunFanOutAsync(null!), $"fanout-{id}"));
+
+        Assert.Equal("items", exception.ParamName);
+    }
+
+    [Fact]
     public async Task ApprovalTaskLatchesItsFirstDecision()
     {
         var id = UniqueId();
@@ -165,6 +175,31 @@ public sealed class WorkflowTests : IAsyncLifetime
         Assert.Equal("operator request", result.Reason);
         var effects = (await inventory.GetSnapshotAsync()).Effects;
         Assert.Equal(["release-inventory", "reserve-inventory"], effects.Values.Select(effect => effect.Kind).Order());
+    }
+
+    [Fact]
+    public async Task ImmediateCancellationReleasesExactlyTheReservationWhichCommitted()
+    {
+        var id = UniqueId();
+        var workflow = Client.GetGrain<IWorkflowGrain>(id);
+        var scheduled = await workflow.RunCancellationAsync(TimeSpan.FromHours(1)).WithId($"cancellation-{id}").ScheduleAsync();
+
+        await scheduled.CancelAsync("immediate cancellation");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var response = await scheduled.GetResponseAsync(timeout.Token);
+        var effects = (await Client.GetGrain<IInventoryGrain>(id).GetSnapshotAsync()).Effects;
+        if (response.Status is DurableTaskStatus.Canceled)
+        {
+            // A root canceled before its body starts applies no effects.
+            Assert.Empty(effects);
+            return;
+        }
+
+        var result = response.GetResult<CancellationWorkflowResult>();
+        Assert.True(result.Canceled);
+        Assert.Equal("immediate cancellation", result.Reason);
+        Assert.Equal(effects.ContainsKey($"{id}:reserve"), effects.ContainsKey($"{id}:release"));
+        Assert.Equal(effects.ContainsKey($"{id}:reserve") ? 2 : 0, effects.Count);
     }
 
     [Fact]
@@ -417,6 +452,48 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         Assert.True(completed.Result.GetProperty("approved").GetBoolean());
         Assert.Equal("accepted", completed.Result.GetProperty("reason").GetString());
         Assert.Equal("production", completed.Result.GetProperty("subject").GetString());
+    }
+
+    [Fact]
+    public async Task BasicRequestConflictPreservesTheOriginalResult()
+    {
+        var id = UniqueId();
+        using var first = await _http.PostAsync($"/workflows/basic/{id}?input=first", null);
+        using var conflict = await _http.PostAsync($"/workflows/basic/{id}?input=second", null);
+        using var replay = await _http.PostAsync($"/workflows/basic/{id}?input=first", null);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(await first.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task FanOutRequestConflictPreservesTheOriginalResult()
+    {
+        var id = UniqueId();
+        using var first = await _http.PostAsJsonAsync($"/workflows/fan-out/{id}", new[] { "first" });
+        using var conflict = await _http.PostAsJsonAsync($"/workflows/fan-out/{id}", new[] { "second" });
+        using var replay = await _http.PostAsJsonAsync($"/workflows/fan-out/{id}", new[] { "first" });
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(await first.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task OrderRequestConflictPreservesTheOriginalResult()
+    {
+        var id = UniqueId();
+        using var first = await _http.PostAsync($"/workflows/orders/{id}?failShipping=false", null);
+        using var conflict = await _http.PostAsync($"/workflows/orders/{id}?failShipping=true", null);
+        using var replay = await _http.PostAsync($"/workflows/orders/{id}?failShipping=false", null);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(await first.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
     }
 
     [Fact]

@@ -39,8 +39,17 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        var workflow = client.GetGrain<IWorkflowGrain>(workflowId);
-        var scheduled = await workflow.RunBasicAsync(input).WithId(RootId("basic", workflowId)).ScheduleAsync(cancellationToken);
+        ScheduledTask<BasicWorkflowResult> scheduled;
+        try
+        {
+            var workflow = client.GetGrain<IWorkflowGrain>(workflowId);
+            scheduled = await workflow.RunBasicAsync(input).WithId(RootId("basic", workflowId)).ScheduleAsync(cancellationToken);
+        }
+        catch (DurableTaskConflictException)
+        {
+            return Conflict();
+        }
+
         return Results.Ok(await scheduled.WaitAsync(cancellationToken));
     }
 
@@ -55,8 +64,17 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        var workflow = client.GetGrain<IWorkflowGrain>(workflowId);
-        var scheduled = await workflow.RunFanOutAsync(items).WithId(RootId("fanout", workflowId)).ScheduleAsync(cancellationToken);
+        ScheduledTask<FanOutWorkflowResult> scheduled;
+        try
+        {
+            var workflow = client.GetGrain<IWorkflowGrain>(workflowId);
+            scheduled = await workflow.RunFanOutAsync(items).WithId(RootId("fanout", workflowId)).ScheduleAsync(cancellationToken);
+        }
+        catch (DurableTaskConflictException)
+        {
+            return Conflict();
+        }
+
         return Results.Ok(await scheduled.WaitAsync(cancellationToken));
     }
 
@@ -81,7 +99,7 @@ public static class WorkflowEndpoints
             var scheduled = await ScheduleApprovalAsync(client, workflowId, subject, cancellationToken);
             return Accepted("approval", workflowId, scheduled.Id);
         }
-        catch (InvalidOperationException)
+        catch (DurableTaskConflictException)
         {
             return Conflict();
         }
@@ -110,7 +128,7 @@ public static class WorkflowEndpoints
         {
             scheduled = await ScheduleApprovalAsync(client, workflowId, submission.Subject, cancellationToken);
         }
-        catch (InvalidOperationException)
+        catch (DurableTaskConflictException)
         {
             return Conflict();
         }
@@ -183,9 +201,18 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        var workflow = client.GetGrain<IWorkflowGrain>(orderId);
-        var scheduled = await workflow.RunOrderSagaAsync(new(orderId, failShipping))
-            .WithId(RootId("order", orderId)).ScheduleAsync(cancellationToken);
+        ScheduledTask<OrderWorkflowResult> scheduled;
+        try
+        {
+            var workflow = client.GetGrain<IWorkflowGrain>(orderId);
+            scheduled = await workflow.RunOrderSagaAsync(new(orderId, failShipping))
+                .WithId(RootId("order", orderId)).ScheduleAsync(cancellationToken);
+        }
+        catch (DurableTaskConflictException)
+        {
+            return Conflict();
+        }
+
         return Results.Ok(await scheduled.WaitAsync(cancellationToken));
     }
 

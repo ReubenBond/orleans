@@ -43,7 +43,7 @@ curl -X POST "$service/workflows/orders/order-1?failShipping=true"
 `WorkflowGrain` hosts every workflow. The service schedules each one under a root ID derived from the workflow ID,
 such as `approval-approval-1`, and the workflow awaits each child with `WithId`, so its children have IDs such as
 `approval-approval-1/decision`. Scheduling an existing root ID with the same request reattaches to that task, and a
-different request under that ID fails with a conflict.
+different request under that ID returns `409 Conflict`.
 
 - **Basic and fan-out.** The workflow calls `ActivityGrain` once per step. The fan-out workflow returns each branch's
   result in item order, including the ID of the task which recorded it, such as `fanout-fan-1/branches/2`.
@@ -53,8 +53,9 @@ different request under that ID fails with a conflict.
   decision after the deadline, or a subject which differs from the running workflow's returns `409 Conflict`.
 - **Cancellation.** The workflow reserves stock and holds it for one day. `DELETE` starts the workflow when it isn't
   running and requests durable cancellation with a reason. The runtime records the first request and its reason with
-  the task, so a replay observes them. The workflow catches the cancellation, releases the reservation in a
-  shielded child, `.Shielded()`, and completes with `canceled: true` and the reason.
+  the task, so a replay observes them. The workflow settles the reservation's outcome with `WhenAllCompleted`,
+  catches the cancellation, and releases a successful reservation in a shielded child, `.Shielded()`. It completes
+  with `canceled: true` and the reason.
 - **Order saga.** The workflow reserves inventory and charges payment concurrently with `WhenAllCompleted`, then ships.
   When shipping fails, it refunds and releases the steps which succeeded with a named `WhenAll`. Inventory, payment, and
   activity grains record each effect by operation ID and return the recorded effect for a repeated operation, so a replay
