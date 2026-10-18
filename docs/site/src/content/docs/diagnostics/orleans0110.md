@@ -21,7 +21,7 @@ A durable task body passes durable work, such as lambdas which await durable tas
 
 ## Rule description
 
-Each lambda creates its durable child when its code runs, so the order in which the children are created follows the order in which the lambdas reach their first `await`. Unnamed children receive generated identifiers in that order, which can differ in a replay, and a replay which assigns a recorded identifier to another child returns that child's result or fails with a divergence error. Each child also commits its invocation in its own journal write.
+Each lambda creates its durable child when its code runs, so the order in which the children are created follows the order in which the lambdas reach their first `await`. Unnamed children receive generated identifiers in that order, which can differ in a replay, and a replay which assigns a recorded identifier to another child returns that child's result or diverges and stalls the execution. Each child also commits its invocation in its own journal write.
 
 `Task` combinators also leave losing inputs running: `Task.WhenAny` returns while the other inputs continue, and nothing cancels or awaits them. `Task.WaitAll` and `Task.WaitAny` block the activation's scheduler.
 
