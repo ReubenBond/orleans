@@ -50,6 +50,7 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
             AssertFenced(() => states.Log.TrimBefore(1));
             AssertFenced(states.Log.Clear);
             AssertFenced(states.Log.Seal);
+            AssertFenced(() => states.Log.BeginDraft());
             AssertFenced(() => states.Completion.TrySetResult(1));
             AssertFenced(() => states.Completion.TrySetException(new InvalidOperationException()));
             AssertFenced(() => states.Completion.TrySetCanceled());
@@ -118,6 +119,95 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public Task ClosedFence_DraftCleanupPreservesCancellation(bool dispose) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var (_, states) = await CreateStatesAsync(new VolatileJournalStorage());
+        var draft = states.Log.BeginDraft();
+        draft.Write("partial");
+        await using var read = states.Log.ReadAsync(mode: DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
+        Assert.Equal(LogEventKind.DraftItem, (await read.NextAsync()).Kind);
+
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            AssertFenced(() =>
+            {
+                using (draft)
+                {
+                    fence.Close();
+                    try
+                    {
+                        JournaledStateMutationFence.ThrowIfClosed();
+                    }
+                    finally
+                    {
+                        if (!dispose)
+                        {
+                            draft.Abandon("canceled");
+                        }
+                    }
+                }
+            });
+
+            Assert.False(draft.IsOpen);
+            Assert.Equal(0, draft.Count);
+            draft.Abandon("already closed");
+            draft.Dispose();
+        }
+
+        Assert.Equal(new LogEvent<string>
+        {
+            Kind = LogEventKind.DraftAbandoned,
+            DraftId = draft.Id,
+            Status = DurableChangeStatus.Draft,
+            AbandonReason = dispose ? LogDraftAbandonReason.Disposed : LogDraftAbandonReason.Abandoned,
+            Message = dispose ? null : "canceled",
+        }, await read.NextAsync());
+        Assert.Empty(states.Log);
+        Assert.Equal(0, states.Log.NextSequence);
+    });
+
+    [Fact]
+    public Task ClosedFence_PreservesDraftLifecycleUntilCleanup() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var (_, states) = await CreateStatesAsync(new VolatileJournalStorage());
+        using var draft = states.Log.BeginDraft();
+        draft.Write("partial");
+        await using var read = states.Log.ReadAsync(mode: DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
+        Assert.Equal(LogEventKind.DraftItem, (await read.NextAsync()).Kind);
+
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            fence.Close();
+            AssertFenced(() => states.Log.BeginDraft());
+            AssertFenced(() => draft.Commit());
+            AssertFenced(() => draft.Commit("entry"));
+            Assert.True(draft.IsOpen);
+            Assert.Equal(1, draft.Count);
+            Assert.Empty(states.Log);
+            Assert.Equal(0, states.Log.NextSequence);
+        }
+
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        using var following = states.Log.BeginDraft();
+        Assert.Equal(draft.Id.ActivationId, following.Id.ActivationId);
+        Assert.Equal(draft.Id.Number + 1, following.Id.Number);
+        following.Write("next");
+        Assert.True(await next);
+        Assert.Equal(LogEventKind.DraftItem, read.Current.Kind);
+        Assert.Equal(following.Id, read.Current.DraftId);
+        Assert.Equal("next", read.Current.Item);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public Task NullPersistentStateIsNotInitializedWithinClosedFence(bool recover) => RunOnActivationSchedulerAsync(async () =>
     {
         var storage = new VolatileJournalStorage();
@@ -173,6 +263,9 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
         using (JournaledStateMutationFence.Enter(fence))
         {
             states.Seed();
+            using var draft = states.Log.BeginDraft();
+            draft.Write("partial");
+            draft.Commit();
             await sut.Manager.WriteStateAsync(CancellationToken);
         }
 
@@ -223,6 +316,55 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
         }
 
         Assert.Equal(6, states.Value.Value);
+    });
+
+    [Fact]
+    public Task NestedScopes_RestoreFencesAndSuspensionsAcrossAwaits() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var outer = CreateFence();
+        outer.Close();
+        var innerException = new OperationCanceledException("The inner scope ended.");
+        var inner = new JournaledStateMutationFence(static state => (Exception)state!, innerException);
+        inner.Close();
+
+        using (JournaledStateMutationFence.Enter(outer))
+        {
+            AssertFenced(JournaledStateMutationFence.ThrowIfClosed);
+            using (JournaledStateMutationFence.Suspend())
+            {
+                JournaledStateMutationFence.ThrowIfClosed();
+                using (JournaledStateMutationFence.Suspend())
+                {
+                    await Task.Yield();
+                    JournaledStateMutationFence.ThrowIfClosed();
+                }
+
+                using (JournaledStateMutationFence.Enter(inner))
+                {
+                    Assert.Same(innerException, Assert.Throws<OperationCanceledException>(JournaledStateMutationFence.ThrowIfClosed));
+                    using (JournaledStateMutationFence.Suspend())
+                    {
+                        await Task.Yield();
+                        JournaledStateMutationFence.ThrowIfClosed();
+                    }
+
+                    Assert.Same(innerException, Assert.Throws<OperationCanceledException>(JournaledStateMutationFence.ThrowIfClosed));
+                }
+
+                JournaledStateMutationFence.ThrowIfClosed();
+            }
+
+            AssertFenced(JournaledStateMutationFence.ThrowIfClosed);
+            using (JournaledStateMutationFence.Enter(outer))
+            {
+                await Task.Yield();
+                AssertFenced(JournaledStateMutationFence.ThrowIfClosed);
+            }
+
+            AssertFenced(JournaledStateMutationFence.ThrowIfClosed);
+        }
+
+        JournaledStateMutationFence.ThrowIfClosed();
     });
 
     private static readonly OperationCanceledException FenceException = new("The fenced scope ended.");
