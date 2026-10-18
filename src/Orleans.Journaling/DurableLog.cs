@@ -690,6 +690,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         public void Write(T item)
         {
             ThrowIfClosed();
+            JournaledStateMutationFence.ThrowIfClosed();
             _items!.Add(item);
             log.SignalReaders(DurableWatchMode.Drafts);
         }

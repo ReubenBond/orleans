@@ -90,6 +90,32 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
     });
 
     [Fact]
+    public Task ClosedFence_PreservesOpenDraftContents() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var (_, states) = await CreateStatesAsync(new VolatileJournalStorage());
+        using var draft = states.Log.BeginDraft();
+        draft.Write("before");
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            fence.Close();
+            AssertFenced(() => draft.Write("after"));
+        }
+
+        Assert.True(draft.IsOpen);
+        Assert.Equal(1, draft.Count);
+        await using var read = states.Log.ReadAsync(mode: DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
+        var item = await read.NextAsync();
+        Assert.Equal(LogEventKind.DraftItem, item.Kind);
+        Assert.Equal("before", item.Item);
+        draft.Abandon();
+        Assert.Equal(LogEventKind.DraftAbandoned, (await read.NextAsync()).Kind);
+        Assert.Empty(states.Log);
+    });
+
+    [Fact]
     public Task OpenFence_StateChangesCommit() => RunOnActivationSchedulerAsync(async () =>
     {
         var storage = new VolatileJournalStorage();
