@@ -183,6 +183,7 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
 /// The draft closes when its owner commits, abandons, or disposes it, and when the log closes it because the log's journal
 /// was deleted or the log was sealed. Disposing an open draft abandons it. Use the draft in the owning activation's execution context and check
 /// <see cref="IsOpen"/> before committing a draft which the log may have closed.
+/// Abandonment and disposal remain available during cancellation cleanup to release volatile items and report the outcome.
 /// </para>
 /// </remarks>
 public interface IDurableLogDraft<T> : IDisposable
