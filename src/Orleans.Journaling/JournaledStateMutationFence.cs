@@ -21,6 +21,10 @@ namespace Orleans.Journaling;
 /// runs within the fenced flow on the code's behalf, runs within <see cref="Suspend"/>. Changes made in place to a mutable
 /// object which a journaled state holds don't pass through the state, so the fence can't stop them.
 /// </para>
+/// <para>
+/// Draft creation, item writes, and commits honor the fence. Abandoning or disposing a draft remains available during
+/// cancellation cleanup: it releases the draft's volatile items and reports abandonment to its readers.
+/// </para>
 /// </remarks>
 /// <param name="createException">Creates the exception which a change throws once the fence is closed, from <paramref name="state"/>.</param>
 /// <param name="state">The state which <paramref name="createException"/> receives.</param>
@@ -78,11 +82,22 @@ internal sealed class JournaledStateMutationFence(Func<object?, Exception> creat
     }
 
     /// <summary>Restores the fence which applied to the flow before <see cref="Enter"/> or <see cref="Suspend"/>.</summary>
+    /// <remarks>
+    /// The caller owns the returned scope and disposes it exactly once in the same asynchronous flow, in reverse order
+    /// of creation. Use lexical <see langword="using"/> scopes to maintain this ownership and nesting.
+    /// </remarks>
     public readonly struct Scope(JournaledStateMutationFence? previous) : IDisposable
     {
+#if DEBUG
+        private readonly JournaledStateMutationFence? _enteredFence = Current.Value;
+#endif
+
         /// <inheritdoc/>
         public void Dispose()
         {
+#if DEBUG
+            Debug.Assert(ReferenceEquals(Current.Value, _enteredFence), "Fence scopes are disposed once in lexical nesting order.");
+#endif
             if (!ReferenceEquals(Current.Value, previous))
             {
                 Current.Value = previous;

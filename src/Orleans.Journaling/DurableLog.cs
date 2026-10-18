@@ -128,6 +128,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     public IDurableLogDraft<T> BeginDraft()
     {
         ThrowIfSealed();
+        JournaledStateMutationFence.ThrowIfClosed();
         var drafts = _drafts ??= new DraftTable();
         var draft = new Draft(this, new LogDraftId(drafts.ActivationId, ++drafts.LastNumber));
         drafts.Open.Add(draft);
@@ -713,6 +714,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         public long Commit(params ReadOnlySpan<T> entries)
         {
             ThrowIfClosed();
+            JournaledStateMutationFence.ThrowIfClosed();
             var sequence = log.AppendRange(entries);
             log.CloseDraft(this, DraftOutcome.Committed(sequence, entries.Length));
             return sequence;
