@@ -90,6 +90,81 @@ public class JournaledStateMutationFenceTests : JournalingTestBase
     });
 
     [Fact]
+    public Task ClosedFence_PreservesOpenDraftContents() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var (_, states) = await CreateStatesAsync(new VolatileJournalStorage());
+        using var draft = states.Log.BeginDraft();
+        draft.Write("before");
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            fence.Close();
+            AssertFenced(() => draft.Write("after"));
+        }
+
+        Assert.True(draft.IsOpen);
+        Assert.Equal(1, draft.Count);
+        await using var read = states.Log.ReadAsync(mode: DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
+        var item = await read.NextAsync();
+        Assert.Equal(LogEventKind.DraftItem, item.Kind);
+        Assert.Equal("before", item.Item);
+        draft.Abandon();
+        Assert.Equal(LogEventKind.DraftAbandoned, (await read.NextAsync()).Kind);
+        Assert.Empty(states.Log);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task NullPersistentStateIsNotInitializedWithinClosedFence(bool recover) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new VolatileJournalStorage();
+        var (manager, state, other) = await CreateAsync();
+        state.State = null!;
+        await manager.WriteStateAsync(CancellationToken);
+        if (recover)
+        {
+            (manager, state, other) = await CreateAsync();
+        }
+
+        var fence = CreateFence();
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            fence.Close();
+            AssertFenced(() => _ = state.State);
+        }
+
+        other.Value = 1;
+        await manager.WriteStateAsync(CancellationToken);
+        var (_, recoveredState, recoveredOther) = await CreateAsync();
+        Assert.Equal(1, recoveredOther.Value);
+        Assert.True(recoveredState.RecordExists);
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            AssertFenced(() => _ = recoveredState.State);
+        }
+
+        var initialized = recoveredState.State;
+        Assert.Empty(initialized);
+        using (JournaledStateMutationFence.Enter(fence))
+        {
+            Assert.Same(initialized, recoveredState.State);
+        }
+
+        async Task<(IJournaledStateManager Manager, IPersistentState<List<int>> State, DurableValue<int> Other)> CreateAsync()
+        {
+            var sut = CreateTestSystem(storage);
+            var persistentState = new JournaledPersistentState<List<int>>(
+                "state", sut.Manager, new OrleansBinaryPersistentStateCommandCodec<List<int>>(Codec<List<int>>(), SessionPool), CodecProvider.GetActivator<List<int>>());
+            var otherValue = new DurableValue<int>("other", sut.Manager, new OrleansBinaryDurableValueCommandCodec<int>(Codec<int>(), SessionPool));
+            await sut.Lifecycle.OnStart(CancellationToken);
+            return (sut.Manager, persistentState, otherValue);
+        }
+    });
+
+    [Fact]
     public Task OpenFence_StateChangesCommit() => RunOnActivationSchedulerAsync(async () =>
     {
         var storage = new VolatileJournalStorage();
