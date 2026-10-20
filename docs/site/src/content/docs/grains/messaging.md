@@ -343,7 +343,8 @@ write, and a later pass processes it.
 
 Deliveries to the grain, through
 <xref:Orleans.Messaging.IMessagingExtension.DeliverAsync*>, interleave with the
-grain's other requests. A delivery validates, deduplicates, and stages the message's
+grain's other requests. A delivery validates the envelope and the future-send-time
+bound before deduplication, then stages the message's
 acceptance synchronously, then waits for that journal write; concurrent deliveries
 share journal writes. Inbox message sinks run synchronously within the delivery, so a
 sink can run while a request is suspended at an `await`, as handlers can.
@@ -432,6 +433,15 @@ The inbox attributes staged changes to the handler attempt's own asynchronous fl
 so changes which an interleaved grain request stages don't count as the attempt's.
 
 ## Backpressure, retries, and dead letters
+
+The inbox rejects an incoming `SentAt` later than its Durable Jobs time plus
+`DeduplicationWindow` with <xref:System.ArgumentOutOfRangeException>. Equality is
+admitted. The check precedes deduplication, so a far-future timestamp stages
+nothing and extends no pending or completed record. The outbox treats the
+exception as a failed attempt, preserving the original `SentAt` and retrying until
+`SentAt + OutboxRetryTimeout`; retry exhaustion retires the send as `DeadLettered`
+with an unknown earlier outcome. Messages staged directly in the sending grain's
+own inbox use a local staging time and follow the local-send path.
 
 When the inbox holds
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
