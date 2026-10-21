@@ -19,6 +19,51 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task HandlerFailureWithoutStaging_OnAGrainWithAnOutbox_RecordsItsOutcomeOnTheSameActivation()
+    {
+        // The outbox reports every send it stages, so its presence doesn't make an attempt's staged changes unknown, and
+        // a failure which staged nothing records its outcome: this fixture's zero InboxRetryTimeout dead-letters it.
+        var receiver = NewGrain();
+        var activationId = (await receiver.GetSnapshotAsync()).ActivationId;
+        var envelope = CreateEnvelope(receiver, NewMessage(150, "fails-without-staging") with { ThrowDuringPreparation = true });
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+
+        var final = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        var letter = Assert.Single(final.InboxDeadLetters);
+        Assert.Equal(envelope.Envelope.MessageId, letter.MessageId);
+        Assert.Contains("Injected handler preparation failure", letter.Reason, StringComparison.Ordinal);
+        Assert.Equal(1, letter.AttemptCount);
+        Assert.Equal(activationId, final.ActivationId);
+    }
+
+    [Fact]
+    public async Task HandlerFailureAfterAnOutboxSend_DiscardsTheSendThroughRecovery()
+    {
+        // A send which the attempt staged is its change, so the failure deactivates the grain rather than commit the send
+        // with a retry record. Each recovery charges the interrupted attempt, and the second dead-letters the message.
+        var receiver = NewGrain();
+        var target = NewGrain();
+        var activationId = (await receiver.GetSnapshotAsync()).ActivationId;
+        var envelope = CreateEnvelope(receiver, NewMessage(151, "fails-after-sending") with
+        {
+            ForwardTo = target.GetGrainId(),
+            ThrowAfterSending = true
+        });
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+
+        var final = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        var letter = Assert.Single(final.InboxDeadLetters);
+        Assert.Equal(envelope.Envelope.MessageId, letter.MessageId);
+        Assert.Equal("The activation stopped without recording the outcome of an attempt.", letter.Reason);
+        Assert.Equal(2, letter.AttemptCount);
+        Assert.NotEqual(activationId, final.ActivationId);
+        Assert.Equal(0, final.OutboxCount);
+        Assert.Empty((await target.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
     public async Task StagedOutboxWithoutCommit_IsRemovedOnReactivationAndNeverDispatched()
     {
         var sender = NewGrain();
