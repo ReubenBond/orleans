@@ -527,7 +527,6 @@ public class ReferenceAssemblyModelExtractorTests
             [
                 MetadataReference.CreateFromFile(typeof(UnitTests.FSharpTypes.GenericDU<>).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Microsoft.FSharp.Core.FSharpOption<>).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(UnitTests.GrainInterfaces.INonGenericBase).Assembly.Location),
             ]);
         var model = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
             compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics);

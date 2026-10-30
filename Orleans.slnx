@@ -197,6 +197,7 @@
     <Project Path="test/Grains/TestFSharp/TestFSharp.fsproj" />
     <Project Path="test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj" />
     <Project Path="test/Grains/TestFSharpGrainInterfaces/FSharpInterfaces/TestFSharpInterfaces.fsproj" />
+    <Project Path="test/Grains/TestFSharpModels/TestFSharpModels.fsproj" />
     <Project Path="test/Grains/TestGrainInterfaces/TestGrainInterfaces.csproj" />
     <Project Path="test/Grains/TestGrains/TestGrains.csproj" />
     <Project Path="test/Grains/TestInternalGrainInterfaces/TestInternalGrainInterfaces.csproj" />
