@@ -91,13 +91,16 @@ internal static class SerializableSourceOutputGenerator
     }
 
     internal static SourceOutputResult GenerateDtoSource(DtoSerializerOutputPlan output)
-        => SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
-            output.AssemblyName, output.Serializer.Type.TypeSyntax.ToString(), output.MetadataIdentity,
+    {
+        var typeSyntax = output.Serializer.Type.TypeSyntax.ToString();
+        return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
+            output.AssemblyName, typeSyntax, output.MetadataIdentity,
             output.GeneratedNamespace, output.Serializer.Type.TypeParameters.Count,
             SerializerGenerator.Generate(output.Serializer),
             output.Copier is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
             output.Activator is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
-            output.GeneratedNamespace));
+            output.GeneratedNamespace), new(output.MetadataIdentity, typeSyntax));
+    }
 
     internal static ImmutableArray<SourceOutputResult> CreateSerializableSourceOutputs(
         Compilation compilation,
@@ -161,7 +164,7 @@ internal static class SerializableSourceOutputGenerator
             }
         }
 
-        return GeneratedSourceOutput.DeduplicateSourceOutputs(sourceEntries);
+        return sourceEntries.ToImmutable();
     }
 
     internal static ImmutableArray<SourceOutputResult> CreateReferencedSerializableSourceOutputs(
@@ -287,7 +290,7 @@ internal static class SerializableSourceOutputGenerator
                 SerializerGenerator.Generate(serializerPlan),
                 copierPlan is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
                 activatorPlan is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
-                typeDescription.GeneratedNamespace));
+                typeDescription.GeneratedNamespace), new(metadataIdentity, typeSyntax));
     }
 
     internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)

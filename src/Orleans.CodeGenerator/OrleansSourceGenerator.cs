@@ -261,7 +261,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         var serializerOutputs = compilationAwareSerializerOutputs
             .Combine(enumSerializerOutputs.Collect())
             .Combine(dtoSerializerOutputs.Collect())
-            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSourceOutputs(input.Left.Left.AddRange(input.Left.Right)
+            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSerializableSourceOutputs(input.Left.Left.AddRange(input.Left.Right)
                 .AddRange(input.Right.OfType<SourceOutputResult>())))
             .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
             .WithTrackingName(SerializerOutputsTrackingName);

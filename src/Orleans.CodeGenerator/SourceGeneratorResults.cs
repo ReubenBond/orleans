@@ -29,18 +29,26 @@ internal readonly struct GeneratedSourceEntry(string hintName, string source) : 
     }
 }
 
+internal sealed record SerializableSourceIdentity(TypeMetadataIdentity MetadataIdentity, string TypeSyntax);
+
 // Source can accompany a diagnostic so invalid implementations retain their editor type-checking declarations.
-internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, Diagnostic? diagnostic) : IEquatable<SourceOutputResult>
+internal readonly struct SourceOutputResult(
+    GeneratedSourceEntry? sourceEntry,
+    Diagnostic? diagnostic,
+    SerializableSourceIdentity? serializableIdentity = null) : IEquatable<SourceOutputResult>
 {
     public GeneratedSourceEntry? SourceEntry { get; } = sourceEntry;
     public Diagnostic? Diagnostic { get; } = diagnostic;
+    public SerializableSourceIdentity? SerializableIdentity { get; } = serializableIdentity;
 
-    public static SourceOutputResult FromSource(GeneratedSourceEntry sourceEntry) => new(sourceEntry, null);
+    public static SourceOutputResult FromSource(GeneratedSourceEntry sourceEntry, SerializableSourceIdentity? serializableIdentity = null)
+        => new(sourceEntry, null, serializableIdentity);
     public static SourceOutputResult FromDiagnostic(Diagnostic diagnostic) => new(null, diagnostic);
 
     public bool Equals(SourceOutputResult other)
         => Nullable.Equals(SourceEntry, other.SourceEntry)
-            && SourceGeneratorDiagnosticComparer.AreEqual(Diagnostic, other.Diagnostic);
+            && SourceGeneratorDiagnosticComparer.AreEqual(Diagnostic, other.Diagnostic)
+            && EqualityComparer<SerializableSourceIdentity?>.Default.Equals(SerializableIdentity, other.SerializableIdentity);
 
     public override bool Equals(object? obj) => obj is SourceOutputResult other && Equals(other);
 
@@ -50,6 +58,7 @@ internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, D
         {
             var hash = SourceEntry.GetHashCode();
             hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetHashCode(Diagnostic);
+            hash = hash * 31 + (SerializableIdentity?.GetHashCode() ?? 0);
             return hash;
         }
     }

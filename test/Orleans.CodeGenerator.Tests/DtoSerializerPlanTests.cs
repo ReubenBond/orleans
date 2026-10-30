@@ -71,6 +71,23 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         """;
 
     [Fact]
+    public async Task ImmutableDtoWithRecursiveValueMember_GeneratesWithoutAnalyzingMemberCopyability()
+    {
+        var compilation = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializer, Orleans.Immutable]
+            public sealed class Payload { [Orleans.Id(0)] public Node Value { get; set; } }
+            public struct Node { public System.Collections.Immutable.ImmutableList<Node> Children; }
+            """);
+        var (_, result) = Run(CreateDriver(), compilation);
+        var plan = Assert.Single(GetPlans(result));
+        Assert.Null(plan.Copier);
+        var source = Assert.Single(GetSerializerEntries(result)).Source;
+        Assert.Contains("IFieldCodec<global::Node>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("class Copier_Payload", source, StringComparison.Ordinal);
+        AssertFreshParity(compilation, result);
+    }
+
+    [Fact]
     public async Task UnrelatedBodyEdit_CachesEveryDtoEmitterWithoutRendering()
     {
         var compilation = await TestCompilationHelper.CreateCompilation(RichSource);
