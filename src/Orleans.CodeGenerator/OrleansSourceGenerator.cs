@@ -219,13 +219,16 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 input.Right))
             .WithTrackingName(MetadataAggregateTrackingName);
 
-        // Enums have one declaration, so their emission plans can retain the discovery provider's per-owner identity.
+        // Keep nullable slots through emission so diagnostic transitions preserve later owners on Roslyn 4.5.
         var enumSerializerPlans = serializableTypeResults
-            .Where(static result => result.EnumSerializerPlan is not null)
-            .Select(static (result, _) => result.EnumSerializerPlan!)
+            .Select(static (result, _) => result.EnumSerializerPlan)
             .WithTrackingName(EnumSerializerPlansTrackingName);
         var enumSerializerOutputs = enumSerializerPlans
-            .Select(static (plan, _) => EnumSerializerGenerator.GenerateSource(plan))
+            .Select(static (plan, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return plan is null ? default(SourceOutputResult?) : EnumSerializerGenerator.GenerateSource(plan);
+            })
             .WithTrackingName(EnumSerializerOutputsTrackingName);
 
         // Keep one slot per discovered declaration. Roslyn 4.5 can lose a later unchanged owner when a filtered
@@ -261,7 +264,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         var serializerOutputs = compilationAwareSerializerOutputs
             .Combine(enumSerializerOutputs.Collect())
             .Combine(dtoSerializerOutputs.Collect())
-            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSerializableSourceOutputs(input.Left.Left.AddRange(input.Left.Right)
+            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSerializableSourceOutputs(input.Left.Left.AddRange(input.Left.Right.OfType<SourceOutputResult>())
                 .AddRange(input.Right.OfType<SourceOutputResult>())))
             .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
             .WithTrackingName(SerializerOutputsTrackingName);
