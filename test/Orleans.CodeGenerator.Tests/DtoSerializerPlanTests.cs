@@ -70,20 +70,53 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         public static class Unrelated { public static int Value() => 1; }
         """;
 
-    [Fact]
-    public async Task ImmutableDtoWithRecursiveValueMember_GeneratesWithoutAnalyzingMemberCopyability()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ImmutableDtoWithRecursiveValueMember_GeneratesWithoutAnalyzingMemberCopyability(bool isSealed)
     {
-        var compilation = await TestCompilationHelper.CreateCompilation("""
+        var compilation = await TestCompilationHelper.CreateCompilation($$"""
             [Orleans.GenerateSerializer, Orleans.Immutable]
-            public sealed class Payload { [Orleans.Id(0)] public Node Value { get; set; } }
+            public {{(isSealed ? "sealed " : "")}}class Payload { [Orleans.Id(0)] public Node Value { get; set; } }
             public struct Node { public System.Collections.Immutable.ImmutableList<Node> Children; }
             """);
         var (_, result) = Run(CreateDriver(), compilation);
         var plan = Assert.Single(GetPlans(result));
-        Assert.Null(plan.Copier);
         var source = Assert.Single(GetSerializerEntries(result)).Source;
         Assert.Contains("IFieldCodec<global::Node>", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("class Copier_Payload", source, StringComparison.Ordinal);
+        if (isSealed)
+        {
+            Assert.Null(plan.Copier);
+            Assert.DoesNotContain("class Copier_Payload", source, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.NotNull(plan.Copier);
+            Assert.Contains("class Copier_Payload", source, StringComparison.Ordinal);
+            Assert.Contains("output.Value = input.Value;", source, StringComparison.Ordinal);
+        }
+        AssertFreshParity(compilation, result);
+    }
+
+    [Fact]
+    public async Task PrivateActivatorNamedField_UsesInjectedActivatorWithUnsafeAccessors()
+    {
+        var compilation = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializer]
+            public sealed class Payload
+            {
+                [Orleans.Id(3)] private int _activator;
+                public Payload(int value) { _activator = value; }
+            }
+            """);
+        var (_, result) = Run(CreateDriver(), compilation);
+        var plan = Assert.Single(GetPlans(result));
+        Assert.True(plan.Serializer.Type.UseActivator);
+        Assert.Equal(2, plan.Serializer.Fields.Count(static field => field.FieldName == "_activator"));
+        Assert.Equal(2, plan.Copier!.Fields.Count(static field => field.FieldName == "_activator"));
+        Assert.Contains(plan.Serializer.Fields, static field => field.Kind == EmissionFieldKind.Accessor && field.FieldName == "_activator");
+        Assert.Contains(plan.Serializer.Fields, static field => field.Kind == EmissionFieldKind.Service && field.FieldName == "_activator");
+        Assert.Contains("_activator.Create()", Assert.Single(GetSerializerEntries(result)).Source, StringComparison.Ordinal);
         AssertFreshParity(compilation, result);
     }
 

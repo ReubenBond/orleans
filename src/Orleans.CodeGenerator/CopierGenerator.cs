@@ -79,9 +79,10 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             fields = GetFieldDescriptions(type, members, isExceptionType, out onlyDeepFields);
             var copiers = type.IsUnsealedImmutable ? null : fields.OfType<ICopierDescription>().Concat(LibraryTypes.StaticCopiers).ToList();
+            // Value-type plans omit shallow members: copying the original struct already preserves those fields.
             memberPlans = members.Where(member => !onlyDeepFields || !member.IsShallowCopyable).Select(member =>
                 new MemberEmissionPlan(member.Member.FieldId, member.IsPrimaryConstructorParameter,
-                    member.IsValueType, member.IsShallowCopyable,
+                    member.IsValueType,
                     member.GetGetter(MemberEmissionPlan.Instance),
                     member.GetSetter(MemberEmissionPlan.Instance, MemberEmissionPlan.Value),
                     default, default,
@@ -495,7 +496,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         if (!membersCopied)
         {
-            GenerateMemberwiseCopy(type, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            GenerateMemberwiseCopy(type, members, originalParam, contextParam, resultVar, body);
             body.Add(ReturnStatement(resultVar));
         }
 
@@ -522,7 +523,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         static FieldEmissionPlan GetActivatorField(List<FieldEmissionPlan> copierFields)
         {
-            var result = copierFields.Find(f => f.FieldName == ActivatorFieldName);
+            var result = copierFields.Find(static field => field.Kind == EmissionFieldKind.Service && field.FieldName == ActivatorFieldName);
             Debug.Assert(result is not null);
             return result!;
         }
@@ -593,16 +594,13 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         IdentifierNameSyntax sourceVar,
         IdentifierNameSyntax contextVar,
         IdentifierNameSyntax destinationVar,
-        List<StatementSyntax> body,
-        bool onlyDeepFields = false)
+        List<StatementSyntax> body)
     {
         AddSerializationCallbacks(type, sourceVar, destinationVar, "OnCopying", body);
 
         var orderedMembers = members.OrderBy(m => m.FieldId);
         foreach (var member in orderedMembers)
         {
-            if (onlyDeepFields && member.IsShallowCopyable) continue;
-
             var getValueExpression = member.GetCopy(sourceVar, contextVar);
             var memberAssignment = ExpressionStatement(member.GetSetter(destinationVar, getValueExpression));
             body.Add(memberAssignment);
