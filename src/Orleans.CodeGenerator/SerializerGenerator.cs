@@ -1,9 +1,11 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Diagnostics;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.SyntaxGeneration;
+using Orleans.CodeGenerator.Model;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
 
@@ -28,9 +30,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         => HotReloadSafe && !type.IsEnumType && type.SupportsHotReloadMemberAddition;
 
     public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
-    {
-        var simpleClassName = GetSimpleClassName(type);
+        => Generate(CreatePlan(type));
 
+    internal SerializerEmissionPlan CreatePlan(ISerializableTypeDescription type, SerializableTypeEmissionPlan? typePlan = null)
+    {
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
         {
@@ -55,37 +58,63 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
         var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, HasBaseCodec(type));
-        var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-        var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, construction);
-
-        var accessibility = type.Accessibility switch
+        var hotReloadShape = UseHotReloadShape(type);
+        var memberPlans = members.Select(member =>
         {
-            Accessibility.Public => SyntaxKind.PublicKeyword,
-            _ => SyntaxKind.InternalKeyword,
-        };
+            var memberType = member.Member.Type;
+            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
+            var codec = staticCodec is not null ? staticCodec.CodecType.ToNameSyntax()
+                : GetCodecExpression(fieldDescriptions.OfType<CodecFieldDescription>()
+                    .First(field => SymbolEqualityComparer.Default.Equals(field.UnderlyingType, memberType)));
+            ExpressionSyntax? expectedType = staticCodec is not null ? null : hotReloadShape
+                ? TypeOfExpression(member.Member.TypeSyntax)
+                : fieldDescriptions.OfType<TypeFieldDescription>()
+                    .First(field => SymbolEqualityComparer.Default.Equals(field.UnderlyingType, memberType)).FieldName.ToIdentifierName();
+            return new MemberEmissionPlan(member.Member.FieldId, member.IsPrimaryConstructorParameter,
+                member.IsValueType, member.IsShallowCopyable,
+                member.GetGetter(MemberEmissionPlan.Instance),
+                member.GetSetter(MemberEmissionPlan.Instance, MemberEmissionPlan.Value),
+                new EmissionSyntax<ExpressionSyntax>(codec),
+                expectedType is not null ? new EmissionSyntax<ExpressionSyntax>(expectedType) : default(EmissionSyntax<ExpressionSyntax>?), default);
+        }).ToImmutableArray();
 
-        var baseType = (type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
+        var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
+        return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes),
+            (type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax),
+            serializerInterface is not null ? new EmissionSyntax<TypeSyntax>(serializerInterface.ToTypeSyntax(type.TypeSyntax)) : default(EmissionSyntax<TypeSyntax>?),
+            fieldDescriptions.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans,
+            ConstructionEmissionPlan.Create(construction),
+            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null);
+    }
+
+    internal static ClassDeclarationSyntax Generate(SerializerEmissionPlan plan)
+    {
+        var type = plan.Type;
+        var simpleClassName = GetSimpleClassName(type.Name);
+        var fieldDescriptions = plan.Fields.ToList();
+        var members = plan.Members.ToList();
+        var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
+        var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, plan.Construction);
 
         var classDeclaration = ClassDeclaration(simpleClassName)
-            .AddBaseListTypes(SimpleBaseType(baseType))
-            .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
+            .AddBaseListTypes(SimpleBaseType(plan.BaseType.Syntax))
+            .AddModifiers(Token(type.IsPublic ? SyntaxKind.PublicKeyword : SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(fieldDeclarations);
 
         if (ctor != null)
             classDeclaration = classDeclaration.AddMembers(ctor);
 
-        if (type.IsEnumType)
+        if (plan.Enum is { } enumPlan)
         {
-            var plan = EnumSerializerGenerator.CreatePlan(type, LibraryTypes);
-            var writeMethod = EnumSerializerGenerator.GenerateWriteMethod(plan);
-            var readMethod = EnumSerializerGenerator.GenerateReadMethod(plan);
+            var writeMethod = EnumSerializerGenerator.GenerateWriteMethod(enumPlan);
+            var readMethod = EnumSerializerGenerator.GenerateReadMethod(enumPlan);
             classDeclaration = classDeclaration.AddMembers(writeMethod, readMethod);
         }
         else
         {
-            var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
-            var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
+            var serializeMethod = GenerateSerializeMethod(type, members);
+            var deserializeMethod = GenerateDeserializeMethod(type, members);
             if (type.IsAbstractType)
             {
                 if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
@@ -99,15 +128,15 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
                 classDeclaration = classDeclaration.AddMembers(serializeMethod!, deserializeMethod!, writeFieldMethod, readValueMethod);
 
-                var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
+                var serializerInterface = plan.AdditionalInterface?.Syntax;
                 if (serializerInterface != null)
-                    classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(serializerInterface.ToTypeSyntax(type.TypeSyntax)));
+                    classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(serializerInterface));
             }
         }
 
         if (type.IsGenericType)
         {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
+            classDeclaration = type.AddTypeParameters(classDeclaration);
         }
 
         return classDeclaration;
@@ -143,39 +172,32 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(field.FieldName), GetServiceExpression(field.FieldType, IdentifierName(CodecProviderFieldName))))
             : IdentifierName(field.FieldName);
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<FieldEmissionPlan> fieldDescriptions)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
 
-        static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
+        static MemberDeclarationSyntax GetFieldDeclaration(FieldEmissionPlan description)
         {
-            switch (description)
+            switch (description.Kind)
             {
-                case TypeFieldDescription type:
+                case EmissionFieldKind.Type:
                     return FieldDeclaration(
                             VariableDeclaration(
-                                type.FieldType,
-                                SingletonSeparatedList(VariableDeclarator(type.FieldName)
-                                    .WithInitializer(EqualsValueClause(TypeOfExpression(type.UnderlyingTypeSyntax))))))
+                                description.FieldType,
+                                SingletonSeparatedList(VariableDeclarator(description.FieldName)
+                                    .WithInitializer(EqualsValueClause(description.Initializer!.Value.Syntax)))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case CodecFieldTypeFieldDescription type:
-                    return FieldDeclaration(
-                            VariableDeclaration(
-                                type.FieldType,
-                                SingletonSeparatedList(VariableDeclarator(type.FieldName)
-                                    .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case FieldAccessorDescription { LazyInitialization: true, InitializationSyntax: not null } accessor:
+                case EmissionFieldKind.Accessor when description.LazyInitialization && description.Initializer.HasValue:
                     return
-                        FieldDeclaration(VariableDeclaration(accessor.FieldType, SingletonSeparatedList(VariableDeclarator(accessor.FieldName))))
+                        FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
+                case EmissionFieldKind.Accessor when description.Initializer.HasValue:
                     return
-                        FieldDeclaration(VariableDeclaration(accessor.FieldType,
-                            SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                        FieldDeclaration(VariableDeclaration(description.FieldType,
+                            SingletonSeparatedList(VariableDeclarator(description.FieldName).WithInitializer(EqualsValueClause(description.Initializer.Value.Syntax)))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
-                    return GetUnsafeAccessorDeclaration(accessor);
+                case EmissionFieldKind.Accessor:
+                    return GetUnsafeAccessorDeclaration(description);
                 default:
                     var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword));
@@ -185,8 +207,14 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     }
 
     internal static MethodDeclarationSyntax GetUnsafeAccessorDeclaration(FieldAccessorDescription accessor)
+        => GetUnsafeAccessorDeclaration(FieldEmissionPlan.Create(accessor));
+
+    internal static MethodDeclarationSyntax GetUnsafeAccessorDeclaration(FieldEmissionPlan accessor)
     {
-        var instance = Parameter(Identifier("instance")).WithType(accessor.ContainingType);
+        Debug.Assert(accessor.Kind == EmissionFieldKind.Accessor);
+        Debug.Assert(accessor.ContainingType.HasValue);
+        Debug.Assert(accessor.AccessorName is not null);
+        var instance = Parameter(Identifier("instance")).WithType(accessor.ContainingType!.Value.Syntax);
         if (accessor.ContainingTypeIsValueType)
         {
             instance = instance.AddModifiers(Token(SyntaxKind.RefKeyword));
@@ -204,7 +232,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             parameters.Add(Parameter(Identifier("value")).WithType(accessor.FieldType));
         }
 
-        return MethodDeclaration(returnType, accessor.AccessorName)
+        return MethodDeclaration(returnType, accessor.AccessorName!)
             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
             .AddAttributeLists(AttributeList(SingletonSeparatedList(
                 Attribute(ParseName("global::System.Runtime.CompilerServices.UnsafeAccessorAttribute"))
@@ -218,24 +246,24 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     }
 
     private static ConstructorDeclarationSyntax? GenerateConstructor(
-        string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, GeneratedTypeConstruction construction)
+        string simpleClassName, List<FieldEmissionPlan> fieldDescriptions, ConstructionEmissionPlan construction)
     {
         var statements = new List<StatementSyntax>();
         foreach (var field in fieldDescriptions)
         {
             switch (field)
             {
-                case GeneratedFieldDescription _ when field.IsInjected:
+                case { IsInjected: true }:
                     statements.Add(ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
                             ThisExpression().Member(field.FieldName.ToIdentifierName()),
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
-                case CodecProviderFieldDescription:
+                case { Kind: EmissionFieldKind.CodecProvider }:
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
                     break;
-                case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
+                case { Kind: EmissionFieldKind.Service, IsInjected: false }:
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
@@ -396,10 +424,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         return new(LibraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
     }
 
-    private MemberDeclarationSyntax? GenerateSerializeMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+    private static MemberDeclarationSyntax? GenerateSerializeMethod(
+        SerializableTypeEmissionPlan type,
+        List<MemberEmissionPlan> members)
     {
         var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -433,11 +460,11 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         if (type.IncludePrimaryConstructorParameters)
         {
-            AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
+            AddSerializationMembers(type, members.Where(m => m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
             body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
         }
 
-        AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
+        AddSerializationMembers(type, members.Where(m => !m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
 
         AddSerializationCallbacks(type, instanceParam, "OnSerialized", body);
 
@@ -446,13 +473,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var parameters = new[]
         {
-            Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+            Parameter("writer".ToIdentifier()).WithType(type.Library.Writer.Syntax).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
             Parameter("instance".ToIdentifier()).WithType(type.TypeSyntax)
         };
 
         if (type.IsValueType)
         {
-            parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
+            parameters[1] = parameters[1].WithModifiers(type.Library.HasScopedKeyword ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
         }
 
         var res = MethodDeclaration(returnType, SerializeMethodName)
@@ -464,17 +491,17 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         res = type.IsAbstractType
             ? res.AddModifiers(Token(SyntaxKind.OverrideKeyword))
-            : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
+            : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(type.Library.BufferWriter.Syntax)));
 
         return res;
     }
 
-    private void AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
+    private static void AddSerializationMembers(SerializableTypeEmissionPlan type, IEnumerable<MemberEmissionPlan> members, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
     {
         uint previousFieldId = 0;
-        foreach (var member in members.OrderBy(m => m.Member.FieldId))
+        foreach (var member in members.OrderBy(m => m.FieldId))
         {
-            var description = member.Member;
+            var description = member;
             ExpressionSyntax fieldIdDeltaExpr;
             if (type.OmitDefaultMemberValues)
             {
@@ -490,18 +517,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
             // Codecs can either be static classes or injected into the constructor.
             // Either way, the member signatures are the same.
-            var memberType = description.Type;
-            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
-            ExpressionSyntax codecExpression;
-            if (staticCodec != null)
-            {
-                codecExpression = staticCodec.CodecType.ToNameSyntax();
-            }
-            else
-            {
-                var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
-                codecExpression = GetCodecExpression(instanceCodec);
-            }
+            Debug.Assert(member.Codec.HasValue);
+            var codecExpression = member.Codec!.Value.Syntax;
 
             // When a static codec is available, we can call it directly and can skip passing the expected type,
             // since it is known to be the static codec's field type:
@@ -513,10 +530,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 Argument(fieldIdDeltaExpr)
             };
 
-            if (staticCodec is null)
-                writeFieldArgs.Add(Argument(UseHotReloadShape(type)
-                    ? TypeOfExpression(description.TypeSyntax)
-                    : serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType)).FieldName.ToIdentifierName()));
+            if (member.ExpectedType?.Syntax is { } expectedType)
+                writeFieldArgs.Add(Argument(expectedType));
 
             writeFieldArgs.Add(Argument(member.GetGetter(instanceParam)));
 
@@ -543,10 +558,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private MemberDeclarationSyntax? GenerateDeserializeMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+    private static MemberDeclarationSyntax? GenerateDeserializeMethod(
+        SerializableTypeEmissionPlan type,
+        List<MemberEmissionPlan> members)
     {
         var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -595,7 +609,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             // C#: Field header = default;
             body.Add(LocalDeclarationStatement(
                 VariableDeclaration(
-                    LibraryTypes.Field.ToTypeSyntax(),
+                    type.Library.Field.Syntax,
                     SingletonSeparatedList(VariableDeclarator(headerVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.DefaultLiteralExpression)))))));
 
             emptyBodyCount = 2;
@@ -622,16 +636,15 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         if (body.Count == emptyBodyCount && type.IsAbstractType)
             return null;
 
-        var genericParam = ParseTypeName("TReaderInput");
         var parameters = new[]
         {
-            Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+            Parameter(readerParam.Identifier).WithType(type.Library.Reader.Syntax).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
             Parameter(instanceParam.Identifier).WithType(type.TypeSyntax)
         };
 
         if (type.IsValueType)
         {
-            parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
+            parameters[1] = parameters[1].WithModifiers(type.Library.HasScopedKeyword ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
         }
 
         var res = MethodDeclaration(returnType, DeserializeMethodName)
@@ -647,7 +660,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         return res;
 
         // Create the loop body.
-        StatementSyntax GetDeserializerLoop(List<ISerializableMember> members)
+        StatementSyntax GetDeserializerLoop(List<MemberEmissionPlan> members)
         {
             var refHeaderVar = ArgumentList(SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), headerVar)));
             if (members.Count == 0)
@@ -671,25 +684,17 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             loopBody.Add(endObjectCheck);
             loopBody.Add(idUpdate);
 
-            members.Sort((x, y) => x.Member.FieldId.CompareTo(y.Member.FieldId));
-            var contiguousIds = members[members.Count - 1].Member.FieldId == members.Count - 1;
+            members.Sort((x, y) => x.FieldId.CompareTo(y.FieldId));
+            var contiguousIds = members[members.Count - 1].FieldId == members.Count - 1;
             foreach (var member in members)
             {
-                var description = member.Member;
+                var description = member;
 
                 // C#: instance.<member> = <codec>.ReadValue(ref reader, header);
                 // Codecs can either be static classes or injected into the constructor.
                 // Either way, the member signatures are the same.
-                ExpressionSyntax codecExpression;
-                if (LibraryTypes.StaticCodecs.FindByUnderlyingType(description.Type) is { } staticCodec)
-                {
-                    codecExpression = staticCodec.CodecType.ToNameSyntax();
-                }
-                else
-                {
-                    var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, description.Type));
-                    codecExpression = GetCodecExpression(instanceCodec);
-                }
+                Debug.Assert(member.Codec.HasValue);
+                var codecExpression = member.Codec!.Value.Syntax;
 
                 ExpressionSyntax readValueExpression = InvocationExpression(
                     codecExpression.Member("ReadValue"),
@@ -736,31 +741,29 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+    private static void AddSerializationCallbacks(SerializableTypeEmissionPlan type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
     {
-        for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
+        foreach (var callback in type.SerializationHooks)
         {
-            var hookType = type.SerializationHooks[hookIndex];
-            var member = hookType.GetAllMembers<IMethodSymbol>(callbackMethodName, Accessibility.Public).FirstOrDefault();
-            if (member is null || member.Parameters.Length != 1)
+            if (callback.Method != callbackMethodName)
             {
                 continue;
             }
 
             var argument = Argument(instanceParam);
-            if (member.Parameters[0].RefKind == RefKind.Ref)
+            if (callback.FirstByRef)
             {
                 argument = argument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
             }
 
             body.Add(ExpressionStatement(InvocationExpression(
-                IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
+                IdentifierName($"_hook{callback.HookIndex}").Member(callbackMethodName),
                 ArgumentList(SeparatedList([argument])))));
         }
     }
 
-    private MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
-        ISerializableTypeDescription type)
+    private static MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
+        SerializableTypeEmissionPlan type)
     {
         var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -879,9 +882,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var parameters = new[]
         {
-            Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+            Parameter("writer".ToIdentifier()).WithType(type.Library.Writer.Syntax).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
             Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-            Parameter("expectedType".ToIdentifier()).WithType(LibraryTypes.Type.ToTypeSyntax()),
+            Parameter("expectedType".ToIdentifier()).WithType(type.Library.SystemType.Syntax),
             Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
         };
 
@@ -889,14 +892,14 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
             .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-            .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
+            .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(type.Library.BufferWriter.Syntax)))
             .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 
-    private MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields)
+    private static MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
+        SerializableTypeEmissionPlan type,
+        List<FieldEmissionPlan> serializerFields)
     {
         var readerParam = "reader".ToIdentifierName();
         var fieldParam = "field".ToIdentifierName();
@@ -927,7 +930,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         ExpressionSyntax createValueExpression = type.UseActivator switch
         {
-            true => InvocationExpression(serializerFields.OfType<ActivatorFieldDescription>().Single().FieldName.ToIdentifierName().Member("Create")),
+            true => InvocationExpression(serializerFields.Single(static field => field.FieldName == ActivatorFieldName).FieldName.ToIdentifierName().Member("Create")),
             false => type.GetObjectCreationExpression()
         };
 
@@ -977,7 +980,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             body.Add(
                 LocalDeclarationStatement(
                     VariableDeclaration(
-                        LibraryTypes.Type.ToTypeSyntax(),
+                        type.Library.SystemType.Syntax,
                         SingletonSeparatedList(VariableDeclarator(valueTypeField.Identifier)
                             .WithInitializer(EqualsValueClause(fieldParam.Member("FieldType")))))));
             body.Add(
@@ -996,8 +999,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var parameters = new[]
         {
-            Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
+            Parameter(readerParam.Identifier).WithType(type.Library.Reader.Syntax).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+            Parameter(fieldParam.Identifier).WithType(type.Library.Field.Syntax)
         };
 
         return MethodDeclaration(type.TypeSyntax, ReadValueMethodName)

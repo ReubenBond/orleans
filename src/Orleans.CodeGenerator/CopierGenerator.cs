@@ -1,8 +1,10 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Diagnostics;
 using Orleans.CodeGenerator.SyntaxGeneration;
+using Orleans.CodeGenerator.Model;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
@@ -27,14 +29,21 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         ISerializableTypeDescription type,
         Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers)
     {
+        var plan = CreatePlan(type, defaultCopiers);
+        return plan is null ? null : GenerateCopier(plan);
+    }
+
+    internal CopierEmissionPlan? CreatePlan(
+        ISerializableTypeDescription type,
+        Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers,
+        SerializableTypeEmissionPlan? typePlan = null)
+    {
         var isShallowCopyable = type.IsShallowCopyable;
         if (isShallowCopyable && !type.IsGenericType)
         {
             defaultCopiers.Add(type, LibraryTypes.ShallowCopier.ToTypeSyntax(type.TypeSyntax));
             return null;
         }
-
-        var simpleClassName = GetSimpleClassName(type);
 
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
@@ -58,53 +67,76 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             }
         }
 
-        var accessibility = type.Accessibility switch
-        {
-            Accessibility.Public => SyntaxKind.PublicKeyword,
-            _ => SyntaxKind.InternalKeyword,
-        };
-
         var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
 
         var baseType = isExceptionType ? QualifiedName(AliasQualifiedName("global", IdentifierName("Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList([type.TypeSyntax, type.BaseType.ToTypeSyntax()]))))
             : (isShallowCopyable ? LibraryTypes.ShallowCopier : LibraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
 
-        var classDeclaration = ClassDeclaration(simpleClassName)
-            .AddBaseListTypes(SimpleBaseType(baseType))
-            .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes());
-
+        var fields = new List<GeneratedFieldDescription>();
+        var onlyDeepFields = false;
+        var memberPlans = ImmutableArray<MemberEmissionPlan>.Empty;
         if (!isShallowCopyable)
         {
-            var fieldDescriptions = GetFieldDescriptions(type, members, isExceptionType, out var onlyDeepFields);
-            var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, !isExceptionType && !type.IsSealedType, isExceptionType);
+            fields = GetFieldDescriptions(type, members, isExceptionType, out onlyDeepFields);
+            var copiers = type.IsUnsealedImmutable ? null : fields.OfType<ICopierDescription>().Concat(LibraryTypes.StaticCopiers).ToList();
+            memberPlans = members.Where(member => !onlyDeepFields || !member.IsShallowCopyable).Select(member =>
+                new MemberEmissionPlan(member.Member.FieldId, member.IsPrimaryConstructorParameter,
+                    member.IsValueType, member.IsShallowCopyable,
+                    member.GetGetter(MemberEmissionPlan.Instance),
+                    member.GetSetter(MemberEmissionPlan.Instance, MemberEmissionPlan.Value),
+                    default, default,
+                    new EmissionSyntax<ExpressionSyntax>(GenerateMemberCopy(fields, member.GetGetter(MemberEmissionPlan.Instance), MemberEmissionPlan.Context, copiers, member))))
+                .ToImmutableArray();
+        }
+
+        var construction = new GeneratedTypeConstruction(LibraryTypes, fields,
+            !isShallowCopyable && !isExceptionType && !type.IsSealedType, !isShallowCopyable && isExceptionType);
+        return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes), isShallowCopyable, isExceptionType,
+            onlyDeepFields, baseType, LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax),
+            fields.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans, ConstructionEmissionPlan.Create(construction));
+    }
+
+    internal static ClassDeclarationSyntax GenerateCopier(CopierEmissionPlan plan)
+    {
+        var type = plan.Type;
+        var simpleClassName = GetSimpleClassName(type.Name);
+        var isExceptionType = plan.IsExceptionType;
+        var classDeclaration = ClassDeclaration(simpleClassName)
+            .AddBaseListTypes(SimpleBaseType(plan.BaseType.Syntax))
+            .AddModifiers(Token(type.IsPublic ? SyntaxKind.PublicKeyword : SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
+            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes());
+
+        if (!plan.IsShallowCopyable)
+        {
+            var fieldDescriptions = plan.Fields.ToList();
+            var members = plan.Members.ToList();
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType, construction);
+            var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType, plan.Construction);
 
             classDeclaration = classDeclaration.AddMembers(fieldDeclarations);
 
             if (!isExceptionType)
             {
-                var copyMethod = GenerateMemberwiseDeepCopyMethod(type, fieldDescriptions, members, onlyDeepFields);
+                var copyMethod = GenerateMemberwiseDeepCopyMethod(type, fieldDescriptions, members, plan.OnlyDeepFields);
                 classDeclaration = classDeclaration.AddMembers(copyMethod);
             }
 
             if (ctor != null)
                 classDeclaration = classDeclaration.AddMembers(ctor);
 
-            if (isExceptionType || construction.HasBaseContract)
+            if (isExceptionType || plan.Construction.HasBaseContract)
             {
                 if (GenerateBaseCopierDeepCopyMethod(type, fieldDescriptions, members, isExceptionType) is { } baseCopier)
                     classDeclaration = classDeclaration.AddMembers(baseCopier);
 
-                if (construction.HasBaseContract)
-                    classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)));
+                if (plan.Construction.HasBaseContract)
+                    classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(plan.AdditionalInterface.Syntax));
             }
         }
 
         if (type.IsGenericType)
         {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
+            classDeclaration = type.AddTypeParameters(classDeclaration);
         }
 
         return classDeclaration;
@@ -124,24 +156,24 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
     public static string GetSimpleClassName(string name) => $"Copier_{name}";
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<FieldEmissionPlan> fieldDescriptions)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
 
-        static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
+        static MemberDeclarationSyntax GetFieldDeclaration(FieldEmissionPlan description)
         {
             switch (description)
             {
-                case FieldAccessorDescription { LazyInitialization: true, InitializationSyntax: not null } accessor:
+                case { Kind: EmissionFieldKind.Accessor, LazyInitialization: true } accessor when accessor.Initializer.HasValue:
                     return
                         FieldDeclaration(VariableDeclaration(accessor.FieldType, SingletonSeparatedList(VariableDeclarator(accessor.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
+                case { Kind: EmissionFieldKind.Accessor } accessor when accessor.Initializer.HasValue:
                     return
                         FieldDeclaration(VariableDeclaration(accessor.FieldType,
-                            SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                            SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.Initializer.Value.Syntax)))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
+                case { Kind: EmissionFieldKind.Accessor } accessor:
                     return GetUnsafeAccessorDeclaration(accessor);
                 default:
                     var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
@@ -152,7 +184,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     }
 
     private static ConstructorDeclarationSyntax? GenerateConstructor(
-        string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType, GeneratedTypeConstruction construction)
+        string simpleClassName, List<FieldEmissionPlan> fieldDescriptions, bool isExceptionType, ConstructionEmissionPlan construction)
     {
         var statements = new List<StatementSyntax>();
 
@@ -160,17 +192,17 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             switch (field)
             {
-                case GeneratedFieldDescription _ when field.IsInjected:
+                case { IsInjected: true }:
                     statements.Add(ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
                             ThisExpression().Member(field.FieldName.ToIdentifierName()),
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
-                case CodecProviderFieldDescription:
+                case { Kind: EmissionFieldKind.CodecProvider }:
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
                     break;
-                case CopierFieldDescription or BaseCopierFieldDescription when !field.IsInjected:
+                case { Kind: EmissionFieldKind.Service, IsInjected: false }:
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
@@ -333,10 +365,10 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
     }
 
-    private MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> copierFields,
-        List<ISerializableMember> members,
+    private static MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
+        SerializableTypeEmissionPlan type,
+        List<FieldEmissionPlan> copierFields,
+        List<MemberEmissionPlan> members,
         bool onlyDeepFields)
     {
         var returnType = type.TypeSyntax;
@@ -454,14 +486,14 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         if (!membersCopied)
         {
-            GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            GenerateMemberwiseCopy(type, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
             body.Add(ReturnStatement(resultVar));
         }
 
         var parameters = new[]
         {
             Parameter(originalParam.Identifier).WithType(type.TypeSyntax),
-            Parameter(contextParam.Identifier).WithType(LibraryTypes.CopyContext.ToTypeSyntax())
+            Parameter(contextParam.Identifier).WithType(type.Library.CopyContext.Syntax)
         };
 
         return MethodDeclaration(returnType, DeepCopyMethodName)
@@ -471,7 +503,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             .AddBodyStatements([.. body]);
     }
 
-    private static ExpressionSyntax GetCreateValueExpression(ISerializableTypeDescription type, List<GeneratedFieldDescription> copierFields)
+    private static ExpressionSyntax GetCreateValueExpression(SerializableTypeEmissionPlan type, List<FieldEmissionPlan> copierFields)
     {
         return type.UseActivator switch
         {
@@ -479,18 +511,18 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             false => type.GetObjectCreationExpression()
         };
 
-        static GeneratedFieldDescription GetActivatorField(List<GeneratedFieldDescription> copierFields)
+        static FieldEmissionPlan GetActivatorField(List<FieldEmissionPlan> copierFields)
         {
-            var result = copierFields.Find(f => f is ActivatorFieldDescription);
+            var result = copierFields.Find(f => f.FieldName == ActivatorFieldName);
             Debug.Assert(result is not null);
             return result!;
         }
     }
 
-    private MemberDeclarationSyntax? GenerateBaseCopierDeepCopyMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> copierFields,
-        List<ISerializableMember> members,
+    private static MemberDeclarationSyntax? GenerateBaseCopierDeepCopyMethod(
+        SerializableTypeEmissionPlan type,
+        List<FieldEmissionPlan> copierFields,
+        List<MemberEmissionPlan> members,
         bool isExceptionType)
     {
         var inputParam = "input".ToIdentifierName();
@@ -518,7 +550,6 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         GenerateMemberwiseCopy(
             type,
-            copierFields,
             members,
             inputParam,
             contextParam,
@@ -532,7 +563,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             Parameter(inputParam.Identifier).WithType(type.TypeSyntax),
             Parameter(resultParam.Identifier).WithType(type.TypeSyntax),
-            Parameter(contextParam.Identifier).WithType(LibraryTypes.CopyContext.ToTypeSyntax())
+            Parameter(contextParam.Identifier).WithType(type.Library.CopyContext.Syntax)
         };
 
         var method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), DeepCopyMethodName)
@@ -547,10 +578,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return method;
     }
 
-    private void GenerateMemberwiseCopy(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> copierFields,
-        List<ISerializableMember> members,
+    private static void GenerateMemberwiseCopy(
+        SerializableTypeEmissionPlan type,
+        List<MemberEmissionPlan> members,
         IdentifierNameSyntax sourceVar,
         IdentifierNameSyntax contextVar,
         IdentifierNameSyntax destinationVar,
@@ -559,21 +589,12 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     {
         AddSerializationCallbacks(type, sourceVar, destinationVar, "OnCopying", body);
 
-        var copiers = type.IsUnsealedImmutable ? null : copierFields.OfType<ICopierDescription>()
-                .Concat(LibraryTypes.StaticCopiers)
-                .ToList();
-
-        var orderedMembers = members.OrderBy(m => m.Member.FieldId);
+        var orderedMembers = members.OrderBy(m => m.FieldId);
         foreach (var member in orderedMembers)
         {
             if (onlyDeepFields && member.IsShallowCopyable) continue;
 
-            var getValueExpression = GenerateMemberCopy(
-                copierFields,
-                inputValue: member.GetGetter(sourceVar),
-                contextVar,
-                copiers,
-                member);
+            var getValueExpression = member.GetCopy(sourceVar, contextVar);
             var memberAssignment = ExpressionStatement(member.GetSetter(destinationVar, getValueExpression));
             body.Add(memberAssignment);
         }
@@ -632,32 +653,30 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return getValueExpression;
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
+    private static void AddSerializationCallbacks(SerializableTypeEmissionPlan type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
     {
         var serializationHooks = type.SerializationHooks;
-        for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)
+        foreach (var callback in serializationHooks)
         {
-            var hookType = serializationHooks[hookIndex];
-            var member = hookType.GetAllMembers<IMethodSymbol>(callbackMethodName, Accessibility.Public).FirstOrDefault();
-            if (member is null || member.Parameters.Length != 2)
+            if (callback.Method != callbackMethodName)
             {
                 continue;
             }
 
             var originalArgument = Argument(originalInstance);
-            if (member.Parameters[0].RefKind == RefKind.Ref)
+            if (callback.FirstByRef)
             {
                 originalArgument = originalArgument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
             }
 
             var resultArgument = Argument(resultInstance);
-            if (member.Parameters[1].RefKind == RefKind.Ref)
+            if (callback.SecondByRef)
             {
                 resultArgument = resultArgument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
             }
 
             body.Add(ExpressionStatement(InvocationExpression(
-                IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
+                IdentifierName($"_hook{callback.HookIndex}").Member(callbackMethodName),
                 ArgumentList(SeparatedList([originalArgument, resultArgument])))));
         }
     }

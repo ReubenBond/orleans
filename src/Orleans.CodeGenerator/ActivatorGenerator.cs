@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -17,18 +19,27 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
     }
 
     public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
-    {
-        var simpleClassName = GetSimpleClassName(type);
+        => GenerateActivator(CreatePlan(type));
 
-        var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
+    internal ActivatorEmissionPlan CreatePlan(ISerializableTypeDescription type, SerializableTypeEmissionPlan? typePlan = null)
+        => new(typePlan ?? SerializableTypeEmissionPlan.Create(type, _generatorServices.LibraryTypes),
+            _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax),
+            type.ActivatorConstructorParameters.Select(static parameter => new EmissionSyntax<TypeSyntax>(parameter)).ToImmutableArray());
+
+    internal static ClassDeclarationSyntax GenerateActivator(ActivatorEmissionPlan plan)
+    {
+        var type = plan.Type;
+        var simpleClassName = GetSimpleClassName(type.Name);
+
+        var baseInterface = plan.BaseInterface.Syntax;
 
         var orderedFields = new List<ConstructorArgument>();
         var index = 0;
-        if (type.ActivatorConstructorParameters is { Count: > 0 } parameters)
+        if (plan.ConstructorParameters is { Count: > 0 } parameters)
         {
             foreach (var arg in parameters)
             {
-                orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
+                orderedFields.Add(new ConstructorArgument { Type = arg.Syntax, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
                 index++;
             }
         }
@@ -56,7 +67,7 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
 
         if (type.IsGenericType)
         {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
+            classDeclaration = type.AddTypeParameters(classDeclaration);
         }
 
         return classDeclaration;
@@ -112,10 +123,10 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
+    private static MemberDeclarationSyntax GenerateCreateMethod(SerializableTypeEmissionPlan type, List<ConstructorArgument> orderedFields)
     {
         ExpressionSyntax createObject;
-        if (type.ActivatorConstructorParameters is { Count: > 0 })
+        if (orderedFields.Count > 0)
         {
             var argList = new List<ArgumentSyntax>();
             foreach (var field in orderedFields)
