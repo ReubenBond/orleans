@@ -40,7 +40,41 @@ internal static class SerializableSourceOutputGenerator
             var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
             var enumPlan = EnumSerializerGenerator.CreateOutputPlan(
                 typeDescription, libraryTypes, compilation.AssemblyName ?? "assembly", metadataIdentity);
-            return SerializableTypeResult.FromModel(model, enumPlan);
+            if (typeDescription is not SerializableTypeDescription || typeDescription.IsEnumType)
+            {
+                return SerializableTypeResult.FromModel(model, enumPlan);
+            }
+
+            // A partial type has one emission owner: the declaration carrying its first serializer attribute.
+            // Other declarations still contribute to symbol analysis and the existing metadata deduplication.
+            var ownerAttribute = symbol.GetAttributes().First(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.GenerateSerializerAttribute));
+            var ownerSyntax = ownerAttribute.ApplicationSyntaxReference!;
+            var ownsEmission = context.TargetNode.SyntaxTree == ownerSyntax.SyntaxTree
+                && context.TargetNode.Span.Contains(ownerSyntax.Span);
+            if (!ownsEmission)
+            {
+                return default;
+            }
+
+            try
+            {
+                var services = new GeneratorServices(compilation, codeGeneratorOptions, libraryTypes);
+                var typePlan = SerializableTypeEmissionPlan.Create(typeDescription, libraryTypes);
+                var serializerPlan = new SerializerGenerator(services).CreatePlan(typeDescription, typePlan);
+                var copierPlan = new CopierGenerator(services).CreatePlan(typeDescription, [], typePlan);
+                var activatorPlan = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
+                    ? new ActivatorGenerator(services).CreatePlan(typeDescription, typePlan) : null;
+                cancellationToken.ThrowIfCancellationRequested();
+                return SerializableTypeResult.FromModel(model, dtoSerializerPlan: new(
+                    serializerPlan, copierPlan, activatorPlan, compilation.AssemblyName ?? "assembly",
+                    metadataIdentity, typeDescription.GeneratedNamespace));
+            }
+            catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
+            {
+                // Emission diagnostics retain metadata discovery and current-tree diagnostic provenance.
+                return SerializableTypeResult.FromModel(model, diagnostic: analysisException.Diagnostic);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -54,6 +88,18 @@ internal static class SerializableSourceOutputGenerator
                 sourceLocation,
                 typeSyntax);
         }
+    }
+
+    internal static SourceOutputResult GenerateDtoSource(DtoSerializerOutputPlan output)
+    {
+        var typeSyntax = output.Serializer.Type.TypeSyntax.ToString();
+        return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
+            output.AssemblyName, typeSyntax, output.MetadataIdentity,
+            output.GeneratedNamespace, output.Serializer.Type.TypeParameters.Count,
+            SerializerGenerator.Generate(output.Serializer),
+            output.Copier is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
+            output.Activator is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
+            output.GeneratedNamespace), new(output.MetadataIdentity, typeSyntax));
     }
 
     internal static ImmutableArray<SourceOutputResult> CreateSerializableSourceOutputs(
@@ -118,7 +164,7 @@ internal static class SerializableSourceOutputGenerator
             }
         }
 
-        return GeneratedSourceOutput.DeduplicateSourceOutputs(sourceEntries);
+        return sourceEntries.ToImmutable();
     }
 
     internal static ImmutableArray<SourceOutputResult> CreateReferencedSerializableSourceOutputs(
@@ -226,12 +272,12 @@ internal static class SerializableSourceOutputGenerator
         string hintGeneratedNamespace,
         int genericArity)
     {
-        var serializer = serializerGenerator.Generate(typeDescription);
-        var copier = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
+        var serializerPlan = serializerGenerator.CreatePlan(typeDescription);
+        var copierPlan = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
             ? null
-            : copierGenerator.GenerateCopier(typeDescription, defaultCopiers);
-        var activatorClass = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
-            ? activatorGenerator.GenerateActivator(typeDescription)
+            : copierGenerator.CreatePlan(typeDescription, defaultCopiers, serializerPlan.Type);
+        var activatorPlan = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
+            ? activatorGenerator.CreatePlan(typeDescription, serializerPlan.Type)
             : null;
 
         return SourceOutputResult.FromSource(
@@ -241,10 +287,10 @@ internal static class SerializableSourceOutputGenerator
                 metadataIdentity,
                 hintGeneratedNamespace,
                 genericArity,
-                serializer,
-                copier,
-                activatorClass,
-                typeDescription.GeneratedNamespace));
+                SerializerGenerator.Generate(serializerPlan),
+                copierPlan is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
+                activatorPlan is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
+                typeDescription.GeneratedNamespace), new(metadataIdentity, typeSyntax));
     }
 
     internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)
@@ -470,4 +516,3 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-
