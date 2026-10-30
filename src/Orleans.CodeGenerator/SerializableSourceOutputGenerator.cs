@@ -68,7 +68,7 @@ internal static class SerializableSourceOutputGenerator
                 cancellationToken.ThrowIfCancellationRequested();
                 return SerializableTypeResult.FromModel(model, dtoSerializerPlan: new(
                     serializerPlan, copierPlan, activatorPlan, compilation.AssemblyName ?? "assembly",
-                    metadataIdentity, typeDescription.GeneratedNamespace));
+                    metadataIdentity, typeDescription.GeneratedNamespace, typeDescription.TypeSyntax.ToString()));
             }
             catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
             {
@@ -91,16 +91,11 @@ internal static class SerializableSourceOutputGenerator
     }
 
     internal static SourceOutputResult GenerateDtoSource(DtoSerializerOutputPlan output)
-    {
-        var typeSyntax = output.Serializer.Type.TypeSyntax.ToString();
-        return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
-            output.AssemblyName, typeSyntax, output.MetadataIdentity,
+        => SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
+            output.AssemblyName, output.TypeSyntax, output.MetadataIdentity,
             output.GeneratedNamespace, output.Serializer.Type.TypeParameters.Count,
-            SerializerGenerator.Generate(output.Serializer),
-            output.Copier is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
-            output.Activator is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
-            output.GeneratedNamespace), new(output.MetadataIdentity, typeSyntax));
-    }
+            output.Serializer, output.Copier, output.Activator,
+            output.GeneratedNamespace), new(output.MetadataIdentity, output.TypeSyntax));
 
     internal static ImmutableArray<SourceOutputResult> CreateSerializableSourceOutputs(
         Compilation compilation,
@@ -287,9 +282,9 @@ internal static class SerializableSourceOutputGenerator
                 metadataIdentity,
                 hintGeneratedNamespace,
                 genericArity,
-                SerializerGenerator.Generate(serializerPlan),
-                copierPlan is { } copier ? CopierGenerator.GenerateCopier(copier) : null,
-                activatorPlan is { } activator ? ActivatorGenerator.GenerateActivator(activator) : null,
+                serializerPlan,
+                copierPlan,
+                activatorPlan,
                 typeDescription.GeneratedNamespace), new(metadataIdentity, typeSyntax));
     }
 

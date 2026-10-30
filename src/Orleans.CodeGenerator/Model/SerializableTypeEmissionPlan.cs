@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,63 +10,125 @@ using static Orleans.CodeGenerator.SerializerGenerator;
 
 namespace Orleans.CodeGenerator.Model;
 
-// These nodes are constructed semantic fragments, never nodes from an input syntax tree.
-// Equality precedes class/method construction and whole-file formatting.
-internal readonly struct EmissionSyntax<T>(T syntax) : IEquatable<EmissionSyntax<T>> where T : SyntaxNode
-{
-    public T Syntax { get; } = syntax;
-
-    public bool Equals(EmissionSyntax<T> other) => SyntaxFactory.AreEquivalent(Syntax, other.Syntax);
-    public override bool Equals(object? obj) => obj is EmissionSyntax<T> other && Equals(other);
-    public override int GetHashCode()
-    {
-        var hash = 17;
-        if (Syntax is not null)
-        {
-            foreach (var token in Syntax.DescendantTokens())
-            {
-                hash = StructuralEquality.Combine(hash, token.RawKind);
-                hash = StructuralEquality.Combine(hash, StructuralEquality.GetHashCode(token.ValueText));
-            }
-        }
-
-        return hash;
-    }
-
-    public static implicit operator EmissionSyntax<T>(T syntax) => new(syntax);
-}
+// Emission plans hold the complete, spelled C# fragments which their writers emit: types, names, and expressions.
+// Their value equality lets an unchanged plan skip rendering.
 
 internal sealed record EmissionLibraryTypes(
-    EmissionSyntax<TypeSyntax> SystemType,
-    EmissionSyntax<TypeSyntax> Writer,
-    EmissionSyntax<TypeSyntax> Reader,
-    EmissionSyntax<TypeSyntax> Field,
-    EmissionSyntax<TypeSyntax> BufferWriter,
-    EmissionSyntax<TypeSyntax> CodecProvider,
-    EmissionSyntax<TypeSyntax> CopyContext,
-    bool HasScopedKeyword)
+    string SystemType,
+    string Writer,
+    string Reader,
+    string Field,
+    string BufferWriter,
+    string CodecProvider,
+    string CopyContext,
+    bool HasScopedKeyword,
+    string TimeSpan,
+    string MethodInfo,
+    string TargetHolder,
+    string CancellationToken)
 {
     public static EmissionLibraryTypes Create(LibraryTypes library) => new(
-        library.Type.ToTypeSyntax(),
-        library.Writer.ToTypeSyntax(),
-        library.Reader.ToTypeSyntax(ParseTypeName("TReaderInput")),
-        library.Field.ToTypeSyntax(),
-        library.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))),
-        library.ICodecProvider.ToTypeSyntax(),
-        library.CopyContext.ToTypeSyntax(),
-        library.HasScopedKeyword());
+        CodeText.Type(library.Type.ToTypeSyntax()),
+        CodeText.Type(library.Writer.ToTypeSyntax()),
+        CodeText.Type(library.Reader.ToTypeSyntax(ParseTypeName("TReaderInput"))),
+        CodeText.Type(library.Field.ToTypeSyntax()),
+        CodeText.Type(library.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword)))),
+        CodeText.Type(library.ICodecProvider.ToTypeSyntax()),
+        CodeText.Type(library.CopyContext.ToTypeSyntax()),
+        library.HasScopedKeyword(),
+        CodeText.Type(library.TimeSpan.ToTypeSyntax()),
+        CodeText.Type(library.MethodInfo.ToTypeSyntax()),
+        CodeText.Type(library.ITargetHolder.ToTypeSyntax()),
+        CodeText.Type(library.CancellationToken.ToTypeSyntax()));
 }
 
-internal sealed record GenericParameterEmissionPlan(
-    string Name,
-    EquatableArray<EmissionSyntax<TypeParameterConstraintSyntax>> Constraints);
+internal sealed record GenericParameterEmissionPlan(string Name, EquatableArray<string> Constraints)
+{
+    public static EquatableArray<GenericParameterEmissionPlan> Create(List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
+        => SyntaxFactoryUtility.GetTypeParameterConstraintTexts(typeParameters)
+            .Select(static parameter => new GenericParameterEmissionPlan(parameter.Name, parameter.Constraints.ToImmutableArray()))
+            .ToImmutableArray();
+
+    /// <summary>Appends <c>&lt;T1, T2&gt;</c>, or nothing for a non-generic declaration.</summary>
+    public static void AppendParameterList(StringBuilder builder, EquatableArray<GenericParameterEmissionPlan> parameters)
+    {
+        if (parameters.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append('<');
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append(parameters[i].Name);
+        }
+
+        builder.Append('>');
+    }
+
+    /// <summary>
+    /// Writes a declaration line followed by its constraint clauses. A clause following a <c>new()</c> constraint
+    /// begins a continuation line, indented once, as in the established normalized layout.
+    /// </summary>
+    public static void WriteDeclarationLine(SourceWriter writer, StringBuilder declaration, EquatableArray<GenericParameterEmissionPlan> parameters)
+    {
+        var continued = false;
+        var breakBeforeClause = false;
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Constraints.Count == 0)
+            {
+                continue;
+            }
+
+            if (breakBeforeClause)
+            {
+                writer.WriteLine(declaration.ToString());
+                declaration.Clear();
+                if (!continued)
+                {
+                    writer.Indent();
+                    continued = true;
+                }
+            }
+            else
+            {
+                declaration.Append(' ');
+            }
+
+            declaration.Append("where ").Append(parameter.Name).Append(" : ");
+            for (var i = 0; i < parameter.Constraints.Count; i++)
+            {
+                if (i > 0)
+                {
+                    declaration.Append(", ");
+                }
+
+                declaration.Append(parameter.Constraints[i]);
+            }
+
+            breakBeforeClause = parameter.Constraints[parameter.Constraints.Count - 1] == "new()";
+        }
+
+        writer.WriteLine(declaration.ToString());
+        if (continued)
+        {
+            writer.Unindent();
+        }
+    }
+}
 
 internal sealed record SerializationCallbackEmissionPlan(string Method, int HookIndex, bool FirstByRef, bool SecondByRef);
 
 internal sealed record SerializableTypeEmissionPlan(
     string Name,
     bool IsPublic,
-    EmissionSyntax<TypeSyntax> Type,
+    string Type,
     bool IsValueType,
     bool IsSealedType,
     bool IsAbstractType,
@@ -75,21 +138,15 @@ internal sealed record SerializableTypeEmissionPlan(
     bool TrackReferences,
     bool OmitDefaultMemberValues,
     bool IsUnsealedImmutable,
-    EmissionSyntax<ExpressionSyntax> ObjectCreation,
+    string ObjectCreation,
     EquatableArray<GenericParameterEmissionPlan> TypeParameters,
     EquatableArray<SerializationCallbackEmissionPlan> SerializationHooks,
     EmissionLibraryTypes Library)
 {
-    public TypeSyntax TypeSyntax => Type.Syntax;
     public bool IsGenericType => TypeParameters.Count > 0;
-    public ExpressionSyntax GetObjectCreationExpression() => ObjectCreation.Syntax;
 
     public static SerializableTypeEmissionPlan Create(ISerializableTypeDescription type, LibraryTypes library)
     {
-        var parameters = SyntaxFactoryUtility.GetTypeParameterConstraints(type.TypeParameters)
-            .Select(static parameter => new GenericParameterEmissionPlan(parameter.Name,
-                parameter.Constraints.Select(static constraint => new EmissionSyntax<TypeParameterConstraintSyntax>(constraint)).ToImmutableArray()))
-            .ToImmutableArray();
         var callbacks = ImmutableArray.CreateBuilder<SerializationCallbackEmissionPlan>();
         foreach (var method in new[] { "OnSerializing", "OnSerialized", "OnDeserializing", "OnDeserialized", "OnCopying", "OnCopied" })
         {
@@ -107,27 +164,26 @@ internal sealed record SerializableTypeEmissionPlan(
             }
         }
 
-        return new(type.Name, type.Accessibility == Accessibility.Public, type.TypeSyntax,
+        var typeText = CodeText.Type(type.TypeSyntax);
+        return new(type.Name, type.Accessibility == Accessibility.Public, typeText,
             type.IsValueType, type.IsSealedType, type.IsAbstractType, type.HasComplexBaseType,
             type.IncludePrimaryConstructorParameters, type.UseActivator, type.TrackReferences,
-            type.OmitDefaultMemberValues, type.IsUnsealedImmutable, type.GetObjectCreationExpression(),
-            parameters, callbacks.ToImmutable(), EmissionLibraryTypes.Create(library));
+            type.OmitDefaultMemberValues, type.IsUnsealedImmutable, GetObjectCreation(type, typeText),
+            GenericParameterEmissionPlan.Create(type.TypeParameters), callbacks.ToImmutable(), library.EmissionTypes);
     }
 
-    public ClassDeclarationSyntax AddTypeParameters(ClassDeclarationSyntax declaration)
+    // Each description creates one of three construction forms; spell the selected form with the plan's type text.
+    private static string GetObjectCreation(ISerializableTypeDescription type, string typeText) => type.GetObjectCreationExpression() switch
     {
-        foreach (var parameter in TypeParameters)
-        {
-            if (parameter.Constraints.Count > 0)
-            {
-                declaration = declaration.AddConstraintClauses(TypeParameterConstraintClause(parameter.Name)
-                    .AddConstraints([.. parameter.Constraints.Select(static constraint => constraint.Syntax)]));
-            }
-        }
+        DefaultExpressionSyntax => $"default({typeText})",
+        ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Initializer: null } => $"new {typeText}()",
+        CastExpressionSyntax { Expression: InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax helper } }
+            => $"({typeText}){CodeText.Type(helper.Expression)}.GetUninitializedObject(typeof({typeText}))",
+        var expression => throw new InvalidOperationException($"Unsupported object creation expression '{expression}'."),
+    };
 
-        return TypeParameters.Count == 0 ? declaration : declaration.WithTypeParameterList(
-            TypeParameterList(SeparatedList(TypeParameters.Select(static parameter => TypeParameter(parameter.Name)))));
-    }
+    /// <summary>Appends the type parameter list for a generated declaration of this type.</summary>
+    public void AppendTypeParameterList(StringBuilder builder) => GenericParameterEmissionPlan.AppendParameterList(builder, TypeParameters);
 }
 
 internal enum EmissionFieldKind
@@ -139,71 +195,111 @@ internal enum EmissionFieldKind
 }
 
 internal sealed record FieldEmissionPlan(
-    EmissionSyntax<TypeSyntax> Type,
+    string Type,
     string FieldName,
     EmissionFieldKind Kind,
     bool IsInjected,
     bool LazyInitialization,
-    EmissionSyntax<ExpressionSyntax>? Initializer = null,
-    EmissionSyntax<TypeSyntax>? ContainingType = null,
+    string? Initializer = null,
+    string? ContainingType = null,
     string? AccessorName = null,
     bool IsUnsafeFieldAccessor = false,
     bool ContainingTypeIsValueType = false)
 {
-    public TypeSyntax FieldType => Type.Syntax;
-
     public static FieldEmissionPlan Create(GeneratedFieldDescription field) => field switch
     {
-        TypeFieldDescription type => new(field.FieldType, field.FieldName, EmissionFieldKind.Type, false, false,
-            TypeOfExpression(type.UnderlyingTypeSyntax)),
-        CodecFieldTypeFieldDescription type => new(field.FieldType, field.FieldName, EmissionFieldKind.Type, false, false,
-            TypeOfExpression(type.CodecFieldType)),
-        FieldAccessorDescription accessor => new(field.FieldType, field.FieldName, EmissionFieldKind.Accessor, false,
-            field.LazyInitialization, accessor.InitializationSyntax is { } initializer ? new(initializer) : default(EmissionSyntax<ExpressionSyntax>?),
-            new EmissionSyntax<TypeSyntax>(accessor.ContainingType), accessor.AccessorName,
+        TypeFieldDescription type => new(CodeText.Type(field.FieldType), field.FieldName, EmissionFieldKind.Type, false, false,
+            $"typeof({CodeText.Type(type.UnderlyingTypeSyntax)})"),
+        CodecFieldTypeFieldDescription type => new(CodeText.Type(field.FieldType), field.FieldName, EmissionFieldKind.Type, false, false,
+            $"typeof({CodeText.Type(type.CodecFieldType)})"),
+        FieldAccessorDescription accessor => new(CodeText.Type(field.FieldType), field.FieldName, EmissionFieldKind.Accessor, false,
+            field.LazyInitialization, accessor.Initialization, CodeText.Type(accessor.ContainingType), accessor.AccessorName,
             accessor.IsUnsafeFieldAccessor, accessor.ContainingTypeIsValueType),
-        CodecProviderFieldDescription => new(field.FieldType, field.FieldName, EmissionFieldKind.CodecProvider, false, false),
-        _ => new(field.FieldType, field.FieldName, EmissionFieldKind.Service, field.IsInjected, field.LazyInitialization),
+        CodecProviderFieldDescription => new(CodeText.Type(field.FieldType), field.FieldName, EmissionFieldKind.CodecProvider, false, false),
+        _ => new(CodeText.Type(field.FieldType), field.FieldName, EmissionFieldKind.Service, field.IsInjected, field.LazyInitialization),
     };
 }
 
-// Access expressions use annotated holes, so binding never rewrites a user's member/type identifier.
+internal enum MemberAccessKind
+{
+    /// <summary><c>instance.Target</c>, assigned directly.</summary>
+    Member,
+
+    /// <summary><c>Target(instance)</c> reads; <c>Target(instance, value)</c> writes.</summary>
+    Invoke,
+
+    /// <summary><c>Target(instance)</c> returns a field reference which reads or is assigned.</summary>
+    FieldReference,
+}
+
+/// <summary>
+/// Accesses a member of an instance expression. <see cref="Target"/> is a spelled member name or accessor expression.
+/// </summary>
+internal sealed record MemberAccessPlan(MemberAccessKind Kind, string Target, bool RefInstance = false)
+{
+    public static MemberAccessPlan ForMember(string memberName) => new(MemberAccessKind.Member, CodeText.Identifier(memberName));
+
+    public string Get(string instance) => Kind == MemberAccessKind.Member
+        ? instance + "." + Target
+        : $"{Target}({(RefInstance ? "ref " : string.Empty)}{instance})";
+
+    public string Set(string instance, string value) => Kind switch
+    {
+        MemberAccessKind.Member => $"{instance}.{Target} = {value}",
+        MemberAccessKind.Invoke => $"{Target}({(RefInstance ? "ref " : string.Empty)}{instance}, {value})",
+        _ => $"{Target}({(RefInstance ? "ref " : string.Empty)}{instance}) = {value}",
+    };
+}
+
+internal enum MemberCopyKind
+{
+    /// <summary>The value is shallow-copyable and is assigned as read.</summary>
+    Value,
+
+    /// <summary><c>context.DeepCopy(value)</c>.</summary>
+    Context,
+
+    /// <summary><c>Copier.DeepCopy(value, context)</c>, optionally cast to the member type.</summary>
+    Copier,
+}
+
+internal sealed record MemberCopyPlan(MemberCopyKind Kind, string? Copier = null, string? CastType = null)
+{
+    public static MemberCopyPlan Value { get; } = new(MemberCopyKind.Value);
+
+    public string Copy(string value, string context) => Kind switch
+    {
+        MemberCopyKind.Value => value,
+        MemberCopyKind.Context => $"{context}.DeepCopy({value})",
+        _ => CastType is null
+            ? $"{Copier}.DeepCopy({value}, {context})"
+            : $"({CastType}){Copier}.DeepCopy({value}, {context})",
+    };
+}
+
 internal sealed record MemberEmissionPlan(
     uint FieldId,
     bool IsPrimaryConstructorParameter,
     bool IsValueType,
-    EmissionSyntax<ExpressionSyntax> Getter,
-    EmissionSyntax<ExpressionSyntax> Setter,
-    EmissionSyntax<ExpressionSyntax>? Codec,
-    EmissionSyntax<ExpressionSyntax>? ExpectedType,
-    EmissionSyntax<ExpressionSyntax>? Copy)
+    MemberAccessPlan Getter,
+    MemberAccessPlan Setter,
+    string? Codec,
+    string? ExpectedType,
+    MemberCopyPlan? Copy)
 {
-    private static readonly SyntaxAnnotation InstanceHole = new("Orleans.Emission.Instance");
-    private static readonly SyntaxAnnotation ValueHole = new("Orleans.Emission.Value");
-    private static readonly SyntaxAnnotation ContextHole = new("Orleans.Emission.Context");
-
-    internal static IdentifierNameSyntax Instance => IdentifierName("instance").WithAdditionalAnnotations(InstanceHole);
-    internal static IdentifierNameSyntax Value => IdentifierName("value").WithAdditionalAnnotations(ValueHole);
-    internal static IdentifierNameSyntax Context => IdentifierName("context").WithAdditionalAnnotations(ContextHole);
-
-    public ExpressionSyntax GetGetter(ExpressionSyntax instance) => Bind(Getter.Syntax, instance, null, null);
-    public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value) => Bind(Setter.Syntax, instance, value, null);
-    public ExpressionSyntax GetCopy(ExpressionSyntax instance, ExpressionSyntax context)
+    public string GetGetter(string instance) => Getter.Get(instance);
+    public string GetSetter(string instance, string value) => Setter.Set(instance, value);
+    public string GetCopy(string instance, string context)
     {
-        Debug.Assert(Copy.HasValue);
-        return Bind(Copy!.Value.Syntax, instance, null, context);
+        Debug.Assert(Copy is not null);
+        return Copy!.Copy(Getter.Get(instance), context);
     }
-
-    private static ExpressionSyntax Bind(ExpressionSyntax expression, ExpressionSyntax instance, ExpressionSyntax? value, ExpressionSyntax? context)
-        => expression.ReplaceNodes(expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
-            .Where(static node => node.HasAnnotation(InstanceHole) || node.HasAnnotation(ValueHole) || node.HasAnnotation(ContextHole)),
-            (node, _) => node.HasAnnotation(InstanceHole) ? instance : node.HasAnnotation(ValueHole) ? value! : context!);
 }
 
 internal sealed record SerializerEmissionPlan(
     SerializableTypeEmissionPlan Type,
-    EmissionSyntax<TypeSyntax> BaseType,
-    EmissionSyntax<TypeSyntax>? AdditionalInterface,
+    string BaseType,
+    string? AdditionalInterface,
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
     EquatableArray<MemberEmissionPlan> Members,
@@ -214,8 +310,8 @@ internal sealed record CopierEmissionPlan(
     bool IsShallowCopyable,
     bool IsExceptionType,
     bool OnlyDeepFields,
-    EmissionSyntax<TypeSyntax> BaseType,
-    EmissionSyntax<TypeSyntax> AdditionalInterface,
+    string BaseType,
+    string AdditionalInterface,
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
     EquatableArray<MemberEmissionPlan> Members);
@@ -227,23 +323,36 @@ internal sealed record ConstructionEmissionPlan(
 {
     public static ConstructionEmissionPlan Create(GeneratedTypeConstruction construction)
         => new(construction.HasBaseContract, construction.Parameters.Select(static parameter =>
-            new ConstructorParameterEmissionPlan(parameter.Type, parameter.Name)).ToImmutableArray());
+            new ConstructorParameterEmissionPlan(CodeText.Type(parameter.Type), CodeText.Identifier(parameter.Name))).ToImmutableArray());
+
+    /// <summary>Appends <c>Type name, ...</c> for the constructor's parameter list.</summary>
+    public void AppendParameters(StringBuilder builder)
+    {
+        for (var i = 0; i < Parameters.Count; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append(Parameters[i].Type).Append(' ').Append(Parameters[i].Name);
+        }
+    }
 }
 
-internal sealed record ConstructorParameterEmissionPlan(EmissionSyntax<TypeSyntax> Type, string Name)
-{
-    public ParameterSyntax ToSyntax() => Parameter(Name.ToIdentifier()).WithType(Type.Syntax);
-}
+internal sealed record ConstructorParameterEmissionPlan(string Type, string Name);
 
 internal sealed record ActivatorEmissionPlan(
     SerializableTypeEmissionPlan Type,
-    EmissionSyntax<TypeSyntax> BaseInterface,
-    EquatableArray<EmissionSyntax<TypeSyntax>> ConstructorParameters);
+    string BaseInterface,
+    EquatableArray<string> ConstructorParameters);
 
+// TypeSyntax is the serializable type's identity spelling, which names its source hint.
 internal sealed record DtoSerializerOutputPlan(
     SerializerEmissionPlan Serializer,
     CopierEmissionPlan? Copier,
     ActivatorEmissionPlan? Activator,
     string AssemblyName,
     TypeMetadataIdentity MetadataIdentity,
-    string GeneratedNamespace);
+    string GeneratedNamespace,
+    string TypeSyntax);

@@ -474,24 +474,22 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task ReachablePlanGraph_ContainsDetachedFragmentsNotCompilationStateOrInputText()
+    public async Task ReachablePlanGraph_ContainsSpelledTextNotSyntaxOrCompilationState()
     {
         var compilation = await TestCompilationHelper.CreateCompilation(RichSource);
         var (_, result) = Run(CreateDriver(), compilation);
         var plans = GetPlans(result);
         Assert.Equal(5, plans.Length);
-        var inputTrees = compilation.SyntaxTrees.ToArray();
-        var inputTexts = inputTrees.Select(tree => tree.GetText(TestContext.Current.CancellationToken)).ToArray();
         var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-        var fragmentCount = 0;
+        var textCount = 0;
         foreach (var plan in plans)
         {
             Inspect(plan, plan.MetadataIdentity.MetadataName);
         }
 
-        Assert.True(fragmentCount > 0);
-        output.WriteLine($"Inspected {plans.Length} DTO plans, {visited.Count} reachable objects and {fragmentCount} syntax fragments. " +
-            "Traversal covers plan instance fields and sequence contents; syntax is inspected through its logical root, not Roslyn's global metadata caches.");
+        Assert.True(textCount > 0);
+        output.WriteLine($"Inspected {plans.Length} DTO plans, {visited.Count} reachable objects and {textCount} spelled text fragments. " +
+            "Traversal covers plan instance fields and sequence contents.");
 
         void Inspect(object? value, string path)
         {
@@ -503,36 +501,16 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
             Assert.False(value is Compilation, $"{path} retains a Compilation");
             Assert.False(value is ISymbol, $"{path} retains an ISymbol");
             Assert.False(value is SemanticModel, $"{path} retains a SemanticModel");
-            if (value is SourceText text)
-            {
-                Assert.DoesNotContain(inputTexts, original => ReferenceEquals(original, text));
-                return;
-            }
-
-            if (value is SyntaxTree tree)
-            {
-                Assert.DoesNotContain(inputTrees, original => ReferenceEquals(original, tree));
-                if (tree.TryGetText(out var treeText))
-                {
-                    Inspect(treeText, path + ".Text");
-                }
-
-                return;
-            }
-
-            if (value is SyntaxNode syntax)
-            {
-                fragmentCount++;
-                var root = syntax.AncestorsAndSelf().Last();
-                Inspect(root.SyntaxTree, path + ".SyntaxTree");
-                // Constructed expression/type fragments must not hide an input declaration or a rendered method/class.
-                Assert.DoesNotContain(root.DescendantNodesAndSelf(),
-                    static node => node is CompilationUnitSyntax or MemberDeclarationSyntax);
-                return;
-            }
+            Assert.False(value is SyntaxNode or SyntaxTree or SourceText, $"{path} retains syntax or source text");
 
             var type = value.GetType();
-            if (value is string || type.IsPrimitive || type.IsEnum)
+            if (value is string)
+            {
+                textCount++;
+                return;
+            }
+
+            if (type.IsPrimitive || type.IsEnum)
             {
                 return;
             }
@@ -547,7 +525,6 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
 
                 return;
             }
-
             // Only descend into owned plan data, never runtime Type metadata or framework global caches.
             Assert.Equal(typeof(DtoSerializerOutputPlan).Assembly, type.Assembly);
             for (var current = type; current is not null && current != typeof(object) && current != typeof(ValueType); current = current.BaseType)
