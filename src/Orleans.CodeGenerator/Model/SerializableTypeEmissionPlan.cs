@@ -172,7 +172,6 @@ internal sealed record MemberEmissionPlan(
     uint FieldId,
     bool IsPrimaryConstructorParameter,
     bool IsValueType,
-    bool IsShallowCopyable,
     EmissionSyntax<ExpressionSyntax> Getter,
     EmissionSyntax<ExpressionSyntax> Setter,
     EmissionSyntax<ExpressionSyntax>? Codec,

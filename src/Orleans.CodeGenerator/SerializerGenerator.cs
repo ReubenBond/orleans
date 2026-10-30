@@ -70,9 +70,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 ? TypeOfExpression(member.Member.TypeSyntax)
                 : fieldDescriptions.OfType<TypeFieldDescription>()
                     .First(field => SymbolEqualityComparer.Default.Equals(field.UnderlyingType, memberType)).FieldName.ToIdentifierName();
-            // Copyability belongs to copier planning; serializer-only members can have recursive value-type graphs.
             return new MemberEmissionPlan(member.Member.FieldId, member.IsPrimaryConstructorParameter,
-                member.IsValueType, IsShallowCopyable: false,
+                member.IsValueType,
                 member.GetGetter(MemberEmissionPlan.Instance),
                 member.GetSetter(MemberEmissionPlan.Instance, MemberEmissionPlan.Value),
                 new EmissionSyntax<ExpressionSyntax>(codec),
@@ -931,7 +930,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         ExpressionSyntax createValueExpression = type.UseActivator switch
         {
-            true => InvocationExpression(serializerFields.Single(static field => field.FieldName == ActivatorFieldName).FieldName.ToIdentifierName().Member("Create")),
+            true => InvocationExpression(serializerFields.Single(static field => field.Kind == EmissionFieldKind.Service
+                && field.FieldName == ActivatorFieldName).FieldName.ToIdentifierName().Member("Create")),
             false => type.GetObjectCreationExpression()
         };
 
