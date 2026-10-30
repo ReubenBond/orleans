@@ -88,21 +88,24 @@ internal readonly struct SerializableTypeResult(
     Diagnostic? diagnostic,
     TypeMetadataIdentity metadataIdentity,
     SourceLocationModel sourceLocation,
-    string typeSyntax) : IEquatable<SerializableTypeResult>
+    string typeSyntax,
+    EnumSerializerOutputPlan? enumSerializerPlan = null) : IEquatable<SerializableTypeResult>
 {
     public SerializableTypeModel? Model { get; } = model;
     public Diagnostic? Diagnostic { get; } = diagnostic;
     public TypeMetadataIdentity MetadataIdentity { get; } = metadataIdentity;
     public SourceLocationModel SourceLocation { get; } = sourceLocation;
     public string TypeSyntax { get; } = typeSyntax;
+    public EnumSerializerOutputPlan? EnumSerializerPlan { get; } = enumSerializerPlan;
 
-    public static SerializableTypeResult FromModel(SerializableTypeModel model)
+    public static SerializableTypeResult FromModel(SerializableTypeModel model, EnumSerializerOutputPlan? enumSerializerPlan = null)
         => new(
             model,
             diagnostic: null,
             model?.MetadataIdentity ?? TypeMetadataIdentity.Empty,
             model?.SourceLocation ?? default,
-            model?.TypeSyntax.SyntaxString ?? string.Empty);
+            model?.TypeSyntax.SyntaxString ?? string.Empty,
+            enumSerializerPlan);
 
     public static SerializableTypeResult FromDiagnostic(
         Diagnostic diagnostic,
@@ -116,7 +119,8 @@ internal readonly struct SerializableTypeResult(
             && SourceGeneratorDiagnosticComparer.AreEqual(Diagnostic, other.Diagnostic)
             && MetadataIdentity.Equals(other.MetadataIdentity)
             && SourceLocation.Equals(other.SourceLocation)
-            && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal);
+            && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal)
+            && EqualityComparer<EnumSerializerOutputPlan?>.Default.Equals(EnumSerializerPlan, other.EnumSerializerPlan);
 
     public override bool Equals(object? obj) => obj is SerializableTypeResult other && Equals(other);
 
@@ -129,6 +133,7 @@ internal readonly struct SerializableTypeResult(
             hash = hash * 31 + MetadataIdentity.GetHashCode();
             hash = hash * 31 + SourceLocation.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeSyntax ?? string.Empty);
+            hash = hash * 31 + (EnumSerializerPlan?.GetHashCode() ?? 0);
             return hash;
         }
     }
@@ -228,9 +233,12 @@ internal static class SourceGeneratorDiagnosticComparer
             return false;
         }
 
+        // Location equality preserves current SyntaxTree provenance even when the displayed diagnostic is unchanged.
         return string.Equals(left.Id, right.Id, StringComparison.Ordinal)
             && left.Severity == right.Severity
             && left.WarningLevel == right.WarningLevel
+            && Equals(left.Location, right.Location)
+            && left.AdditionalLocations.SequenceEqual(right.AdditionalLocations)
             && string.Equals(left.ToString(), right.ToString(), StringComparison.Ordinal);
     }
 
@@ -246,6 +254,11 @@ internal static class SourceGeneratorDiagnosticComparer
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id ?? string.Empty);
             hash = hash * 31 + (int)diagnostic.Severity;
             hash = hash * 31 + diagnostic.WarningLevel;
+            hash = hash * 31 + diagnostic.Location.GetHashCode();
+            foreach (var location in diagnostic.AdditionalLocations)
+            {
+                hash = hash * 31 + location.GetHashCode();
+            }
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(diagnostic.ToString() ?? string.Empty);
             return hash;
         }
