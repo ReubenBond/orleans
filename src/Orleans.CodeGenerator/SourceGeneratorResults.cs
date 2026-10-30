@@ -89,7 +89,8 @@ internal readonly struct SerializableTypeResult(
     TypeMetadataIdentity metadataIdentity,
     SourceLocationModel sourceLocation,
     string typeSyntax,
-    EnumSerializerOutputPlan? enumSerializerPlan = null) : IEquatable<SerializableTypeResult>
+    EnumSerializerOutputPlan? enumSerializerPlan = null,
+    DtoSerializerOutputPlan? dtoSerializerPlan = null) : IEquatable<SerializableTypeResult>
 {
     public SerializableTypeModel? Model { get; } = model;
     public Diagnostic? Diagnostic { get; } = diagnostic;
@@ -97,15 +98,18 @@ internal readonly struct SerializableTypeResult(
     public SourceLocationModel SourceLocation { get; } = sourceLocation;
     public string TypeSyntax { get; } = typeSyntax;
     public EnumSerializerOutputPlan? EnumSerializerPlan { get; } = enumSerializerPlan;
+    public DtoSerializerOutputPlan? DtoSerializerPlan { get; } = dtoSerializerPlan;
 
-    public static SerializableTypeResult FromModel(SerializableTypeModel model, EnumSerializerOutputPlan? enumSerializerPlan = null)
+    public static SerializableTypeResult FromModel(SerializableTypeModel model, EnumSerializerOutputPlan? enumSerializerPlan = null,
+        DtoSerializerOutputPlan? dtoSerializerPlan = null, Diagnostic? diagnostic = null)
         => new(
             model,
-            diagnostic: null,
+            diagnostic,
             model?.MetadataIdentity ?? TypeMetadataIdentity.Empty,
             model?.SourceLocation ?? default,
             model?.TypeSyntax.SyntaxString ?? string.Empty,
-            enumSerializerPlan);
+            enumSerializerPlan,
+            dtoSerializerPlan);
 
     public static SerializableTypeResult FromDiagnostic(
         Diagnostic diagnostic,
@@ -120,7 +124,8 @@ internal readonly struct SerializableTypeResult(
             && MetadataIdentity.Equals(other.MetadataIdentity)
             && SourceLocation.Equals(other.SourceLocation)
             && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal)
-            && EqualityComparer<EnumSerializerOutputPlan?>.Default.Equals(EnumSerializerPlan, other.EnumSerializerPlan);
+            && EqualityComparer<EnumSerializerOutputPlan?>.Default.Equals(EnumSerializerPlan, other.EnumSerializerPlan)
+            && EqualityComparer<DtoSerializerOutputPlan?>.Default.Equals(DtoSerializerPlan, other.DtoSerializerPlan);
 
     public override bool Equals(object? obj) => obj is SerializableTypeResult other && Equals(other);
 
@@ -134,6 +139,7 @@ internal readonly struct SerializableTypeResult(
             hash = hash * 31 + SourceLocation.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeSyntax ?? string.Empty);
             hash = hash * 31 + (EnumSerializerPlan?.GetHashCode() ?? 0);
+            hash = hash * 31 + (DtoSerializerPlan?.GetHashCode() ?? 0);
             return hash;
         }
     }
