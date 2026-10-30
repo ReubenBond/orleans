@@ -101,6 +101,9 @@ jobs:
     - name: Test dependency cache policy
       shell: pwsh
       run: ./.github/scripts/test-dependency-cache.ps1
+    - name: Test Dashboard frontend incrementality
+      shell: pwsh
+      run: ./.github/scripts/test-dashboard-frontend.ps1
     - name: Build
       run: dotnet build -bl
     - name: Check CodeGen graph inventory
