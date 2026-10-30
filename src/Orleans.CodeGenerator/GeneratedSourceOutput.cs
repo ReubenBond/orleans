@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -139,6 +140,19 @@ internal static class GeneratedSourceOutput
         ImmutableArray<SourceOutputResult>.Builder sourceEntries)
         => DeduplicateSourceOutputs(sourceEntries.ToImmutable());
 
+    internal static ImmutableArray<SourceOutputResult> DeduplicateSerializableSourceOutputs(
+        ImmutableArray<SourceOutputResult> sourceEntries)
+    {
+        Debug.Assert(sourceEntries.All(static output => output.SourceEntry is null || output.SerializableIdentity is not null));
+        // The first owner retains a colliding hint, so all emission paths share the discovery model's canonical order.
+        return DeduplicateSourceOutputs([.. sourceEntries
+            .OrderBy(static output => output.SerializableIdentity is null ? 1 : 0)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.TypeSyntax, StringComparer.Ordinal)]);
+    }
+
     internal static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
         ImmutableArray<SourceOutputResult> sourceEntries)
     {
@@ -182,7 +196,7 @@ internal static class GeneratedSourceOutput
             var uniqueHintName = CreateDistinctSourceHintName(entry.HintName, source, emittedSourceByHintName);
             emittedSources.Add(source, uniqueHintName);
             emittedSourceByHintName.Add(uniqueHintName, source);
-            result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source)));
+            result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source), sourceOutput.SerializableIdentity));
         }
 
         return NormalizeSourceOutputs(result.ToImmutable());
