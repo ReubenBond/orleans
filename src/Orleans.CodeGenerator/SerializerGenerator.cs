@@ -28,6 +28,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         => HotReloadSafe && !type.IsEnumType && type.SupportsHotReloadMemberAddition;
 
     public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
+        => Generate(type, out _);
+
+    public ClassDeclarationSyntax Generate(ISerializableTypeDescription type, out AttributeListSyntax? dependencyContract)
     {
         var simpleClassName = GetSimpleClassName(type);
 
@@ -54,6 +57,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
+        dependencyContract = SerializerDependencyContract.CreateAttribute(type,
+            fieldDescriptions.OfType<CodecFieldDescription>().Select(static field => field.UnderlyingType), simpleClassName);
         var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
         var ctor = GenerateConstructor(simpleClassName, fieldDescriptions);
 

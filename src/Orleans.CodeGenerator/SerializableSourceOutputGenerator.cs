@@ -224,10 +224,11 @@ internal static class SerializableSourceOutputGenerator
         string hintGeneratedNamespace,
         int genericArity)
     {
-        var serializer = serializerGenerator.Generate(typeDescription);
+        var serializer = serializerGenerator.Generate(typeDescription, out var serializerContract);
+        AttributeListSyntax? copierContract = null;
         var copier = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
             ? null
-            : copierGenerator.GenerateCopier(typeDescription, defaultCopiers);
+            : copierGenerator.GenerateCopier(typeDescription, defaultCopiers, out copierContract);
         var activatorClass = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
             ? activatorGenerator.GenerateActivator(typeDescription)
             : null;
@@ -242,7 +243,9 @@ internal static class SerializableSourceOutputGenerator
                 serializer,
                 copier,
                 activatorClass,
-                typeDescription.GeneratedNamespace));
+                typeDescription.GeneratedNamespace,
+                serializerContract,
+                copierContract));
     }
 
     internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)
@@ -468,5 +471,4 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-
 

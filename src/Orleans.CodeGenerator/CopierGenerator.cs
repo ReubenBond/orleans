@@ -26,7 +26,14 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     public ClassDeclarationSyntax? GenerateCopier(
         ISerializableTypeDescription type,
         Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers)
+        => GenerateCopier(type, defaultCopiers, out _);
+
+    public ClassDeclarationSyntax? GenerateCopier(
+        ISerializableTypeDescription type,
+        Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers,
+        out AttributeListSyntax? dependencyContract)
     {
+        dependencyContract = null;
         var isShallowCopyable = type.IsShallowCopyable;
         if (isShallowCopyable && !type.IsGenericType)
         {
@@ -35,6 +42,10 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         }
 
         var simpleClassName = GetSimpleClassName(type);
+        if (isShallowCopyable)
+        {
+            dependencyContract = SerializerDependencyContract.CreateAttribute(type, [], simpleClassName);
+        }
 
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
@@ -77,6 +88,8 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         if (!isShallowCopyable)
         {
             var fieldDescriptions = GetFieldDescriptions(type, members, isExceptionType, out var onlyDeepFields);
+            dependencyContract = SerializerDependencyContract.CreateAttribute(type,
+                fieldDescriptions.OfType<CopierFieldDescription>().Select(static field => field.UnderlyingType), simpleClassName);
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
             var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType);
 

@@ -199,7 +199,9 @@ internal static class GeneratedSourceOutput
         ClassDeclarationSyntax serializer,
         ClassDeclarationSyntax? copier,
         ClassDeclarationSyntax? activator,
-        string generatedNamespace)
+        string generatedNamespace,
+        AttributeListSyntax? serializerContract = null,
+        AttributeListSyntax? copierContract = null)
     {
         var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
         AddMember(namespacedMembers, generatedNamespace, serializer);
@@ -213,9 +215,20 @@ internal static class GeneratedSourceOutput
             AddMember(namespacedMembers, generatedNamespace, activator);
         }
 
+        var contracts = new List<AttributeListSyntax>(2);
+        if (serializerContract is not null)
+        {
+            contracts.Add(serializerContract);
+        }
+
+        if (copierContract is not null)
+        {
+            contracts.Add(copierContract);
+        }
+
         return new GeneratedSourceEntry(
             CreateSerializableHintName(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity),
-            CreateSourceString(CreateCompilationUnit(namespacedMembers)));
+            CreateSourceString(CreateCompilationUnit(namespacedMembers, SyntaxFactory.List(contracts))));
     }
 
     internal static void AddMember(
