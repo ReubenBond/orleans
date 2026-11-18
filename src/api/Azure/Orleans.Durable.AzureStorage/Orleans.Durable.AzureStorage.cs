@@ -6,6 +6,20 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+namespace Orleans.Hosting
+{
+    public static partial class AzureStorageDurableJobsExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureTableDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureTableJournalStorageOptions> configure) { throw null; }
+    }
+}
+
 namespace Orleans.Journaling
 {
     public sealed partial class AzureBlobJournalStorageOptions
