@@ -4,6 +4,7 @@ namespace Orleans.Journaling;
 /// Identifies how far an observed change has progressed toward durability.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.DurableChangeStatus")]
 public enum DurableChangeStatus : byte
 {
     /// <summary>
@@ -32,6 +33,7 @@ public enum DurableChangeStatus : byte
 /// </remarks>
 [Flags]
 [GenerateSerializer]
+[Alias("Orleans.Journaling.DurableWatchMode")]
 public enum DurableWatchMode : byte
 {
     /// <summary>
@@ -60,6 +62,7 @@ public enum DurableWatchMode : byte
 /// intermediate values.
 /// </remarks>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.ValueChange`1")]
 public readonly record struct ValueChange<T>
 {
     /// <summary>
@@ -85,6 +88,7 @@ public readonly record struct ValueChange<T>
 /// Identifies the kind of a <see cref="DictionaryChange{TKey, TValue}"/>.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.DictionaryChangeKind")]
 public enum DictionaryChangeKind : byte
 {
     /// <summary>
@@ -119,6 +123,7 @@ public enum DictionaryChangeKind : byte
 /// <typeparam name="TKey">The key type.</typeparam>
 /// <typeparam name="TValue">The value type.</typeparam>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.DictionaryChange`2")]
 public readonly record struct DictionaryChange<TKey, TValue> : IDurableChange<DictionaryChange<TKey, TValue>>
     where TKey : notnull
 {
@@ -169,6 +174,7 @@ public readonly record struct DictionaryChange<TKey, TValue> : IDurableChange<Di
 /// Identifies the kind of a <see cref="ListChange{T}"/>.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.ListChangeKind")]
 public enum ListChangeKind : byte
 {
     /// <summary>
@@ -212,6 +218,7 @@ public enum ListChangeKind : byte
 /// </summary>
 /// <typeparam name="T">The item type.</typeparam>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.ListChange`1")]
 public readonly record struct ListChange<T> : IDurableChange<ListChange<T>>
 {
     /// <summary>
@@ -262,6 +269,7 @@ public readonly record struct ListChange<T> : IDurableChange<ListChange<T>>
 /// Identifies the kind of a <see cref="SetChange{T}"/>.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.SetChangeKind")]
 public enum SetChangeKind : byte
 {
     /// <summary>
@@ -295,6 +303,7 @@ public enum SetChangeKind : byte
 /// </summary>
 /// <typeparam name="T">The item type.</typeparam>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.SetChange`1")]
 public readonly record struct SetChange<T> : IDurableChange<SetChange<T>>
 {
     /// <summary>
@@ -338,6 +347,7 @@ public readonly record struct SetChange<T> : IDurableChange<SetChange<T>>
 /// Identifies the kind of a <see cref="QueueChange{T}"/>.
 /// </summary>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.QueueChangeKind")]
 public enum QueueChangeKind : byte
 {
     /// <summary>
@@ -371,6 +381,7 @@ public enum QueueChangeKind : byte
 /// </summary>
 /// <typeparam name="T">The item type.</typeparam>
 [GenerateSerializer]
+[Alias("Orleans.Journaling.QueueChange`1")]
 public readonly record struct QueueChange<T> : IDurableChange<QueueChange<T>>
 {
     /// <summary>
