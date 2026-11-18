@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Messaging;
 
-internal sealed class MessagingInstruments(OrleansInstruments instruments)
+internal sealed class DurableMessagingInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string GrainTypeTagName = "grain_type";
@@ -20,7 +20,7 @@ internal sealed class MessagingInstruments(OrleansInstruments instruments)
     private readonly UpDownCounter<long> _inboxDepth = instruments.Meter.CreateUpDownCounter<long>("orleans-messaging-inbox-depth");
     private readonly UpDownCounter<long> _outboxDepth = instruments.Meter.CreateUpDownCounter<long>("orleans-messaging-outbox-depth");
 
-    internal static MessagingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
+    internal static DurableMessagingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
 
     internal void OnInboxDepthChanged(string grainType, int delta) => AddDepth(_inboxDepth, grainType, delta);
 

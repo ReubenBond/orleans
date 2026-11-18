@@ -74,7 +74,7 @@ public static class MessagingExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigurationValidator, DurableMessagingOptionsValidator>());
 
         services.ConfigureNamedOptionForLogging<DurableMessagingOptions>(Options.DefaultName);
-        services.TryAddSingleton<MessagingInstruments>();
+        services.TryAddSingleton<DurableMessagingInstruments>();
         services.TryAddSingleton<IOutboxTransport, GrainOutboxTransport>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
