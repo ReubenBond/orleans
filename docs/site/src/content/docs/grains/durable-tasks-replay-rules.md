@@ -10,7 +10,7 @@ ms.topic: reference
 A durable task resumes after a deactivation or a failure by running its body again from
 the start, while each recorded operation returns its recorded outcome. The rules on this
 page keep that replay equivalent to the run which recorded the operations. The
-`Microsoft.Orleans.DurableTasks.Abstractions` package carries analyzers which check them
+`Microsoft.Orleans.Durable.Abstractions` package carries analyzers which check them
 at build time and report diagnostics ORLEANS0200 to ORLEANS0223; each diagnostic's page
 shows the code which triggers it and common fixes.
 
