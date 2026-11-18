@@ -2,7 +2,6 @@
   <PropertyGroup>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
