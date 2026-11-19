@@ -17,6 +17,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Storage;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.DurableJobs;
 
@@ -583,6 +584,10 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
+        if (_serviceProvider.GetService<DurableObservationSource>() is { } observations)
+        {
+            state.ConfigureObservations(observations, $"{descriptor.Provider.Name}:{descriptor.StorageId}");
+        }
         var fence = new JournaledJobShardOwnershipFence(
             _serviceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(_journaledStateManagerOptions.JournalFormatKey));
         var manager = descriptor.Provider.Factory.CreateStandalone(descriptor.StorageId);

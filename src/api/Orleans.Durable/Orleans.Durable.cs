@@ -30,6 +30,65 @@ namespace Orleans.Configuration
     }
 }
 
+namespace Orleans.Durable.Diagnostics
+{
+    public sealed partial record DurableObservation()
+    {
+        public string? AttemptId { get { throw null; } init { } }
+
+        public required string Component { get { throw null; } init { } }
+
+        public string? Detail { get { throw null; } init { } }
+
+        public System.DateTimeOffset? DueTime { get { throw null; } init { } }
+
+        public System.Guid Epoch { get { throw null; } }
+
+        public System.Guid Incarnation { get { throw null; } init { } }
+
+        public bool IsCommitted { get { throw null; } init { } }
+
+        public string? JobId { get { throw null; } init { } }
+
+        public string? MessageId { get { throw null; } init { } }
+
+        public required string Owner { get { throw null; } init { } }
+
+        public string? RelatedGrainId { get { throw null; } init { } }
+
+        public string? RelatedTaskId { get { throw null; } init { } }
+
+        public long Sequence { get { throw null; } }
+
+        public string? TaskId { get { throw null; } init { } }
+
+        public System.DateTimeOffset Timestamp { get { throw null; } init { } }
+
+        public string? TraceParent { get { throw null; } init { } }
+
+        public required string Transition { get { throw null; } init { } }
+
+        public string? WireTaskId { get { throw null; } init { } }
+
+        public long? WriteVersion { get { throw null; } }
+    }
+
+    public sealed partial class DurableObservationSource : System.IObservable<DurableObservation>, System.IDisposable
+    {
+        public const int DefaultCapacity = 256;
+        public const string MeterName = "Orleans.Durable.Observations";
+        public DurableObservationSource(Microsoft.Extensions.Logging.ILogger<DurableObservationSource> logger) { }
+
+        public long DroppedCount { get { throw null; } }
+
+        public void Dispose() { }
+
+        public System.IDisposable Subscribe(System.IObserver<DurableObservation> observer, int capacity) { throw null; }
+
+        public System.IDisposable Subscribe(System.IObserver<DurableObservation> observer) { throw null; }
+    }
+}
+
 namespace Orleans.DurableJobs
 {
     [GenerateSerializer]

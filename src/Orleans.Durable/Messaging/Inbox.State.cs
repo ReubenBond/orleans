@@ -5,11 +5,13 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Journaling;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.Messaging;
 
 internal sealed partial class Inbox
 {
+    private CommittedObservationBuffer? _observations;
     private readonly Dictionary<MessageId, InboxEntry> _messages = [];
     private readonly Dictionary<MessageId, InboxProcessedEntry> _processed = [];
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
@@ -64,6 +66,7 @@ internal sealed partial class Inbox
 
     private void OnWriteCaptured(bool snapshot = false)
     {
+        _observations?.Capture();
         _capturedSequence = _lastSequence;
         _capturedAdmissionFloor = _admissionFloor;
         _capturedSnapshot = snapshot;
@@ -72,6 +75,7 @@ internal sealed partial class Inbox
 
     void IStateMachine.OnWriteCompleted()
     {
+        _observations?.Acknowledge();
         _durableSequence = _capturedSequence;
         _durableAdmissionFloor = _capturedAdmissionFloor;
         // Floor-only appends stay constant-time; snapshots reclaim history after their admission floor is durable.
@@ -100,7 +104,9 @@ internal sealed partial class Inbox
     private void Emit(InboxCommand command)
     {
         Shared.InboxCodec.WriteSet(command, _writer);
+        var observation = CreateObservation(command);
         Apply(command);
+        if (observation is not null) _observations!.Stage(observation);
         var dueTime = command switch
         {
             { Kind: InboxCommandKind.Accept, Message: { } message } => message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
@@ -113,6 +119,7 @@ internal sealed partial class Inbox
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _observations?.Reset();
         ReportDepth(-_messages.Count);
         _writer = writer;
         _messages.Clear();
@@ -123,6 +130,31 @@ internal sealed partial class Inbox
         _capturedSnapshot = false;
         _stoppedCleanly = false;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
+    }
+
+    private DurableObservation? CreateObservation(InboxCommand command)
+    {
+        if (Shared.Observations is not { IsEnabled: true } source) return null;
+        var transition = command.Kind switch
+        {
+            InboxCommandKind.Accept => "Accepted",
+            InboxCommandKind.Retry => "RetryScheduled",
+            InboxCommandKind.Complete when command.DeadLetter is not null => "DeadLettered",
+            InboxCommandKind.Complete when command.Rejection is not null => "Rejected",
+            InboxCommandKind.Complete => _messages.ContainsKey(command.MessageId) ? "Completed" : "AcceptedAndCompleted",
+            _ => null
+        };
+        if (transition is null) return null;
+        _observations ??= new(source);
+        return new()
+        {
+            Owner = GrainContext.GrainId.ToString(),
+            Component = "inbox",
+            Transition = transition,
+            Timestamp = Shared.JobTimeProvider.GetUtcNow(),
+            MessageId = (command.Message?.Envelope.MessageId ?? command.MessageId).ToString(),
+            DueTime = command.Message?.Envelope.DeliverAt ?? command.State?.NextAttemptAt
+        };
     }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>

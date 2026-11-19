@@ -663,7 +663,8 @@ public partial class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null,
+        Orleans.Durable.Diagnostics.DurableObservationSource? observations = null)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournaling();
@@ -673,6 +674,7 @@ public partial class JournaledJobShardManagerTests
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         builder.Services.AddSingleton(catalog ?? (IJournalStorageCatalog)storageProvider);
+        if (observations is not null) builder.Services.AddSingleton(observations);
         return builder.Services.BuildServiceProvider();
     }
 

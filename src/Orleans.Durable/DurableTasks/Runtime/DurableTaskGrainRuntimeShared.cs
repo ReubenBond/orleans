@@ -7,6 +7,7 @@ using Orleans.DurableJobs;
 using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.DurableTasks.Runtime;
 
@@ -16,8 +17,10 @@ internal sealed class DurableTaskGrainRuntimeShared(
     ILogger<DurableTaskGrainRuntime> logger,
     IOptions<DurableTaskOptions> options,
     IOptions<DurableMessagingOptions> messagingOptions,
-    Serializer serializer)
+    Serializer serializer,
+    DurableObservationSource? observations = null)
 {
+    public DurableObservationSource? Observations { get; } = observations;
     public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
     /// <summary>
     /// Gets the Durable Jobs clock, which Messaging compares <c>Envelope.DeliverAt</c> and outbox retry times against. Logical

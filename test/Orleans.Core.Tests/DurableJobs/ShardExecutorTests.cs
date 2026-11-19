@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.DurableJobs;
+using Orleans.Durable.Diagnostics;
 using Orleans.Runtime.Messaging;
 using Xunit;
 
@@ -19,6 +21,90 @@ namespace NonSilo.Tests.ScheduledJobs;
 [TestArea("DurableJobs")]
 public class ShardExecutorTests
 {
+    [Theory]
+    [InlineData(DurableJobMutationResult.Applied)]
+    [InlineData(DurableJobMutationResult.JobNotFound)]
+    public async Task JobCompletionObservationRequiresAcknowledgedRemoval(DurableJobMutationResult removalResult)
+    {
+        using var source = new DurableObservationSource(NullLogger<DurableObservationSource>.Instance);
+        var observer = new JobObservationObserver();
+        using var subscription = source.Subscribe(observer);
+        var jobs = CreateJobs(1);
+        var shard = CreateJobShard(jobs);
+        var factory = CreateGrainFactory();
+        var handled = new List<string>();
+        ConfigureGrainFactoryToTrackCompletions(factory, handled);
+        var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removal = new TaskCompletionSource<DurableJobMutationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        shard.RemoveJobAsync(jobs[0].Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            removalEntered.TrySetResult();
+            return removal.Task;
+        });
+        var executor = new ShardExecutor(factory, CreateOptions(maxConcurrentJobs: 1),
+            CreateOverloadDetector(isOverloaded: false), NullLogger<ShardExecutor>.Instance, observations: source);
+        var running = executor.RunShardAsync(shard, TestContext.Current.CancellationToken);
+        try
+        {
+            await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.False(running.IsCompleted);
+            var started = Assert.Single(await observer.DrainAsync(source));
+            Assert.Equal("AttemptStarted", started.Transition);
+            Assert.Equal("job-0", started.JobId);
+            Assert.Equal(shard.Id, started.Owner);
+            Assert.False(started.IsCommitted);
+            Assert.Null(started.WriteVersion);
+            Assert.False(string.IsNullOrEmpty(started.AttemptId));
+
+            removal.SetResult(removalResult);
+            await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            var events = await observer.DrainAsync(source);
+            Assert.Equal(removalResult == DurableJobMutationResult.Applied ? ["Completed", "AttemptStopped"] : ["AttemptStopped"],
+                events.Select(item => item.Transition).ToArray());
+            Assert.All(events, item =>
+            {
+                Assert.Equal(started.JobId, item.JobId);
+                Assert.Equal(started.AttemptId, item.AttemptId);
+                Assert.Equal(started.Epoch, item.Epoch);
+            });
+            if (removalResult == DurableJobMutationResult.Applied)
+            {
+                Assert.True(events[0].IsCommitted);
+                Assert.Equal(1, events[0].WriteVersion);
+            }
+            Assert.False(events[^1].IsCommitted);
+            Assert.Null(events[^1].WriteVersion);
+            Assert.Equal(Enumerable.Range(1, events.Count + 1).Select(value => (long)value),
+                events.Prepend(started).Select(item => item.Sequence));
+            Assert.Equal(["job-0"], handled);
+        }
+        finally
+        {
+            removal.TrySetResult(removalResult);
+            await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+    }
+
+    private sealed class JobObservationObserver : IObserver<DurableObservation>
+    {
+        private readonly Channel<DurableObservation> _items = Channel.CreateUnbounded<DurableObservation>();
+        public void OnNext(DurableObservation value) => _items.Writer.TryWrite(value);
+        public void OnError(Exception error) { }
+        public void OnCompleted() { }
+        public async Task<List<DurableObservation>> DrainAsync(DurableObservationSource source)
+        {
+            var marker = new DurableObservation { Owner = "test", Component = "barrier", Transition = "barrier" };
+            source.Publish(marker);
+            var result = new List<DurableObservation>();
+            while (true)
+            {
+                var item = await _items.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                if (ReferenceEquals(marker, item)) return result;
+                result.Add(item);
+            }
+        }
+    }
+
     [Fact]
     public async Task RunShardAsync_WhenNotOverloaded_ProcessesJobsWithoutDelay()
     {

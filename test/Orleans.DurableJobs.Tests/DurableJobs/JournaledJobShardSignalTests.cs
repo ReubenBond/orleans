@@ -257,11 +257,11 @@ public partial class JournaledJobShardManagerTests
         private readonly Queue<AppendGate> _writes = new();
         private readonly CancellationTokenSource _timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
-        private SignalTest(TimeProvider? clock)
+        private SignalTest(TimeProvider? clock, Orleans.Durable.Diagnostics.DurableObservationSource? observations = null)
         {
             _timeout.CancelAfter(TimeSpan.FromSeconds(30));
             Storage = new CountingJournalStorageProvider(delayAppends: false, onAppend: OnAppendAsync);
-            Services = CreateServices(Storage, clock);
+            Services = CreateServices(Storage, clock, observations: observations);
         }
 
         public CancellationToken Token => _timeout.Token;
@@ -269,9 +269,10 @@ public partial class JournaledJobShardManagerTests
         public ServiceProvider Services { get; }
         public JournaledJobShard Shard { get; private set; } = null!;
 
-        public static async Task<SignalTest> CreateAsync(SignalTimeProvider? clock = null)
+        public static async Task<SignalTest> CreateAsync(SignalTimeProvider? clock = null,
+            Orleans.Durable.Diagnostics.DurableObservationSource? observations = null)
         {
-            var test = new SignalTest(clock);
+            var test = new SignalTest(clock, observations);
             var membership = new TestClusterMembershipService();
             var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5090), 0);
             membership.SetSiloStatus(silo, SiloStatus.Active);

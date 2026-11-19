@@ -12,6 +12,7 @@ using Orleans.Diagnostics;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Durable.Diagnostics;
 namespace Orleans.DurableJobs;
 
 /// <summary>
@@ -24,6 +25,7 @@ internal sealed partial class ShardExecutor
     private readonly DurableJobsOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly DurableJobsInstruments _durableJobsInstruments;
+    private readonly DurableObservationSource? _observations;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
     private int _currentCapacity;
@@ -38,13 +40,15 @@ internal sealed partial class ShardExecutor
     /// <param name="logger">The logger instance.</param>
     /// <param name="timeProvider">The time provider used to schedule job execution.</param>
     /// <param name="durableJobsInstruments">The durable jobs metrics instruments.</param>
+    /// <param name="observations">The operational observation source.</param>
     public ShardExecutor(
         IInternalGrainFactory grainFactory,
         IOptions<DurableJobsOptions> options,
         IOverloadDetector overloadDetector,
         ILogger<ShardExecutor> logger,
         [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null,
-        DurableJobsInstruments? durableJobsInstruments = null)
+        DurableJobsInstruments? durableJobsInstruments = null,
+        DurableObservationSource? observations = null)
     {
         _grainFactory = grainFactory;
         _logger = logger;
@@ -52,6 +56,7 @@ internal sealed partial class ShardExecutor
         _overloadDetector = overloadDetector;
         _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _observations = observations;
 
         _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
             ? _options.SlowStartInitialConcurrency
@@ -321,6 +326,25 @@ internal sealed partial class ShardExecutor
         _durableJobsInstruments.OnJobAttemptStarted(_timeProvider.GetUtcNow() - jobContext.Job.DueTime);
 
         using var activity = DurableJobsDiagnostics.StartExecuteActivity(jobContext.Job, jobContext.DequeueCount, jobContext.RunId);
+        CommittedObservationBuffer? attemptObservations = null;
+        DurableObservation? attemptObservation = null;
+        if (_observations is { IsEnabled: true } source)
+        {
+            attemptObservations = new(source);
+            attemptObservation = new()
+            {
+                Owner = shard is JournaledJobShard journaled ? $"{journaled.Provider.Name}:{journaled.StorageId}" : shard.Id,
+                Component = "job",
+                Transition = "AttemptStarted",
+                Timestamp = _timeProvider.GetUtcNow(),
+                JobId = jobContext.Job.Id,
+                AttemptId = jobContext.RunId,
+                RelatedGrainId = jobContext.Job.TargetGrainId.ToString(),
+                DueTime = jobContext.Job.DueTime,
+                TraceParent = jobContext.Job.TraceParent
+            };
+            attemptObservations.Activity(attemptObservation);
+        }
         try
         {
             try
@@ -349,6 +373,12 @@ internal sealed partial class ShardExecutor
                         var removeResult = await shard.RemoveJobAsync(jobContext.Job.Id, attemptCancellationToken);
                         if (removeResult == DurableJobMutationResult.Applied)
                         {
+                            if (attemptObservations is not null)
+                            {
+                                attemptObservations.Stage(attemptObservation! with { Transition = "Completed", Timestamp = _timeProvider.GetUtcNow() });
+                                attemptObservations.Capture();
+                                attemptObservations.Acknowledge();
+                            }
                             LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
                             _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                             activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
@@ -490,6 +520,10 @@ internal sealed partial class ShardExecutor
         }
         finally
         {
+            if (attemptObservations is not null)
+            {
+                attemptObservations.Activity(attemptObservation! with { Transition = "AttemptStopped", Timestamp = _timeProvider.GetUtcNow() });
+            }
             // Cleanup must happen even when retry persistence throws, otherwise slots leak and shard processing can stall.
             _jobConcurrencyLimiter.Release();
             runningTasks?.TryRemove(jobContext.RunId, out _);

@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Collections.Concurrent;
 using Orleans.DurableTasks;
+using Orleans.Durable.Diagnostics;
 using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -4345,7 +4346,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             bool initialize = true,
             TimeProvider? timeProvider = null,
             TimeSpan? deduplicationWindow = null,
-            bool reentrant = false)
+            bool reentrant = false,
+            DurableObservationSource? observations = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager, timeProvider);
@@ -4356,7 +4358,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             initialize,
             timeProvider,
             deduplicationWindow,
-            reentrant);
+            reentrant,
+            observations);
     }
 
     /// <summary>
@@ -4374,7 +4377,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             bool initialize = true,
             TimeProvider? timeProvider = null,
             TimeSpan? deduplicationWindow = null,
-            bool reentrant = false)
+            bool reentrant = false,
+            DurableObservationSource? observations = null)
     {
         var context = CreateTestActivation(reentrant);
         var accessor = Substitute.For<IGrainContextAccessor>();
@@ -4391,7 +4395,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             {
                 DeduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(1),
             }),
-            CreateSerializer());
+            CreateSerializer(),
+            observations);
         var transport = new RecordingDurableTaskMessageTransport();
         var runtime = new DurableTaskGrainRuntime(
             storage,
@@ -4638,6 +4643,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         /// <summary>Gets how many times <see cref="Tasks"/> has been enumerated.</summary>
         public int TasksEnumerationCount { get; private set; }
+        public int TryGetTaskCount { get; private set; }
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks
         {
@@ -4756,6 +4762,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
         {
+            TryGetTaskCount++;
             var found = _states.TryGetValue(taskId, out var value);
             state = value;
             return found;

@@ -6,6 +6,7 @@ using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.Messaging;
 
@@ -27,6 +28,7 @@ internal sealed class MessagingShared
         JobManager = services.GetRequiredService<ILocalDurableJobManager>();
         Transport = services.GetRequiredService<IOutboxTransport>();
         Instruments = services.GetRequiredService<DurableMessagingInstruments>();
+        Observations = services.GetService<DurableObservationSource>();
         var loggers = services.GetRequiredService<ILoggerFactory>();
         InboxLogger = loggers.CreateLogger<Inbox>();
         OutboxLogger = loggers.CreateLogger<Outbox>();
@@ -51,6 +53,7 @@ internal sealed class MessagingShared
     public IOutboxTransport Transport { get; }
 
     public DurableMessagingInstruments Instruments { get; }
+    public DurableObservationSource? Observations { get; }
 
     public ILogger InboxLogger { get; }
 
