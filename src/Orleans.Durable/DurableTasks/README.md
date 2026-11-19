@@ -292,6 +292,9 @@ if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
 
 ## Diagnostics
 
+[`DurableObservationSource`](../Diagnostics/README.md) delivers committed transitions and separately labeled
+attempt activity to bounded asynchronous operational subscribers, with immutable identity and causation metadata.
+
 `DurableTaskReference<T>.GetStatusAsync` and `GetResponseAsync` report a task's status and result.
 `DurableTaskEvents`, the `Orleans.DurableTasks` diagnostic listener, reports the runtime's transitions
 synchronously on the activation which makes them, when the runtime stages them: `TaskCreated`,

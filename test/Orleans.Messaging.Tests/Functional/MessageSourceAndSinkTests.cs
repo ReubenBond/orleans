@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.DurableJobs;
+using Orleans.Durable.Diagnostics;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Messaging.Configuration;
@@ -604,6 +605,40 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
         Assert.Equal(0, await OnGrainAsync(receiver, context => Inbox(context).Count));
+    }
+
+    [Fact]
+    public async Task ProcessedRejectionUpsertObservesRejectedWithoutCreatingAnotherDeadLetter()
+    {
+        var receiver = NewGrain();
+        Probe.For(receiver).Mode = SinkMode.DeadLetter;
+        await receiver.WriteAsync();
+        var source = await OnGrainAsync(receiver, context =>
+            context.ActivationServices.GetRequiredService<DurableObservationSource>());
+        var observer = new CommittedObservationTests.Observer();
+        using var subscription = source.Subscribe(observer);
+        var message = NewInboxMessage("observed-rejection", NewPayload());
+        var extension = receiver.AsReference<IMessagingExtension>();
+        Assert.Equal(DeliveryStatus.DeadLettered, (await extension.DeliverAsync(message, Token)).Status);
+        var initial = Assert.Single(await observer.DrainOwnerAsync(source, receiver.GetGrainId().ToString()));
+        Assert.Equal("DeadLettered", initial.Transition);
+        Assert.True(await OnGrainAsync(receiver, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().RemoveInboxDeadLetter(message.Envelope.MessageId)));
+
+        Probe.For(receiver).Mode = SinkMode.Accept;
+        var later = new InboxMessage { Envelope = message.Envelope, SentAt = message.SentAt.AddTicks(1) };
+        var result = await extension.DeliverAsync(later, Token);
+        Assert.Equal(SourceSinkGrain.Rejection, result.Message);
+        Assert.Equal(SourceSinkGrain.RejectionCode, result.Code);
+        var rejected = Assert.Single(await observer.DrainOwnerAsync(source, receiver.GetGrainId().ToString()));
+        Assert.Equal("Rejected", rejected.Transition);
+        Assert.Equal("inbox", rejected.Component);
+        Assert.Equal(message.Envelope.MessageId.ToString(), rejected.MessageId);
+        Assert.True(rejected.IsCommitted);
+        Assert.True(rejected.WriteVersion > initial.WriteVersion);
+        Assert.Empty(await OnGrainAsync(receiver, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters.ToArray()));
+        Assert.Equal(1, Probe.For(receiver).SinkOffers);
     }
 
     [Fact]

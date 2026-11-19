@@ -105,6 +105,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private Exception? _stallException;
 
     private Guid? _incarnation;
+    private Guid? _observationAttemptId;
+
+    internal Guid ObservationAttemptId => _observationAttemptId ??= Guid.NewGuid();
 
     public GrainDurableTaskContext(
         TaskId taskId,
@@ -348,6 +351,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _parkedWaits++;
             (_awaited ??= []).UnionWith(awaited);
+            foreach (var task in awaited) _runtime.ObserveWait(Id, task, started: true);
             _ = wait.ContinueWith(
                 static (_, state) =>
                 {
@@ -360,6 +364,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 _scheduler);
             EndSegment();
             await gate.Task;
+            foreach (var task in awaited) _runtime.ObserveWait(Id, task, started: false);
             if (--_parkedWaits > 0)
             {
                 EndSegment();

@@ -130,6 +130,16 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         {
             return _jobsIdToBucket.ContainsKey(jobId);
         }
+
+    }
+
+    internal DurableJob? GetJob(string jobId)
+    {
+        lock (_syncLock)
+        {
+            return _jobsIdToBucket.TryGetValue(jobId, out var bucket) && bucket.TryGetJob(jobId, out var item)
+                ? item.Job : null;
+        }
     }
 
     /// <summary>

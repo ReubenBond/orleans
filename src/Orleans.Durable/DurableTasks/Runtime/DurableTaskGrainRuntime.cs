@@ -769,10 +769,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>Returns a task's state, staging the state of a task which doesn't exist.</summary>
     private IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request)
     {
-        var reportCreation = DurableTaskEvents.IsTaskCreatedEnabled && !_storage.TryGetTask(taskId, out _);
+        var reportCreation = (DurableTaskEvents.IsTaskCreatedEnabled || _shared.Observations is { IsEnabled: true })
+            && !_storage.TryGetTask(taskId, out _);
         var state = _storage.GetOrCreateTask(taskId, kind, request);
         if (reportCreation)
         {
+            ObserveTask(taskId, "Created", committed: true, state: state);
             DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
         }
 
@@ -802,6 +804,10 @@ internal sealed partial class DurableTaskGrainRuntime(
             _storage.SetResponse(taskId, state, response);
         }
 
+        if (_shared.Observations is { IsEnabled: true })
+        {
+            ObserveTask(taskId, "Outcome", committed: true, detail: response.Status.ToString(), state: state);
+        }
         DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
         return response;
     }
@@ -810,6 +816,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     private void AddRecord(TaskId taskId, DurableTaskRecordKind kind, string fingerprint, DurableTaskResponse response)
     {
         _storage.AddRecord(taskId, kind, fingerprint, response);
+        ObserveTask(taskId, "Created", committed: true);
+        if (_shared.Observations is { IsEnabled: true })
+        {
+            ObserveTask(taskId, "Outcome", committed: true, detail: response.Status.ToString());
+        }
         DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
         DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
     }
@@ -817,8 +828,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>Stages a task's deletion.</summary>
     private void RemoveTask(TaskId taskId)
     {
+        IDurableTaskState? removedState = null;
+        if (_shared.Observations is { IsEnabled: true }) _storage.TryGetTask(taskId, out removedState);
         if (_storage.RemoveTask(taskId))
         {
+            ObserveTask(taskId, "Deleted", committed: true, state: removedState);
             DurableTaskEvents.EmitTaskDeleted(GrainContext, taskId);
         }
     }
@@ -1138,6 +1152,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         state ??= GetOrCreateTask(taskId, DurableTaskRecordKind.Delay, request: null);
         var generation = checked(state.ResumeGeneration + 1);
         _storage.SetDelay(taskId, state, dueTime, generation);
+        if (_shared.Observations is { IsEnabled: true })
+        {
+            ObserveTask(taskId, "DelayScheduled", committed: true, state: state,
+                messageId: DurableTaskMessageTransport.CreateResumeMessageId(GrainId, taskId, GetIncarnation(taskId), generation, dueTime));
+        }
 
         // The grain's own inbox accepts the resume in the same journal write as the delay, so every durable delay has a
         // durable resume.
@@ -1277,6 +1296,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var tasks = _storage.Tasks.ToList();
         foreach (var (taskId, state) in tasks)
         {
+            ObserveTask(taskId, "Recovered", committed: false, state: state);
             if (!HasStoredResult(state)
                 && state.HasRequest
                 && state.DueTime is null
@@ -1383,6 +1403,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (scheduled.Start)
         {
             _pendingStarts.Add(taskId);
+            ObserveTask(taskId, "Scheduled", committed: true);
         }
 
         return scheduled.Response;
@@ -1732,6 +1753,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled: {Reason}.", GrainId, taskId, reason);
         DurableTaskEvents.EmitExecutionStalled(GrainContext, taskId, reason, exception);
+        if (_shared.Observations is { IsEnabled: true })
+        {
+            ObserveTask(taskId, "AttemptStalled", committed: false, detail: reason.ToString());
+        }
     }
 
 
@@ -1740,6 +1765,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _observations?.Reset();
         _pendingStarts.Clear();
         _pendingHandleResponses.Clear();
         foreach (var propagation in _pendingCancellationPropagations.Values)
@@ -1766,6 +1792,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private void CaptureCommitEffects()
     {
+        _observations?.Capture();
         // Effects stay pending until a write which captured them completes, so a capture which writes no bytes
         // leaves them for the next write.
         _committingStarts = (_pendingStarts.Count == 0) ? [] : [.. _pendingStarts];
@@ -1775,6 +1802,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private void RunCommittedEffects()
     {
+        _observations?.Acknowledge();
         var starts = _committingStarts;
         var handleResponses = _committingHandleResponses;
         var propagations = _committingCancellationPropagations;
@@ -2263,6 +2291,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var invocation = Invoke(createTask, state, context, start.Task);
         _runningRequests.Add(taskId, new RunningRequest(invocation, context));
+        ObserveTask(taskId, "AttemptStarted", committed: false);
         DurableTaskEvents.EmitExecutionStarted(GrainContext, taskId);
         context.Start(start);
     }
@@ -2334,6 +2363,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (_runningRequests.TryGetValue(context.Id, out var running)
                 && ReferenceEquals(running.Context, context))
             {
+                ObserveTask(context.Id, "AttemptStopped", committed: false);
                 _runningRequests.Remove(context.Id);
                 _executionContexts.Remove(context.Id);
                 DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
@@ -2742,6 +2772,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             // Deactivation waits for the canceled attempt, which drains.
             TrackBackgroundTask(running.Context.Settled, "running a deleted durable task");
+            ObserveTask(taskId, "AttemptStopped", committed: false, detail: "TaskDeleted", attempt: running.Context);
             DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 
@@ -3003,6 +3034,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             _storage.RequestCancellation(currentTaskId, currentTaskState, reason);
+            ObserveTask(currentTaskId, "CancellationRequested", committed: true, state: currentTaskState);
             if (TryGetExecutionContext(currentTaskId, out var context))
             {
                 if (currentTaskState.Request is IDurableTaskRequest request
@@ -3125,6 +3157,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_runningRequests.Remove(taskId, out var running))
         {
             TrackBackgroundTask(running.Context.Settled, "running an aborted durable task");
+            ObserveTask(taskId, "AttemptStopped", committed: false, detail: "TaskAborted", attempt: running.Context);
             DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 

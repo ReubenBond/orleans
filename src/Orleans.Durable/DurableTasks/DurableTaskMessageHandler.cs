@@ -53,6 +53,7 @@ internal sealed class DurableTaskMessageHandler(
                     }
 
                     runtime.SubscribeFromInbox(invocation.TaskId, new(sender, subscriberId));
+                    runtime.ObserveMessage(invocation.TaskId, message.Envelope.MessageId, sender: sender);
                     return true;
                 }
 
@@ -74,6 +75,7 @@ internal sealed class DurableTaskMessageHandler(
                         sender,
                         invocation.Detached,
                         invocation.SubscriberId);
+                    runtime.ObserveMessage(invokedId, message.Envelope.MessageId, sender: sender);
                 }
                 catch (DurableTaskConflictException conflict)
                 {
@@ -91,12 +93,14 @@ internal sealed class DurableTaskMessageHandler(
                     completion.TaskId,
                     response,
                     GetSender(completion.Sender));
+                runtime.ObserveMessage(completion.SubscriberId ?? completion.TaskId, message.Envelope.MessageId, wireId: true, sender: completion.Sender);
                 return true;
             case DurableTaskMessageTypes.CancellationSubject:
                 var cancellation = messageTypes.Cancellation.Decode(message.Envelope);
                 if (cancellation.SubscriberId is { } unsubscribedId)
                 {
                     runtime.UnsubscribeFromInbox(cancellation.TaskId, new(GetSender(cancellation.Sender), unsubscribedId));
+                    runtime.ObserveMessage(cancellation.TaskId, message.Envelope.MessageId, sender: cancellation.Sender);
                 }
                 else
                 {
@@ -112,18 +116,24 @@ internal sealed class DurableTaskMessageHandler(
                     {
                         runtime.SignalCancellationFromInbox(taskId, caller, cancellation.CancellationReason);
                     }
+
+                    runtime.ObserveMessage(taskId, message.Envelope.MessageId, sender: caller);
                 }
 
                 return true;
             case DurableTaskMessageTypes.SignalSubject:
                 var signal = messageTypes.Signal.Decode(message.Envelope);
-                _ = GetSender(signal.Sender);
+                var signalSender = GetSender(signal.Sender);
 
                 // A rejected signal, such as one for a terminal task or with a conflicting value, stages nothing and is
                 // dead-lettered with the rejection as its reason. A signal which precedes its invocation is recorded.
                 if (runtime.StageSignalFromInbox(signal.TaskId, signal.Name, signal.Value) is { } rejection)
                 {
                     result = DeliveryResult.DeadLettered(rejection.Message);
+                }
+                else
+                {
+                    runtime.ObserveMessage(signal.TaskId, message.Envelope.MessageId, sender: signalSender);
                 }
 
                 return true;
@@ -143,6 +153,7 @@ internal sealed class DurableTaskMessageHandler(
         cancellationToken.ThrowIfCancellationRequested();
         var resume = messageTypes.Resume.Decode(context.Message.Envelope);
         runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, GetSender(resume.Sender));
+        runtime.ObserveMessage(resume.TaskId, context.Message.Envelope.MessageId, sender: resume.Sender);
         context.Complete();
         return ValueTask.CompletedTask;
     }

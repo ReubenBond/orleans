@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Orleans.Journaling;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.DurableJobs;
 
@@ -13,6 +14,15 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
     private readonly TimeProvider _timeProvider;
     private InMemoryJobQueue _jobQueue;
     private JournalStreamWriter _writer;
+    private DurableObservationSource? _observationSource;
+    private CommittedObservationBuffer? _observations;
+    private string? _observationOwner;
+
+    internal void ConfigureObservations(DurableObservationSource source, string owner)
+    {
+        _observationSource = source;
+        _observationOwner = owner;
+    }
 
     public JournaledJobShardState(
         JobShardId shardId,
@@ -92,6 +102,7 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
         Write(DurableJobShardJournalRecord.ForSchedule(job));
         ApplySchedule(job);
+        Observe(job, "Scheduled", job.DueTime);
         return job;
     }
 
@@ -103,8 +114,11 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
             return false;
         }
 
+        var job = _observationSource is { IsEnabled: true } ? _jobQueue.GetJob(jobId) : null;
         Write(DurableJobShardJournalRecord.ForRemove(jobId));
-        return ApplyRemove(jobId);
+        var removed = ApplyRemove(jobId);
+        if (removed && job is not null) Observe(job, "Retired", dueTime: null);
+        return removed;
     }
 
     public bool RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
@@ -125,8 +139,11 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
             return false;
         }
 
+        var job = _observationSource is { IsEnabled: true } ? _jobQueue.GetJob(jobId) : null;
         Write(DurableJobShardJournalRecord.ForRetry(jobId, newDueTime, dequeueCount, executionGeneration));
-        return ApplyRetry(jobId, newDueTime, dequeueCount, executionGeneration);
+        var retried = ApplyRetry(jobId, newDueTime, dequeueCount, executionGeneration);
+        if (retried && job is not null) Observe(job, "RetryScheduled", newDueTime);
+        return retried;
     }
 
     public void MarkAsComplete()
@@ -186,6 +203,7 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _observations?.Reset();
         _jobQueue = new(_timeProvider);
         IsAddingCompleted = false;
         _writer = writer;
@@ -193,13 +211,32 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
+        _observations?.Capture();
     }
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
     {
         GetCodec().WriteSet(DurableJobShardJournalRecord.ForSnapshot(CaptureSnapshot()), writer);
+        _observations?.Capture();
     }
 
+    void IStateMachine.OnWriteCompleted() => _observations?.Acknowledge();
+
+    private void Observe(DurableJob job, string transition, DateTimeOffset? dueTime)
+    {
+        if (_observationSource is not { IsEnabled: true } source) return;
+        (_observations ??= new(source)).Stage(new()
+        {
+            Component = "job",
+            Owner = _observationOwner!,
+            Transition = transition,
+            Timestamp = _timeProvider.GetUtcNow(),
+            JobId = job.Id,
+            RelatedGrainId = job.TargetGrainId.ToString(),
+            DueTime = dueTime,
+            TraceParent = job.TraceParent
+        });
+    }
 
     private void Write(DurableJobShardJournalRecord record) => GetCodec().WriteSet(record, _writer);
 

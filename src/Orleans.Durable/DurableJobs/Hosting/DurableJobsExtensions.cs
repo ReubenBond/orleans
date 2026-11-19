@@ -10,6 +10,7 @@ using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Configuration;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.Hosting;
 
@@ -43,6 +44,7 @@ public static class DurableJobsExtensions
         }
 
         services.TryAddSingleton<DurableJobsInstruments>();
+        services.TryAddSingleton<DurableObservationSource>();
         services.AddSingleton<IConfigurationValidator, DurableJobsOptionsValidator>();
         services.AddSingleton<IConfigurationValidator, DurableJobsJournalingConfigurationValidator>();
         services.AddSingleton<ShardExecutor>();

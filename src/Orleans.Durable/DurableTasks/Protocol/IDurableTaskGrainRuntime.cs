@@ -160,6 +160,9 @@ internal struct DurableTaskDiagnosticState
 // 2. Client proxy: does not store results locally, does not support subscribing. Available outside the context of a grain.
 internal interface IDurableTaskGrainRuntime
 {
+    // Attempt activity is separate from acknowledged state and never controls scheduling.
+    void ObserveWait(TaskId taskId, TaskId awaited, bool started) { }
+
     DateTimeOffset UtcNow { get; }
 
     /// <summary>Gets the grain whose executions the runtime runs.</summary>

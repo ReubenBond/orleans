@@ -270,6 +270,11 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId));
+        if (_shared.Observations is { IsEnabled: true }
+            && recordId is { } wireId && CallerScope.TryParseWireId(wireId, out _, out var nodeId))
+        {
+            ObserveTask(nodeId, "InvocationSent", committed: true, messageId: messageId);
+        }
         MessageTransport.Send(messageId);
     }
 

@@ -5,11 +5,13 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Journaling;
+using Orleans.Durable.Diagnostics;
 
 namespace Orleans.Messaging;
 
 internal sealed partial class Outbox
 {
+    private CommittedObservationBuffer? _observations;
     // Entries are durable once a completed write captured their sequence number.
     private long _lastSequence;
     private long _capturedSequence;
@@ -20,10 +22,15 @@ internal sealed partial class Outbox
             ? _pump.EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), cancellationToken)
             : ValueTask.CompletedTask;
 
-    private void OnWriteCaptured() => _capturedSequence = _lastSequence;
+    private void OnWriteCaptured()
+    {
+        _capturedSequence = _lastSequence;
+        _observations?.Capture();
+    }
 
     void IStateMachine.OnWriteCompleted()
     {
+        _observations?.Acknowledge();
         _durableSequence = _capturedSequence;
         _pump.Signal();
     }
@@ -41,13 +48,43 @@ internal sealed partial class Outbox
     private void Emit(OutboxCommand command)
     {
         Shared.OutboxCodec.WriteSet(command, _writer);
+        var observation = CreateObservation(command);
         Apply(command);
+        if (observation is not null) _observations!.Stage(observation);
     }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _observations?.Reset();
         _writer = writer;
         ResetState();
+    }
+
+    private DurableObservation? CreateObservation(OutboxCommand command)
+    {
+        if (Shared.Observations is not { IsEnabled: true } source) return null;
+        var transition = command.Kind switch
+        {
+            OutboxCommandKind.Enqueue => "Enqueued",
+            OutboxCommandKind.Delivery when command.DeadLetter is not null => "DeadLettered",
+            OutboxCommandKind.Delivery when command.State is not null => "RetryScheduled",
+            OutboxCommandKind.Delivery => "Retired",
+            _ => null
+        };
+        if (transition is null) return null;
+        _observations ??= new(source);
+        _messages.TryGetValue(command.MessageId, out var existing);
+        var message = command.Message ?? existing?.Message;
+        return new()
+        {
+            Owner = GrainId.ToString(),
+            Component = "outbox",
+            Transition = transition,
+            Timestamp = JobTimeProvider.GetUtcNow(),
+            MessageId = (command.Message?.Envelope.MessageId ?? command.Reference?.MessageId ?? command.MessageId).ToString(),
+            RelatedGrainId = message?.ReceiverId.ToString(),
+            DueTime = command.State?.NextAttemptAt ?? message?.Envelope.DeliverAt
+        };
     }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
