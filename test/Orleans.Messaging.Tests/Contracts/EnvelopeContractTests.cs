@@ -170,6 +170,8 @@ public sealed class EnvelopeContractTests
     [Theory]
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
+    [InlineData("InboxDeadLetter")]
+    [InlineData("OutboxDeadLetter")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -203,6 +205,31 @@ public sealed class EnvelopeContractTests
             if (message is InboxMessage received) Assert.Equal(SentAt, received.SentAt);
             if (kind.EndsWith("DeadLetter", StringComparison.Ordinal)) Assert.Equal(3, result.GetType().GetProperty("AttemptCount")!.GetValue(result));
         }
+    }
+
+    [Fact]
+    public void PublicDeadLetterRoundTripsThroughOrleansSerialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var letter = new DeadLetter<InboxMessage>
+        {
+            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
+            DeadLetteredAt = DateTimeOffset.UnixEpoch,
+            Reason = "failure",
+            AttemptCount = 3,
+            Code = "orders/invalid"
+        };
+        var serializer = services.GetRequiredService<Serializer<DeadLetter<InboxMessage>>>();
+
+        var result = Assert.IsType<DeadLetter<InboxMessage>>(serializer.Deserialize(serializer.SerializeToArray(letter)));
+
+        Assert.Equal(letter.Message.Envelope.MessageId, result.Message.Envelope.MessageId);
+        Assert.Equal(new byte[] { 1, 2 }, result.Message.Envelope.Payload);
+        Assert.Equal("subject.v1", result.Message.Envelope.Subject);
+        Assert.Equal(DateTimeOffset.UnixEpoch, result.DeadLetteredAt);
+        Assert.Equal("failure", result.Reason);
+        Assert.Equal(3, result.AttemptCount);
+        Assert.Equal("orders/invalid", result.Code);
     }
 
     [Fact]

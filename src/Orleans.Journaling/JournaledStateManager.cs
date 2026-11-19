@@ -14,6 +14,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly Lock _lock = new();
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
+    // Whether a registered state journals changes which a StagedChangeScope can't observe.
+    private bool _hasUnreportedChanges;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -143,6 +146,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             _states.Add(name, stateMachine);
+            if (stateMachine is not IReportsStagedChanges) _hasUnreportedChanges = true;
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
@@ -276,6 +280,32 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             throw new InvalidOperationException(
                                 "The journaled state operation was queued before deletion reset its state.");
+                        }
+
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                for (var prepared = false; !prepared;)
+                                {
+                                    // Preparation serves every caller coalesced into this write, so only shutdown cancels it.
+                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
                         }
 
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -593,6 +623,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 return;
             }
         }
+    }
+
+    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
+    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    {
+        prepared = true;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                var preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully)
+                {
+                    prepared = false;
+                    return preparation;
+                }
+
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        return ValueTask.CompletedTask;
     }
 
     private void Fence(Exception exception)
@@ -1053,6 +1105,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
+    /// <summary>
+    /// Begins recording whether the calling asynchronous flow stages a change in this manager's states.
+    /// </summary>
+    /// <remarks>
+    /// Call it from the async method whose flow the scope covers; see <see cref="StagedChangeScope"/>. A state which
+    /// implements <see cref="IReportsStagedChanges"/> reports each change it stages. While a registered state doesn't,
+    /// every scope reports staged changes. Orleans.Messaging uses a scope to tell whether a failed handler attempt
+    /// staged changes.
+    /// </remarks>
+    internal StagedChangeScope BeginStagedChangeScope() => StagedChangeScope.Begin(_journalWriter, !_hasUnreportedChanges);
+
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 
@@ -1323,7 +1386,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine, IReportsStagedChanges
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
@@ -1350,6 +1413,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,
