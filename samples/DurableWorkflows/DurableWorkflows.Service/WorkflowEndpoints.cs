@@ -23,6 +23,7 @@ public static class WorkflowEndpoints
         endpoints.MapDelete("/workflows/cancellation/{workflowId}", CancelAsync);
         endpoints.MapGet("/workflows/cancellation/{workflowId}/status", GetCancellationStatusAsync);
         endpoints.MapPost("/workflows/orders/{orderId}", RunOrderAsync);
+        endpoints.MapOrderStatusEndpoints();
         return endpoints;
     }
 

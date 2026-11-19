@@ -36,6 +36,113 @@ public sealed class WorkflowTests : IAsyncLifetime
     public ValueTask DisposeAsync() => _cluster.DisposeAsync();
 
     [Fact]
+    public async Task OrderStatusWaitsForAcknowledgementAndMarksJournalReset()
+    {
+        var id = UniqueId();
+        var workflow = Client.GetGrain<IWorkflowGrain>(id);
+        var controls = workflow.AsReference<IOrderStatusTestExtension>();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var watch = workflow.WatchOrderStatusAsync(timeout.Token).WithBatchSize(1).GetAsyncEnumerator(timeout.Token);
+        Assert.True(await watch.MoveNextAsync());
+
+        var shipping = new OrderStatus(id, OrderStage.Shipping, Guid.NewGuid());
+        await controls.StageAsync(shipping);
+        Assert.True(await controls.IsReadBlockedAsync());
+        var next = watch.MoveNextAsync().AsTask();
+        var read = workflow.GetOrderStatusAsync(timeout.Token);
+        Assert.False(next.IsCompleted);
+        Assert.False(read.IsCompleted);
+        await controls.CommitAsync();
+
+        Assert.True(await next);
+        Assert.Equal(shipping, watch.Current.Status);
+        Assert.Equal(watch.Current.Status, await read);
+        Assert.True(watch.Current.IsResync);
+        var completed = shipping with { Stage = OrderStage.Completed };
+        await controls.StageAsync(completed);
+        await controls.CommitAsync();
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Equal(completed, watch.Current.Status);
+        Assert.False(watch.Current.IsResync);
+        await controls.ResetAsync();
+        var recreated = new OrderStatus(id, OrderStage.Preparing, Guid.NewGuid());
+        await controls.StageAsync(recreated);
+        await controls.CommitAsync();
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Equal(recreated, watch.Current.Status);
+        Assert.True(watch.Current.IsResync);
+        await controls.ResetAsync();
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Equal(new(id, OrderStage.NotStarted), watch.Current.Status);
+        Assert.True(watch.Current.IsResync);
+    }
+
+    [Theory]
+    [InlineData(false, OrderStage.Completed)]
+    [InlineData(true, OrderStage.Compensated)]
+    public async Task SlowOrderStatusReaderCoalescesToCommittedProjection(bool failShipping, OrderStage expected)
+    {
+        var id = UniqueId();
+        var workflow = Client.GetGrain<IWorkflowGrain>(id);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var watch = workflow.WatchOrderStatusAsync(timeout.Token).WithBatchSize(1).GetAsyncEnumerator(timeout.Token);
+        Assert.True(await watch.MoveNextAsync());
+        var initial = watch.Current;
+        Assert.Equal(new(id, OrderStage.NotStarted), initial.Status);
+        Assert.True(initial.IsResync);
+
+        await RunAsync(workflow.RunOrderSagaAsync(new(id, failShipping)), $"order-{id}");
+
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Equal(expected, watch.Current.Status.Stage);
+        Assert.Equal(await workflow.GetOrderStatusAsync(timeout.Token), watch.Current.Status);
+        Assert.Equal(initial.SubscriptionId, watch.Current.SubscriptionId);
+        Assert.True(watch.Current.Version > initial.Version);
+        Assert.True(watch.Current.IsResync);
+        Assert.NotEqual(Guid.Empty, watch.Current.Status.LifecycleId);
+    }
+
+    [Fact]
+    public async Task OrderWatchRegistrationRacingWithChangeObservesTerminalState()
+    {
+        var id = UniqueId();
+        var workflow = Client.GetGrain<IWorkflowGrain>(id);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var status = new OrderStatusClient(workflow, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderStatusClient>.Instance);
+
+        var wait = status.WaitAsync(value => value.IsTerminal, timeout.Token);
+        await RunAsync(workflow.RunOrderSagaAsync(new(id, false)), $"order-{id}");
+
+        var terminal = await wait;
+        Assert.Equal(id, terminal.OrderId);
+        Assert.Equal(OrderStage.Completed, terminal.Stage);
+        Assert.NotEqual(Guid.Empty, terminal.LifecycleId);
+    }
+
+    [Fact]
+    public async Task OrderStatusReconnectsAfterActivationReplacementWithFreshBaseline()
+    {
+        var id = UniqueId();
+        var workflow = Client.GetGrain<IWorkflowGrain>(id);
+        await RunAsync(workflow.RunOrderSagaAsync(new(id, false)), $"order-{id}");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var status = new OrderStatusClient(workflow, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderStatusClient>.Instance);
+        await using var watch = status.WatchAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+        Assert.True(await watch.MoveNextAsync());
+        var initial = watch.Current;
+        Assert.Equal(OrderStage.Completed, initial.Status.Stage);
+        Assert.NotEqual(Guid.Empty, initial.Status.LifecycleId);
+        var originalActivation = await workflow.GetRuntimeInfoAsync();
+        await _cluster.DeactivateAsync(workflow);
+
+        Assert.True(await watch.MoveNextAsync());
+        Assert.True(watch.Current.IsResync);
+        Assert.NotEqual(initial.SubscriptionId, watch.Current.SubscriptionId);
+        Assert.Equal(initial.Status, watch.Current.Status);
+        Assert.NotEqual(originalActivation.ActivationId, (await workflow.GetRuntimeInfoAsync()).ActivationId);
+    }
+
+    [Fact]
     public async Task BasicWorkflowAndDuplicateReplayExecuteEffectsOnce()
     {
         var id = UniqueId();
@@ -302,6 +409,7 @@ public sealed class WorkflowTests : IAsyncLifetime
                 .UseInMemoryDurableJobs()
                 .Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary")
                 .AddDurableTasks(options => options.ResultRetentionPeriod = TimeSpan.FromHours(1))
+                .AddGrainExtension<IOrderStatusTestExtension, OrderStatusTestExtension>()
                 .AddGrainExtension<IWorkflowTestExtension, WorkflowTestExtension>();
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
@@ -391,6 +499,51 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         _http.Dispose();
         await _app.DisposeAsync();
         await _cluster.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task OrderHttpReadWatchAndWaitShareCommittedProjection()
+    {
+        var id = UniqueId();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var url = $"/workflows/orders/{id}/status";
+        using var stream = await _http.GetAsync($"{url}/watch", HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        Assert.Equal(HttpStatusCode.OK, stream.StatusCode);
+        Assert.Equal("application/x-ndjson", stream.Content.Headers.ContentType!.MediaType);
+        using var lines = new StreamReader(await stream.Content.ReadAsStreamAsync(timeout.Token));
+        var first = JsonSerializer.Deserialize<OrderStatusUpdate>((await lines.ReadLineAsync(timeout.Token))!, JsonSerializerOptions.Web)!;
+        Assert.True(first.IsResync);
+        Assert.Equal(new(id, OrderStage.NotStarted), first.Status);
+
+        using var started = await _http.PostAsync($"/workflows/orders/{id}?failShipping=false", null, timeout.Token);
+        Assert.Equal(HttpStatusCode.OK, started.StatusCode);
+        OrderStatusUpdate current;
+        do
+        {
+            current = JsonSerializer.Deserialize<OrderStatusUpdate>((await lines.ReadLineAsync(timeout.Token))!, JsonSerializerOptions.Web)!;
+        }
+        while (!current.Status.IsTerminal);
+
+        Assert.Equal(OrderStage.Completed, current.Status.Stage);
+        Assert.Equal(first.SubscriptionId, current.SubscriptionId);
+        Assert.Equal(current.Status, await _http.GetFromJsonAsync<OrderStatus>(url, timeout.Token));
+        Assert.Equal(current.Status, await _http.GetFromJsonAsync<OrderStatus>($"{url}/terminal", timeout.Token));
+    }
+
+    [Fact]
+    public async Task OrderHttpWatchCancellationEndsBlockedRead()
+    {
+        var id = UniqueId();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var response = await _http.GetAsync($"/workflows/orders/{id}/status/watch",
+            HttpCompletionOption.ResponseHeadersRead, cancellation.Token);
+        using var lines = new StreamReader(await response.Content.ReadAsStreamAsync(cancellation.Token));
+        Assert.NotNull(await lines.ReadLineAsync(cancellation.Token));
+        var next = lines.ReadLineAsync(cancellation.Token).AsTask();
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => next);
     }
 
     [Theory]
@@ -751,4 +904,48 @@ public sealed class WorkflowTestExtension : IWorkflowTestExtension
 {
     public async DurableTask<ApprovalWorkflowResult> FailWithNotFoundAsync() =>
         throw new DurableTaskNotFoundException(DurableTask.Current.Id);
+}
+
+public interface IOrderStatusTestExtension : IGrainExtension
+{
+    [Orleans.Concurrency.AlwaysInterleave]
+    Task StageAsync(OrderStatus status);
+    [Orleans.Concurrency.AlwaysInterleave]
+    Task CommitAsync();
+    [Orleans.Concurrency.AlwaysInterleave]
+    Task ResetAsync();
+    [Orleans.Concurrency.AlwaysInterleave]
+    Task<bool> IsReadBlockedAsync();
+}
+
+public sealed class OrderStatusTestExtension(
+    IDurableStateManager state,
+    IJournaledStateManager journal,
+    IGrainContext context) : IOrderStatusTestExtension
+{
+    public Task StageAsync(OrderStatus status)
+    {
+        state.GetOrAddValue<OrderStatus>("order-status").Value = status;
+        return Task.CompletedTask;
+    }
+
+    public Task CommitAsync() => state.WriteStateAsync().AsTask();
+    public Task ResetAsync() => journal.DeleteStateAsync().AsTask();
+
+    public async Task<bool> IsReadBlockedAsync()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var read = ((IWorkflowGrain)context.GrainInstance!).GetOrderStatusAsync(cancellation.Token);
+        var blocked = !read.IsCompleted;
+        cancellation.Cancel();
+        try
+        {
+            await read;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+
+        return blocked;
+    }
 }

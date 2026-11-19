@@ -2,7 +2,7 @@ using Orleans.Durable.Tasks;
 
 namespace DurableWorkflows;
 
-public interface IWorkflowGrain : IGrainWithStringKey
+public partial interface IWorkflowGrain : IGrainWithStringKey
 {
     DurableTask<BasicWorkflowResult> RunBasicAsync(string input);
     DurableTask<FanOutWorkflowResult> RunFanOutAsync(string[] items);

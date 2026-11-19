@@ -14,6 +14,9 @@ It demonstrates:
 - recovery of an in-progress approval workflow on another service replica;
 - observation of retained results by root ID.
 
+[Observe an order](client-status.md) shows committed application status through a one-shot read,
+an HTTP stream, and a client-side predicate wait, including cancellation and reconnect after activation loss.
+
 The Aspire AppHost starts two service replicas, Redis for Orleans membership, and persistent Azurite Blob Storage for
 Journaling and Durable Jobs. The service exposes health checks and HTTP endpoints without fixed ports.
 
