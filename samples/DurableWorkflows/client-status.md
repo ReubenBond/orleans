@@ -47,8 +47,8 @@ or a later update. A snapshot of staged state waits for the journal write's ackn
 
 Each projection is one immutable value in the grain's journal. Its fields become visible together at an
 acknowledged grain-write boundary. A projection spanning several durable collections should likewise be
-materialized into one value at the business boundary; composing independent streams requires coordinating
-their write watermarks before publication.
+materialized into one value at the business boundary and persisted with those collections in the same
+acknowledged journal write.
 
 Durable-value watches retain the latest committed projection and the bounded values awaiting a write
 acknowledgement. Slow readers coalesce obsolete snapshots. `OrderStatusClient` requests batches of one,
