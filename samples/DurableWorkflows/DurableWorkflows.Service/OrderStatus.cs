@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace DurableWorkflows;
 

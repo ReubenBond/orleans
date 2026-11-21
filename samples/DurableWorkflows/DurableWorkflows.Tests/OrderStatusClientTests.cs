@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using DurableWorkflows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.DurableTasks;
+using Orleans.Durable.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Xunit;
