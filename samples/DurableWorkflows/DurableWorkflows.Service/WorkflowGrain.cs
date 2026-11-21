@@ -8,9 +8,17 @@ namespace DurableWorkflows;
 // which it awaits with WithId has a stable ID beneath that root. After a deactivation or a silo failure, the runtime
 // replays the method from the start: completed children return their recorded results, so the workflow resumes where
 // it stopped.
-public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableGrain, IWorkflowGrain
+public sealed partial class WorkflowGrain : DurableGrain, IWorkflowGrain
 {
     private readonly Guid _activationId = Guid.NewGuid();
+    private readonly ILocalSiloDetails _localSiloDetails;
+    private readonly IDurableValue<OrderStatus> _orderStatus;
+
+    public WorkflowGrain(ILocalSiloDetails localSiloDetails)
+    {
+        _localSiloDetails = localSiloDetails;
+        _orderStatus = StateManager.GetOrAddValue<OrderStatus>("order-status");
+    }
 
     private string WorkflowId => this.GetPrimaryKeyString();
 
@@ -100,6 +108,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
 
         var inventory = GrainFactory.GetGrain<IInventoryGrain>(orderId);
         var payment = GrainFactory.GetGrain<IPaymentGrain>(orderId);
+        SetOrderStage(OrderStage.Preparing);
 
         // WhenAllCompleted waits for both steps and returns their handles, each with its own outcome.
         var prepared = await DurableTask.WhenAllCompleted(
@@ -113,9 +122,11 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
         {
             try
             {
+                SetOrderStage(OrderStage.Shipping);
                 await Activity($"{orderId}-shipping")
                     .ExecuteAsync(new($"{orderId}:ship", "ship", request.FailShipping))
                     .WithId("ship");
+                SetOrderStage(OrderStage.Completed);
                 return new(orderId, OrderWorkflowStatus.Completed, [], null);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -124,6 +135,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
             }
         }
 
+        SetOrderStage(OrderStage.Compensating);
         List<DurableTask<SagaEffect>> compensations = [];
         if (charge.Status is DurableTaskStatus.CompletedSuccessfully)
         {
@@ -136,6 +148,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
         }
 
         var undone = await DurableTask.WhenAll(compensations).WithId("compensate");
+        SetOrderStage(OrderStage.Compensated);
         return new(orderId, OrderWorkflowStatus.Compensated, [.. undone.Select(effect => effect.Kind)], $"The {failedStep} step failed.");
     }
 
@@ -144,5 +157,5 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
     private IActivityGrain Activity(string key) => GrainFactory.GetGrain<IActivityGrain>(key);
 
     private WorkflowRuntimeInfo CreateRuntimeInfo() =>
-        new(localSiloDetails.SiloAddress.ToParsableString(), _activationId);
+        new(_localSiloDetails.SiloAddress.ToParsableString(), _activationId);
 }
