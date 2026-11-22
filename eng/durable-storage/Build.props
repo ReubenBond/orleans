@@ -102,4 +102,9 @@
     <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
+
+  <!-- Each production package carries its README, which src/Directory.Build.props names as the package's readme file. -->
+  <ItemGroup Condition="'$(IsDurableStorageSourceProject)' == 'true' and '$(ReadMeExists)' == 'true'">
+    <None Include="$(ReadMePath)" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
