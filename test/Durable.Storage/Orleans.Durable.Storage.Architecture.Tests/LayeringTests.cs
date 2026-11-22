@@ -351,7 +351,7 @@ public sealed class LayeringTests
     /// </summary>
     [Theory]
     [InlineData("Orleans.Core", "Orleans.", true)]
-    [InlineData("Orleans.Journaling", "Orleans.", true)]
+    [InlineData("Orleans.Durable.Journaling", "Orleans.", true)]
     [InlineData("Microsoft.Orleans.Runtime", "Microsoft.Orleans.", true)]
     [InlineData("Orleans.Consensus.CasPaxos.Grpc", "Orleans.", false)]
     [InlineData("Orleans.Testing.Simulation", "Orleans.", false)]

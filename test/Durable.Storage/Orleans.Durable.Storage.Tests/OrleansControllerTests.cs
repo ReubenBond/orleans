@@ -32,7 +32,7 @@ using Orleans.Durable.Storage.Engine.Wal.Portable;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Durable.Storage.Testing;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.Storage;
@@ -4771,7 +4771,7 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
 
             var siloOptions = new DurableStorageSiloOptions { Node = node, Control = control };
             _ = siloBuilder.AddDurableJournalStorageWith(siloOptions, state.ProviderName);
-            _ = siloBuilder.Services.Configure<global::Orleans.Journaling.Json.JsonJournalOptions>(static options => options.AddTypeInfoResolver(JournaledChunksJsonContext.Default));
+            _ = siloBuilder.Services.Configure<global::Orleans.Durable.Journaling.Json.JsonJournalOptions>(static options => options.AddTypeInfoResolver(JournaledChunksJsonContext.Default));
             state.Silo?.Invoke(silo, siloBuilder);
         }
     }

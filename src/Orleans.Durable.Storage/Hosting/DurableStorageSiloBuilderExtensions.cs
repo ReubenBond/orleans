@@ -15,7 +15,7 @@ using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.Wal;
 using Orleans.Durable.Storage.Engine.Wal.Portable;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;

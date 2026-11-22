@@ -1,5 +1,5 @@
 using Orleans.Durable.Storage.Engine.Journals;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;

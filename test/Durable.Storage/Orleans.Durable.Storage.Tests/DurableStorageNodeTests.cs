@@ -7,7 +7,7 @@ using Orleans.Durable.Storage.Engine.Cluster.Control;
 using Orleans.Durable.Storage.Engine.ObjectStore.Memory;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Tests;

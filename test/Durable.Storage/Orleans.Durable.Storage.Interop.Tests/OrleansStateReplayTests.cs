@@ -5,7 +5,7 @@ using Orleans.Durable.Storage.Engine.Archive.Logs.Control;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Testing;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Providers;
 
 namespace Orleans.Durable.Storage.Interop.Tests;

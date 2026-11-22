@@ -9,7 +9,7 @@ using Orleans.Durable.Storage.Engine.Archive.Lsm;
 using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers.Objects;
 using Orleans.Durable.Storage.Engine.ObjectStore;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 namespace Orleans.Durable.Storage.Hosting;
 

@@ -13,7 +13,7 @@ using Orleans.Durable.Storage.Engine.Ledgers.Store;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.Wal;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Polly;
 using Polly.Retry;

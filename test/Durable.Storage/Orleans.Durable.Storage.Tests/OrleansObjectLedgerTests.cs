@@ -1428,9 +1428,9 @@ public sealed class OrleansObjectLedgerTests : IAsyncLifetime
             _ = siloBuilder.AddDurableJournalStorageWith(siloOptions, providerName: null);
             if (journalFormatKey is not null)
             {
-                _ = siloBuilder.Services.Configure<global::Orleans.Journaling.JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
+                _ = siloBuilder.Services.Configure<global::Orleans.Durable.Journaling.JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             }
-            _ = siloBuilder.Services.Configure<global::Orleans.Journaling.Json.JsonJournalOptions>(static options => options.AddTypeInfoResolver(JournaledChunksJsonContext.Default));
+            _ = siloBuilder.Services.Configure<global::Orleans.Durable.Journaling.Json.JsonJournalOptions>(static options => options.AddTypeInfoResolver(JournaledChunksJsonContext.Default));
         }
     }
 }

@@ -7,7 +7,7 @@ using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Objects;
 using Orleans.Durable.Storage.Engine.Ledgers.Store;
 using Orleans.Durable.Storage.Engine.ObjectStore;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using StorePrefix = Orleans.Durable.Storage.Engine.Archive.ArchiveStorePrefix;
 

@@ -12,7 +12,7 @@ using Orleans.Durable.Storage.Engine.Archive.Logs.Control;
 using Orleans.Durable.Storage.Engine.Journals;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 
 [assembly: AssemblyFixture(typeof(CloudEmulators))]
 [assembly: CloudEmulatorsUse(Emulator.Azurite)]

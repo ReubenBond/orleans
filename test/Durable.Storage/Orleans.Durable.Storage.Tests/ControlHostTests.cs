@@ -21,7 +21,7 @@ using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.ObjectStore.Memory;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 

@@ -8,7 +8,7 @@ using Orleans.Durable.Storage.Engine.Cluster.Control;
 using Orleans.Durable.Storage.Engine.Journals;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Control;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;

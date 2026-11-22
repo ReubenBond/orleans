@@ -12,7 +12,7 @@ using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Control;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Storage;
 using static Orleans.Durable.Storage.Tests.NodeRegistrySamples;

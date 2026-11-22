@@ -5,7 +5,7 @@ using System.IO.Hashing;
 using Microsoft.Extensions.Options;
 using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Journals;
-using Orleans.Journaling;
+using Orleans.Durable.Journaling;
 using Orleans.Storage;
 
 namespace Orleans.Durable.Storage;
