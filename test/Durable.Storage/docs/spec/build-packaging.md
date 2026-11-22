@@ -94,9 +94,11 @@ and `Azure.Data.Tables` in `Orleans.Durable.Storage.AzureStorage`, `AWSSDK.S3` a
 `Orleans.Durable.Storage.GoogleCloud`, which also takes `Polly.Core` for the retries its object store adds
 to its client's ([archive LSM §9](components/archive-lsm.md#9-providers-and-implementations)). The Engine and the
 composition take `Polly.Core` and `System.IO.Hashing`, and `Orleans.Durable.Storage.RocksDb` takes `RocksDB`. The SDK,
-`Polly.Core`, CsCheck, and Verify releases are those Storage's suites qualify: `Directory.Packages.props` applies them
-to Storage projects alone, so the dependency closures of Orleans' other packages stay unchanged, and a process which
-loads both resolves the later release. `Azure.Storage.Blobs` 12.30.1 supplies the Blob service version Storage requests.
+CsCheck, and Verify releases Storage's suites qualify are the repository's central versions, which Orleans' other
+packages and tests share; `Azure.Storage.Blobs` 12.30.1 supplies the Blob service version Storage requests. Polly.Core
+takes the version the repository's Polly packages resolve; `Directory.Packages.props` pins it for Storage projects
+alone, because transitive pinning would add it to the package dependencies of every Orleans package which reaches it
+through Polly.
 
 `Orleans.Durable.Storage.Cloud.Tests` takes `Aspire.Hosting.Testing`, at the AppHost's Aspire release, to start the
 AppHost's emulators, and `Azure.Identity`, whose `DefaultAzureCredential` authenticates the live Azure fidelity run with
