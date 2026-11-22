@@ -4186,6 +4186,31 @@ public class LocalDurableJobManagerTests
         Assert.Equal(0, accessor.WritableShardKeyCount);
     }
 
+    [Fact]
+    public void Construction_RegistersTheSystemTargetWhichOtherSilosRouteCancellationTo()
+    {
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var shared = CreateSystemTargetShared(new TestLocalSiloDetails(siloAddress));
+        var options = Options.Create(CreateOptions());
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var overloadDetector = Substitute.For<IOverloadDetector>();
+        var timeProvider = new FakeTimeProvider();
+
+        var manager = new LocalDurableJobManager(
+            Substitute.For<JobShardManager>(siloAddress),
+            new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, timeProvider),
+            grainFactory,
+            new TestClusterMembershipService(),
+            overloadDetector,
+            timeProvider,
+            options,
+            shared,
+            NullLogger<LocalDurableJobManager>.Instance);
+
+        var target = SystemTargetGrainId.Create(LocalDurableJobManager.JobManagerGrainType, siloAddress).GrainId;
+        Assert.Same(manager, shared.ActivationDirectory.FindTarget(target));
+    }
+
     private static LocalDurableJobManager CreateManager(
         JobShardManager shardManager,
         FakeTimeProvider timeProvider,

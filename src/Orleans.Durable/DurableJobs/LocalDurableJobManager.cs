@@ -76,6 +76,9 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _logger = logger;
         _options = options.Value;
+
+        // Other silos route cancellation of jobs in shards this silo owns to this system target.
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     /// <inheritdoc/>
