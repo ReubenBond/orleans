@@ -10,8 +10,7 @@
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>
 
-    <!-- An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), as the composition's (build-packaging.md §2). -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,13 +18,13 @@
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
-    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\apphost\Orleans.Durable.Storage.AppHost\Orleans.Durable.Storage.AppHost.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+    <ProjectReference Include="..\apphost\Orleans.Durable.Storage.AppHost\Orleans.Durable.Storage.AppHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.AzureStorage\Orleans.Durable.AzureStorage.csproj" />
   </ItemGroup>
 
   <ItemGroup>

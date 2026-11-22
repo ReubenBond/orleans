@@ -5,6 +5,6 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Abstractions\Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
   </ItemGroup>
 </Project>

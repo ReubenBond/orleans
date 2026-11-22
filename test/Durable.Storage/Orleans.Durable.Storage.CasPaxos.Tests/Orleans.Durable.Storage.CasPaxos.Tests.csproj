@@ -10,7 +10,7 @@
   <Import Project="..\..\eng\Orleans.Consensus.CasPaxos.props" />
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.CasPaxos\Orleans.Durable.Storage.CasPaxos.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.CasPaxos\Orleans.Durable.Storage.CasPaxos.csproj" />
     <ProjectReference Include="$(OrleansConsensusCasPaxosSourceRoot)\csharp\src\Orleans.Consensus.CasPaxos.Testing\Orleans.Consensus.CasPaxos.Testing.csproj" />
     <ProjectReference Include="$(OrleansConsensusCasPaxosSourceRoot)\csharp\src\Orleans.Consensus.CasPaxos.Sqlite\Orleans.Consensus.CasPaxos.Sqlite.csproj" />
   </ItemGroup>

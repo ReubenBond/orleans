@@ -8,24 +8,23 @@
     <!-- The multi-silo tests over both archive stores take more than the default session's 12 minutes under the full suite. -->
     <ClogTestSessionTimeout>25m</ClogTestSessionTimeout>
 
-    <!-- An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), as the composition's (build-packaging.md §2). -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.Accordant" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
-    <PackageReference Include="Microsoft.Orleans.TestingHost" />
     <PackageReference Include="Verify.XunitV3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.RocksDb\Orleans.Durable.Storage.RocksDb.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.RocksDb\Orleans.Durable.Storage.RocksDb.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.Orleans\Orleans.Durable.Storage.Fuzz.Orleans.csproj" />
+    <ProjectReference Include="..\fuzz\Orleans.Durable.Storage.Fuzz.Orleans\Orleans.Durable.Storage.Fuzz.Orleans.csproj" />
     <Compile Include="..\shared\CorpusReplay.cs" Link="CorpusReplay.cs" />
     <Compile Include="..\shared\LedgerProposals.cs" Link="LedgerProposals.cs" />
   </ItemGroup>

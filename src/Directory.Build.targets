@@ -82,4 +82,6 @@
     <MakeDir Directories="$(GenAPITargetDirectory)" Condition="!Exists('$(GenAPITargetDirectory)')" />
   </Target>
 
+  <Import Project="$(DurableStorageBuildDirectory)Build.targets" Condition="'$(IsDurableStorageProject)' == 'true'" />
+
 </Project>

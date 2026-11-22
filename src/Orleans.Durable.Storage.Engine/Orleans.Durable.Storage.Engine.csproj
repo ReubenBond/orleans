@@ -7,6 +7,8 @@
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.Engine</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage Engine</Title>
+    <Description>The managed layers of Microsoft Orleans Durable Storage: buffers, threading, group commit, the write-ahead log, ledgers and the LedgerStore, object-store ledgers, metadata registers, archives, journals, the state database, and controller decisions.</Description>
 
     <!-- The WAL's direct I/O and io_uring, and the LedgerStore's records, read and write through pointers. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

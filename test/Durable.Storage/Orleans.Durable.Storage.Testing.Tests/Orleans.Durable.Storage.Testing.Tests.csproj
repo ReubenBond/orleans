@@ -11,7 +11,7 @@
   <ItemGroup>
     <Compile Include="..\shared\SharedVectors.cs" Link="SharedVectors.cs" />
     <!-- The vectors' rejection codes are DecodeRejection's, in the engine. -->
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
     <Compile Include="..\shared\Linearizability\*.cs" LinkBase="Linearizability" />
     <EmbeddedResource Include="..\shared\Linearizability\Visualization\*"
                       LinkBase="Linearizability\Visualization"

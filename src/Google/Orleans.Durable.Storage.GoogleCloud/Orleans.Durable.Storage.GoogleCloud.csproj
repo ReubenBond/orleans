@@ -2,10 +2,13 @@
   <!-- Google Cloud's providers: Cloud Storage object stores and Firestore conditional registers. -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.GoogleCloud</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage Google Cloud Providers</Title>
+    <Description>Google Cloud Storage object store and Firestore metadata register providers for Microsoft Orleans Durable Storage.</Description>
+    <PackageTags>$(PackageTags) Google Firestore</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

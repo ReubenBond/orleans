@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="Aspire.AppHost.Sdk" />
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.5" />
 
   <!-- Runs samples/Orleans.Durable.Storage.Samples.Journaling as three silos over Azurite, with the Aspire dashboard (just sample). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +14,7 @@
 
   <!-- The emulators' images, pinned by digest once for both AppHosts (build-packaging.md §2). -->
   <ItemGroup>
-    <Compile Include="..\..\apphost\shared\EmulatorImages.cs" Link="EmulatorImages.cs" />
+    <Compile Include="$(SourceRoot)test\Durable.Storage\apphost\shared\EmulatorImages.cs" Link="EmulatorImages.cs" />
   </ItemGroup>
 
   <ItemGroup>

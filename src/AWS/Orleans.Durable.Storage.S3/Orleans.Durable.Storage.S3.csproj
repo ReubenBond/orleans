@@ -2,10 +2,13 @@
   <!-- Amazon's providers: S3 object stores and DynamoDB conditional registers. -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.S3</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage AWS Providers</Title>
+    <Description>Amazon S3 object store and Amazon DynamoDB metadata register providers for Microsoft Orleans Durable Storage.</Description>
+    <PackageTags>$(PackageTags) AWS S3 DynamoDB</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

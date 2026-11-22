@@ -6,6 +6,9 @@
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.FileSystem</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage File System Providers</Title>
+    <Description>Local file system object store and metadata register providers for Microsoft Orleans Durable Storage.</Description>
+    <PackageTags>$(PackageTags) FileSystem</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

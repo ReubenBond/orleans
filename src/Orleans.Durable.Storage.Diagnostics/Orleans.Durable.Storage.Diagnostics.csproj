@@ -5,6 +5,8 @@
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.Diagnostics</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage Diagnostics</Title>
+    <Description>Bounded fatal-error reporting and immediate process termination for Microsoft Orleans Durable Storage.</Description>
 
     <!-- The fatal-error handler's immediate exit calls _exit and TerminateProcess through source-generated imports. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

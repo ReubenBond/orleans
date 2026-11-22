@@ -18,11 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.S3\Orleans.Durable.Storage.S3.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.GoogleCloud\Orleans.Durable.Storage.GoogleCloud.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Durable.Storage.S3\Orleans.Durable.Storage.S3.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Durable.Storage.GoogleCloud\Orleans.Durable.Storage.GoogleCloud.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.MetaStore\Orleans.Durable.Storage.Fuzz.MetaStore.csproj" />
+    <ProjectReference Include="..\fuzz\Orleans.Durable.Storage.Fuzz.MetaStore\Orleans.Durable.Storage.Fuzz.MetaStore.csproj" />
     <Compile Include="..\shared\CorpusReplay.cs" Link="CorpusReplay.cs" />
     <Compile Include="..\shared\SharedVectors.cs" Link="SharedVectors.cs" />
   </ItemGroup>

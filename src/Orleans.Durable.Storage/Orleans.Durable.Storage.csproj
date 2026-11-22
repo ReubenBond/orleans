@@ -7,12 +7,9 @@
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage</RootNamespace>
-
-    <!--
-      An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), which the journaling adapter implements,
-      until Orleans.Journaling ships stable (build-packaging.md §2).
-    -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <Title>Microsoft Orleans Durable Storage</Title>
+    <Description>Layered journal storage for Microsoft Orleans Durable: the journal storage provider, silo hosting, routing, placement, ledger replica transport, and control grains over the Durable Storage engine.</Description>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
 
     <!--
       Binds the silo's options from configuration with generated code rather than reflection, so the binding stays within
@@ -22,20 +19,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <!-- The composition reads the Engine's internals under its grant, so it depends on the Engine's exact version. -->
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Runtime" />
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Polly.Core" />
     <PackageReference Include="System.IO.Hashing" />
   </ItemGroup>
 
   <!--
     Orleans' own buffer, which the replica calls' grain messages carry (orleans.md §5.12), has one name here, so a bare
-    ArcBuffer always means Clog's.
+    ArcBuffer always means Storage's.
   -->
   <ItemGroup>
     <Using Include="Orleans.Serialization.Buffers.ArcBuffer" Alias="OrleansBuffer" />

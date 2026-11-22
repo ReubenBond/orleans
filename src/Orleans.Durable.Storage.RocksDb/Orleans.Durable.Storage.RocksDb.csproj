@@ -2,6 +2,9 @@
   <!-- The state database's RocksDB storage, apart from the engine so that only a host which takes it loads RocksDB. -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.RocksDb</RootNamespace>
+    <Title>Microsoft Orleans Durable Storage RocksDB Index</Title>
+    <Description>RocksDB persistence for the derived journal indexes of Microsoft Orleans Durable Storage.</Description>
+    <PackageTags>$(PackageTags) RocksDB</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

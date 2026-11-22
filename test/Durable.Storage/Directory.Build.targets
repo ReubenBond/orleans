@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildTargetsPath Condition="'$(_DirectoryBuildTargetsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildTargetsFile)'))</_ParentDirectoryBuildTargetsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
+
+  <Import Project="$(SourceRoot)eng\durable-storage\Build.targets" />
+
+  <!--
+    Storage's test applications run under their own testconfig.json, which enables the crash and hang dump extensions
+    and keeps xUnit's default parallelism, in place of Orleans' (docs/spec/verification.md).
+  -->
+  <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
+    <None Remove="$(SourceRoot)test\testconfig.json" />
+    <None Include="$(MSBuildThisFileDirectory)testconfig.json"
+          Condition="'$(ClogMutationTesting)' != 'true'"
+          Link="testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
+</Project>

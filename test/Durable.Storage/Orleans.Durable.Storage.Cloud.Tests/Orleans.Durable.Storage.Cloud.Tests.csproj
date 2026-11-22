@@ -17,10 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\apphost\Orleans.Durable.Storage.AppHost\Orleans.Durable.Storage.AppHost.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.S3\Orleans.Durable.Storage.S3.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.GoogleCloud\Orleans.Durable.Storage.GoogleCloud.csproj" />
+    <ProjectReference Include="..\apphost\Orleans.Durable.Storage.AppHost\Orleans.Durable.Storage.AppHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Durable.Storage.S3\Orleans.Durable.Storage.S3.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Durable.Storage.GoogleCloud\Orleans.Durable.Storage.GoogleCloud.csproj" />
   </ItemGroup>
 
   <ItemGroup>

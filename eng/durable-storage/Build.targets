@@ -1,0 +1,26 @@
+<Project>
+  <!--
+    The Durable Storage family's build targets, imported after Orleans' targets by src/Directory.Build.targets,
+    test/Durable.Storage/Directory.Build.targets, and playground/DurableStorage/Directory.Build.targets.
+  -->
+
+  <!--
+    Orleans' build targets add Orleans namespaces to the implicit global usings after the project's items; removing them
+    keeps Orleans' names, such as its FatalErrorHandler, from shadowing Storage's in every project which reaches Orleans.
+  -->
+  <Target Name="ClogRemoveOrleansUsings" BeforeTargets="GenerateGlobalUsings">
+    <ItemGroup>
+      <Using Remove="Orleans" />
+      <Using Remove="Orleans.Hosting" />
+      <Using Remove="Orleans.Runtime" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Only a project which builds Orleans grains or serializers (OrleansBuildTimeCodeGen) is an Orleans framework part;
+    the Engine, Diagnostics, and the technology providers name no Orleans type.
+  -->
+  <ItemGroup Condition="'$(OrleansBuildTimeCodeGen)' != 'true'">
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+</Project>

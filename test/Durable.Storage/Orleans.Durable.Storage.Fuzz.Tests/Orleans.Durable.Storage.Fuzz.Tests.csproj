@@ -5,6 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz\Orleans.Durable.Storage.Fuzz.csproj" />
+    <ProjectReference Include="..\fuzz\Orleans.Durable.Storage.Fuzz\Orleans.Durable.Storage.Fuzz.csproj" />
   </ItemGroup>
 </Project>

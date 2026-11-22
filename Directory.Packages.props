@@ -138,6 +138,13 @@
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
   </ItemGroup>
+  <!-- Durable Storage's own dependencies: RocksDB for its derived indexes, SharpFuzz for its decoder fuzzing, and its test diagnostics. -->
+  <ItemGroup>
+    <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.750501" />
+    <PackageVersion Include="RocksDB" Version="11.8.1.7098" />
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
+  </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0' ">
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
@@ -238,5 +245,28 @@
     <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.9.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis" Version="5.9.0" />
     <PackageVersion Update="System.Collections.Immutable" Version="10.0.1" Condition=" '$(TargetFramework)' == 'net10.0' " />
+  </ItemGroup>
+  <!--
+    Durable Storage references Polly.Core directly. The version applies to Storage projects alone, so transitive pinning
+    leaves the Polly.Core which other Orleans packages resolve through Polly unchanged. Storage's cloud providers use
+    the SDK releases their conformance suites qualify, including the Blob service version they request.
+  -->
+  <ItemGroup Condition="$(MSBuildProjectName.StartsWith('Orleans.Durable.Storage'))">
+    <PackageVersion Include="Polly.Core" Version="8.8.0" />
+    <PackageVersion Update="AWSSDK.DynamoDBv2" Version="4.0.107.3" />
+    <PackageVersion Update="AWSSDK.S3" Version="4.0.104.11" />
+    <PackageVersion Update="Azure.Data.Tables" Version="12.13.0" />
+    <PackageVersion Update="Azure.Storage.Blobs" Version="12.30.1" />
+    <PackageVersion Update="Google.Cloud.Firestore" Version="4.5.0" />
+    <PackageVersion Update="Google.Cloud.Storage.V1" Version="5.0.0" />
+    <!-- Storage's property tests' generators and pinned seeds are qualified with this CsCheck release. -->
+    <PackageVersion Update="CsCheck" Version="4.9.1" />
+    <!--
+      Storage's snapshots use Verify 32.0.0, its last release on or before 1 September 2026: Verify's Open Source
+      Maintenance Fee covers every later release. The exact range, with transitive pinning, makes restore fail rather
+      than admit a later Verify package.
+    -->
+    <PackageVersion Include="Verify" Version="[32.0.0]" />
+    <PackageVersion Update="Verify.XunitV3" Version="[32.0.0]" />
   </ItemGroup>
 </Project>

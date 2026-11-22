@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    NamespaceTests reads the metadata of every production assembly, so this project references every project under
-    src. The wildcard keeps a new production project in scope without editing this file. SimulationClosureTests reads
+    NamespaceTests reads the metadata of every production assembly, so this project references every Storage project
+    under src. The wildcards keep a new production project in scope without editing this file. SimulationClosureTests reads
     what each simulation project's build rewrites, LayeringTests reads each fuzz target assembly's references, and the
     real-disk check reads the WAL tests' recording file system, so this project references each of those, without its
     assembly, to build it first.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\*\*.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage*\Orleans.Durable.Storage*.csproj;$(SourceRoot)src\*\Orleans.Durable.Storage.*\Orleans.Durable.Storage.*.csproj" />
     <!-- A simulation project builds in its simulation configuration (docs/spec/build-packaging.md §1). -->
     <ProjectReference Include="..\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj"
                       ReferenceOutputAssembly="false"
@@ -17,7 +17,7 @@
                       ReferenceOutputAssembly="false"
                       Private="false"
                       SetConfiguration="Configuration=Simulation$(Configuration)" />
-    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.*\Orleans.Durable.Storage.Fuzz.*.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\fuzz\Orleans.Durable.Storage.Fuzz.*\Orleans.Durable.Storage.Fuzz.*.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\Orleans.Durable.Storage.Engine.Wal.Tests\Orleans.Durable.Storage.Engine.Wal.Tests.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 

@@ -1,0 +1,5 @@
+is_global = true
+global_level = 101
+
+# Durable Storage benchmarks.
+dotnet_diagnostic.CA1515.severity = none

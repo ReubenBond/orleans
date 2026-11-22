@@ -1,0 +1,105 @@
+<Project>
+  <!--
+    The Durable Storage family's build settings, which every Storage project imports after Orleans' defaults:
+    src/Directory.Build.props for the production projects, test/Durable.Storage/Directory.Build.props for its tests and
+    tools, and playground/DurableStorage/Directory.Build.props for the sample. Storage is stricter than Orleans'
+    repository defaults: every analyzer enabled, checked arithmetic, and the trim, AOT, and single-file analyzers on its
+    production projects (test/Durable.Storage/docs/spec/build-packaging.md).
+  -->
+  <PropertyGroup>
+    <DurableStorageBuildDirectory>$(MSBuildThisFileDirectory)</DurableStorageBuildDirectory>
+    <IsDurableStorageProject>true</IsDurableStorageProject>
+    <IsDurableStorageSourceProject Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith($([MSBuild]::NormalizeDirectory('$(SourceRoot)', 'src'))))">true</IsDurableStorageSourceProject>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <Features>strict</Features>
+    <WarningLevel>9999</WarningLevel>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <WarningsNotAsErrors></WarningsNotAsErrors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!--
+    test/Durable.Storage/eng/mutation.ps1 sets ClogMutationTesting in its environment. Stryker.NET writes each mutated
+    assembly into its test projects' output directories, so a mutation run builds into a tree of its own and the outputs
+    which validation tests stay the ones the build produced.
+  -->
+  <PropertyGroup Condition="'$(ClogMutationTesting)' == 'true'">
+    <BaseOutputPath>$(SourceRoot)Artifacts\durable-storage-mutation\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(SourceRoot)Artifacts\durable-storage-mutation\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <!--
+    The simulation configurations (test/Durable.Storage/docs/spec/build-packaging.md §1): the simulation projects, and
+    the src projects they rewrite, build in SimulationRelease and SimulationDebug, which the solution maps from Release
+    and Debug. Each defines ORLEANS_DURABLE_STORAGE_SIMULATION, which compiles in the conditional seams of
+    test/Durable.Storage/docs/spec/verification.md §7.2, and builds as its base configuration otherwise: SimulationDebug
+    unoptimized with DEBUG, so debug assertions run under simulation, and SimulationRelease optimized. Every other build,
+    and every shipped artifact, is Debug or Release, without the symbol; each assembly a simulation configuration builds
+    carries the OrleansDurableStorageSimulation assembly metadata, by which Orleans.Durable.Storage.Architecture.Tests
+    checks that no Debug or Release build of src holds a seam.
+  -->
+  <PropertyGroup>
+    <Configurations>Debug;Release;SimulationDebug;SimulationRelease</Configurations>
+    <ClogSimulationBuild Condition="'$(Configuration)' == 'SimulationDebug' or '$(Configuration)' == 'SimulationRelease'">true</ClogSimulationBuild>
+    <ClogBaseConfiguration Condition="'$(Configuration)' == 'SimulationDebug'">Debug</ClogBaseConfiguration>
+    <ClogBaseConfiguration Condition="'$(Configuration)' == 'SimulationRelease'">Release</ClogBaseConfiguration>
+    <ClogBaseConfiguration Condition="'$(ClogBaseConfiguration)' == ''">$(Configuration)</ClogBaseConfiguration>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ClogSimulationBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);ORLEANS_DURABLE_STORAGE_SIMULATION</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'SimulationDebug'">
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'SimulationRelease'">
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ClogSimulationBuild)' == 'true'">
+    <AssemblyMetadata Include="OrleansDurableStorageSimulation" Value="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)DurableStorage.globalconfig" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" Visible="false" />
+  </ItemGroup>
+
+  <!--
+    Shipping code stays trim- and AOT-clean: every Storage project under src builds with the trim, AOT, and single-file
+    analyzers on and with warnings as errors. Each production package is versioned with the Durable family's alpha
+    suffix and validates its framework assets against an empty baseline until its first release.
+  -->
+  <PropertyGroup Condition="'$(IsDurableStorageSourceProject)' == 'true'">
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <PackageId>Microsoft.$(MSBuildProjectName)</PackageId>
+    <PackageTags>$(PackageTags) Durable Storage Journaling</PackageTags>
+    <VersionSuffix Condition="'$(VersionSuffix)' != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+</Project>

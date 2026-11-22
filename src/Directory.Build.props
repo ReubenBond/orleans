@@ -72,4 +72,7 @@
     <PackageReference Include="Microsoft.DotNet.GenAPI.Task" PrivateAssets="All" />
   </ItemGroup>
 
+  <!-- The Durable Storage family keeps its stricter compiler and analyzer settings. -->
+  <Import Project="$(SourceRoot)eng\durable-storage\Build.props" Condition="$(MSBuildProjectName.StartsWith('Orleans.Durable.Storage'))" />
+
 </Project>

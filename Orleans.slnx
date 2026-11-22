@@ -23,6 +23,10 @@
     <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Silo/DurableJobsJournaling.Silo.csproj" />
     <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Web/DurableJobsJournaling.Web.csproj" />
   </Folder>
+  <Folder Name="/playground/DurableStorage/">
+    <Project Path="playground/DurableStorage/Orleans.Durable.Storage.Samples.AppHost/Orleans.Durable.Storage.Samples.AppHost.csproj" />
+    <Project Path="playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling/Orleans.Durable.Storage.Samples.Journaling.csproj" />
+  </Folder>
   <Folder Name="/playground/Dashboard/">
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
@@ -71,6 +75,11 @@
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
     <Project Path="src/Orleans.Durable.Abstractions/Orleans.Durable.Abstractions.csproj" />
     <Project Path="src/Orleans.Durable.Http/Orleans.Durable.Http.csproj" />
+    <Project Path="src/Orleans.Durable.Storage/Orleans.Durable.Storage.csproj" />
+    <Project Path="src/Orleans.Durable.Storage.Diagnostics/Orleans.Durable.Storage.Diagnostics.csproj" />
+    <Project Path="src/Orleans.Durable.Storage.Engine/Orleans.Durable.Storage.Engine.csproj" />
+    <Project Path="src/Orleans.Durable.Storage.FileSystem/Orleans.Durable.Storage.FileSystem.csproj" />
+    <Project Path="src/Orleans.Durable.Storage.RocksDb/Orleans.Durable.Storage.RocksDb.csproj" />
   </Folder>
   <Folder Name="/src/Consensus/">
     <Project Path="src/Consensus/Orleans.Consensus.CasPaxos/Orleans.Consensus.CasPaxos.csproj" />
@@ -96,6 +105,7 @@
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Durable.S3/Orleans.Durable.S3.csproj" />
+    <Project Path="src/AWS/Orleans.Durable.Storage.S3/Orleans.Durable.Storage.S3.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.Kinesis/Orleans.Streaming.Kinesis.csproj" />
@@ -107,6 +117,7 @@
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Durable.AzureStorage/Orleans.Durable.AzureStorage.csproj" />
+    <Project Path="src/Azure/Orleans.Durable.Storage.AzureStorage/Orleans.Durable.Storage.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
@@ -120,6 +131,7 @@
   </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
+    <Project Path="src/Google/Orleans.Durable.Storage.GoogleCloud/Orleans.Durable.Storage.GoogleCloud.csproj" />
     <Project Path="src/Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
     <Project Path="src/Google/Orleans.Persistence.Firestore/Orleans.Persistence.Firestore.csproj" />
     <Project Path="src/Google/Orleans.Reminders.Firestore/Orleans.Reminders.Firestore.csproj" />
@@ -212,6 +224,44 @@
     <Project Path="test/DistributedTests/DistributedTests.Common/DistributedTests.Common.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Grains/DistributedTests.Grains.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Server/DistributedTests.Server.csproj" />
+  </Folder>
+  <Folder Name="/test/Durable.Storage/">
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Architecture.Tests/Orleans.Durable.Storage.Architecture.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Diagnostics.Tests/Orleans.Durable.Storage.Diagnostics.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Tests/Orleans.Durable.Storage.Engine.Archive.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Buffers.Tests/Orleans.Durable.Storage.Engine.Buffers.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.GroupCommit.Tests/Orleans.Durable.Storage.Engine.GroupCommit.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Journals.Tests/Orleans.Durable.Storage.Engine.Journals.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Threading.Tests/Orleans.Durable.Storage.Engine.Threading.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Wal.Tests/Orleans.Durable.Storage.Engine.Wal.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Fuzz.Tests/Orleans.Durable.Storage.Fuzz.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Interop.Tests/Orleans.Durable.Storage.Interop.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Model.Tests/Orleans.Durable.Storage.Model.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Samples.Tests/Orleans.Durable.Storage.Samples.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Testing.Tests/Orleans.Durable.Storage.Testing.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj" />
+  </Folder>
+  <Folder Name="/test/Durable.Storage/apphost/">
+    <Project Path="test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost/Orleans.Durable.Storage.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/test/Durable.Storage/benchmarks/">
+    <Project Path="test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks/Orleans.Durable.Storage.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/test/Durable.Storage/fuzz/">
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz/Orleans.Durable.Storage.Fuzz.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Abstractions/Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive/Orleans.Durable.Storage.Fuzz.Archive.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs/Orleans.Durable.Storage.Fuzz.Archive.Logs.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Journals/Orleans.Durable.Storage.Fuzz.Journals.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Ledgers/Orleans.Durable.Storage.Fuzz.Ledgers.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.MetaStore/Orleans.Durable.Storage.Fuzz.MetaStore.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Orleans/Orleans.Durable.Storage.Fuzz.Orleans.csproj" />
+    <Project Path="test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Wal/Orleans.Durable.Storage.Fuzz.Wal.csproj" />
   </Folder>
   <Folder Name="/test/Extensions/">
     <Project Path="test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj" />
