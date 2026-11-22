@@ -39,6 +39,12 @@ Both builder and service-collection APIs are supported. Each name has its own
 backend options, storage provider, catalog, and state-manager factory. Named
 registrations leave default grain journaling independent.
 
+A silo whose grain journals use Durable Storage (`AddDurableJournalStorage`)
+keeps its Jobs shards in such a named Azure provider: Durable Jobs lists shards
+through the provider's catalog and claims them through conditional blob or table
+metadata updates, which the Azure providers supply. See
+[Durable Jobs beside Durable Storage](../../../Orleans.Durable/DurableJobs/README.md#durable-jobs-beside-durable-storage).
+
 To move new work to another account, container, or table, retain A's original
 namespace under `"jobs-a"` and register B's namespace under `"jobs-b"`:
 

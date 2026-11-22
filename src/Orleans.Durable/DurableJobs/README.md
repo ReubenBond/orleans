@@ -157,6 +157,34 @@ cancellation, compaction, and deletion. Timestamp/GUID shard IDs,
 handles stay unchanged. A shard has one authoritative storage location
 throughout its lifetime.
 
+### Durable Jobs beside Durable Storage
+
+Durable Jobs discovers shards by listing its provider's journal catalog
+(`IJournalStorageCatalog`) and claims them through conditional journal metadata
+updates. When Durable Storage (`AddDurableJournalStorage`) serves the silo's
+grain journals, Jobs keeps its shards in a named provider which supplies both,
+such as Azure Blob:
+
+```csharp
+siloBuilder
+    .AddDurableJournalStorage(configuration.GetSection("DurableStorage"))
+    .AddAzureBlobJournalStorage("jobs", options =>
+    {
+        options.BlobServiceClient = blobServiceClient;
+        options.ContainerName = "jobs";
+    })
+    .UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
+```
+
+Grain journals, including Messaging and Durable Tasks state, use Durable
+Storage unless `[JournalStorageProvider]` selects another provider. The jobs
+they schedule, including Messaging and Durable Tasks wake-ups, live in the
+`"jobs"` shards, which keep their creation, discovery, ownership, retries,
+cancellation, and recovery in Azure. A silo whose selected Jobs provider has no
+catalog, such as Durable Storage under `"Default"` when `ActiveProviderName` is
+left unset, stops at startup with an `OrleansConfigurationException` which names
+the provider and `IJournalStorageCatalog`.
+
 ### Cut over and retire a provider
 
 Bindings are fixed at startup. For an A-to-B migration:
