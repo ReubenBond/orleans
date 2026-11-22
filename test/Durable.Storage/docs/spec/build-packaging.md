@@ -67,8 +67,8 @@ version (`PackExactVersion`). Orleans' build targets add the namespaces `Orleans
 `Orleans.Runtime` to the implicit global usings; `eng/durable-storage/Build.targets` removes them in every Storage
 project, so Orleans' names, such as its `FatalErrorHandler`, never shadow Storage's. Only the composition and the
 projects which reference it (its tests, its fuzz target, the interop tests, the benchmarks, and the sample), the native
-CASPaxos MetaStore (`Orleans.Durable.Storage.CasPaxos`) and its tests, and the architecture tests, take Orleans, which `Orleans.Durable.Storage.Architecture.Tests` checks against every production
-assembly's references.
+CASPaxos MetaStore (`Orleans.Durable.Storage.CasPaxos`) and its tests, and the architecture tests, take Orleans, which
+`Orleans.Durable.Storage.Architecture.Tests` checks against every production assembly's references.
 
 Fast CASPaxos and Clockwork are imported into the repository once each, as the `Orleans.Consensus.CasPaxos.*` family
 under `src/Consensus/` and the `Orleans.Testing.Simulation.*` family under `src/Simulation/`, each keeping its domain
@@ -109,9 +109,10 @@ first-party membership on Azure Table storage. It also takes the OpenTelemetry p
 `OpenTelemetry.Extensions.Hosting` and `OpenTelemetry.Exporter.OpenTelemetryProtocol`, third-party packages, for one
 requirement: exporting the sample's metrics and logs over OTLP to the Aspire dashboard, where its README directs the
 reader. No `src` project takes them. The AppHosts pin each emulator's image by digest, once, in
-`test/Durable.Storage/apphost/shared/EmulatorImages.cs`, which both `test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost` and the sample's
-`playground/DurableStorage/Orleans.Durable.Storage.Samples.AppHost` compile, so a run starts the same bytes whatever its registry's tags
-later name ([verification §13](verification.md#13-qualification-boundaries)):
+`test/Durable.Storage/apphost/shared/EmulatorImages.cs`, which both
+`test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost` and the sample's
+`playground/DurableStorage/Orleans.Durable.Storage.Samples.AppHost` compile, so a run starts the same bytes whatever its
+registry's tags later name ([verification §13](verification.md#13-qualification-boundaries)):
 
 | Image | Release | Digest (`sha256:`) |
 | --- | --- | --- |
@@ -131,18 +132,21 @@ properties turn off deterministic compilation and source-path mapping in the tes
 compiler records each test's source path, beside which Verify keeps the test's snapshots.
 
 Decoder fuzzing ([verification §6.1](verification.md#61-decoder-fuzzing)) takes three pinned parts: the SharpFuzz 2.3.0
-package in the campaign executable `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz` alone; the SharpFuzz.CommandLine 2.3.0 tool in
-Storage's tool manifest (`test/Durable.Storage/.config/dotnet-tools.json`), with Stryker.NET and ReportGenerator, which instruments the published decoder assemblies; and the libfuzzer-dotnet
-`v2025.05.02.0904` driver, which `test/Durable.Storage/eng/fuzz.ps1` downloads under `test/Durable.Storage/artifacts/tools` and verifies against a pinned SHA-256
-per platform. All three are MIT-licensed. The per-layer target libraries reference their layer and the oracle framework
-only, and each layer's corpus replay tests run its targets over uninstrumented decoders.
+package in the campaign executable `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz` alone; the
+SharpFuzz.CommandLine 2.3.0 tool in Storage's tool manifest (`test/Durable.Storage/.config/dotnet-tools.json`), with
+Stryker.NET and ReportGenerator, which instruments the published decoder assemblies; and the libfuzzer-dotnet
+`v2025.05.02.0904` driver, which `test/Durable.Storage/eng/fuzz.ps1` downloads under
+`test/Durable.Storage/artifacts/tools` and verifies against a pinned SHA-256 per platform. All three are MIT-licensed.
+The per-layer target libraries reference their layer and the oracle framework only, and each layer's corpus replay tests
+run its targets over uninstrumented decoders.
 
 The documentation checks ([verification §12](verification.md#12-gates-and-measurements)) run on Node.js with the
-packages `test/Durable.Storage/eng/docs/package-lock.json` pins: markdownlint-cli2 0.24.0 (markdownlint 0.42.0), remark-cli 12.0.1 with
-remark-validate-links 13.1.0, and Mermaid 12.2.0 under jsdom 30.1.3. `test/Durable.Storage/eng/check-docs.ps1` installs them with `npm ci`
-under `artifacts/tools/docs` whenever the lock file's hash changes, as `test/Durable.Storage/eng/model-check-quint.ps1` installs Quint
-from `test/Durable.Storage/eng/quint/package-lock.json`, and the install fails on a Node.js release the packages do not support. Mermaid
-12.2.0 is the release GitHub's Markdown renderer runs, and its pin moves with GitHub's.
+packages `test/Durable.Storage/eng/docs/package-lock.json` pins: markdownlint-cli2 0.24.0 (markdownlint 0.42.0),
+remark-cli 12.0.1 with remark-validate-links 13.1.0, and Mermaid 12.2.0 under jsdom 30.1.3.
+`test/Durable.Storage/eng/check-docs.ps1` installs them with `npm ci` under `artifacts/tools/docs` whenever the lock
+file's hash changes, as `test/Durable.Storage/eng/model-check-quint.ps1` installs Quint from
+`test/Durable.Storage/eng/quint/package-lock.json`, and the install fails on a Node.js release the packages do not
+support. Mermaid 12.2.0 is the release GitHub's Markdown renderer runs, and its pin moves with GitHub's.
 
 ## 3. Executable artifacts
 
@@ -194,6 +198,7 @@ would change.
 | Language version | `preview` everywhere. Every `src` project but the Engine compiles under C# 15 (`latest`), each against the Engine built with the preview: unions (in the Engine, the composition, and the Azure and file-system packages) and collection expression arguments are released C# 15 features. The WAL's io_uring interop (`IoUringInterop` and its `LibraryImport` stubs), in the Engine, declares pointer types outside an unsafe context, which only C# 15's preview memory-safety model admits. | The WAL's interop marks its pointer declarations unsafe, or the target adopts the preview. A language version before C# 15 has no unions: each becomes the hand-written form of [conventions §15](conventions.md#15-outcomes-unions-and-errors). |
 | .NET 11 APIs | The union support types (`System.Runtime.CompilerServices.IUnion`, `UnionAttribute`) in each assembly which declares a union; `string.StartsWith(char, StringComparison)` in `Orleans.Durable.Storage.FileSystem`; and the Microsoft.Extensions logging, options, and dependency-injection abstractions, which the .NET 11 shared framework carries (§1), in `Orleans.Durable.Storage.Engine.Ledgers`, the LSM, archive logs, `Orleans.Durable.Storage.FileSystem`, the Orleans composition, and its controllers' decisions. Every other platform reference resolves in .NET 10. | For an older framework: the union support types supplied to the compiler, the `StartsWith` call replaced, and the Microsoft.Extensions abstractions taken as packages, which NuGet prunes only from a `net11.0` graph (§1). |
 | Fast CASPaxos | `Orleans.Durable.Storage.CasPaxos` references the transport-neutral `Orleans.Consensus.CasPaxos.Server` and `.Sqlite` projects and Orleans' runtime, whose voters' system target uses `Orleans.Core`'s and `Orleans.Runtime`'s internals. | None. |
+
 ## 7. Design rationale
 
 One framework, .NET 11 on its GA SDK, gives every project the runtime and compiler which unions need ([conventions

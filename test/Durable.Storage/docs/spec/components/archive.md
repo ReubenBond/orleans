@@ -228,10 +228,11 @@ name. The answer merges the caller's live rows into a history read with the read
 **The slow path is the oracle, not the fast path.** Without a key index, `ReadAsync` scans every live ledger containing
 the key from slot 0 (or from an `Absent` answer's per-ledger bound), reading every batch of those ledgers to find the
 key's rows. It is the reference implementation and the test oracle. With an `ArchiveKeyIndex` (row 5.2 part D of the
-[implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), `ArchiveReader` locates the key's slots per live ledger through
-the node's caught-up key indexes ([journals §8.3](journals.md#83-warm-state)) and point-reads only the defining and row
-batches, while `Absent` carries per-ledger bounds (`ArchiveStoreRead.Absent.Bounds`) so an unindexed first touch scans
-only above them.
+[implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
+`ArchiveReader` locates the key's slots per live ledger through the node's caught-up key indexes ([journals
+§8.3](journals.md#83-warm-state)) and point-reads only the defining and row batches, while `Absent` carries per-ledger
+bounds (`ArchiveStoreRead.Absent.Bounds`) so an unindexed first touch scans only above them.
 
 **One store per cluster.** The stores' durable states differ, so a cluster changing stores would need a migration
 ([deferred](../deferred.md#changing-the-archive-store-of-a-live-cluster)); the composition records the store the
@@ -598,16 +599,16 @@ after a read's answer.
   - *The history fold.* The fold of a key's decided rows (versions, tokens, and content) is compared with each prefix
     followed by the live rows not held, over the memory store, the LSM, and every archive-log store, in deterministic
     simulation with drains, drops, compactions where the store has them, and stale caches
-    ([verification §3.3](../verification.md#33-the-history-fold)). `ArchiveOracle` (`test/Durable.Storage/shared/Archive`) is the one
-    reading of §2.1 every test shares.
-  - *The chain checker* (HI-I4, JS-I10), `TokenChainChecker` in `test/Durable.Storage/shared/Archive`. A global checker after every
-    simulation step replays `Plan` per key across segments and ledgers, through splits and merges, and checks every
-    stored token, anchored as HI-I4 states, a write held in part at `Plan` of its held part and none held after one not
-    held whole; `VersionChecker`, beside it, checks every stored version against the fold, a count reset among them,
-    that a key's versions never repeat but in the LSM's caveat (§8.3), and that every version base a read answers names
-    one state of its key; Debug assertions pair it where admission writes a defining row and where drains and loads read
-    one. Mutants which store a token from the wrong parent, plan a token from a fenced write, reset a version, or skip
-    the reader's check fail.
+    ([verification §3.3](../verification.md#33-the-history-fold)). `ArchiveOracle`
+    (`test/Durable.Storage/shared/Archive`) is the one reading of §2.1 every test shares.
+  - *The chain checker* (HI-I4, JS-I10), `TokenChainChecker` in `test/Durable.Storage/shared/Archive`. A global checker
+    after every simulation step replays `Plan` per key across segments and ledgers, through splits and merges, and
+    checks every stored token, anchored as HI-I4 states, a write held in part at `Plan` of its held part and none held
+    after one not held whole; `VersionChecker`, beside it, checks every stored version against the fold, a count reset
+    among them, that a key's versions never repeat but in the LSM's caveat (§8.3), and that every version base a read
+    answers names one state of its key; Debug assertions pair it where admission writes a defining row and where drains
+    and loads read one. Mutants which store a token from the wrong parent, plan a token from a fenced write, reset a
+    version, or skip the reader's check fail.
   - *Laws of the pure members* (CsCheck, over every provider): a write is not held before it lands and is held after;
     with a map value generated per read, one still listing a suffix of the landed ledgers or older than the store,
     `Holds` holds exactly the writes of the ledgers it no longer lists, or every landed write where tokens order the
@@ -680,15 +681,15 @@ after a read's answer.
   each store in simulation: every `VersionBase` a read answers differs from every earlier one while the store holds the
   key, so rebased versions never repeat, except, on the LSM, after compaction drops the key entirely, the recorded
   caveat (§8.3).
-- **Contract.** One `IArchiveStore` conformance suite (`ArchiveStoreContract`, `test/Durable.Storage/shared/Archive`) runs over every
-  implementation: the memory store, the LSM, and every archive-log store. It checks `Absent` only when the key's prefix
-  would hold no command, also when another key's commands are held; a prefix's content as the fold of the held commands,
-  across openers, append runs, a tombstoned `Delete`, an empty `Delete`, and an `Append` after a `Delete`; `HasBase`
-  true exactly when a `Replace` opened the base, an empty one included; `Tombstone` present only while the key is
-  deleted; `Holds` of every write a drain applied; a read whose map value is older than the store, holding no write of
-  a ledger past its `NextLedgerId`; a straggler drain which changes nothing, through the LSM's committer; `VersionBase`
-  advancing with every write; the pure members' laws on the provider's parameters; a fold's state within
-  `ArchivePlan.MaxStateBytes`, measured at `Begin` and at an `Append`; a store of empty tokens admitting
+- **Contract.** One `IArchiveStore` conformance suite (`ArchiveStoreContract`, `test/Durable.Storage/shared/Archive`)
+  runs over every implementation: the memory store, the LSM, and every archive-log store. It checks `Absent` only when
+  the key's prefix would hold no command, also when another key's commands are held; a prefix's content as the fold of
+  the held commands, across openers, append runs, a tombstoned `Delete`, an empty `Delete`, and an `Append` after a
+  `Delete`; `HasBase` true exactly when a `Replace` opened the base, an empty one included; `Tombstone` present only
+  while the key is deleted; `Holds` of every write a drain applied; a read whose map value is older than the store,
+  holding no write of a ledger past its `NextLedgerId`; a straggler drain which changes nothing, through the LSM's
+  committer; `VersionBase` advancing with every write; the pure members' laws on the provider's parameters; a fold's
+  state within `ArchivePlan.MaxStateBytes`, measured at `Begin` and at an `Append`; a store of empty tokens admitting
   every key and command; a stable, non-zero store ID which reads back; a store's record created once, holding the store
   fields the spec gives each store, and answered whole to every later call and to another instance over the same
   objects, whatever its caller parameters; a first call which loses the record's creation to a winner with other caller

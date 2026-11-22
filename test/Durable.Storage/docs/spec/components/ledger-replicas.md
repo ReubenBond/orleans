@@ -765,22 +765,23 @@ catalog refuses every later request for the ledger ([LS-I2](ledgerstore.md#5-inv
 
 ## 10. Verification
 
-Projects: `test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests` (class names below); `test/Durable.Storage/specs/ledger-protocol` and
-`test/Durable.Storage/specs/ledgers` (Quint, run by `test/Durable.Storage/eng/model-check-quint.ps1`). The [ledger
-model](../../../specs/ledger-protocol/README.md) checks each replica's answers, seals, recovery writes, drops, and
-restarts under the ledger protocol ([ledger-protocol §10](ledger-protocol.md#10-verification)), and each of its
-invariants has a mutant which must produce its counterexample.
+Projects: `test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests` (class names below);
+`test/Durable.Storage/specs/ledger-protocol` and `test/Durable.Storage/specs/ledgers` (Quint, run by
+`test/Durable.Storage/eng/model-check-quint.ps1`). The [ledger model](../../../specs/ledger-protocol/README.md) checks
+each replica's answers, seals, recovery writes, drops, and restarts under the ledger protocol ([ledger-protocol
+§10](ledger-protocol.md#10-verification)), and each of its invariants has a mutant which must produce its
+counterexample.
 
 `LedgerReplicaConformanceTests` runs an executable spec of the replica contract, `LedgerReplicaSpec`, through the
 conformance kit ([verification §4.1](../verification.md#41-the-conformance-kit)) over the memory provider's and a
 LedgerStore's replicas of two ledgers on one node, the store crashing and restarting, and over a `Ledger` in the spec's
 composition role, whose listing is the union of its nodes' ([ledger-protocol §10](ledger-protocol.md#10-verification)).
-The spec and its executor are shared test source (`test/Durable.Storage/shared/Conformance/LedgerReplica`), so simulation reuses the
-oracle. Each replica runs every sequence and concurrent group Accordant generates to a small depth, and long CsCheck
-sequences and concurrent groups. The spec's role decides what a caller may send: a ledger replica answers every request
-as §8.1 does, writer writes and recovery writes alike (§2.1); a `Ledger` receives only what the ledger protocol sends
-it, its writer's writes within the window above the known contiguous tail they carry, reads, seal checks, and
-recoveries, and never a bare seal or a recovery write.
+The spec and its executor are shared test source (`test/Durable.Storage/shared/Conformance/LedgerReplica`), so
+simulation reuses the oracle. Each replica runs every sequence and concurrent group Accordant generates to a small
+depth, and long CsCheck sequences and concurrent groups. The spec's role decides what a caller may send: a ledger
+replica answers every request as §8.1 does, writer writes and recovery writes alike (§2.1); a `Ledger` receives only
+what the ledger protocol sends it, its writer's writes within the window above the known contiguous tail they carry,
+reads, seal checks, and recoveries, and never a bare seal or a recovery write.
 
 For a ledger replica the spec models, per ledger on its node, the DATA registers, the seal, the retained contiguous
 tail, whether the replica exists, and the ledger's tombstone: a writer write meets the seal, a recovery write passes it,

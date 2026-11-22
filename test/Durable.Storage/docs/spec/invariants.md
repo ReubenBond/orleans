@@ -12,11 +12,12 @@ statement here is a one-line summary.
   parentheses. Code cites the invariant's ID next to the enforcement
   ([conventions](conventions.md#9-citations-in-code)).
 - **Evidence** names test classes (with their project when it is not the component's default test project), model
-  properties and mutants (Quint in `test/Durable.Storage/specs/ledger-protocol`, `test/Durable.Storage/specs/ledgers`, `test/Durable.Storage/specs/archive`, and `test/Durable.Storage/specs/archive-logs`,
-  run by `test/Durable.Storage/eng/model-check-quint.ps1`), golden vectors under `test/Durable.Storage/shared-vectors/`, and fuzz targets whose corpora
-  under `test/Durable.Storage/fuzz/corpus/` the owning layer's `CorpusReplayTests` replay. Every Quint invariant has an independent mutant
-  which must produce its counterexample, and the ledger protocol model adds a regression and reachability witnesses.
-  The owning file's Verification section names the individual test cases.
+  properties and mutants (Quint in `test/Durable.Storage/specs/ledger-protocol`, `test/Durable.Storage/specs/ledgers`,
+  `test/Durable.Storage/specs/archive`, and `test/Durable.Storage/specs/archive-logs`, run by
+  `test/Durable.Storage/eng/model-check-quint.ps1`), golden vectors under `test/Durable.Storage/shared-vectors/`, and
+  fuzz targets whose corpora under `test/Durable.Storage/fuzz/corpus/` the owning layer's `CorpusReplayTests` replay.
+  Every Quint invariant has an independent mutant which must produce its counterexample, and the ledger protocol model
+  adds a regression and reachability witnesses. The owning file's Verification section names the individual test cases.
 - *Not yet in code* marks an invariant, or the named part of one, whose enforcement is not implemented.
 - *Planned* marks evidence which the owning Verification section specifies and which arrives with the
   implementation. §14 lists the invariants whose evidence is planned only or partial.
@@ -129,12 +130,12 @@ Code: `Orleans.Durable.Storage.Engine.Ledgers` (`Ledger`, `LedgerQuorum`, `Ledge
 Code: `Orleans.Durable.Storage.Engine.MetaStore.Abstractions` (`MetaStoreRegisterName`) and the provider projects
 (`Orleans.Durable.Storage.Engine.MetaStore`, `Orleans.Durable.Storage.FileSystem`, `Orleans.Durable.Storage.CasPaxos`,
 `Orleans.Durable.Storage.AzureStorage`, `Orleans.Durable.Storage.S3`, `Orleans.Durable.Storage.GoogleCloud`). Tests:
-`Orleans.Durable.Storage.Engine.MetaStore.Tests`; the contract kit `test/Durable.Storage/shared/ConditionalRegisterContract.cs` runs in
-`Orleans.Durable.Storage.Engine.MetaStore.Tests` and `Orleans.Durable.Storage.CasPaxos.Tests`.
-`Orleans.Durable.Storage.Engine.GroupCommit` holds `GroupCommitter`, which the ledger map's, the manifest's, and the
-node registry's committers share ([conventions §6](conventions.md#6-retries-and-idempotency));
-`Orleans.Durable.Storage.Engine.GroupCommit.Tests` tests it over fake rules, and each committer's tests, conformance
-tests, and simulations test it under that value's commit rules.
+`Orleans.Durable.Storage.Engine.MetaStore.Tests`; the contract kit
+`test/Durable.Storage/shared/ConditionalRegisterContract.cs` runs in `Orleans.Durable.Storage.Engine.MetaStore.Tests`
+and `Orleans.Durable.Storage.CasPaxos.Tests`. `Orleans.Durable.Storage.Engine.GroupCommit` holds `GroupCommitter`, which
+the ledger map's, the manifest's, and the node registry's committers share ([conventions
+§6](conventions.md#6-retries-and-idempotency)); `Orleans.Durable.Storage.Engine.GroupCommit.Tests` tests it over fake
+rules, and each committer's tests, conformance tests, and simulations test it under that value's commit rules.
 
 | ID | Statement | Section | Enforcing code | Evidence |
 | --- | --- | --- | --- | --- |

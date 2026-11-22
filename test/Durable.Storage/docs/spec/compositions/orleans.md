@@ -28,17 +28,17 @@ composes; Orleans membership, placement, and messaging provide liveness and perf
 Code: `Orleans.Durable.Storage`, in the assembly `Orleans.Durable.Storage`, with its control-plane types in
 `Orleans.Durable.Storage.Engine.Cluster.Control`, and the controllers' decisions, which name no Orleans type, in the
 component `Orleans.Durable.Storage.Engine.Cluster.Control`, which the Engine (`Orleans.Durable.Storage.Engine`)
-compiles. In code (row 4.1 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)): the silo's node over its
-LedgerStore, the node registry with its codec, committer, and resolver, `RegisteredNodePlacement`, and registration
-through the controller grain; the replica transport (row 4.7); the controllers' cores, `ClusterController` and
-`NodeController` (row 4.3's B1); and the controller and node control grains which host them, the silo's Ledgers runtime
-and control loop, and the sweep host (row 4.3's B2); node retirement, its gate, and cluster restart (row 4.4's A);
-resource governance (row 4.4's B); the durability repair and the placement policies (row 4.4's C); the
-failure-triggered drains (row 4.6); and the
-journaling adapter: its Journals in the silo, node grain, router, Orleans journal storage, grain placement, and status
-(row 4.2); the re-placement of journaled grains by live migration (row 4.5's D); and archive logs in the silo: the
-store's selection, registration with the cluster's store identity, the archive gate, and the drains, drops, and sweeps
-(row 4.9). *Not yet in code*: the rest.
+compiles. In code (row 4.1 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)):
+the silo's node over its LedgerStore, the node registry with its codec, committer, and resolver,
+`RegisteredNodePlacement`, and registration through the controller grain; the replica transport (row 4.7); the
+controllers' cores, `ClusterController` and `NodeController` (row 4.3's B1); and the controller and node control grains
+which host them, the silo's Ledgers runtime and control loop, and the sweep host (row 4.3's B2); node retirement, its
+gate, and cluster restart (row 4.4's A); resource governance (row 4.4's B); the durability repair and the placement
+policies (row 4.4's C); the failure-triggered drains (row 4.6); and the journaling adapter: its Journals in the silo,
+node grain, router, Orleans journal storage, grain placement, and status (row 4.2); the re-placement of journaled grains
+by live migration (row 4.5's D); and archive logs in the silo: the store's selection, registration with the cluster's
+store identity, the archive gate, and the drains, drops, and sweeps (row 4.9). *Not yet in code*: the rest.
 
 ### Design rationale
 
@@ -87,20 +87,22 @@ a ledger closes only at the end of a recovery which sealed `N − Q + 1` of its 
 ([LG-I9](../components/ledgers.md#5-invariants)), so after the restart no transition could close them and every range
 would stall. Without object-store ledgers, the profile's planned whole-cluster stop keeps every instance allocated
 instead, and its restart is §5.10's. When object-store ledgers are configured and ready (row 4.8 B of the
-[implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), `IClusterControllerGrain.StartDrainAllAsync` runs a two-phase
-drain-all before an instance-releasing stop ([§5.14](#514-object-store-ledgers), [§8](#8-operation)): phase 1 rolls
-every range whose open ledger is on nodes into the object store and drains and drops every closed ledger on nodes,
-suppressing any new placement onto nodes; once zero node-backed ledgers remain in the map, phase 2 retires every active
-diskful node in `CLNR` and raises the map's retirement floor to cover those retirements, freeing every StatefulSet
-ordinal without changing `CLNR` or adding a parked ledger state. A parked ledger, open with no primary claim and closed
-at slot 0 without a recovery, was rejected: it adds a map state which changes LG-I1, LG-I5, and LG-I9, the ledger map
-model, and the executor, for what rolls into the object store already give. After the instances are stopped and
-restarted over empty roots at the same ordinals, each silo registers a fresh node identity, takes over the open
-object-store ledgers with zero lost acknowledged entries, and rolls the ranges back onto the new nodes under
-`ControlOptions.LedgerPlacement`. A silo which finds an empty root at an ordinal whose node is active still stops and
-asks the operator, on this profile as on persistent volumes, though an instance move makes that state routine: an
-unmounted or unformatted device leaves the same empty root over intact data, and a succession taken automatically would
-turn a mount error the operator could repair into a lost node, several at once when one event restarts several instances
+[implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
+`IClusterControllerGrain.StartDrainAllAsync` runs a two-phase drain-all before an instance-releasing stop
+([§5.14](#514-object-store-ledgers), [§8](#8-operation)): phase 1 rolls every range whose open ledger is on nodes into
+the object store and drains and drops every closed ledger on nodes, suppressing any new placement onto nodes; once zero
+node-backed ledgers remain in the map, phase 2 retires every active diskful node in `CLNR` and raises the map's
+retirement floor to cover those retirements, freeing every StatefulSet ordinal without changing `CLNR` or adding a
+parked ledger state. A parked ledger, open with no primary claim and closed at slot 0 without a recovery, was rejected:
+it adds a map state which changes LG-I1, LG-I5, and LG-I9, the ledger map model, and the executor, for what rolls into
+the object store already give. After the instances are stopped and restarted over empty roots at the same ordinals, each
+silo registers a fresh node identity, takes over the open object-store ledgers with zero lost acknowledged entries, and
+rolls the ranges back onto the new nodes under `ControlOptions.LedgerPlacement`. A silo which finds an empty root at an
+ordinal whose node is active still stops and asks the operator, on this profile as on persistent volumes, though an
+instance move makes that state routine: an unmounted or unformatted device leaves the same empty root over intact data,
+and a succession taken automatically would turn a mount error the operator could repair into a lost node, several at
+once when one event restarts several instances
 ([deferred](../deferred.md#automatic-succession-of-a-lost-instance-local-disk)). The profile is therefore a deployment
 rule and its procedures, with no option of its own: it changes nothing a silo does.
 
@@ -518,11 +520,11 @@ cluster's own silos serve (`AddCasPaxosMetaStore` in `Orleans.Durable.Storage.Ca
 before the runtime initializes and serve once admitted, which the silo waits for after joining membership and before it
 is active, so a node registers at `Active` over consensus which serves; its voters are addressed through Orleans
 membership, never through a register they serve.
-`playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling` is an Orleans app which runs Clog as its journal storage this way.
-`DurableStorageNode`, the silo lifecycle participant in `.Hosting`, owns the node's LedgerStore, replica endpoint,
-registry entry, state database, Journals, primaries, executor, and node control plane. `JournalRouter` sends each
-journal's entries and reads to its primary. The silo's services supply the `IMetaStore` holding `ledger-map` and
-`node-registry`. In code (row 4.1), `AddDurableJournalStorage` registers the node, its registry resolver,
+`playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling` is an Orleans app which runs Clog as its journal
+storage this way. `DurableStorageNode`, the silo lifecycle participant in `.Hosting`, owns the node's LedgerStore,
+replica endpoint, registry entry, state database, Journals, primaries, executor, and node control plane. `JournalRouter`
+sends each journal's entries and reads to its primary. The silo's services supply the `IMetaStore` holding `ledger-map`
+and `node-registry`. In code (row 4.1), `AddDurableJournalStorage` registers the node, its registry resolver,
 `RegisteredNodePlacement`'s director, and the controller grain, and `PortableWalStorage` as the node's `WalStorage`
 unless the silo's services supply one; a second call fails, since a silo hosts one node (OR-I9). In code (row 4.2's C):
 the journal storage provider, `DurableJournalStorageProvider`, and its named overload.
@@ -2118,13 +2120,14 @@ storage latency grants no other process authority to write.
 
 ### 5.12 Replica transport
 
-In code (row 4.7 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)): `OrleansLedgerReplicaTransport`, the
-silo's `ILedgerReplicaTransport` service; `ILedgerStoreGrain`, its activation `LedgerStoreGrain`, and the silo's
-`LedgerReplicaHost`; the silo's `LocalNode` and its serving gate; the limits, `ReplicaCallLimits`; the result table's
-mapping and reply checks, `LedgerReplicaCallResults`; and each destination node's two lanes, each a `CallBudget` of
-`Orleans.Durable.Storage.Engine.Threading` made by Ledgers' `NodeCallBudget`; the owner's snapshot reservations and
-forwarded-read slots, `ForwardedReads` (row 4.2's B); and the write and read lanes, `ForwardingBudgets`, with later
-pages in none (row 4.2's C).
+In code (row 4.7 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)):
+`OrleansLedgerReplicaTransport`, the silo's `ILedgerReplicaTransport` service; `ILedgerStoreGrain`, its activation
+`LedgerStoreGrain`, and the silo's `LedgerReplicaHost`; the silo's `LocalNode` and its serving gate; the limits,
+`ReplicaCallLimits`; the result table's mapping and reply checks, `LedgerReplicaCallResults`; and each destination
+node's two lanes, each a `CallBudget` of `Orleans.Durable.Storage.Engine.Threading` made by Ledgers' `NodeCallBudget`;
+the owner's snapshot reservations and forwarded-read slots, `ForwardedReads` (row 4.2's B); and the write and read
+lanes, `ForwardingBudgets`, with later pages in none (row 4.2's C).
 
 Each silo reaches ledger replicas through `OrleansLedgerReplicaTransport`, its
 [`ILedgerReplicaTransport`](../components/ledger-replicas.md#22-iledgerreplicatransport), which meets
@@ -2412,10 +2415,10 @@ costs, against the rejected design of a dedicated gRPC service per silo:
 - **One request per message.** A payload crosses in one message instead of a stream, within the payload limit
   above.
 
-**Measurements.** `OrleansMultiProcessBenchmarks` (`test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`, `--orleans-bench`,
-row 5.4) measured one silo per OS process with Server GC (`DOTNET_gcServer=1`, verified `IsServerGC == true`) over real
-loopback TCP sockets (`UseDevelopmentClustering`) on a quiet reference machine: a 32-thread Intel Xeon Platinum 8370C
-with 128 GiB RAM under Windows 11, on .NET 11 and Orleans' pinned nightly build
+**Measurements.** `OrleansMultiProcessBenchmarks` (`test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`,
+`--orleans-bench`, row 5.4) measured one silo per OS process with Server GC (`DOTNET_gcServer=1`, verified `IsServerGC
+== true`) over real loopback TCP sockets (`UseDevelopmentClustering`) on a quiet reference machine: a 32-thread Intel
+Xeon Platinum 8370C with 128 GiB RAM under Windows 11, on .NET 11 and Orleans' pinned nightly build
 ([build and packaging §2](../build-packaging.md#2-source-and-dependency-policy)), with the default limits, shared
 `FileSystemMetaStore` and `FileSystemObjectStore`, and per-silo `PortableWalStorage` roots (1 GiB files) on one local
 NTFS NVMe volume. Each row reports the mean and min–max range of three runs. Allocations are reported per byte of
@@ -2590,22 +2593,23 @@ nodes. The map entry's location decides each ledger's storage ([ledgers §4](../
 controller's placement policy chooses it for every ledger a transition opens, by the cluster's default,
 `LedgerPlacement`, so a roll moves a range between the two.
 
-In code (rows 7.1, 7.4, and 7.5 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)): the composition places,
-takes over, counts standing for, hands off, rolls, and drains object-store ledgers alongside quorum ledgers for both
-the per-slot (`ObjectLedgerLayout.PerSlot`) and Azure append (`ObjectLedgerLayout.Append`, `CLOE` extents) layouts;
-`ControlOptions.LedgerPlacement`, `ObjectLedgerWindow`, and `ObjectStoreRequestsPerSecond` govern placement, window, and
-shared request rate; `DurableStorageOptions.ObjectLedgers` configures the store over `PrefixedAppendableObjectStore`
-(resolved first under the keyed service `DurableStorageOptions.ObjectLedgersStoreServiceKey`, falling back to unkeyed
-`IObjectStore`, so the LSM and object-store ledgers may target distinct buckets or accounts) wrapped by uniform
-store-boundary pacing (`PacedObjectStore` / `PacedAppendableObjectStore`) and `ObjectLedgerCache` (which clears any
-pre-existing volatile cache files in `CacheDirectory` on startup rather than adopting unverified files across store
-identities); diskless silos run without `Root` and register a fresh node identity each start; governance (WAL release,
-retention rolls, disk budgets, and retirement drain waits) ignores object-store ledgers; primaries drain open
-object-store ledgers and any `ObjectLedgersReady` live node drains closed ones; `ObjectLedgerSweeper` runs on the
-controller grain's silo; and startup checks the store's record behind `ObjectLedgerGate` against the
-`object_ledger_store_id` recorded in `CLNR` alongside the archive store identity, gating all data-plane and transition
-access until the gate passes (OL-I1). *Not yet in code*: `MaxSegmentAge` rolling for object-store ledgers and provider
-qualification (row 7.6).
+In code (rows 7.1, 7.4, and 7.5 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)):
+the composition places, takes over, counts standing for, hands off, rolls, and drains object-store ledgers alongside
+quorum ledgers for both the per-slot (`ObjectLedgerLayout.PerSlot`) and Azure append (`ObjectLedgerLayout.Append`,
+`CLOE` extents) layouts; `ControlOptions.LedgerPlacement`, `ObjectLedgerWindow`, and `ObjectStoreRequestsPerSecond`
+govern placement, window, and shared request rate; `DurableStorageOptions.ObjectLedgers` configures the store over
+`PrefixedAppendableObjectStore` (resolved first under the keyed service
+`DurableStorageOptions.ObjectLedgersStoreServiceKey`, falling back to unkeyed `IObjectStore`, so the LSM and
+object-store ledgers may target distinct buckets or accounts) wrapped by uniform store-boundary pacing
+(`PacedObjectStore` / `PacedAppendableObjectStore`) and `ObjectLedgerCache` (which clears any pre-existing volatile
+cache files in `CacheDirectory` on startup rather than adopting unverified files across store identities); diskless
+silos run without `Root` and register a fresh node identity each start; governance (WAL release, retention rolls, disk
+budgets, and retirement drain waits) ignores object-store ledgers; primaries drain open object-store ledgers and any
+`ObjectLedgersReady` live node drains closed ones; `ObjectLedgerSweeper` runs on the controller grain's silo; and
+startup checks the store's record behind `ObjectLedgerGate` against the `object_ledger_store_id` recorded in `CLNR`
+alongside the archive store identity, gating all data-plane and transition access until the gate passes (OL-I1). *Not
+yet in code*: `MaxSegmentAge` rolling for object-store ledgers and provider qualification (row 7.6).
 
 - **Placement and mixed-cluster capability.** An object-store ledger names no replica nodes: the controller chooses only
   its primary, by the policy of [§5.4](#54-primaries-and-grain-placement), and a takeover chooses any live
@@ -3091,9 +3095,9 @@ node by node:
 | `long-failure-domain` | A failure domain is at most 64 bytes (`NodeRegistryEntry.MaxFailureDomainBytes`) |
 | `diskless-ordinal` | A diskless node carries no StatefulSet ordinal |
 
-Golden vectors, accepted and rejected, live in `test/Durable.Storage/shared-vectors/orleans`; the rejections include each rule's
-boundary, and values which break two rules at once, which pin the order above. The `orleans-registry` fuzz target
-checks the decoder against an independent reading of these rules ([formats](../formats.md)). The codec decodes
+Golden vectors, accepted and rejected, live in `test/Durable.Storage/shared-vectors/orleans`; the rejections include
+each rule's boundary, and values which break two rules at once, which pin the order above. The `orleans-registry` fuzz
+target checks the decoder against an independent reading of these rules ([formats](../formats.md)). The codec decodes
 `archive_store` and `archive_store_id` into the Archive's store identity, `ArchiveStoreIdentity`
 ([archive §4](../components/archive.md#4-data-types)), with no record of its own: `archive_store` is the
 `ArchiveStoreKind`'s value, the LSM 1, archive logs 2, and the memory store 3, which the Archive owns and pins, and
@@ -3435,16 +3439,16 @@ ASCII, which Clog refuses before admission, each an observation of Orleans (pinn
 §7.3](../components/archive-logs.md#73-azure-layout)). The interop tests run on the fake transport on every change, on
 Azurite and a live account at milestones, and on every Orleans version bump, since Orleans' layout constants are
 internal; a random-sequence property runs at milestones with a recorded seed, and on every change 100 fresh CsCheck
-cases on the fake transport, a recorded seed replaying only through `DURABLE_STORAGE_TEST_SEED`. A CsCheck property checks that
-every journal's row key names its log by exactly its identity, over identities across the Unicode scalar range.
-**Replace requests:** a journal driven to 40,000 blocks answers `IsCompactionRequested`, one driven past 49,900 answers
-`ReplaceRequired` through forwarding, which latches the request, and the grain's next write is a `Replace`. **Forwarded
-reads:** a journal larger than 1 MiB reads whole through pages of one pinned snapshot, a write between pages changes no
-page and the version returned is the snapshot's, snapshots beyond `MaxForwardedReadBytes` wait in order while the later
-pages of pinned snapshots, in their own lane, complete behind a read lane full of first pages, with a mutant which
-queues later pages there, and an expired snapshot answers `Expired` and the read starts again. **Budgets:** a forwarded
-write completes while its primary's replica calls fill the replica budget, and a forwarded write whose deadline passes
-in its lane answers `ForwardQueueTimeout` and is resent. **The nodes' drains** (in code, row 4.9's B):
+cases on the fake transport, a recorded seed replaying only through `DURABLE_STORAGE_TEST_SEED`. A CsCheck property
+checks that every journal's row key names its log by exactly its identity, over identities across the Unicode scalar
+range. **Replace requests:** a journal driven to 40,000 blocks answers `IsCompactionRequested`, one driven past 49,900
+answers `ReplaceRequired` through forwarding, which latches the request, and the grain's next write is a `Replace`.
+**Forwarded reads:** a journal larger than 1 MiB reads whole through pages of one pinned snapshot, a write between pages
+changes no page and the version returned is the snapshot's, snapshots beyond `MaxForwardedReadBytes` wait in order while
+the later pages of pinned snapshots, in their own lane, complete behind a read lane full of first pages, with a mutant
+which queues later pages there, and an expired snapshot answers `Expired` and the read starts again. **Budgets:** a
+forwarded write completes while its primary's replica calls fill the replica budget, and a forwarded write whose
+deadline passes in its lane answers `ForwardQueueTimeout` and is resent. **The nodes' drains** (in code, row 4.9's B):
 `ClusterControllerTests.ANewActivationAssignsNoShareUntilEveryNodeReportedAndThenSharesTheWholeBudget`, no share before
 every node reported, then the work-conserving shares summing to the budget, and none for a replaced process or on the
 LSM; `AnActivationAssignsNoShareUnderAnUnobservedView`; `ANewActivationWaitsForEveryUpNodeRetiredOnesIncluded`;

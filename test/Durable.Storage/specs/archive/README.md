@@ -102,16 +102,16 @@ compaction which kept none, stands for; the sweeper's listing, manifest read, de
 `sweepSecond`, `sweepDelete`, and `sweepDone`; and a history read is `readMap`, `readManifest`, and `readFinish` at its
 end. `compactKeep` uploads the rows a compaction output holds when they hold every row the reduction keeps, and only
 rows of its inputs: a compactor which judged by an older manifest value, or by the code's coarser rule for an empty
-`Delete`, keeps more, and the invariants judge the rows it kept. With `DURABLE_STORAGE_ARCHIVE_TRACES` set, each seed writes a
-module `ArchiveTrace{seed}.qnt` whose `traceReplay` run applies every action in order and checks every invariant, each
-upload's rows, the manifest's watermarks and references after each replace, and each read's answer against `reduced` of
-the decided history at its cut. `.\eng\model-check-quint.ps1 -Traces <directory>` replays each trace with `quint test`,
-then five trace mutants, each one step of the first validated trace which holds what it looks for, changed into a step
-the model refuses, by its action or by the state it expects, while the replay through the step before passes:
-`referenced-delete`, a sweep's delete of a referenced object, which `sweepDelete` refuses (`ReferencedExist`);
-`over-dropping-compaction`, an output without its inputs' newest row, which `compactKeep` refuses (`FoldPreserved`);
-`lowered-watermark`, a manifest whose watermark falls below the one before (`WatermarksMonotone`); `mid-segment-drain`,
-a drain which ends inside its segment, which `drainUpload` refuses (`WatermarksAtSegmentStarts`); and `wrong-read`, a
-read answered without its newest row (`ReadsCorrect`). `just archive-traces` runs both, over seeds 1 to 20 by default,
-and CI's `archive-traces` job on every change ([verification
+`Delete`, keeps more, and the invariants judge the rows it kept. With `DURABLE_STORAGE_ARCHIVE_TRACES` set, each seed
+writes a module `ArchiveTrace{seed}.qnt` whose `traceReplay` run applies every action in order and checks every
+invariant, each upload's rows, the manifest's watermarks and references after each replace, and each read's answer
+against `reduced` of the decided history at its cut. `.\eng\model-check-quint.ps1 -Traces <directory>` replays each
+trace with `quint test`, then five trace mutants, each one step of the first validated trace which holds what it looks
+for, changed into a step the model refuses, by its action or by the state it expects, while the replay through the step
+before passes: `referenced-delete`, a sweep's delete of a referenced object, which `sweepDelete` refuses
+(`ReferencedExist`); `over-dropping-compaction`, an output without its inputs' newest row, which `compactKeep` refuses
+(`FoldPreserved`); `lowered-watermark`, a manifest whose watermark falls below the one before (`WatermarksMonotone`);
+`mid-segment-drain`, a drain which ends inside its segment, which `drainUpload` refuses (`WatermarksAtSegmentStarts`);
+and `wrong-read`, a read answered without its newest row (`ReadsCorrect`). `just archive-traces` runs both, over seeds 1
+to 20 by default, and CI's `archive-traces` job on every change ([verification
 §5.1](../../docs/spec/verification.md#51-trace-validation)).

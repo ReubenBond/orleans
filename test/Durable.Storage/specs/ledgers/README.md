@@ -128,17 +128,18 @@ derives from `N`. There are no depth cutoffs, sampling, or state constraints tha
 ## Trace validation
 
 `just ledger-map-traces` (`test/Durable.Storage/eng/ledger-map-traces.ps1`) checks the implementation's runs against `LedgerMap.qnt`
-([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_MAP_TRACES` set, each
-seed of the ledger map committer simulation (`LedgerMapCommitterSimulationTests`) and the transition simulation
-(`TransitionSimulationTests`) records a `LedgerMapTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) and writes it,
-rendered by `LedgerMapTraceExport`, as a Quint module, `LedgerMapTraceCommitter{seed}.qnt` or
-`LedgerMapTraceTransition{seed}.qnt`, under `artifacts/ledger-map-traces`; `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays
-each with `quint test` on Quint's TypeScript simulator. The seeds are 1 to 10 by default. A module imports `LedgerMap`
-with the constants its run fixes (`KeyBits` the simulation's deepest range, 4 for the committers and 3 for the
-transitions; `MaxLedgers` its last ID; `MaxJsn` its most writes of one key; `MaxMarkers` its markers) and its
-`traceReplay` run applies the model's actions in order, checking every invariant after each step, and the model's state
-against the run's: `mapIs` after each ledger-map write, and `wrote` or `marked` after each batch. A trace fails at an
-action the model disables, a broken invariant, or a state the run did not reach.
+([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_MAP_TRACES`
+set, each seed of the ledger map committer simulation (`LedgerMapCommitterSimulationTests`) and the transition
+simulation (`TransitionSimulationTests`) records a `LedgerMapTrace`
+(`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) and writes it, rendered by `LedgerMapTraceExport`, as a
+Quint module, `LedgerMapTraceCommitter{seed}.qnt` or `LedgerMapTraceTransition{seed}.qnt`, under
+`artifacts/ledger-map-traces`; `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each with `quint test`
+on Quint's TypeScript simulator. The seeds are 1 to 10 by default. A module imports `LedgerMap` with the constants its
+run fixes (`KeyBits` the simulation's deepest range, 4 for the committers and 3 for the transitions; `MaxLedgers` its
+last ID; `MaxJsn` its most writes of one key; `MaxMarkers` its markers) and its `traceReplay` run applies the model's
+actions in order, checking every invariant after each step, and the model's state against the run's: `mapIs` after each
+ledger-map write, and `wrote` or `marked` after each batch. A trace fails at an action the model disables, a broken
+invariant, or a state the run did not reach.
 
 The trace records every value the ledger-map register applied, in order, interleaved with the proposals answered
 durable, and each ledger's decided batches, which the transition simulation's scans read: each closed ledger's below its
@@ -181,9 +182,9 @@ The abstractions:
   so their recorded `T` is no model tail, and their drops need no drain.
 - Trims and reads are not traced.
 
-`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` then runs each trace mutant on the first validated trace which holds what it
-changes. The mutated replay through the step before the change must pass, and through the changed step must fail, the
-model refusing that step by its action guard or by its expectation:
+`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` then runs each trace mutant on the first validated trace which
+holds what it changes. The mutated replay through the step before the change must pass, and through the changed step
+must fail, the model refusing that step by its action guard or by its expectation:
 
 | Trace mutant | Change | Invariant | Refused by |
 | --- | --- | --- | --- |
@@ -200,10 +201,11 @@ model refusing that step by its action guard or by its expectation:
 
 A successful run establishes the listed properties for every reachable state of each configured
 finite model, subject to TLC's fingerprint collision probability. The models abstract the
-seal and recovery of a ledger (checked by [`test/Durable.Storage/specs/ledger-protocol`](../ledger-protocol/README.md)) and byte payloads.
+seal and recovery of a ledger (checked by [`test/Durable.Storage/specs/ledger-protocol`](../ledger-protocol/README.md))
+and byte payloads.
 
-`LedgerMap` lands each append atomically, leaving sealing and recovery to `test/Durable.Storage/specs/ledger-protocol`, whose
-`RefinesAtomicLedger` checks that the ledger protocol refines that atomic ledger, and reduces the LSM to drains.
+`LedgerMap` lands each append atomically, leaving sealing and recovery to `test/Durable.Storage/specs/ledger-protocol`,
+whose `RefinesAtomicLedger` checks that the ledger protocol refines that atomic ledger, and reduces the LSM to drains.
 `LedgerDrop` models one
 closed ledger and one lower open ledger. Creation reads only the node's catalog, and a restart keeps every replica,
 seal, and tombstone, so a node's view matters only to its reconciliation: a view from before the split which installed

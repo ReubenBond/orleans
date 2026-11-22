@@ -328,7 +328,7 @@ names:
 The controllers' decisions compile into the Engine rather than the composition: they name no Orleans type and decide
 over the Engine's layers, and in the Engine a simulation of them loads no Orleans assembly (§2.7). Each assembly's
 package ID is its name in the `Microsoft.Orleans.*` family, `Microsoft.Orleans.Durable.Storage.Engine` among them
-([build and packaging §6](build-packaging.md#6-orleans-source-tree-preparation)).
+([build and packaging §6](build-packaging.md#6-orleans-packages-and-source-layout)).
 
 | Layer or role | Contracts | Implementations |
 | --- | --- | --- |
@@ -351,8 +351,9 @@ Every namespace of a production project lies within a root of a component the pr
 folders follow its namespaces: `Ledgers/Store` holds `Orleans.Durable.Storage.Engine.Ledgers.Store`. Every namespace of
 any other project starts with the project's name. A layer's `.Control` namespace spans its abstractions and
 implementation components. Shared test sources use `Orleans.Durable.Storage.Testing`; shared sample sources use
-`Orleans.Durable.Storage.Samples.Hosting`. The simulation kit (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) and the
-simulation tests run on Clockwork's `Microsoft.Orleans.Testing.Simulation` projects, built from `src/Simulation/`.
+`Orleans.Durable.Storage.Samples.Hosting`. The simulation kit
+(`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) and the simulation tests run on Clockwork's
+`Microsoft.Orleans.Testing.Simulation` projects, built from `src/Simulation/`.
 
 ### 2.7 Design rationale
 

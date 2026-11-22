@@ -33,9 +33,10 @@ namespace `Orleans.Durable.Storage.Engine.Ledgers` and control-plane types
 committer, the primary's proposals and open check, `LedgerReader`, through whose leases the process creates its writers,
 `LedgerWriterRegistry`, transitions, and reconciliation, with segments, key ordinals, markers, slots at batch creation,
 the per-key counter and token, `CLLB`'s layout of §7, `LedgerSegmentView`, `ScanAsync`'s rewind, and a reader's read
-repair (row 5.1 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)). *Not yet in code*: the
-[composition](../compositions/orleans.md) which runs each node's reconciliation whenever its view changes, and
-periodically.
+repair (row 5.1 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)).
+*Not yet in code*: the [composition](../compositions/orleans.md) which runs each node's reconciliation whenever its view
+changes, and periodically.
 
 ### Design rationale
 
@@ -1578,18 +1579,18 @@ parameterize the group committer ([conventions §6](../conventions.md#6-retries-
   so scans rewind and aged segments end with markers under their faults: the transition simulation checks that every
   decided batch below `T` resolves to the version its writer's `BeginRow` returned, from the ledger's first slot and
   after a rewind from a random slot, and the archive simulations' read oracles judge the rows their scans resolve.
-- **The map's values and codec.** Golden vectors (`test/Durable.Storage/shared-vectors/ledgers/`: `maps.json`, among them a value
-  before bootstrap, ranges at depths 1 to 9, and every field at its bound, and `map-rejections.json`, with at least one
-  value per reason of §7, among them a count of 2<sup>32</sup> − 1 ledgers, and one breaking two rules) pin `CLLM` both
-  ways, contiguous and from pages of one byte, and Verify snapshots render each decoded vector and each rejection's
-  reason and message. CsCheck properties: the codec decodes the values it encodes, from any division into pages, and
-  re-encodes each to the same bytes; one independent reading of §7's rules (`LedgerMapFormatRules`) judges every mutated
-  encoding (flipped bits, truncations, insertions, header and ledger fields set to their bounds, a replica repeated),
-  with the CRC as mutated and recomputed, and every reason of the rejection vectors arises; a range's binary form reads
-  back as the range; and `Find` answers what a scan of the value's ledgers answers, and allocates nothing when no closed
-  ledger contains the key. The `ledgers-map` fuzz target holds `LedgerMapValue.Decode` to the same reading, seeded from
-  both vector files, and the layer's tests replay its corpus. In `LedgerMapVectorTests`, `LedgerMapCodecPropertyTests`,
-  and `LedgerMapValueTests`.
+- **The map's values and codec.** Golden vectors (`test/Durable.Storage/shared-vectors/ledgers/`: `maps.json`, among
+  them a value before bootstrap, ranges at depths 1 to 9, and every field at its bound, and `map-rejections.json`, with
+  at least one value per reason of §7, among them a count of 2<sup>32</sup> − 1 ledgers, and one breaking two rules) pin
+  `CLLM` both ways, contiguous and from pages of one byte, and Verify snapshots render each decoded vector and each
+  rejection's reason and message. CsCheck properties: the codec decodes the values it encodes, from any division into
+  pages, and re-encodes each to the same bytes; one independent reading of §7's rules (`LedgerMapFormatRules`) judges
+  every mutated encoding (flipped bits, truncations, insertions, header and ledger fields set to their bounds, a replica
+  repeated), with the CRC as mutated and recomputed, and every reason of the rejection vectors arises; a range's binary
+  form reads back as the range; and `Find` answers what a scan of the value's ledgers answers, and allocates nothing
+  when no closed ledger contains the key. The `ledgers-map` fuzz target holds `LedgerMapValue.Decode` to the same
+  reading, seeded from both vector files, and the layer's tests replay its corpus. In `LedgerMapVectorTests`,
+  `LedgerMapCodecPropertyTests`, and `LedgerMapValueTests`.
 - **Map view.** `LedgerMapViewTests`, over a scripted register whose entries are rented under the test's page
   accounting, so the leak check sees an entry a shared read fails to dispose: the view opens once its first read
   returns; `Current` changes only on reads, and only to newer epochs; three callers during a read share the next read;
@@ -1695,8 +1696,10 @@ parameterize the group committer ([conventions §6](../conventions.md#6-retries-
   releases its lease, so every replica the reader opened is disposed; and a lifetime adopted after this process
   recovered the ledger is stopped at once (LP-I14). `SequencerTests.WaitingAcquisitionsAreGrantedInRequestOrder` and
   `AStopFailsEveryWaitingAcquisition`; `LedgerUnionLawsTests` holds `ProposalOutcome` and `LedgerRead` to the union
-  laws. Deferred (decision 16 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions)): a microbenchmark of
-  the proposal path's allocations, which copies each body once into the batch and allocates no `Row` per row.
+  laws. Deferred (decision 16 of the [implementation
+  plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions)):
+  a microbenchmark of the proposal path's allocations, which copies each body once into the batch and allocates no
+  `Row` per row.
 - **Batch builder.** `LedgerBatchTests`: rows written into a `LedgerBatch` field by field, each body's head with its
   row's fields and the rest in chunks of generated lengths, form the batch the independent reading of §7 gives, each row
   defining or referencing its key as the segment state says, and `RowLength` is each row's exact length; a row outside

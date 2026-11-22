@@ -35,12 +35,13 @@ sweeper, caches, and the memory object store), and the object store providers in
 Data-plane types use namespace `Orleans.Durable.Storage.Engine.Archive.Lsm` and control-plane types
 `Orleans.Durable.Storage.Engine.Archive.Lsm.Control` (§2). In code: the object store contract, the memory and
 file-system providers, and the manifest's format, view, and committer (row 2.1 of the [implementation
-plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), the run object's format, its writer, and its reader (row 3.1), and the archive
-store's reads, ledger drops, `ArchiveOptions`, and drains of whole closed segments within the archive's drain memory
-budget (row 3.2), the sweeper with the file-system store's reclamation of its temporary files (row 3.4), and the store's
-prefixes, its empty token, its tag version base, its pure members, and its record (row 2.4), compaction (rows 3.3 and
-3.3b), the cloud object stores (rows 3.5 and 3.5b), the section metadata cache with its preloads (row 5.3 A), and the
-volatile-disk block cache (row 5.3 B).
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
+the run object's format, its writer, and its reader (row 3.1), and the archive store's reads, ledger drops,
+`ArchiveOptions`, and drains of whole closed segments within the archive's drain memory budget (row 3.2), the sweeper
+with the file-system store's reclamation of its temporary files (row 3.4), and the store's prefixes, its empty token,
+its tag version base, its pure members, and its record (row 2.4), compaction (rows 3.3 and 3.3b), the cloud object
+stores (rows 3.5 and 3.5b), the section metadata cache with its preloads (row 5.3 A), and the volatile-disk block cache
+(row 5.3 B).
 
 ### Design rationale
 
@@ -912,10 +913,11 @@ block skips the order check across it. A read of one range's rows, as a push rea
 first keys lie in the range and the last block whose first key lies below it, checking each under the same rules but
 the section's totals, and stops at the first row past the range; the compaction checks each input's totals over the
 rows of all its ranges' reads, once it has read every range. The partial decoders, of the trailer alone and of the
-tail, apply the rules of the parts they read. The vectors are `test/Durable.Storage/shared-vectors/archive/run-objects.json` and
-`run-object-rejections.json`, which `generate_run_objects.py` beside them writes from its own reading of these rules,
-and the `archive-run-object` fuzz target judges the decoder by an independent reading of them, and its reads of each
-section's halves by the whole read ([verification §6.1](../verification.md#61-decoder-fuzzing)).
+tail, apply the rules of the parts they read. The vectors are
+`test/Durable.Storage/shared-vectors/archive/run-objects.json` and `run-object-rejections.json`, which
+`generate_run_objects.py` beside them writes from its own reading of these rules, and the `archive-run-object` fuzz
+target judges the decoder by an independent reading of them, and its reads of each section's halves by the whole read
+([verification §6.1](../verification.md#61-decoder-fuzzing)).
 
 Every read of a run object, by a history read, a compaction, or the sweeper, first verifies the object's trailer: its
 CRC-32C, and, for a section the manifest references, that the trailer's metadata offset is the `SectionRef`'s tail
@@ -953,8 +955,8 @@ and incomplete), `complete-at-drained-below`, `bad-object-name` (§4), `bad-sect
 (ledger 0, slot past 2<sup>63</sup> − 2, or index past 2<sup>31</sup> − 1), `tags-unordered` (the lowest above the
 highest), `bad-tail-range` (an empty tail, or one ending past 2<sup>63</sup> − 1), `sections-unordered` (not strictly
 after the previous section's object and offset), and `trailing-bytes`. The vectors are
-`test/Durable.Storage/shared-vectors/archive/manifest.json` and `manifest-rejections.json`, and the `archive-manifest` fuzz target
-judges the decoder by an independent reading of these rules ([verification
+`test/Durable.Storage/shared-vectors/archive/manifest.json` and `manifest-rejections.json`, and the `archive-manifest`
+fuzz target judges the decoder by an independent reading of these rules ([verification
 §6.1](../verification.md#61-decoder-fuzzing)). The encoder writes the fields across buffer pages and fills the header
 last, and the decoder reads a `ReadOnlySequence<byte>` in place, so a manifest of any size, many pages long, encodes and
 decodes ([conventions §1](../conventions.md#1-buffers-and-ownership)).
@@ -1607,8 +1609,8 @@ durable entries, under the flush rules of [system model
   against every value after `vⱼ`; a drain's goal, once present, stays present; a fold leaves every change of its
   batch with its goal or a failed rule; and the production rules and fold agree, on every change and value, with a
   reference reading of the §2.9 table which shares no code with them (`ManifestCommitRulesTests`,
-  `test/Durable.Storage/shared/Archive/Lsm/ManifestReference.cs`). Examples show `IsComplete(S)` after the drain which completes `S`,
-  whether or not `DrainedBelow` passes `S`.
+  `test/Durable.Storage/shared/Archive/Lsm/ManifestReference.cs`). Examples show `IsComplete(S)` after the drain which
+  completes `S`, whether or not `DrainedBelow` passes `S`.
 - **Committer conformance.** A history oracle of `ManifestCommitter.CommitAsync` runs in deterministic simulation
   (`ManifestCommitterSimulationTests`): two committers share one manifest in the kit's `SimulatedObjectStore`, which
   fails requests, leaves outcomes unknown, lands writes late, and answers a retried write's own landing as `Mismatch`,
@@ -1637,16 +1639,16 @@ durable entries, under the flush rules of [system model
   (`SimulatedFileSystemObjectStoreConformanceTests`). A listing concurrent with creates and deletes names every object
   no concurrent call changes, and of the others only those the calls create or delete (`ObjectStoreConformanceTests`).
   The cloud stores run the suite on their emulators, which `Orleans.Durable.Storage.Cloud.Tests` starts through the
-  AppHost when `DURABLE_STORAGE_EMULATORS` is 1 (`just emulators`, Release and Debug, where an emulator which fails to start fails
-  the run): random sequences and concurrent groups, with and without a transport double which fails requests before they
-  land or loses their answers after, judged with unknown outcomes, objects across buffer pages, and the contract's
-  examples (`CloudObjectStoreConformanceTests`); and examples of a request refused before it lands, which the client's
-  retry lands, of a create and a replace whose answers are lost, which answer from their own landing, of a failed
-  condition whose answer is lost, which never answers `Applied`, of a stalled send after its call is cancelled, of a
-  download broken while the object is replaced, and of a versioned read's page sizes (`CloudObjectStoreFaultTests`). The
-  S3 SDK's retry quota is one token bucket per endpoint for the whole process, which the other tests' faults would
-  drain, so each test's S3 client takes no quota, and its retries depend on its own requests alone; a create whose
-  answer is lost still retries once another client of the endpoint has emptied the quota
+  AppHost when `DURABLE_STORAGE_EMULATORS` is 1 (`just emulators`, Release and Debug, where an emulator which fails to
+  start fails the run): random sequences and concurrent groups, with and without a transport double which fails requests
+  before they land or loses their answers after, judged with unknown outcomes, objects across buffer pages, and the
+  contract's examples (`CloudObjectStoreConformanceTests`); and examples of a request refused before it lands, which the
+  client's retry lands, of a create and a replace whose answers are lost, which answer from their own landing, of a
+  failed condition whose answer is lost, which never answers `Applied`, of a stalled send after its call is cancelled,
+  of a download broken while the object is replaced, and of a versioned read's page sizes
+  (`CloudObjectStoreFaultTests`). The S3 SDK's retry quota is one token bucket per endpoint for the whole process, which
+  the other tests' faults would drain, so each test's S3 client takes no quota, and its retries depend on its own
+  requests alone; a create whose answer is lost still retries once another client of the endpoint has emptied the quota
   (`ALostAnswerIsRetriedWhenOtherClientsEmptiedTheRetryQuota`). On every change, against canned responses, each store
   refuses the contract's invalid arguments and a cancelled call without a request, sends its conditions and checksum,
   maps each service status to its outcome, checks a ranged read's served range, and follows every listing page

@@ -204,11 +204,12 @@ generated Quint instance modules, complete checker logs, and counterexamples are
 
 A positive case succeeds only when TLC reports success, exits zero, and exhausts its queue. An expected invariant or
 witness counterexample succeeds only with TLC's violation exit status and the named invariant or temporal property. For
-weak-fairness liveness (`RecoveriesEnd`, `no-late-copy`, `ignore-dropped`), `test/Durable.Storage/eng/model-check-quint.ps1` appends
-`Fairness` (`WF_vars(...)`) and `LiveSpec` to the Quint-compiled TLA+ module and checks `RecoveriesEnd` with TLC.
-One expected counterexample, the `seal-short` mutant at `K = 2` (`ledger-protocol-mutant-seal-short-k2-RecoveryBounded`),
-lies 44 steps deep beneath billions of states, so it runs as a seeded random simulation (`quint run --seed=1`), which
-replays the same counterexample on every run; a simulation never stands in for an exhaustive positive case.
+weak-fairness liveness (`RecoveriesEnd`, `no-late-copy`, `ignore-dropped`),
+`test/Durable.Storage/eng/model-check-quint.ps1` appends `Fairness` (`WF_vars(...)`) and `LiveSpec` to the
+Quint-compiled TLA+ module and checks `RecoveriesEnd` with TLC. One expected counterexample, the `seal-short` mutant at
+`K = 2` (`ledger-protocol-mutant-seal-short-k2-RecoveryBounded`), lies 44 steps deep beneath billions of states, so it
+runs as a seeded random simulation (`quint run --seed=1`), which replays the same counterexample on every run; a
+simulation never stands in for an exhaustive positive case.
 
 ## Protocol and implementation mapping
 
@@ -233,15 +234,15 @@ every `Q` replicas which answer include a sealed or dropped one (`OpenCheckSound
 ## Trace validation
 
 [`LedgerProtocolTrace.qnt`](LedgerProtocolTrace.qnt) checks that a run of the implementation is a behavior of the model
-([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set, the quorum
-simulation (`QuorumSimulationTests`), the crash simulation (`LedgerStoreSimulationTests`), the `Ledger` simulation
-(`LedgerSimulationTests`), and the scripted runs of serve-time landings (`ServedLandingSimulationTests`), of a reader's
-read repair (`ReadRepairSimulationTests`), and of a reader's learn from its own replica (`LearnTailSimulationTests`)
-write each run's `LedgerTrace` of its ledger as a Quint trace module (`LedgerTraceExport`): the trace and the constants
-the run fixes, its replicas, `Q`, `K`, positions, recovery executors, tail checks, the map views of the clients which
-learn the recorded `T` (fetchers), duplicate budget, and faults. The trace module imports `LedgerProtocolTrace.qnt`
-(which instantiates `LedgerProtocol.qnt` with `SeparateAnswers`) and replays the module's events in order under
-`quint test`:
+([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set,
+the quorum simulation (`QuorumSimulationTests`), the crash simulation (`LedgerStoreSimulationTests`), the `Ledger`
+simulation (`LedgerSimulationTests`), and the scripted runs of serve-time landings (`ServedLandingSimulationTests`), of
+a reader's read repair (`ReadRepairSimulationTests`), and of a reader's learn from its own replica
+(`LearnTailSimulationTests`) write each run's `LedgerTrace` of its ledger as a Quint trace module (`LedgerTraceExport`):
+the trace and the constants the run fixes, its replicas, `Q`, `K`, positions, recovery executors, tail checks, the map
+views of the clients which learn the recorded `T` (fetchers), duplicate budget, and faults. The trace module imports
+`LedgerProtocolTrace.qnt` (which instantiates `LedgerProtocol.qnt` with `SeparateAnswers`) and replays the module's
+events in order under `quint test`:
 
 | Event | Logged where | Model step |
 | --- | --- | --- |
@@ -297,9 +298,9 @@ before a read which returned its DATA, within one process of the node: a restart
 answer logged before a crash keeps its place, and the model checks that its record was durable; a restart which
 recovers the replica sealed counts as its seal. A `run` test (`traceValid`) replays every event in order and checks the
 model invariants at every step. When a trace fails, `quint test` reports the failing event and
-`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` locates the failing step. Every step is checked against `TypeOK`, `NoRevokedAnswer`,
-`ReadersSeeClose`, `RecoveryBounded`, and `OpenCheckSound`, so each trace is a bounded check of them at the
-implementation's scale, with every freedom trace validation adds. Each trace
+`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` locates the failing step. Every step is checked against
+`TypeOK`, `NoRevokedAnswer`, `ReadersSeeClose`, `RecoveryBounded`, and `OpenCheckSound`, so each trace is a bounded
+check of them at the implementation's scale, with every freedom trace validation adds. Each trace
 maps one recovery's close of the ledger: the quorum simulation's last recovery, the crash simulation's final one, and
 the `Ledger` simulation's first executor to return, whose rival's close then loses. The invariants which hold once the
 ledger ends (`AcknowledgedSurvive`, `NoAcknowledgementAtOrAboveEnd`, `EndSealed`, `CheckTailBelowEnd`,
@@ -405,8 +406,8 @@ its older extent deleted, multiple queued slots coalesce into one append, and a 
 
 ## Bounds
 
-`test/Durable.Storage/eng/model-check-quint.ps1` runs the ledger protocol models in three tiers (`Quick`, `Default`, and `Extended`),
-together with all mutants, reachability witnesses, the `unsealed-negatives` regression, the `amnesia` and
+`test/Durable.Storage/eng/model-check-quint.ps1` runs the ledger protocol models in three tiers (`Quick`, `Default`, and
+`Extended`), together with all mutants, reachability witnesses, the `unsealed-negatives` regression, the `amnesia` and
 `tombstone-loss` assumptions, and the simulated `seal-short` mutant at `K = 2`. Quint compiles finite integer sets
 without TLC symmetry reduction, so every state count below is unsymmetrized. The `Quick` tier (`just models-quick`,
 and `just models-changed` inside `just check`) holds the fast exhaustive cases, every mutant, every assumption, and

@@ -30,5 +30,6 @@ the CRC-32C of its header and body unless its name says otherwise, so each break
 `generate_registry.py` writes both files from an independent reading of §7.3: it serializes each valid body with the
 Protocol Buffers library from §7.3's schema, and writes each non-canonical body byte by byte. The hand-made inputs which
 seed the `orleans-registry` fuzz target are vectors here too, each named `Seed {name}: …`, so a campaign's merge, which
-owns `test/Durable.Storage/fuzz/corpus/orleans-registry` and drops the inputs a seed already covers, never loses them. Run it from the
-repository root after `python -m pip install -r test/Durable.Storage/shared-vectors/orleans/requirements.txt`.
+owns `test/Durable.Storage/fuzz/corpus/orleans-registry` and drops the inputs a seed already covers, never loses them.
+Run it from the repository root after `python -m pip install -r
+test/Durable.Storage/shared-vectors/orleans/requirements.txt`.

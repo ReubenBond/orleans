@@ -4,8 +4,8 @@ Every durable format and wire protocol Clog defines, with the section which spec
 which pin it, and the layouts of object storage, the MetaStore, and local storage. Integers are little-endian
 unless a format says otherwise; every CRC is CRC-32C ([conventions](conventions.md#4-integrity)).
 
-Golden vectors live under `test/Durable.Storage/shared-vectors/<area>/`. The **Vectors** column names the files which pin a
-format. A format's owning section gives its byte layout, which may precede its code; its encoder, decoder, golden
+Golden vectors live under `test/Durable.Storage/shared-vectors/<area>/`. The **Vectors** column names the files which
+pin a format. A format's owning section gives its byte layout, which may precede its code; its encoder, decoder, golden
 vectors, and fuzz target land together, and until then the format is *Not yet in code*.
 
 ## 1. Durable formats

@@ -30,26 +30,26 @@ Code: `Orleans.Durable.Storage.Engine.Journals` (reducer, entry codec, admission
 concrete classes which the composition uses directly. Every type is data plane, in namespace
 `Orleans.Durable.Storage.Engine.Journals`, and uses only the data-plane types of Ledgers and the Archive ([README
 §2.1](../README.md#21-control-plane-and-data-plane)). *In code* (rows 2.3a and 2.3b A to D of the [implementation
-plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), with every body inline and within `MaxBodyBytes`: the row key (`JournalRowKey`);
-versions (`JournalVersion`) with their text form; the entry record of §7 (`JournalEntry`, `JournalEntryRecord`); the
-fold of a history read with the rebase (`JournalState`); a key's planning state (`JournalPlanning`), which its load
-gives with its state (`JournalLoad`); admission on the primary (`LedgerAdmission`), which decides by version, judges an
-`Expired` by version, tombstone, and retention, refuses a key `AdmitsKey` refuses, answers `ReplaceRequired` and the
-archive store's replace request, plans each row's token, writes each entry's row of native content, and proposes through
-`LedgerWriter`'s `LedgerBatch`; and `JournalStore`, which encodes entries, serves each writer the registry serves
-through one admission, loads keys and answers owner reads from the Archive's slow-path read with each read's replace
-request, and runs the startup checks of §8.4 as it is constructed; and the Journals simulation over LedgerStore nodes,
-with the oracles and the fault plan of §10; and tombstone expiry's scan (row 3.4b), which
-`JournalStore.ExpireTombstonesAsync` runs over its admissions' warm state and the Orleans composition's node control
-loop starts each `ExpiryInterval` (§8.6); `JournalStateDatabase` (row 5.2 part D), which maintains each node's derived
-per-ledger key indexes and tombstones over `IJournalIndex` (`RocksDbJournalIndex` in `Orleans.Durable.Storage.RocksDb`
-or `InMemoryJournalIndex` in `Orleans.Durable.Storage.Engine.Journals.Memory`), wired as `LedgerApplyLoop`'s
-`LedgerApplier` with JS-I9 catch-up and one shared scan for non-replicated closed predecessors, feeding `ArchiveReader`'s
-key-indexed live reads through `ArchiveKeyIndex`; and warm state (row 5.2 part E): `JournalWarmState` per primary claim
-(discarded when the claim ends or the process restarts), `ArchiveReader.ReadStoreAsync` first-touch loads and owner reads
-(with zero-object-store absence answers once section metadata is preloaded), cold tombstone expiry over the journal
-index's `tombstones` column family, and warm state's `BytesSinceBase` snapshot request trigger (§8.7). Admission's pump
-creates batches
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
+with every body inline and within `MaxBodyBytes`: the row key (`JournalRowKey`); versions (`JournalVersion`) with their
+text form; the entry record of §7 (`JournalEntry`, `JournalEntryRecord`); the fold of a history read with the rebase
+(`JournalState`); a key's planning state (`JournalPlanning`), which its load gives with its state (`JournalLoad`);
+admission on the primary (`LedgerAdmission`), which decides by version, judges an `Expired` by version, tombstone, and
+retention, refuses a key `AdmitsKey` refuses, answers `ReplaceRequired` and the archive store's replace request, plans
+each row's token, writes each entry's row of native content, and proposes through `LedgerWriter`'s `LedgerBatch`; and
+`JournalStore`, which encodes entries, serves each writer the registry serves through one admission, loads keys and
+answers owner reads from the Archive's slow-path read with each read's replace request, and runs the startup checks of
+§8.4 as it is constructed; and the Journals simulation over LedgerStore nodes, with the oracles and the fault plan of
+§10; and tombstone expiry's scan (row 3.4b), which `JournalStore.ExpireTombstonesAsync` runs over its admissions' warm
+state and the Orleans composition's node control loop starts each `ExpiryInterval` (§8.6); `JournalStateDatabase` (row
+5.2 part D), which maintains each node's derived per-ledger key indexes and tombstones over `IJournalIndex`
+(`RocksDbJournalIndex` in `Orleans.Durable.Storage.RocksDb` or `InMemoryJournalIndex` in
+`Orleans.Durable.Storage.Engine.Journals.Memory`), wired as `LedgerApplyLoop`'s `LedgerApplier` with JS-I9 catch-up and
+one shared scan for non-replicated closed predecessors, feeding `ArchiveReader`'s key-indexed live reads through
+`ArchiveKeyIndex`; and warm state (row 5.2 part E): `JournalWarmState` per primary claim (discarded when the claim ends
+or the process restarts), `ArchiveReader.ReadStoreAsync` first-touch loads and owner reads (with zero-object-store
+absence answers once section metadata is preloaded), cold tombstone expiry over the journal index's `tombstones` column
+family, and warm state's `BytesSinceBase` snapshot request trigger (§8.7). Admission's pump creates batches
 under its disposal's token, and a creation its disposal
 cancels fences the entries it took; and its in-flight batches are bounded by Ledgers' `MaxProposalBytes`.
 
@@ -1108,10 +1108,10 @@ before its registry (§8.1); a call which meets the disposed store fails with `O
   `SimulatedConditionalRegister`, yielding memory replicas, and `SimulatedArchiveStore`: 28 curated concurrent windows
   covering empty, cross-key, warm and cold populated, limit-reached, deleted/expiry-scan, taken-over, fenced, and
   crash-recovered states explored by `WindowScheduleExplorer` (every third window explored at the gate and the rest
-  seeded; all 28 explored under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`), 100 seeded 3-replica quorum cases with latency and archive
-  stale-snapshot restarts, and two admission race-mutant witnesses (`LedgerAdmission.RejectionMutant.DecidesWhileLoading`
-  and `RejectsWaiting`), each passing the default schedule and caught by one preemption. Drains, compactions, and sweeps
-  as spec step functions are not yet in code.
+  seeded; all 28 explored under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`), 100 seeded 3-replica quorum cases with latency
+  and archive stale-snapshot restarts, and two admission race-mutant witnesses
+  (`LedgerAdmission.RejectionMutant.DecidesWhileLoading` and `RejectsWaiting`), each passing the default schedule and
+  caught by one preemption. Drains, compactions, and sweeps as spec step functions are not yet in code.
 - **Tests.** Entry codec vectors, the version's text form and its non-canonical rejections; admission under concurrent
   writers and fencing, including a primary whose ledger a handoff seals mid-batch, whose entries resolve `Durable` below
   `T` and `Fenced` above it; a conflicting entry which waits while its key has entries in flight and ends `Rejected`

@@ -94,14 +94,15 @@ hour 55 minutes.
 `ArchiveLogTraceTests` (`Orleans.Durable.Storage.Simulation.Tests`) records the drain simulation of one key over a
 closed ledger and its open successor as the model's actions, with the run's decided entries and segment starts as its
 constants: each request of the key's log, a segment's start, a marker, a drop, and a sweep, while two drainers race,
-crash, and restart. With `DURABLE_STORAGE_ARCHIVE_LOG_TRACES` set, each seed writes a module `ArchiveLogsTrace{seed}.qnt` whose
-`traceReplay` run applies every action in order and checks every invariant, and after each store request the log's
-position, the store's `(g, r, units)`, against the model's. The ledger writer's decisions give the decided tail,
-`ReplaceAsync` the close, and a blocked drain is a violation. `.\eng\model-check-quint.ps1 -Traces <directory>` replays
-each with `quint test`, failing at an action the model does not enable, and checks two negative controls fail: a copy
-which repeats a segment's start, and the trace of a `marks-unheld` drain whose every create fails
-(`ArchiveLogsTraceUnheld{seed}.qnt`). `just archive-log-traces` runs both, over seeds 1 to 20 by default, and CI's
-`archive-log-traces` job on every change ([verification §5.1](../../docs/spec/verification.md#51-trace-validation)).
+crash, and restart. With `DURABLE_STORAGE_ARCHIVE_LOG_TRACES` set, each seed writes a module
+`ArchiveLogsTrace{seed}.qnt` whose `traceReplay` run applies every action in order and checks every invariant, and after
+each store request the log's position, the store's `(g, r, units)`, against the model's. The ledger writer's decisions
+give the decided tail, `ReplaceAsync` the close, and a blocked drain is a violation. `.\eng\model-check-quint.ps1
+-Traces <directory>` replays each with `quint test`, failing at an action the model does not enable, and checks two
+negative controls fail: a copy which repeats a segment's start, and the trace of a `marks-unheld` drain whose every
+create fails (`ArchiveLogsTraceUnheld{seed}.qnt`). `just archive-log-traces` runs both, over seeds 1 to 20 by default,
+and CI's `archive-log-traces` job on every change ([verification
+§5.1](../../docs/spec/verification.md#51-trace-validation)).
 
 ## Scope of the result
 

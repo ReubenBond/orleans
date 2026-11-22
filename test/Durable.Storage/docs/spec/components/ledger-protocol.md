@@ -56,8 +56,9 @@ process, built from the ledger's `LedgerMetadata`, which is LG-I7's sender check
 §2.5](ledgers.md#25-reads-ledgerreader)), and `LedgerWriterRegistry` holds each writer in its primary's process
 ([ledgers §2.4](ledgers.md#24-primary-ledgerwriter)). A read below the known contiguous tail asks one replica at a time,
 hedges within a budget, repairs a preferred replica which lacked the batch, and forwards a byte-range read's range (§8.3,
-§8.4; rows 4.1b and 5.1 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), and an idle writer writes its
-contiguous tail explicitly (§8.2).
+§8.4; rows 4.1b and 5.1 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
+and an idle writer writes its contiguous tail explicitly (§8.2).
 
 ### Design rationale
 
@@ -114,12 +115,12 @@ calls a replica's seal its fence.
 > (Apache BookKeeper, *The BookKeeper protocol*, "Closing a ledger as a reader")
 
 Jack Vanlightly's TLA+ specifications of the protocol (`Vanlightly/bookkeeper-tlaplus`, which
-[`test/Durable.Storage/specs/ledger-protocol`](../../../specs/ledger-protocol/README.md) adapts) found that BookKeeper 4.13 counted
-`NoSuchEntry` answers from recovery reads which did not fence: an unfenced bookie which answered absent could still
-accept the writer's entry and complete an ack quorum after the ledger closed below it. Recovery here counts an absent
-answer only from a replica whose seal answer it held when it sent the read (LP-I7), which makes every negative final,
-as BookKeeper's fix of fencing recovery reads does. The same work defines quorum coverage, which Clog uses for the
-seal, for recovery's negatives, and for the seal check: `N − Q + 1` replicas have a property exactly when no `Q`
+[`test/Durable.Storage/specs/ledger-protocol`](../../../specs/ledger-protocol/README.md) adapts) found that BookKeeper
+4.13 counted `NoSuchEntry` answers from recovery reads which did not fence: an unfenced bookie which answered absent
+could still accept the writer's entry and complete an ack quorum after the ledger closed below it. Recovery here counts
+an absent answer only from a replica whose seal answer it held when it sent the read (LP-I7), which makes every negative
+final, as BookKeeper's fix of fencing recovery reads does. The same work defines quorum coverage, which Clog uses for
+the seal, for recovery's negatives, and for the seal check: `N − Q + 1` replicas have a property exactly when no `Q`
 replicas lack it.
 
 **A seal ends the writer.** The ledger ends as a BookKeeper ledger does: an executor seals its replicas and recovers a
@@ -1223,23 +1224,23 @@ budget and waited (§8.4), from which row 5.4 measures the hedge rate.
 
 ## 10. Verification
 
-Projects: `test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests` (the writer's and the sequencer's tests in `Writer/`),
-`test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests`, and `test/Durable.Storage/specs/ledger-protocol` (Quint, run by
-`test/Durable.Storage/eng/model-check-quint.ps1`). The [ledger model](../../../specs/ledger-protocol/README.md) checks `Ledger`'s
-writes, recovery, seal check, and reads below a known contiguous tail against a writer which keeps writing and
-acknowledging after it meets a seal, at every quorum of three replicas and with concurrent recoveries, and each of its
-invariants has a mutant which must produce its counterexample. It checks one ledger with bounded slots, windows, and
-replicas, and abstracts batches into slots; multi-ledger transitions are checked by `LedgerMap.qnt`, and drops by
-`LedgerDrop.qnt` ([`test/Durable.Storage/specs/ledgers`](../../../specs/ledgers/README.md)). It refines `AtomicLedger.qnt`, the ledger
+Projects: `test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests` (the writer's and the sequencer's tests in
+`Writer/`), `test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests`, and
+`test/Durable.Storage/specs/ledger-protocol` (Quint, run by `test/Durable.Storage/eng/model-check-quint.ps1`). The
+[ledger model](../../../specs/ledger-protocol/README.md) checks `Ledger`'s writes, recovery, seal check, and reads below
+a known contiguous tail against a writer which keeps writing and acknowledging after it meets a seal, at every quorum of
+three replicas and with concurrent recoveries, and each of its invariants has a mutant which must produce its
+counterexample. It checks one ledger with bounded slots, windows, and replicas, and abstracts batches into slots;
+multi-ledger transitions are checked by `LedgerMap.qnt`, and drops by `LedgerDrop.qnt`
+([`test/Durable.Storage/specs/ledgers`](../../../specs/ledgers/README.md)). It refines `AtomicLedger.qnt`, the ledger
 storage contract's model, whose seal, readers' checks, and fetchers' reads and drains establish `OpenCheckSound`,
 `CheckTailBelowEnd`, and `BelowTailDecided` by their guards (LL-I5 to LL-I7): an atomic mutant per property relaxes the
 guard it rests on, and a protocol mutant per property (`check-ignores-seal`, `check-stored-tail`, `fetch-stored-tail`)
 leaves the atomic ledger's steps at its check's or fetcher's step, so the refinement carries each property to the
-quorum. The ledger traces of the quorum and crash
-simulations (`QuorumSimulationTests`, `LedgerStoreSimulationTests`), and of the scripted runs which serve from records a
-crash left, repair a preferred replica, and learn a tail from one (`ServedLandingSimulationTests`,
-`ReadRepairSimulationTests`, `LearnTailSimulationTests`), are validated against it by TLC
-(`just ledger-traces`, [verification §5.1](../verification.md#51-trace-validation)).
+quorum. The ledger traces of the quorum and crash simulations (`QuorumSimulationTests`, `LedgerStoreSimulationTests`),
+and of the scripted runs which serve from records a crash left, repair a preferred replica, and learn a tail from one
+(`ServedLandingSimulationTests`, `ReadRepairSimulationTests`, `LearnTailSimulationTests`), are validated against it by
+TLC (`just ledger-traces`, [verification §5.1](../verification.md#51-trace-validation)).
 
 `LedgerConformanceTests` is the fold oracle, in two parts. `LedgerStorageSpec`, the ledger storage contract's spec, an
 Accordant model of one ledger as its processes use it through the shared front, judges answers alone (LL-I1 to LL-I9),

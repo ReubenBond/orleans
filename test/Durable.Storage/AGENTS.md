@@ -18,8 +18,9 @@ Journaling.
 - [Verification](docs/spec/verification.md): the testing methodology, oracles, models, gates, and
   qualification boundaries.
 - [Build and packaging](docs/spec/build-packaging.md): framework, compiler, artifact, and compatibility policy.
-- [Implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md): the ordered pull requests which take the code to the spec,
-  with each row's status.
+- [Implementation
+  plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md):
+  the ordered pull requests which take the code to the spec, with each row's status.
 - [Engineering principles](docs/engineering-principles/README.md): how we design, verify, and write code.
 
 Keep the canonical spec current. A change to behavior, a contract, invariant, data type, durable or wire
@@ -63,8 +64,8 @@ spec's dependency rules over components.
 
 The [Justfile](Justfile) is the entry point for builds, tests, and every other check; run its recipes from
 `test/Durable.Storage/`, and each runs a script under `test/Durable.Storage/eng/` over the Storage solution filter,
-`test/Durable.Storage/Durable.Storage.slnf`. Install [just](https://github.com/casey/just) with `winget install Casey.Just`, `cargo install just`, or
-`brew install just`; its recipes run in PowerShell 7 (`pwsh`).
+`test/Durable.Storage/Durable.Storage.slnf`. Install [just](https://github.com/casey/just) with `winget install
+Casey.Just`, `cargo install just`, or `brew install just`; its recipes run in PowerShell 7 (`pwsh`).
 
 ```powershell
 just restore         # restore the Storage solution filter (test/Durable.Storage/eng/validate.ps1)
@@ -171,17 +172,17 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   shape comes from the platform and maps onto Rust for the Roux port
   ([conventions §15](docs/spec/conventions.md#15-outcomes-unions-and-errors)).
 - **Citations in code:** cite the spec's invariant IDs (for example `LG-I5`). Code which implements a
-  paper-defined algorithm or invariant quotes the paper verbatim, citing the paper and its section (`research/papers/<paper>`, in Clog's repository at the snapshot
-  `PROVENANCE.md` names).
+  paper-defined algorithm or invariant quotes the paper verbatim, citing the paper and its section
+  (`research/papers/<paper>`, in Clog's repository at the snapshot `PROVENANCE.md` names).
 - **Requirements are explicit.** A concern becomes a requirement only through a supported use case, a layer
   contract, a paper-defined invariant, a realistic failure mode, or a measurement. Each layer validates
   only the invariants it owns.
 - **Dependencies:** use the BCL and Microsoft.Extensions (hosting, dependency injection, options, logging, metrics,
   resilience, `TimeProvider`, object pools, hashing) before building our own; a Clog component replaces one only for a
-  requirement it cannot meet, recorded with the rationale. Prefer stable packages, versioned centrally in the repository's `Directory.Packages.props`; the Orleans composition
-  references Orleans' projects in this repository ([build and packaging §2](docs/spec/build-packaging.md#2-source-and-dependency-policy)).
-  Copied source (as `ArcBuffer` from Orleans) is adapted into Clog namespaces and maintained as Clog code with its own
-  tests and attribution.
+  requirement it cannot meet, recorded with the rationale. Prefer stable packages, versioned centrally in the
+  repository's `Directory.Packages.props`; the Orleans composition references Orleans' projects in this repository
+  ([build and packaging §2](docs/spec/build-packaging.md#2-source-and-dependency-policy)). Copied source (as `ArcBuffer`
+  from Orleans) is adapted into Clog namespaces and maintained as Clog code with its own tests and attribution.
 
 ## Testing
 
@@ -195,19 +196,19 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   snapshots (pinned at 32.0.0); CsCheck properties, including metamorphic ones; Accordant conformance through the
   CsCheck ⇄ Accordant kit, whose cases run each in a Clockwork simulation of its own where a contract's target can, with
   their concurrent windows' schedules explored within a preemption bound and a race mutant per explored contract
-  (verification §4.1; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` at milestones, `DURABLE_STORAGE_SCHEDULE` replays a schedule); deterministic
-  simulation with fault injection on Clockwork;
+  (verification §4.1; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` at milestones, `DURABLE_STORAGE_SCHEDULE` replays a
+  schedule); deterministic simulation with fault injection on Clockwork;
   integration over real boundaries and Aspire emulators; `Orleans.TestingHost` end-to-end; Stryker.NET mutation
-  testing (core units break below 80%, or below the measured score `test/Durable.Storage/eng/mutation-baseline.json` holds while a gap
-  closes; reviewed equivalent mutants in the same file; each unit a component, configured by a
+  testing (core units break below 80%, or below the measured score `test/Durable.Storage/eng/mutation-baseline.json`
+  holds while a gap closes; reviewed equivalent mutants in the same file; each unit a component, configured by a
   `stryker-config.<Component>.json` beside the `src` project which compiles it, unless that project builds on
   the consensus or simulation family); and soak runs.
 - **Also adopted:** trace validation against the models, coverage-guided fuzzing of decoders, crash-state enumeration,
   and leak checks where they matter most: every test class of the Buffers, the WAL, Ledgers, MetaStore, CASPaxos,
   Archive, archive-log, state database, cloud, and model test projects holds an `ArcBufferLeakCheck`
-  (`test/Durable.Storage/shared/LeakChecks`) and releases every buffer it owns, every `MetaStoreEntry` among them, before teardown,
-  unless it carries `[NoPageLeakCheck(reason)]`; a property runs each case in `_leaks.InScope(() => ...)` or `_leaks.InScopeAsync(...)`;
-  `DURABLE_STORAGE_TEST_LEAK_TRACES=1` reports where each leaked page was rented.
+  (`test/Durable.Storage/shared/LeakChecks`) and releases every buffer it owns, every `MetaStoreEntry` among them,
+  before teardown, unless it carries `[NoPageLeakCheck(reason)]`; a property runs each case in `_leaks.InScope(() =>
+  ...)` or `_leaks.InScopeAsync(...)`; `DURABLE_STORAGE_TEST_LEAK_TRACES=1` reports where each leaked page was rented.
 - **Gates:** every change runs the build, formatting, unit, snapshot, property, and conformance
   tests, the simulation seed corpus, the Debug leg, and affected models; milestones add exploration, full mutation,
   fuzzing campaigns, emulators, and end-to-end tests; soak runs are reserved for final validation of the finished
@@ -215,7 +216,9 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
 - **Expensive work runs after hours, off the critical path:** mutation runs (incremental ones included), seed
   exploration, fuzzing campaigns, extended model runs, and quiet-machine benchmarks run in the nightly window, and a
   pull request lands without waiting for them; their findings are fixed in follow-up pull requests (verification §12).
-  Until the implementation is complete, [decision 16](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions) defers them.
+  Until the implementation is complete, [decision
+  16](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions)
+  defers them.
 - **Debug assertions:** Release builds compile `Debug.Assert` away, so the Debug leg (`just test-debug`) builds its
   projects in Debug so their debug assertions run. A failed assertion throws `DebugAssertionException` at its site and
   is recorded, so it fails its seeded simulation at its step with its seed, its test, or its test assembly, even when
@@ -225,15 +228,15 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   `Orleans.Durable.Storage.Architecture.Tests` checks that the leg reaches every `src` project with debug assertions.
 - Add a regression test for every bug. Every spec invariant links to a test, model, or golden vector in
   [the traceability table](docs/spec/invariants.md). Maintain the models with the protocols they model.
-- Every randomized or simulated test replays from its seed (`DURABLE_STORAGE_TEST_SEED`); every run writes crash, hang, and
-  failure dumps, traces, and simulation histories to its results directory.
+- Every randomized or simulated test replays from its seed (`DURABLE_STORAGE_TEST_SEED`); every run writes crash, hang,
+  and failure dumps, traces, and simulation histories to its results directory.
 - Judge coverage by branch coverage, CRAP scores, mutation scores, and the quality of assertions, not line count.
 
 ## Performance
 
 - Claim an optimization only with measurements: throughput, latency distributions, and allocations.
-- Permanent microbenchmarks live in `test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`. Validate new ones with `--job Dry`,
-  always pass a filter, and compare against an explicit baseline.
+- Permanent microbenchmarks live in `test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`. Validate new
+  ones with `--job Dry`, always pass a filter, and compare against an explicit baseline.
 
 ```powershell
 just bench '*' --job Dry

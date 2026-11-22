@@ -73,50 +73,51 @@ hand-written scenarios, and the client sequences observed in simulation.
 §10](components/ledger-replicas.md#10-verification)); `LedgerConformanceTests`, the fold oracle, checks a `Ledger` and
 its `LedgerWriter` over memory replicas, and over LedgerStore replicas, against `LedgerStorageSpec`, which judges
 answers alone, with `LedgerQuorumOracle` (`test/Durable.Storage/shared/Conformance/Ledger`), from what
-`CallRecordingLedgerReplica` (`test/Durable.Storage/shared/Recording`) records of each replica request, an invocation and a response on
-one clock, each request its own client and a lost answer's response unbounded: every contiguous tail a request carries
-is at most the completed prefix while the ledger is open and the recorded `T` after, a recovery raises the known
-contiguous tail to at most the greater of its prior value and its `c`, which the harness takes from the recorded seal
-answers, and the writer's lifetime stops before a recovery's first seal request ([ledger-protocol
+`CallRecordingLedgerReplica` (`test/Durable.Storage/shared/Recording`) records of each replica request, an invocation
+and a response on one clock, each request its own client and a lost answer's response unbounded: every contiguous tail a
+request carries is at most the completed prefix while the ledger is open and the recorded `T` after, a recovery raises
+the known contiguous tail to at most the greater of its prior value and its `c`, which the harness takes from the
+recorded seal answers, and the writer's lifetime stops before a recovery's first seal request ([ledger-protocol
 §10](components/ledger-protocol.md#10-verification)); `MetaStoreModelTests` (`Orleans.Durable.Storage.Model.Tests`)
-checks `InMemoryConditionalRegister` against `ConditionalRegisterSpec` (`test/Durable.Storage/shared/Conformance/MetaStore`), the spec
-of `IConditionalRegister`, which also judges the file-system MetaStore's crash states (§7.5).
-`ObjectStoreConformanceTests` (`Orleans.Durable.Storage.Engine.Archive.Lsm.Tests`) checks every `IObjectStore` provider,
-with its `IAppendableObjectStore` where it has one, and the in-process fault double `FaultInjectingObjectStore`, against
-`ObjectStoreSpec`
-(`test/Durable.Storage/shared/Conformance/Archive/Lsm`), which also judges the file-system object store's crash states (§7.5), and
-`CloudObjectStoreConformanceTests` (`Orleans.Durable.Storage.Cloud.Tests`) the cloud providers on their emulators (§10).
-A write with an unknown outcome may land at any later point or never, so the spec keeps both possibilities for the rest
-of the case, and the checker's search grows about tenfold for every two such writes; the fault double therefore throws a
-bounded number of faults per case, which bounds the case's unknown writes and its search. Shared contract suites
-(`ConditionalRegisterContract`, `ObjectStoreContract`) run each provider of a layer through the
-same examples.
+checks `InMemoryConditionalRegister` against `ConditionalRegisterSpec`
+(`test/Durable.Storage/shared/Conformance/MetaStore`), the spec of `IConditionalRegister`, which also judges the
+file-system MetaStore's crash states (§7.5). `ObjectStoreConformanceTests`
+(`Orleans.Durable.Storage.Engine.Archive.Lsm.Tests`) checks every `IObjectStore` provider, with its
+`IAppendableObjectStore` where it has one, and the in-process fault double `FaultInjectingObjectStore`, against
+`ObjectStoreSpec` (`test/Durable.Storage/shared/Conformance/Archive/Lsm`), which also judges the file-system object
+store's crash states (§7.5), and `CloudObjectStoreConformanceTests` (`Orleans.Durable.Storage.Cloud.Tests`) the cloud
+providers on their emulators (§10). A write with an unknown outcome may land at any later point or never, so the spec
+keeps both possibilities for the rest of the case, and the checker's search grows about tenfold for every two such
+writes; the fault double therefore throws a bounded number of faults per case, which bounds the case's unknown writes
+and its search. Shared contract suites (`ConditionalRegisterContract`, `ObjectStoreContract`) run each provider of a
+layer through the same examples.
 
 `JournalStoreConformanceTests` (`Orleans.Durable.Storage.Engine.Journals.Tests`) checks `JournalStore` over live ledgers
-on memory replicas and `InMemoryArchiveStore` against `JournalStoreSpec` (`test/Durable.Storage/shared/Conformance/Journals`), the
-Journals spec ([journals §10](components/journals.md#10-verification)). Its state holds each journal's
-`JournalModelState`, with `Appends` and `BaseLength`, the facts the store's limits and a read's replace request judge,
-and whether the process serves the journals' open ledger. Every answer of a write, a read, and the expiry scan's
-`Expired`s goes through `JournalModel.Step`; the spec adds what the model leaves open and this composition decides: a
-serving process answers a steady write `Accepted`, `Rejected`, or `ReplaceRequired`, and one serving none answers every
-call `Moved`; the store's limits refuse an `Append` exactly at the generation's limit, and each answer carries the replace
-request of journals §2.4. The environment's steps are spec operations: a takeover, which replaces the open ledger
-through the process's executor; a write held at its load across a takeover, which is `Fenced`, or `Moved` while the
-registry does not yet serve the successor's writer, or answered by the successor; and a write whose batch reaches its
-replica as the process crashes, `Ambiguous`, an `Expect.OneOf` beside its answered outcomes whose entry is a pending step
-function which lands once where its expected version still names the journal's state, or never, after which the next
-process serves nothing until a takeover. Its state profile is strict about names: no ledger of the composition drops,
-so no load rebases a key, and an answer names a state by one of its names, or by a fresh version only while an ambiguous
-landing or an `Expired` left them unknown; a rejected write applies to no state. A write names its expected version by
-how many versions back the caller learned it, from an acceptance, a rejection, or a read, so stale writes are drawn
-without the state. CsCheck's sequences and concurrent groups and every sequence of three of nine calls run against it;
-Accordant's generation, which runs the spec without a system, would reach only whether the process serves, since its
-placeholder answers name no version. A mutant per contract clause, each a wrapper of the store's answers or effects or a
-memory store whose limits differ from the spec's, fails the spec at the call which shows it: an `Append` accepted at a
-stale version; `ReplaceRequired` where the store admits the `Append`, and an `Append` accepted past the limits; a `Moved`
-or a `Fenced` entry which lands when sent again; an `Ambiguous` `Append` written again after the takeover; an `Accepted`
-and a `Rejected` version which names no state; a read which misses an acknowledged entry or ends with an undecided one;
-a deleted journal read as existing; and a `Replace` folded as an `Append`. `SimulatedJournalStoreConformanceTests`
+on memory replicas and `InMemoryArchiveStore` against `JournalStoreSpec`
+(`test/Durable.Storage/shared/Conformance/Journals`), the Journals spec ([journals
+§10](components/journals.md#10-verification)). Its state holds each journal's `JournalModelState`, with `Appends` and
+`BaseLength`, the facts the store's limits and a read's replace request judge, and whether the process serves the
+journals' open ledger. Every answer of a write, a read, and the expiry scan's `Expired`s goes through
+`JournalModel.Step`; the spec adds what the model leaves open and this composition decides: a serving process answers a
+steady write `Accepted`, `Rejected`, or `ReplaceRequired`, and one serving none answers every call `Moved`; the store's
+limits refuse an `Append` exactly at the generation's limit, and each answer carries the replace request of journals
+§2.4. The environment's steps are spec operations: a takeover, which replaces the open ledger through the process's
+executor; a write held at its load across a takeover, which is `Fenced`, or `Moved` while the registry does not yet
+serve the successor's writer, or answered by the successor; and a write whose batch reaches its replica as the process
+crashes, `Ambiguous`, an `Expect.OneOf` beside its answered outcomes whose entry is a pending step function which lands
+once where its expected version still names the journal's state, or never, after which the next process serves nothing
+until a takeover. Its state profile is strict about names: no ledger of the composition drops, so no load rebases a key,
+and an answer names a state by one of its names, or by a fresh version only while an ambiguous landing or an `Expired`
+left them unknown; a rejected write applies to no state. A write names its expected version by how many versions back
+the caller learned it, from an acceptance, a rejection, or a read, so stale writes are drawn without the state.
+CsCheck's sequences and concurrent groups and every sequence of three of nine calls run against it; Accordant's
+generation, which runs the spec without a system, would reach only whether the process serves, since its placeholder
+answers name no version. A mutant per contract clause, each a wrapper of the store's answers or effects or a memory
+store whose limits differ from the spec's, fails the spec at the call which shows it: an `Append` accepted at a stale
+version; `ReplaceRequired` where the store admits the `Append`, and an `Append` accepted past the limits; a `Moved` or a
+`Fenced` entry which lands when sent again; an `Ambiguous` `Append` written again after the takeover; an `Accepted` and
+a `Rejected` version which names no state; a read which misses an acknowledged entry or ends with an undecided one; a
+deleted journal read as existing; and a `Replace` folded as an `Append`. `SimulatedJournalStoreConformanceTests`
 (`Orleans.Durable.Storage.Simulation.Conformance.Tests`) runs the same spec over Clockwork-rewritten `JournalStore`
 instances backed by `SimulatedConditionalRegister`, yielding memory replicas, and `SimulatedArchiveStore`, with explored
 concurrent windows, seeded 3-replica quorum sequences, and admission race-mutant witnesses (§4.1). Drains, compactions,
@@ -128,20 +129,20 @@ Global predicates are evaluated after every simulation step: open ranges partiti
 increase, closed ledgers were recovered, watermarks never decrease, referenced objects exist, the retirement floor
 only grows, every watermark is a segment start, and the rest of
 [LG-I1–I13](components/ledgers.md#5-invariants) and [LSM-I1–I7](components/archive-lsm.md#5-invariants). The **chain
-checker** (`TokenChainChecker`, `test/Durable.Storage/shared/Archive`) replays `Plan` per key across segments and ledgers, through
-splits and merges, from the archive's `prefix.Token` for the key's earliest write held in none of its commands, and
-checks every stored token and every defining version of a write held in none against it, a write held in part at
-`Plan` of its held part, and no write held after one not held whole ([HI-I4](components/archive.md#5-invariants),
-[JS-I10](components/journals.md#5-invariants)); a count reset fails it, except a rebase, which follows a row of a
-dropped ledger and takes as its base the token `Plan` gives after that row's write, other than the previous base, and
-the restart from `Origin` of a key the LSM forgot after its `Expired`. Debug assertions pair it where admission writes
-a defining row and where drains and loads read one. The **version checker** (`VersionChecker`,
-`test/Durable.Storage/shared/Archive`) asserts that a key's versions never repeat, except along the `Origin`-based versions of a new
-lifetime of a key the LSM has forgotten entirely ([journals §8.3](components/journals.md#83-warm-state)), and that
-every version a read, an acceptance, a rejection, or a first touch answers names one state of its key, each state
-identified by its newest row in the reference history; a rebased version's base must be the store's `VersionBase` at
-its load (`Rebased`), so a rebase to it is fresh. The archive simulations run both after every step, over the
-reads and drains since the last. The retirement
+checker** (`TokenChainChecker`, `test/Durable.Storage/shared/Archive`) replays `Plan` per key across segments and
+ledgers, through splits and merges, from the archive's `prefix.Token` for the key's earliest write held in none of its
+commands, and checks every stored token and every defining version of a write held in none against it, a write held in
+part at `Plan` of its held part, and no write held after one not held whole
+([HI-I4](components/archive.md#5-invariants), [JS-I10](components/journals.md#5-invariants)); a count reset fails it,
+except a rebase, which follows a row of a dropped ledger and takes as its base the token `Plan` gives after that row's
+write, other than the previous base, and the restart from `Origin` of a key the LSM forgot after its `Expired`. Debug
+assertions pair it where admission writes a defining row and where drains and loads read one. The **version checker**
+(`VersionChecker`, `test/Durable.Storage/shared/Archive`) asserts that a key's versions never repeat, except along the
+`Origin`-based versions of a new lifetime of a key the LSM has forgotten entirely ([journals
+§8.3](components/journals.md#83-warm-state)), and that every version a read, an acceptance, a rejection, or a first
+touch answers names one state of its key, each state identified by its newest row in the reference history; a rebased
+version's base must be the store's `VersionBase` at its load (`Rebased`), so a rebase to it is fresh. The archive
+simulations run both after every step, over the reads and drains since the last. The retirement
 gate's checker records the epoch of each map value from which the gate answered a disk releasable, and asserts that
 every later map value names the node in no ledger. A checker reads the state the system exposes (the ledger map, the
 manifest, replicas, objects, and the gate's answers) and holds no model of its own. A map value records no install's
@@ -187,10 +188,10 @@ The checker is Porcupine's search ported to C# in `test/Durable.Storage/shared/L
 
 Partitions are searched round robin in fixed turns on the calling thread, so a check is deterministic, and the first
 illegal partition ends it, as Porcupine's parallel search does. Porcupine's published key-value histories with their
-verdicts are vectors under `test/Durable.Storage/shared-vectors/linearizability`; its Jepsen etcd histories carry no license, so
-generated etcd-shaped histories replace them. Properties check that histories generated from sequential executions
-with random overlapping intervals are accepted, that an injected stale read or lost write is rejected, and that
-partitioned, unpartitioned, and event-ordered checks agree (`Orleans.Durable.Storage.Testing.Tests`).
+verdicts are vectors under `test/Durable.Storage/shared-vectors/linearizability`; its Jepsen etcd histories carry no
+license, so generated etcd-shaped histories replace them. Properties check that histories generated from sequential
+executions with random overlapping intervals are accepted, that an injected stale read or lost write is rejected, and
+that partitioned, unpartitioned, and event-ordered checks agree (`Orleans.Durable.Storage.Testing.Tests`).
 
 ## 4. Properties and conformance
 
@@ -203,17 +204,17 @@ laws, which `UnionLaws` (`test/Durable.Storage/shared/UnionLaws`) checks over an
 
 ### 4.1 The conformance kit
 
-A shared kit (`ConformanceKit` in `test/Durable.Storage/shared/Conformance`) bridges CsCheck and Accordant. It generates operation
-sequences, and concurrent groups of operations, from a spec's operations and their request generators; runs each against
-a fresh system; folds the results through `spec.Allows` (or `AllowsConcurrent` for a concurrent group) over the state
-profile; and lets CsCheck shrink a failing sequence. The kit then removes calls while the case still fails, and reports
-the minimal trace, the spec's explanation, the possible states before the failing round, and the CsCheck seed which
-replays the shrunk case through `DURABLE_STORAGE_TEST_SEED`, as a seeded simulation replays (§7.4). Each case carries a seed for
-its system, such as the seed of random faults, which the report prints; an Accordant case's seed derives from its
-description. Each case runs inside a scope its caller gives the kit; the `ILedgerReplica` spec's cases each run in their
-own page leak scope (§11.1), so a case which leaks a page fails, is minimized, and reports its seed. Without a scheduler
-a case runs on the calling thread and a concurrent group's calls on the thread pool, so the group's interleaving neither
-replays nor shrinks.
+A shared kit (`ConformanceKit` in `test/Durable.Storage/shared/Conformance`) bridges CsCheck and Accordant. It generates
+operation sequences, and concurrent groups of operations, from a spec's operations and their request generators; runs
+each against a fresh system; folds the results through `spec.Allows` (or `AllowsConcurrent` for a concurrent group) over
+the state profile; and lets CsCheck shrink a failing sequence. The kit then removes calls while the case still fails,
+and reports the minimal trace, the spec's explanation, the possible states before the failing round, and the CsCheck
+seed which replays the shrunk case through `DURABLE_STORAGE_TEST_SEED`, as a seeded simulation replays (§7.4). Each case
+carries a seed for its system, such as the seed of random faults, which the report prints; an Accordant case's seed
+derives from its description. Each case runs inside a scope its caller gives the kit; the `ILedgerReplica` spec's cases
+each run in their own page leak scope (§11.1), so a case which leaks a page fails, is minimized, and reports its seed.
+Without a scheduler a case runs on the calling thread and a concurrent group's calls on the thread pool, so the group's
+interleaving neither replays nor shrinks.
 
 A scheduler (`IConformanceScheduler`) runs each case and starts each call of its groups. `SimulatedConformance`
 (`Orleans.Durable.Storage.Simulation.Conformance.Tests`) runs each case in a Clockwork simulation of its own
@@ -256,12 +257,12 @@ deviation is a preemption; outside every window the case's seeded strategy choos
 the schedules by re-execution, the fewest preemptions first: each schedule with `d` preemptions extends its parent with
 `d − 1` by one preemption after its parent's last, so each runs once, and an exploration ends complete when a level adds
 none, or at the bound. The gate's bound (`ScheduleBound.Gate`) runs every schedule with at most one preemption, up to
-128 per case; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` runs up to two, up to 2,000. Stateless exploration rests on a run's choice
-points depending only on its earlier choices: a schedule whose prefix offers other operations than the run it extends
-diverges, and fails its exploration. A failure reports the case, its seed, the schedule's index among those explored,
-and its preemptions, which `DURABLE_STORAGE_SCHEDULE` replays with the case's seed; every exploration reports how many schedules it
-ran, how many choice points its windows held, and whether it ran every schedule. Doubles at the store boundaries yield
-to the scheduler where they would wait a random latency
+128 per case; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` runs up to two, up to 2,000. Stateless exploration rests on a run's
+choice points depending only on its earlier choices: a schedule whose prefix offers other operations than the run it
+extends diverges, and fails its exploration. A failure reports the case, its seed, the schedule's index among those
+explored, and its preemptions, which `DURABLE_STORAGE_SCHEDULE` replays with the case's seed; every exploration reports
+how many schedules it ran, how many choice points its windows held, and whether it ran every schedule. Doubles at the
+store boundaries yield to the scheduler where they would wait a random latency
 (`SimulatedObjectStore.YieldsForLatency`, `SimulatedConditionalRegister.YieldsForLatency`, the fake Azure transport's
 schedule), so each interleaving of a group's requests and answers is a scheduling choice rather than the order of
 latency draws. A component of `src` whose operations complete at once yields through a conditional seam (§7.2),
@@ -313,7 +314,8 @@ which fired, which the trace records after each round. The kit runs Accordant's 
 ones the same way: Accordant's exhaustive generation covers every sequence to a small depth, and CsCheck covers long
 random sequences. One kit serves every contract in §3.1 and every provider of each; a contract's spec and its
 provider-neutral executor are shared test source beside the kit (`test/Durable.Storage/shared/Conformance/LedgerReplica`,
-`test/Durable.Storage/shared/Conformance/Ledger`), and each provider's target classifies the failures the contract leaves to it.
+`test/Durable.Storage/shared/Conformance/Ledger`), and each provider's target classifies the failures the contract
+leaves to it.
 
 ### 4.2 Metamorphic properties
 
@@ -324,10 +326,10 @@ with its implementation, as CsCheck properties.
 
 ## 5. Models
 
-`test/Durable.Storage/eng/model-check-quint.ps1` type-checks every Quint model of the safety core and exhaustively checks their finite state
-spaces through the Apalache/TLC backend ([ledger model](../../specs/ledger-protocol/README.md),
-[Ledgers models](../../specs/ledgers/README.md), [LSM model](../../specs/archive/README.md),
-[archive-log model](../../specs/archive-logs/README.md)):
+`test/Durable.Storage/eng/model-check-quint.ps1` type-checks every Quint model of the safety core and exhaustively
+checks their finite state spaces through the Apalache/TLC backend ([ledger
+model](../../specs/ledger-protocol/README.md), [Ledgers models](../../specs/ledgers/README.md), [LSM
+model](../../specs/archive/README.md), [archive-log model](../../specs/archive-logs/README.md)):
 
 | Model | Behavior | Invariants | Guarantees |
 | --- | --- | --- | --- |
@@ -340,10 +342,10 @@ spaces through the Apalache/TLC backend ([ledger model](../../specs/ledger-proto
 | `ArchiveLogs.qnt` | Per-segment writes of archive logs with base rows, racing and straggler drains, requests which land after their drainer crashed, unknown outcomes, progress markers, drops, the sweeper, readers on a stale map and at a lagging tail, and Journals' loader (a map read, then an archive read, then the rebase); each `Create`, `Append Block`, and `Put Blob` one action; mutants among them `404-as-held-without-properties-read`, `no-zero-pad`, `lagging-read-as-linearizable`, and `drain-ignores-lineage`; three drainers exhausted on every change without the sweeper and nightly with it | `NoLostCommand`, `StaleReaders`, `ReadsAtTheirCut`, `NoUndecidedCommand`, `HoldsSound`, `ReferencedExist`, `VersionsUnique`, `NoFalseCorruption` | LOG-I1 to LOG-I3, LOG-I6, HI-I1, HI-I4, JS-I10 |
 | `LedgerDrop.qnt` | One final-window address of a closed ledger on its replicas; the deposed writer's delayed writes, recovery's seals and recovery writes, creation unless dropped, and drops which leave a tombstone; each node's reconciliation from its own view of the map, which may predate the ledgers' installation; a lower ledger's first write after a higher one's drop, and stray replicas on nodes which held none, dropped again; crashes between the two catalog writes of the drop-split mutants; and the writer's outcome | `DecisionsAgree`, `DurableIsDecided`, `FencedHasNoEffect`, `EndAddressSealed`, `NeverDropsListed`, `TombstoneExcludesReplica` | LG-I4, LG-I5, LG-I7, LR-I3, LR-I7, LR-I8, LP-I5, LP-I7, LS-I2, JS-I4 |
 
-Quint is pinned in `test/Durable.Storage/eng/quint/package-lock.json`; the Apalache archive which carries the translation and TLC is
-pinned and hash-verified. A positive case exhausts its state space. Each invariant has a guard-disabling mutant
-which must produce that invariant's counterexample, checked separately so the failing property is identifiable. Each
-answer a modeled protocol counts has a mutant which gives the answer before its record is durable
+Quint is pinned in `test/Durable.Storage/eng/quint/package-lock.json`; the Apalache archive which carries the
+translation and TLC is pinned and hash-verified. A positive case exhausts its state space. Each invariant has a
+guard-disabling mutant which must produce that invariant's counterexample, checked separately so the failing property is
+identifiable. Each answer a modeled protocol counts has a mutant which gives the answer before its record is durable
 ([durable answers](conventions.md#13-durable-answers)): the ledger model's `NoRevokedAnswer` holds every replica to
 what it answered across restarts, and its volatile-answer mutants break it for each answer, a writer write's `Written`
 and `Sealed`, a read's DATA, a recovery write's `Written`, a creation, a seal, a repeated seal, and a tail check's
@@ -359,18 +361,18 @@ Trace validation establishes that the code implements the modeled protocol. Rand
 from the implementation's state to the model's, and traces recorded in deterministic simulation are checked against the
 models' actions. A trace driver per model lives in the conformance kit (§4.1) and lands with each modeled component.
 
-For the ledger model, simulation records a `LedgerTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`). It logs each
-replica event at the replica's node, in the order the node served it: a writer write, recovery write, seal, read, or
-contiguous-tail read, with the call it answers, the client which sent it (the writer, a recovery executor, or a reader),
-the address, the contiguous tail it carried, the recovery and seal flags, and the answer with its sealed flag and
-contiguous tail. It logs each replica call and answer at the client, from a replica which wraps each replica a client's
-`Ledger` uses, and marks a read sent after the recovery handled that replica's seal answer, the rule recovery applies. A
-recovery reports each replica answer it handles, in the order it handles them, through the observer `Ledger`'s internal
-`RecoverAsync` overload takes for that recovery, and the trace logs it. It logs the client steps the model names
-(acquisition, completion, recovery's start and end with `c` and the candidate end, a contiguous-tail read's start and
-answer, the map's close by a recovery's conditional write, a rival recovery's lost close, a client's learning of the
-recorded `T`, a node's drop, and a restart) where they happen. C# oracles check each trace in the simulation: no replica
-answers a writer write `Written` after it answered a seal (LR-I8); every reported contiguous tail is at most the
+For the ledger model, simulation records a `LedgerTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`). It
+logs each replica event at the replica's node, in the order the node served it: a writer write, recovery write, seal,
+read, or contiguous-tail read, with the call it answers, the client which sent it (the writer, a recovery executor, or a
+reader), the address, the contiguous tail it carried, the recovery and seal flags, and the answer with its sealed flag
+and contiguous tail. It logs each replica call and answer at the client, from a replica which wraps each replica a
+client's `Ledger` uses, and marks a read sent after the recovery handled that replica's seal answer, the rule recovery
+applies. A recovery reports each replica answer it handles, in the order it handles them, through the observer
+`Ledger`'s internal `RecoverAsync` overload takes for that recovery, and the trace logs it. It logs the client steps the
+model names (acquisition, completion, recovery's start and end with `c` and the candidate end, a contiguous-tail read's
+start and answer, the map's close by a recovery's conditional write, a rival recovery's lost close, a client's learning
+of the recorded `T`, a node's drop, and a restart) where they happen. C# oracles check each trace in the simulation: no
+replica answers a writer write `Written` after it answered a seal (LR-I8); every reported contiguous tail is at most the
 writer's completed prefix, or the recorded `T` once the map closes the ledger, and a replica's never decreases between
 restarts (LR-I6, LP-I11); the writer never sees a recovery's candidate end answered `Written`, then or later, and every
 end lies in `[c, c + 2K]` (LP-I7); no writer slot at or above a candidate end completes (LP-I8); a contiguous-tail read
@@ -389,13 +391,13 @@ from below, and the second from above. The trace checks that the end lies in `[c
 The trace is kept with the run's diagnostics.
 
 Quint (`quint test`) then checks each trace against the ledger model ([trace
-validation](../../specs/ledger-protocol/README.md#trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set, the quorum, crash,
-and `Ledger` simulations, and the scripted run of serve-time landings, write each run's trace of its ledger as a Quint
-module (`LedgerTraceExport`), and `LedgerProtocolTrace.qnt` drives `LedgerProtocol.qnt`, with `SeparateAnswers`, through
-the module's events in order, binding each to the action and arguments it names. The trace validates when `quint test`
-executes every event and its invariants without failure. A replica's answer is served by its node and received by its
-client in separate steps: the writer receives its answers as they arrive, a recovery in the order it handles them, and
-a check in any order. A retry maps to a repeat of
+validation](../../specs/ledger-protocol/README.md#trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set, the
+quorum, crash, and `Ledger` simulations, and the scripted run of serve-time landings, write each run's trace of its
+ledger as a Quint module (`LedgerTraceExport`), and `LedgerProtocolTrace.qnt` drives `LedgerProtocol.qnt`, with
+`SeparateAnswers`, through the module's events in order, binding each to the action and arguments it names. The trace
+validates when `quint test` executes every event and its invariants without failure. A replica's answer is served by its
+node and received by its client in separate steps: the writer receives its answers as they arrive, a recovery in the
+order it handles them, and a check in any order. A retry maps to a repeat of
 the same request, and a request the node serves twice to a delivery which leaves it in flight. A `LedgerWriter`'s
 acquisition carries no contiguous tail the trace sees, so the export maps it at its slot's first write, which carries
 one. Its `Completed` steps map to `Complete` through the slot, and its `Stopped` steps stutter: the model's writer never
@@ -459,18 +461,18 @@ Every state of each trace's
 search is checked against `TypeOK`, `NoRevokedAnswer`, `ReadersSeeClose`, `RecoveryBounded`, and `OpenCheckSound`, and
 from the close on against `AcknowledgedSurvive`, `NoAcknowledgementAtOrAboveEnd`, `EndSealed`, `CheckTailBelowEnd`,
 `RetainedBelowEnd`, and `RecoveriesConverge`, so each trace is a bounded check of them at the implementation's scale.
-`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` validates every trace with `quint test`, then nineteen trace mutants, each one changed
-event of a validated trace which the model rejects at that event: a recovery's end moved by one, a close at an end one
-past its recovery's, a write's `Written` answer reported `Sealed`, a revoked DATA answer and a revoked seal after a
-restart, a `Missing` read counted as sent after its seal answer, a seal's tail raised above every carried tail, an
-explicit contiguous-tail write, a read repair, and a learn each one past the tail its evidence allows, a `Q`-th replica
-answering corrupt, a read of DATA from a node no damage event named answered corrupt while the fault budget still
-admits a corruption, and a restart which leaves out a position its node answered, reports DATA no client wrote, reports
-damage as missing, loses a seal an answer reported, or reports a seal no landed seal explains, and a crashed process's
-`Sealed` answer or read of DATA whose seal, write, or copy that landed without an answer is no longer named.
-Every crash trace holds the event the damage mutant changes: once the faults end, a scripted step damages the WAL page
-of a slot on the node whose media the faults damage, the node answers the slot corrupt, and the node restarts holding
-it.
+`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` validates every trace with `quint test`, then nineteen trace
+mutants, each one changed event of a validated trace which the model rejects at that event: a recovery's end moved by
+one, a close at an end one past its recovery's, a write's `Written` answer reported `Sealed`, a revoked DATA answer and
+a revoked seal after a restart, a `Missing` read counted as sent after its seal answer, a seal's tail raised above every
+carried tail, an explicit contiguous-tail write, a read repair, and a learn each one past the tail its evidence allows,
+a `Q`-th replica answering corrupt, a read of DATA from a node no damage event named answered corrupt while the fault
+budget still admits a corruption, and a restart which leaves out a position its node answered, reports DATA no client
+wrote, reports damage as missing, loses a seal an answer reported, or reports a seal no landed seal explains, and a
+crashed process's `Sealed` answer or read of DATA whose seal, write, or copy that landed without an answer is no longer
+named. Every crash trace holds the event the damage mutant changes: once the faults end, a scripted step damages the WAL
+page of a slot on the node whose media the faults damage, the node answers the slot corrupt, and the node restarts
+holding it.
 `just ledger-traces` runs the simulations and the check, over a seed range when one is given.
 
 For archive logs, `ArchiveLogTraceTests` (`Orleans.Durable.Storage.Simulation.Tests`) records the drain simulation as a
@@ -481,41 +483,41 @@ whose failures strike before a request lands. Each request of the key's log maps
 drainer's `Create` and `Put Blob` of an opener among them; a segment's start, a marker, and a drop map to theirs; the
 ledger writer's decisions give the model's decided tail, and `ReplaceAsync` its close; a request for another key and a
 repeat of a request which already landed in the model map to no step. After each store request the trace expects the
-model's position to be the store's, and a drain which blocks is a violation. With `DURABLE_STORAGE_ARCHIVE_LOG_TRACES` set, each
-seed writes a Quint module (`ArchiveLogsTrace{seed}.qnt`) which imports the model with those constants and runs its
-actions in order. `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each with `quint test`, which fails at an action not
-enabled, a position the store did not reach, or a state which breaks an invariant, and checks two negative controls
-fail: a copy which repeats a segment's start, which the model does not enable, and a trace a `marks-unheld` drain
-records while every create of the key fails (`ArchiveLogsTraceUnheld{seed}.qnt`), whose marker the model refuses.
-`just archive-log-traces` runs the simulation and the check, over a seed range when one is given, and CI's
-`archive-log-traces` job runs it on every change.
+model's position to be the store's, and a drain which blocks is a violation. With `DURABLE_STORAGE_ARCHIVE_LOG_TRACES`
+set, each seed writes a Quint module (`ArchiveLogsTrace{seed}.qnt`) which imports the model with those constants and
+runs its actions in order. `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each with `quint test`,
+which fails at an action not enabled, a position the store did not reach, or a state which breaks an invariant, and
+checks two negative controls fail: a copy which repeats a segment's start, which the model does not enable, and a trace
+a `marks-unheld` drain records while every create of the key fails (`ArchiveLogsTraceUnheld{seed}.qnt`), whose marker
+the model refuses. `just archive-log-traces` runs the simulation and the check, over a seed range when one is given, and
+CI's `archive-log-traces` job runs it on every change.
 
-For the ledger map, a `LedgerMapTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) records every value the ledger-map
-register applied, in order, interleaved with the proposals answered durable, and each ledger's decided batches, in the
-ledger map committer simulation (`LedgerMapCommitterSimulationTests`), whose ledgers take no writes, and the transition
-simulation (`TransitionSimulationTests`), whose scans read each closed ledger's batches below its recorded `T` for its
-LG-I5 check and, only when the trace is exported and after every check, each open ledger's below its highest durable
-answer. Recording takes no step, so an untraced run's schedule is unchanged. With `DURABLE_STORAGE_LEDGER_MAP_TRACES` set, each
-seed writes a Quint module (`LedgerMapTraceCommitter{seed}.qnt` or `LedgerMapTraceTransition{seed}.qnt`, rendered by
-`LedgerMapTraceExport`) which imports `LedgerMap.qnt` with the constants its run fixes. A write's value becomes the
-model's conditional steps it shows against the value before it, a group commit several: its installs (`takeover`,
-`split`, or `merge`) in the order of the IDs they open, which is the order the committer's fold applied them, then its
-drops in ID order; the bootstrap is the model's `init`. A decided batch becomes `write` or `marker` at its slot, applied
-no later than its durable answer and before the step which closes its ledger, since an atomic append lands between its
-call and its answer, before the seal. The run checks every invariant after each step, the model's map, ranges, status,
-`next_ledger_id`, and, with writes, each closed ledger's tail against each written value, and each batch's slot, key,
-and row form against the model's. The model omits node identities, replicas, primaries, and the retirement floor
-(LG-I11), so a floor raise is no step; a range or key keeps its top `KeyBits` bits; bodies, JSNs, and tokens are not
-compared; a drop of a ledger with batches follows the model's drain to its `T`, the Archive's completion the
-simulations do not run; and trims and reads are not traced ([ledgers models](../../specs/ledgers/README.md#trace-validation)).
-`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each module with `quint test`, then eight trace mutants, each a change of
-one step of a validated trace which the model refuses at that step, by the step's action guard or by the state it
-expects, while the replay through the step before passes: a takeover's closed ledger listed open (`OneOwner`), an ID
-skipped (`IdsDense`) or reused (`HistoryOrdered`), a write before its ledger's install (`AckedInHistory`) or after its
-close (`HistoryOrdered`), a drop without its drain (`AckedInHistory`) or before a lower overlapping ledger's
-(`DropsInLineageOrder`), and a referencing row read as defining (`ReferencesResolve`). `just ledger-map-traces` runs
-the simulations and the check over seeds 1 to 10, or a seed range when one is given, and CI's `ledger-map-traces` job
-runs it on every change.
+For the ledger map, a `LedgerMapTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) records every value
+the ledger-map register applied, in order, interleaved with the proposals answered durable, and each ledger's decided
+batches, in the ledger map committer simulation (`LedgerMapCommitterSimulationTests`), whose ledgers take no writes, and
+the transition simulation (`TransitionSimulationTests`), whose scans read each closed ledger's batches below its
+recorded `T` for its LG-I5 check and, only when the trace is exported and after every check, each open ledger's below
+its highest durable answer. Recording takes no step, so an untraced run's schedule is unchanged. With
+`DURABLE_STORAGE_LEDGER_MAP_TRACES` set, each seed writes a Quint module (`LedgerMapTraceCommitter{seed}.qnt` or
+`LedgerMapTraceTransition{seed}.qnt`, rendered by `LedgerMapTraceExport`) which imports `LedgerMap.qnt` with the
+constants its run fixes. A write's value becomes the model's conditional steps it shows against the value before it, a
+group commit several: its installs (`takeover`, `split`, or `merge`) in the order of the IDs they open, which is the
+order the committer's fold applied them, then its drops in ID order; the bootstrap is the model's `init`. A decided
+batch becomes `write` or `marker` at its slot, applied no later than its durable answer and before the step which closes
+its ledger, since an atomic append lands between its call and its answer, before the seal. The run checks every
+invariant after each step, the model's map, ranges, status, `next_ledger_id`, and, with writes, each closed ledger's
+tail against each written value, and each batch's slot, key, and row form against the model's. The model omits node
+identities, replicas, primaries, and the retirement floor (LG-I11), so a floor raise is no step; a range or key keeps
+its top `KeyBits` bits; bodies, JSNs, and tokens are not compared; a drop of a ledger with batches follows the model's
+drain to its `T`, the Archive's completion the simulations do not run; and trims and reads are not traced ([ledgers
+models](../../specs/ledgers/README.md#trace-validation)). `test/Durable.Storage/eng/model-check-quint.ps1 -Traces`
+replays each module with `quint test`, then eight trace mutants, each a change of one step of a validated trace which
+the model refuses at that step, by the step's action guard or by the state it expects, while the replay through the step
+before passes: a takeover's closed ledger listed open (`OneOwner`), an ID skipped (`IdsDense`) or reused
+(`HistoryOrdered`), a write before its ledger's install (`AckedInHistory`) or after its close (`HistoryOrdered`), a drop
+without its drain (`AckedInHistory`) or before a lower overlapping ledger's (`DropsInLineageOrder`), and a referencing
+row read as defining (`ReferencesResolve`). `just ledger-map-traces` runs the simulations and the check over seeds 1 to
+10, or a seed range when one is given, and CI's `ledger-map-traces` job runs it on every change.
 
 For the LSM, `ArchiveTraceTests` (`Orleans.Durable.Storage.Simulation.Tests`) records an LSM simulation as a run of the
 LSM model ([archive LSM §10](components/archive-lsm.md#10-verification)). One key's history beside another's, over a
@@ -543,12 +545,12 @@ invariants judge what it kept; the model's exhaustive cases take such compaction
 which imports the model with those constants and runs its actions in order, expecting after each step the model's
 invariants, after each upload the object's rows to be the output's, after each manifest replace the model's watermarks
 and references to be the manifest's, and of each read the answer, folded from its prefix and its live rows, to be the
-fold of the decided history at its cut. `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each module with `quint test`, then
-five trace mutants, each a change of one step of the first validated trace which holds what it looks for, which the
-model refuses at that step, by the step's action guard or by the state it expects, while the replay through the step
-before passes: a sweep's delete of an object the manifest references (`ReferencedExist`), a compaction output without its
-inputs' newest row (`FoldPreserved`), a manifest whose watermark falls below the one before (`WatermarksMonotone`), a
-drain which ends inside its segment (`WatermarksAtSegmentStarts`), and a read which misses its
+fold of the decided history at its cut. `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each module
+with `quint test`, then five trace mutants, each a change of one step of the first validated trace which holds what it
+looks for, which the model refuses at that step, by the step's action guard or by the state it expects, while the replay
+through the step before passes: a sweep's delete of an object the manifest references (`ReferencedExist`), a compaction
+output without its inputs' newest row (`FoldPreserved`), a manifest whose watermark falls below the one before
+(`WatermarksMonotone`), a drain which ends inside its segment (`WatermarksAtSegmentStarts`), and a read which misses its
 newest row (`ReadsCorrect`). `just archive-traces` runs the simulation and the check over seeds 1 to 20, or a seed range
 when one is given, and CI's `archive-traces` job runs it on every change.
 
@@ -572,21 +574,23 @@ its target with its decoder, and campaigns run at milestones.
 
 **Targets.** Each layer's targets live beside its code's layer: `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Wal`,
 `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.MetaStore`, `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Ledgers`,
-`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive`, `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, and
-`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Journals` each use the types of the components whose formats they decode (their
-layer's, or for the MetaStore's register file the `Orleans.Durable.Storage.FileSystem` provider package, and for the
-archive-log targets `Orleans.Durable.Storage.Engine.Archive.Logs` and, for the Azure metadata reader,
-`Orleans.Durable.Storage.AzureStorage`), of what those reach, and of the oracle framework
-`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Abstractions` only, which `Orleans.Durable.Storage.Architecture.Tests` checks over
-each target assembly's compiled references; the executable `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz` gathers every layer's
-targets for campaigns. Each target covers one decoder with one oracle, which applies the format's rules to the input
-bytes independently of the decoder. The decoder rejects an input exactly when the input breaks a rule its format
-documents, naming that rule's reason code, which the oracle loads from the format's rejection vectors, and the oracle
-checks that the input breaks the rule named; otherwise the decoder accepts the input with the value the rules give. A
-canonical format's value then encodes back to exactly the input; a structurally validated format's value decodes to the
-same value from the canonical encoding. A structural decoder over a tree, such as checkpoint loading, is also held to
-completeness: the oracle walks the input itself and requires exactly the objects its walk reaches, so a decoder which
-drops or misplaces an object breaks the oracle even when its writer round trip holds. Any other exception is a finding.
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive`,
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, and
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Journals` each use the types of the components whose formats
+they decode (their layer's, or for the MetaStore's register file the `Orleans.Durable.Storage.FileSystem` provider
+package, and for the archive-log targets `Orleans.Durable.Storage.Engine.Archive.Logs` and, for the Azure metadata
+reader, `Orleans.Durable.Storage.AzureStorage`), of what those reach, and of the oracle framework
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Abstractions` only, which
+`Orleans.Durable.Storage.Architecture.Tests` checks over each target assembly's compiled references; the executable
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz` gathers every layer's targets for campaigns. Each target covers
+one decoder with one oracle, which applies the format's rules to the input bytes independently of the decoder. The
+decoder rejects an input exactly when the input breaks a rule its format documents, naming that rule's reason code,
+which the oracle loads from the format's rejection vectors, and the oracle checks that the input breaks the rule named;
+otherwise the decoder accepts the input with the value the rules give. A canonical format's value then encodes back to
+exactly the input; a structurally validated format's value decodes to the same value from the canonical encoding. A
+structural decoder over a tree, such as checkpoint loading, is also held to completeness: the oracle walks the input
+itself and requires exactly the objects its walk reaches, so a decoder which drops or misplaces an object breaks the
+oracle even when its writer round trip holds. Any other exception is a finding.
 
 Each target decodes its seeds once, unmeasured, before its first input, so one-time costs (static tables and buffer
 pool slabs) stay outside every measurement. A decoding then allocates at most 64 KiB plus 64 bytes per byte of the
@@ -625,22 +629,22 @@ decodes the input with its checksums recomputed, so the fuzzer reaches the rules
 | `archive-log-metadata` | `AzureArchiveLogMetadata.ReadWal` and `ReadCheckpoint`, `AzureArchiveLogStore`'s metadata and tag reader | A set of metadata names and values and a `durable-gen` tag, framed as counted, length-prefixed pairs | The reason an independent reading of archive logs §7.3 gives for the first rule the set breaks, one of `archive-logs/metadata-rejections.json`'s reasons, raised as `ArchiveCorruptException`: a value missing or malformed, a name repeated or differing only in case, a `wal_generation` other than the tag's, a `checkpoint`, `durable_kind`, `durable_base_md5`, or `durable_tomb` which contradicts the generation, a later generation with no opener, a `checkpoint` naming another log or generation, or a `durable_key` other than the key's; or the opener metadata, base MD5, and generation the rules give |
 
 **Corpora.** Each target's seeds are its format's golden vectors, accepted and rejected, read from
-`test/Durable.Storage/shared-vectors` at run time; `CLFM` has rejection vectors only, so its accepted seeds are files its encoder
-writes. `test/Durable.Storage/fuzz/corpus/<target>` holds the inputs campaigns found which reach coverage beyond the seeds, and
-`test/Durable.Storage/fuzz/corpus/<target>/regressions` every input which once broke an oracle. Each layer's tests replay that layer's
-targets on every run, without libFuzzer (`WalCorpusReplayTests`, `MetaStoreCorpusReplayTests`,
-`LedgerStoreCorpusReplayTests`, `LedgersCorpusReplayTests`, `ArchiveCorpusReplayTests`, `ArchiveLogsCorpusReplayTests`
-(`Orleans.Durable.Storage.Engine.Archive.Logs.Tests`, the `archive-log-token`, `archive-log-chunk-base`,
-`archive-log-chunk`, and `archive-log-metadata` targets),
+`test/Durable.Storage/shared-vectors` at run time; `CLFM` has rejection vectors only, so its accepted seeds are files
+its encoder writes. `test/Durable.Storage/fuzz/corpus/<target>` holds the inputs campaigns found which reach coverage
+beyond the seeds, and `test/Durable.Storage/fuzz/corpus/<target>/regressions` every input which once broke an oracle.
+Each layer's tests replay that layer's targets on every run, without libFuzzer (`WalCorpusReplayTests`,
+`MetaStoreCorpusReplayTests`, `LedgerStoreCorpusReplayTests`, `LedgersCorpusReplayTests`, `ArchiveCorpusReplayTests`,
+`ArchiveLogsCorpusReplayTests` (`Orleans.Durable.Storage.Engine.Archive.Logs.Tests`, the `archive-log-token`,
+`archive-log-chunk-base`, `archive-log-chunk`, and `archive-log-metadata` targets),
 `JournalsCorpusReplayTests`, and `OrleansCorpusTests` (`Orleans.Durable.Storage.Tests`), over
-`test/Durable.Storage/shared/CorpusReplay.cs`): every seed and every committed input passes through its oracle within the deadline, the
-seeds reach both a rejection and an acceptance, and no committed input is a copy of a seed. The WAL, LedgerStore, batch,
-LSM, and Journals replays check each input in its own page leak scope (§11.1), so an input whose decoding keeps an
-`ArcBuffer` page fails by name. `Orleans.Durable.Storage.Fuzz.Tests` checks that the campaign harness names each target
-once and that every corpus belongs to a target.
+`test/Durable.Storage/shared/CorpusReplay.cs`): every seed and every committed input passes through its oracle within
+the deadline, the seeds reach both a rejection and an acceptance, and no committed input is a copy of a seed. The WAL,
+LedgerStore, batch, LSM, and Journals replays check each input in its own page leak scope (§11.1), so an input whose
+decoding keeps an `ArcBuffer` page fails by name. `Orleans.Durable.Storage.Fuzz.Tests` checks that the campaign harness
+names each target once and that every corpus belongs to a target.
 
-**Campaigns.** `test/Durable.Storage/eng/fuzz.ps1 -Target <name>|all -Duration <seconds>` publishes the harness, instruments the Engine's
-`Orleans.Durable.Storage.Engine.Wal`, `Orleans.Durable.Storage.Engine.Ledgers`,
+**Campaigns.** `test/Durable.Storage/eng/fuzz.ps1 -Target <name>|all -Duration <seconds>` publishes the harness,
+instruments the Engine's `Orleans.Durable.Storage.Engine.Wal`, `Orleans.Durable.Storage.Engine.Ledgers`,
 `Orleans.Durable.Storage.Engine.Archive`, and `Orleans.Durable.Storage.Engine.Journals` namespaces, and the
 `Orleans.Durable.Storage.FileSystem`, `Orleans.Durable.Storage.AzureStorage`, and `Orleans.Durable.Storage` assemblies,
 with SharpFuzz, checks that each assembly then references `SharpFuzz.Common`, since SharpFuzz exits successfully on a
@@ -681,19 +685,19 @@ built-in rules cover; Clog sets no `OrleansSimulationTargetRuntime`. Each rewrit
 rules support, and every simulation checks the running runtime against them as it starts, so a roll-forward to another
 runtime fails it with `UnsupportedRuntimeException`. A simulation project sets
 `OrleansSimulationInstrumentedTestProject`, which brings in the Microsoft Testing Platform integration
-(`Orleans.Testing.Simulation.Testing.MTP`) through `eng/OrleansSimulation.targets`, and selects the `clockwork.bcl.deterministic` and
-`clockwork.tasks.controlled` rule sets. It builds, with the kit and the `src` projects its closure rewrites, in
-`SimulationRelease` or `SimulationDebug`, which compile in the conditional seams of §7.2 ([build and packaging
-§1](build-packaging.md#1-framework-and-toolchain-boundaries)). After an ordinary build, its dependency closure, Clog's
-assemblies among it, is rewritten out of place and deployed to the project's output, so `dotnet test
---no-build` runs the rewritten copy. The test assembly and the test host, which run before and outside every simulation,
-keep ordinary IL, as does `Orleans.Durable.Storage.Diagnostics`, the fatal-error types' assembly, whose fatal-error
-handler the test host intercepts before every simulation and which within one only calls the interceptor: test code
-which the rewritten code calls only schedules work on Clockwork's scheduler lanes, where cooperative `await`s resume on
-the lane. CsCheck and Accordant keep ordinary IL too: the conformance kit samples, shrinks, and generates cases in the
-test host, outside every simulation, and runs each case in a simulation of its own (§4.1), within which a generator only
-draws and a spec only judges; a scenario which draws CsCheck values draws them before its simulation starts. Race
-exploration is opt-in for targeted tests.
+(`Orleans.Testing.Simulation.Testing.MTP`) through `eng/OrleansSimulation.targets`, and selects the
+`clockwork.bcl.deterministic` and `clockwork.tasks.controlled` rule sets. It builds, with the kit and the `src` projects
+its closure rewrites, in `SimulationRelease` or `SimulationDebug`, which compile in the conditional seams of §7.2
+([build and packaging §1](build-packaging.md#1-framework-and-toolchain-boundaries)). After an ordinary build, its
+dependency closure, Clog's assemblies among it, is rewritten out of place and deployed to the project's output, so
+`dotnet test --no-build` runs the rewritten copy. The test assembly and the test host, which run before and outside
+every simulation, keep ordinary IL, as does `Orleans.Durable.Storage.Diagnostics`, the fatal-error types' assembly,
+whose fatal-error handler the test host intercepts before every simulation and which within one only calls the
+interceptor: test code which the rewritten code calls only schedules work on Clockwork's scheduler lanes, where
+cooperative `await`s resume on the lane. CsCheck and Accordant keep ordinary IL too: the conformance kit samples,
+shrinks, and generates cases in the test host, outside every simulation, and runs each case in a simulation of its own
+(§4.1), within which a generator only draws and a spec only judges; a scenario which draws CsCheck values draws them
+before its simulation starts. Race exploration is opt-in for targeted tests.
 
 The simulation kit, `test/Durable.Storage/Orleans.Durable.Storage.Simulation`, is a library which `test/Durable.Storage/eng/OrleansSimulation.targets`
 references from every simulation project. It is rewritten with Clog's assemblies, so its nodes, transport, and doubles
@@ -702,9 +706,9 @@ locks, since Clockwork runs one operation at a time. Code in the kit and in Clog
 which the rewriting redirects to the virtual clock. A run's `SimulationEnvironment` holds its cluster, transport, trace,
 and checks, and owns the lifetime of every kit component, which tracks itself when it is created: disposal stops a
 component and disarms every timer it armed, so a run leaves no work behind. The `SeededSimulation` driver (§7.4), in
-`test/Durable.Storage/shared/Simulation`, is compiled into each simulation test assembly and drives the cluster from the test thread,
-which joins the simulation under its control scope; the operations it dispatches, their continuations among them, run on
-the kernel's operation workers (`SimulationOperationWorker-*`). Simulation affinity is logical:
+`test/Durable.Storage/shared/Simulation`, is compiled into each simulation test assembly and drives the cluster from the
+test thread, which joins the simulation under its control scope; the operations it dispatches, their continuations among
+them, run on the kernel's operation workers (`SimulationOperationWorker-*`). Simulation affinity is logical:
 `SimulationScheduler.IsSimulationThread`, not the managed thread, says whether code runs inside a simulation, so a check
 of a continuation's thread asserts it, with the run's `SynchronizationContext`. A simulation project runs its tests one
 at a time: concurrent simulations would share the code under test's process-wide state, such as the `ArcBuffer` page
@@ -802,8 +806,8 @@ with the reference rows of its map value's ledgers which the prefix does not hol
 marking held rows, gives the reference's history below the value's next ID. A corpus-wide test checks that reads restart
 on each cause, resume after backpressure, and merge rows the store and the live ledgers both held, and the read-order
 mutant, which takes the map after the store, fails the oracle on every seed. Every change runs one seed, about 19 s of
-wall time, and the mutant on it; exploration runs more through `DURABLE_STORAGE_SIM_SEEDS`, and the replay check runs a smaller
-workload, since it runs the scenario three times.
+wall time, and the mutant on it; exploration runs more through `DURABLE_STORAGE_SIM_SEEDS`, and the replay check runs a
+smaller workload, since it runs the scenario three times.
 
 Production code follows Clockwork's rules: it awaits a `ValueTask` rather than blocking on it, runs on the default task
 scheduler, synchronizes within its process through unnamed primitives, creates no task with `TaskFactory.FromAsync`,
@@ -837,12 +841,12 @@ which register without the execution context, fails only on its own thread, unse
 alone keeps it out. A test host's cancellation token is work of the first kind, since the test host cancels it on a
 thread of its own, which runs there the callbacks rewritten code registered on it with the simulation's context; a
 scenario therefore passes rewritten code only tokens it owns, which only simulation work cancels. Simulation projects
-ban xUnit's test token (`test/Durable.Storage/eng/BannedSymbols.Simulation.txt`), and each use in test-host code, such as the
-`SeededSimulation` driver, which observes it between steps, states why it stays outside the simulation. The driver
-holds the control scope while it builds the environment and steps the cluster. Statically, `SimulationClosureTests`
-reads each simulation project's Clockwork manifest and checks every assembly it rewrites, Clog's, the kit's, and
-packages' alike, against a reviewed allow-list which fails closed: of the Microsoft.Extensions assemblies they
-reference only `Logging.Abstractions`, `Options`, `Primitives`, `DependencyInjection.Abstractions`, and
+ban xUnit's test token (`test/Durable.Storage/eng/BannedSymbols.Simulation.txt`), and each use in test-host code, such
+as the `SeededSimulation` driver, which observes it between steps, states why it stays outside the simulation. The
+driver holds the control scope while it builds the environment and steps the cluster. Statically,
+`SimulationClosureTests` reads each simulation project's Clockwork manifest and checks every assembly it rewrites,
+Clog's, the kit's, and packages' alike, against a reviewed allow-list which fails closed: of the Microsoft.Extensions
+assemblies they reference only `Logging.Abstractions`, `Options`, `Primitives`, `DependencyInjection.Abstractions`, and
 `Configuration.Abstractions`, and of those no `IOptionsMonitor<T>`, `IOptionsSnapshot<T>`, or `OptionsMonitor<T>` and no
 change token (`IChangeToken`, `ChangeToken`, `CancellationChangeToken`, `CompositeChangeToken`); a layer's `.Hosting`
 namespace, in the layer's own assembly, may reference `Microsoft.Extensions.Hosting.Abstractions`, and the kit
@@ -888,26 +892,26 @@ promise of its own: over a task which runs its continuations asynchronously, as 
 does, the BCL runs the promise on the real thread pool, which then posts its waiter's continuation to the simulation
 from outside it, in an order no seed decides and possibly after the driver has found nothing runnable, which it reports
 as a stall. That work carries no simulation context, so the run-time check does not see it. Simulation projects
-therefore ban the BCL's `Task.WhenAll`, `Task.WhenAny`, and `Task.WhenEach` (`test/Durable.Storage/eng/BannedSymbols.Simulation.txt`), and a
-test's code awaits several tasks through the kit's `SimulationTasks`, whose combinators the build rewrites to
-Clockwork's controlled ones; source which ordinary test projects share awaits its tasks one by one.
-`SeededSimulationTests.TheKitsCombinatorsCompleteInsideTheSimulation` checks that each completes on a simulation
-thread over such a task, where the BCL's completes on the thread pool. The same holds for the test assembly's other
-hand-offs to the BCL: `ConfigureAwait(false)`, which resumes off the lane; a `Task.Yield` or `Task.Delay` and a
-`WaitAsync` timeout, whose timer and cancellation callbacks the BCL may run on the thread pool; and
-`CancellationTokenSource.CancelAsync`. Shared test source which also runs inside a simulation, such as the ledger
-harnesses (`test/Durable.Storage/shared/Conformance/LedgerComposition`), uses none of them and, under `DURABLE_STORAGE_SIMULATION_TESTS`, which
-the simulation test projects define in every configuration, yields, delays, and waits for a release
-through `SimulationTasks.Yield`, `Delay`, and `CompletesWithinAsync`. A rewritten caller's wait on a task of the test
-assembly which later operations complete is a wait the scheduler cannot attribute, so it reports a stall when nothing
-else is runnable: a harness settles such work itself before rewritten code waits on it, as `LedgerSystem` lets its
-replicas' late landings finish before the quorum's disposal waits on them. Likewise a rewritten caller's `await` on a
-task of the test assembly which a later continuation of the test assembly completes escapes the coordinator: under
-`DURABLE_STORAGE_SIMULATION_TESTS` the scripted register (`ScriptedConditionalRegister`) decides each held write as it arrives and
-applies the decision a scheduler step later, through `SimulationTasks.Yield`, rather than waiting for a test's decision.
-A scenario whose clients race runs them in the kit, on its client node's scheduler lane, as the quorum scenario's
-writer, recoveries, seal checker, and reader run in `RecoveryRace`: each of their awaits, timers, and combinators is
-then a controlled operation of that lane, and the test only awaits the race's end.
+therefore ban the BCL's `Task.WhenAll`, `Task.WhenAny`, and `Task.WhenEach`
+(`test/Durable.Storage/eng/BannedSymbols.Simulation.txt`), and a test's code awaits several tasks through the kit's
+`SimulationTasks`, whose combinators the build rewrites to Clockwork's controlled ones; source which ordinary test
+projects share awaits its tasks one by one. `SeededSimulationTests.TheKitsCombinatorsCompleteInsideTheSimulation` checks
+that each completes on a simulation thread over such a task, where the BCL's completes on the thread pool. The same
+holds for the test assembly's other hand-offs to the BCL: `ConfigureAwait(false)`, which resumes off the lane; a
+`Task.Yield` or `Task.Delay` and a `WaitAsync` timeout, whose timer and cancellation callbacks the BCL may run on the
+thread pool; and `CancellationTokenSource.CancelAsync`. Shared test source which also runs inside a simulation, such as
+the ledger harnesses (`test/Durable.Storage/shared/Conformance/LedgerComposition`), uses none of them and, under
+`DURABLE_STORAGE_SIMULATION_TESTS`, which the simulation test projects define in every configuration, yields, delays,
+and waits for a release through `SimulationTasks.Yield`, `Delay`, and `CompletesWithinAsync`. A rewritten caller's wait
+on a task of the test assembly which later operations complete is a wait the scheduler cannot attribute, so it reports a
+stall when nothing else is runnable: a harness settles such work itself before rewritten code waits on it, as
+`LedgerSystem` lets its replicas' late landings finish before the quorum's disposal waits on them. Likewise a rewritten
+caller's `await` on a task of the test assembly which a later continuation of the test assembly completes escapes the
+coordinator: under `DURABLE_STORAGE_SIMULATION_TESTS` the scripted register (`ScriptedConditionalRegister`) decides each
+held write as it arrives and applies the decision a scheduler step later, through `SimulationTasks.Yield`, rather than
+waiting for a test's decision. A scenario whose clients race runs them in the kit, on its client node's scheduler lane,
+as the quorum scenario's writer, recoveries, seal checker, and reader run in `RecoveryRace`: each of their awaits,
+timers, and combinators is then a controlled operation of that lane, and the test only awaits the race's end.
 
 The scenarios catch only the failures their faults explain (`QuorumFailures`): an `AggregateException` when no write or
 read reaches a quorum ([ledger-replicas §6.4](components/ledger-replicas.md#64-failures)), each of whose replica
@@ -996,8 +1000,8 @@ client history, a read is sent again, and once the faults heal every call is ans
 ### 7.4 Seeds and replay
 
 A seed controls a simulation's work, scheduling, and virtual time. `SeededSimulation` wraps Clockwork's seeds and
-replay artifacts: it prints the seed, honors `DURABLE_STORAGE_TEST_SEED`, and on failure records the replay command and the
-replay artifact in the results directory. A fixed seed corpus gates every change within a time budget (§12);
+replay artifacts: it prints the seed, honors `DURABLE_STORAGE_TEST_SEED`, and on failure records the replay command and
+the replay artifact in the results directory. A fixed seed corpus gates every change within a time budget (§12);
 milestones add seed exploration, schedule exploration (the conformance kit's explored windows at
 `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, §4.1, which `just explore-schedules` runs), and minimization.
 
@@ -1038,15 +1042,15 @@ directory the run's trace (`<test>.seed-<seed>.history.log`) and Clockwork's rep
 `ORLEANS_SIMULATION_REPLAY_ARTIFACT` replays an artifact's exact schedule in place of the seed. Every execution logs its
 steps, virtual time, and wall time.
 
-`DURABLE_STORAGE_SIM_MINIMIZE=1` also minimizes a failure's schedule with Clockwork's minimizer, a milestone activity: a candidate
-counts only when its exact replay fails within the failing run's steps with the same failure: by type, and by the
-invariant it violated, the site of the debug assertion it failed (its first frame's method and IL offset, since sites
-may share a message) and the assertion's message, or its message. The minimized artifact (`.min.cwr.json`), its
+`DURABLE_STORAGE_SIM_MINIMIZE=1` also minimizes a failure's schedule with Clockwork's minimizer, a milestone activity: a
+candidate counts only when its exact replay fails within the failing run's steps with the same failure: by type, and by
+the invariant it violated, the site of the debug assertion it failed (its first frame's method and IL offset, since
+sites may share a message) and the assertion's message, or its message. The minimized artifact (`.min.cwr.json`), its
 rendered schedule (`.min.trace.txt`), and its trace (`.min.history.log`) join the evidence. A stalled run is not
 minimized, since a longer schedule fails it too.
 
-A corpus theory takes its seeds from `SeededSimulation.Corpus`, which `DURABLE_STORAGE_SIM_SEEDS` replaces with seeds or ranges
-(`1..500`) for seed exploration, and through which a failure's replay command runs its failing seed alone. The
+A corpus theory takes its seeds from `SeededSimulation.Corpus`, which `DURABLE_STORAGE_SIM_SEEDS` replaces with seeds or
+ranges (`1..500`) for seed exploration, and through which a failure's replay command runs its failing seed alone. The
 corpus theories record each seed once with `Run`; one `RunAndReplay` test per scenario also records its seed a
 second time and replays the first run's artifact exactly, and fails unless all three record the same trace, and a
 Verify snapshot pins one seed's trace, step count, and schedule identity (a hash of its decisions and outcome), so a
@@ -1055,14 +1059,15 @@ re-approves it. Simulations record client histories with `HistoryRecorder` on vi
 
 `SeededSimulation.RunCase` runs one conformance case's scenario (§4.1) with every check `Run` makes, seeded with the
 case's seed exactly, which no environment variable replaces, and returns the run, failed or not, without writing
-evidence: the kit runs many cases while it shrinks and explores, and owns their replay through `DURABLE_STORAGE_TEST_SEED` and
-`DURABLE_STORAGE_SCHEDULE`. It may wrap the run's seeded scheduling strategy before the first step, as the window explorer does.
+evidence: the kit runs many cases while it shrinks and explores, and owns their replay through
+`DURABLE_STORAGE_TEST_SEED` and `DURABLE_STORAGE_SCHEDULE`. It may wrap the run's seeded scheduling strategy before the
+first step, as the window explorer does.
 
 Projects without Clockwork use `SeededSimulation.RunAsync`, which runs a scenario over `FakeTimeProvider` and
-simulated storage: it prints the seed and honors `DURABLE_STORAGE_TEST_SEED`. A run which fails, or whose scenario raised a debug
-assertion (§11.2), records the replay command and `<test>.seed-<seed>.history.log`. `RunAndReplayAsync` compares two
-histories from the same seed. Thread-pool timing, real clocks, unseeded randomness, and cross-test shared state fall
-outside such a schedule; a simulation retaining them identifies that limitation.
+simulated storage: it prints the seed and honors `DURABLE_STORAGE_TEST_SEED`. A run which fails, or whose scenario
+raised a debug assertion (§11.2), records the replay command and `<test>.seed-<seed>.history.log`. `RunAndReplayAsync`
+compares two histories from the same seed. Thread-pool timing, real clocks, unseeded randomness, and cross-test shared
+state fall outside such a schedule; a simulation retaining them identifies that limitation.
 
 ### 7.5 Crash-state enumeration
 
@@ -1165,8 +1170,8 @@ least two per point: beyond it, the enumerator keeps every point's strictest and
 others with the seed. The LedgerStore workloads' caps exceed their distinct images, so they recover every distinct
 image they enumerate, including each sampled point's sample. For a seeded sample of the states whose recovery wrote,
 every crash state of the recovery's own trace recovers again and is judged at the outer point. The seed follows
-`DURABLE_STORAGE_TEST_SEED` (§7.4); a failure reports the crash point, the fate of each unsynced operation, the image, and the
-trace.
+`DURABLE_STORAGE_TEST_SEED` (§7.4); a failure reports the crash point, the fate of each unsynced operation, the image,
+and the trace.
 
 **Oracles.** Each state recovers through the real code and is judged against the acknowledged history at its crash
 point: an operation acknowledged at or before the point survives, and one in progress may or may not.
@@ -1283,12 +1288,12 @@ component's tests however many components share an assembly. Each component but 
 `src` project which compiles it, `stryker-config.<Component>.json`, whose `mutate` patterns select exactly the
 component's source files, which `Orleans.Durable.Storage.Architecture.Tests` checks, and which names the test projects
 that test it, or for an abstractions component its layer's test project, each with the kits, oracles, and corpus replays
-it links from `test/Durable.Storage/shared`. `Orleans.Durable.Storage.Architecture.Tests` takes no part, since it checks dependencies
-rather than behavior, nor does `Orleans.Durable.Storage.Fuzz.Tests`, which checks the fuzzing harness's registry while
-each layer's tests replay its corpora. Mutation runs neither build nor mutate the consensus and simulation families:
-`Orleans.Durable.Storage.CasPaxos`, which builds on Fast CASPaxos, has no configuration, and the simulation
-projects, which build on Clockwork, take no part (below). Stryker skips every file headed `<auto-generated>`, as source
-generators head their output.
+it links from `test/Durable.Storage/shared`. `Orleans.Durable.Storage.Architecture.Tests` takes no part, since it checks
+dependencies rather than behavior, nor does `Orleans.Durable.Storage.Fuzz.Tests`, which checks the fuzzing harness's
+registry while each layer's tests replay its corpora. Mutation runs neither build nor mutate the consensus and
+simulation families: `Orleans.Durable.Storage.CasPaxos`, which builds on Fast CASPaxos, has no configuration, and the
+simulation projects, which build on Clockwork, take no part (below). Stryker skips every file headed `<auto-generated>`,
+as source generators head their output.
 
 Stryker records which tests reach each mutant by running each test alone. By default (`perTest`) it reuses a test host
 and collects each test's coverage through the host within a fixed ten-second window. A busy host can miss the window;
@@ -1323,11 +1328,11 @@ score counts as detected. Load which slows a run past the limit thus reports a s
 default, ledger replica's runs timed out mutants which compile to the original code or change only an exception's
 message. The ledger replica's configuration adds 60 seconds, so that its timeouts are hangs (§9.1).
 
-`test/Durable.Storage/eng/mutation.ps1` runs Stryker with the pinned SDK and a unit's configuration: on the core units, on the units
-`-Project` names, or with `-Since <commit>` on what changed since that commit in the working tree. A unit's changed
-source files are mutated alone, the whole unit is mutated when its test projects or the shared test sources changed,
-and a unit with neither change is skipped; Stryker's own `--since` diffs through LibGit2Sharp, which resolves a git
-worktree to its main checkout. `-Rescore` scores existing reports against the baseline. `just mutation-core`,
+`test/Durable.Storage/eng/mutation.ps1` runs Stryker with the pinned SDK and a unit's configuration: on the core units,
+on the units `-Project` names, or with `-Since <commit>` on what changed since that commit in the working tree. A unit's
+changed source files are mutated alone, the whole unit is mutated when its test projects or the shared test sources
+changed, and a unit with neither change is skipped; Stryker's own `--since` diffs through LibGit2Sharp, which resolves a
+git worktree to its main checkout. `-Rescore` scores existing reports against the baseline. `just mutation-core`,
 `just mutation <unit>...`, and `just mutation-since <ref>` wrap it. It writes each unit's Stryker log, HTML and
 JSON reports, `survivors.txt`, and `equivalent.txt` under `artifacts/mutation/<Unit>`, removes any snapshot test's
 `.received` file a killed mutant left (§8), and reports each unit's score, break threshold, counts, and wall time.
@@ -1335,19 +1340,20 @@ Stryker.NET 5.0.0 runs on .NET 10, reads each project's language version, `previ
 own Roslyn 5.9, whose `preview` includes unions; Stryker.NET 5.1.0 takes the version each project reports rather than
 resolving it against its own compiler (row 0.20 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)).
 
-A mutation run sets `DurableStorageMutationTesting`, under which the build writes to `Artifacts/durable-storage-mutation` at the repository's root and the test
-applications carry no `testconfig.json`. Stryker writes each mutated assembly into its test projects' output
-directories, so the outputs which validation tests keep the build's assemblies. The crash and hang dump extensions
-(§11) run the test host beneath a controller process which opens a second server connection, and Stryker's runner
-serves one connection per test application; under mutation a failing or crashing test is a killed mutant and Stryker's
-own timeout ends one which hangs, so the run also sets `DURABLE_STORAGE_TEST_FAILURE_DUMPS=0`.
+A mutation run sets `DurableStorageMutationTesting`, under which the build writes to
+`Artifacts/durable-storage-mutation` at the repository's root and the test applications carry no `testconfig.json`.
+Stryker writes each mutated assembly into its test projects' output directories, so the outputs which validation tests
+keep the build's assemblies. The crash and hang dump extensions (§11) run the test host beneath a controller process
+which opens a second server connection, and Stryker's runner serves one connection per test application; under mutation
+a failing or crashing test is a killed mutant and Stryker's own timeout ends one which hangs, so the run also sets
+`DURABLE_STORAGE_TEST_FAILURE_DUMPS=0`.
 
 The score is the share of killed and timed-out mutants among every mutant a test ran or could have run against (killed,
-timed out, survived, or uncovered), less the survivors which `test/Durable.Storage/eng/mutation-baseline.json` records as equivalent. Each
-equivalent entry names a mutator and optionally a file, the original and replacement text, and a `within` pattern which
-must enclose the mutant, with a one-line reason; entries without a file describe classes of equivalent mutants. A full
-run fails on an entry for a file which no survivor matches, so the baseline stays current. The core units are those
-the baseline lists with a break threshold: `Orleans.Durable.Storage.Engine.Ledgers` and
+timed out, survived, or uncovered), less the survivors which `test/Durable.Storage/eng/mutation-baseline.json` records
+as equivalent. Each equivalent entry names a mutator and optionally a file, the original and replacement text, and a
+`within` pattern which must enclose the mutant, with a one-line reason; entries without a file describe classes of
+equivalent mutants. A full run fails on an entry for a file which no survivor matches, so the baseline stays current.
+The core units are those the baseline lists with a break threshold: `Orleans.Durable.Storage.Engine.Ledgers` and
 `Orleans.Durable.Storage.Engine.Ledgers.Store`, then the LSM, archive logs
 (`Orleans.Durable.Storage.Engine.Archive.Logs`), and Journals as each lands. Each breaks at 80% unless the baseline
 holds it at a lower measured score while its gap closes (§9.1, §13), and its threshold rises as its suites mature. A
@@ -1382,12 +1388,12 @@ removed ones:
 | `Orleans.Durable.Storage.Engine.Ledgers` and `Orleans.Durable.Storage.Engine.Ledgers.Store`, one project until row B.8b split it | 78.50% | 78.5% | 1,640 | 58 | 362 | 103 | 224 | 501 | 2 h 53 min |
 | The append path and its sequencer, their own project until row B.8c folded them into `Orleans.Durable.Storage.Engine.Ledgers` | 100% | 80% | 110 | 27 | 0 | 0 | 47 | 54 | 4 min 37 s |
 
-`test/Durable.Storage/eng/mutation-baseline.json` records the two ledger projects' tested mutants and compile errors (§9) at their first full
-runs after row B.8b's split and row B.8c's fold, which carried the append path's reviewed equivalent mutants into
-`Orleans.Durable.Storage.Engine.Ledgers`; before them, the projects this table measured tested 2,387 and 184 mutants and
-failed to compile 501 and 54. Until then each holds the combined project's 78.5% as a provisional floor, and the code
-row B.8c folded into `Orleans.Durable.Storage.Engine.Ledgers` keeps the 80% floor it met as its own project, which the
-review of that run checks, since a break threshold applies to a whole unit.
+`test/Durable.Storage/eng/mutation-baseline.json` records the two ledger projects' tested mutants and compile errors
+(§9) at their first full runs after row B.8b's split and row B.8c's fold, which carried the append path's reviewed
+equivalent mutants into `Orleans.Durable.Storage.Engine.Ledgers`; before them, the projects this table measured tested
+2,387 and 184 mutants and failed to compile 501 and 54. Until then each holds the combined project's 78.5% as a
+provisional floor, and the code row B.8c folded into `Orleans.Durable.Storage.Engine.Ledgers` keeps the 80% floor it met
+as its own project, which the review of that run checks, since a break threshold applies to a whole unit.
 
 No mutant which compiles to the original code or changes only an exception's message timed out in either run, so the
 timeouts do not measure the machine's load (§9). The ledger projects' remaining timeouts are hangs: a scan whose counter
@@ -1408,14 +1414,14 @@ which the script lists in its `survivors.txt`, are the gap §13 records.
 
 **Integration.** The conformance suites (§3.1, §4.1) run over real boundaries: Orleans grain calls, WAL files (and
 io_uring on Linux), RocksDB, and cloud providers against the storage-service emulators of
-`test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost`. They establish that each boundary behaves as its simulated double assumes.
-Local boundaries run on every change; emulators run at milestones: `just emulators` runs
+`test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost`. They establish that each boundary behaves as its
+simulated double assumes. Local boundaries run on every change; emulators run at milestones: `just emulators` runs
 `Orleans.Durable.Storage.Cloud.Tests` and `Orleans.Durable.Storage.Interop.Tests` in Release and Debug with
-`DURABLE_STORAGE_EMULATORS=1`, which starts the AppHost's emulators through Aspire's testing host, and fails if any test skips: an
-emulator which does not start or answer fails its tests. Without the variable the emulator tests skip, naming it, while
-the stores' stub tests run on every change: canned responses through a transport double pin each request's conditions
-and checksum and each service status's outcome, so the every-change gate, and a mutation run over it, covers the mapping
-without an emulator. Each run keeps its configuration's xUnit report under
+`DURABLE_STORAGE_EMULATORS=1`, which starts the AppHost's emulators through Aspire's testing host, and fails if any test
+skips: an emulator which does not start or answer fails its tests. Without the variable the emulator tests skip, naming
+it, while the stores' stub tests run on every change: canned responses through a transport double pin each request's
+conditions and checksum and each service status's outcome, so the every-change gate, and a mutation run over it, covers
+the mapping without an emulator. Each run keeps its configuration's xUnit report under
 `artifacts/validation/Emulators/{Release,Debug}`, and a passing run writes `artifacts/validation/Emulators/run.json`
 beside them: the commit (`git rev-parse HEAD`, and whether the tree had uncommitted changes), each AppHost image's
 digest ([build and packaging §2](build-packaging.md#2-source-and-dependency-policy)), and the reports' paths.
@@ -1429,11 +1435,11 @@ which takes the Azure CLI's sign-in on a workstation and a workload identity in 
 Owner on the account, the built-in role which may write blob index tags. No shared key or SAS reaches the tests, and no
 file in the repository holds a credential. Without the variable each live case skips with a reason which names it;
 `just emulators` scopes its skip allowlist per project (`Orleans.Durable.Storage.Interop.Tests` allows only
-`AzureLiveAccount.SkipReason` while `DURABLE_STORAGE_AZURE_LIVE` is unset, and `Orleans.Durable.Storage.Cloud.Tests` allows each of
-`AzureLiveAccount`, `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount`'s skip reasons verbatim while its
-corresponding `DURABLE_STORAGE_*_LIVE` variable is unset, which `LiveAccountHarnessTests` pins), records the tests it allowed in
-its run record, and allows no skip while each variable is set. Precondition 3b's tag condition, 7, and 7b, which Azurite
-does not model, are established only by that run.
+`AzureLiveAccount.SkipReason` while `DURABLE_STORAGE_AZURE_LIVE` is unset, and `Orleans.Durable.Storage.Cloud.Tests`
+allows each of `AzureLiveAccount`, `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount`'s skip reasons verbatim
+while its corresponding `DURABLE_STORAGE_*_LIVE` variable is unset, which `LiveAccountHarnessTests` pins), records the
+tests it allowed in its run record, and allows no skip while each variable is set. Precondition 3b's tag condition, 7,
+and 7b, which Azurite does not model, are established only by that run.
 
 Live runs, each case recorded per backend:
 
@@ -1448,10 +1454,11 @@ Live runs, each case recorded per backend:
 each precondition of [object-store ledgers §3.1](components/object-ledgers.md#31-from-the-object-store) and the
 end-to-end `ObjectLedgerStorage` and `AppendObjectLedgerStorage` lifecycles on their emulators (or
 `FakeS3DirectoryBucketService` for S3 Express) and on live accounts gated by `DURABLE_STORAGE_AZURE_LIVE`, `DURABLE_STORAGE_S3_LIVE`,
-`DURABLE_STORAGE_S3_EXPRESS_LIVE`, and `DURABLE_STORAGE_GCS_LIVE`. `AzureLiveAccount` isolates each test in a per-test container with a
-once-per-process stale-container sweep; `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount` isolate each test
-under a timestamped prefix with a once-per-process stale-prefix sweep and bounded-parallel cleanup on disposal. No file
-in the repository holds a credential. Each provider remains unqualified until its live run passes and is recorded below:
+`DURABLE_STORAGE_S3_EXPRESS_LIVE`, and `DURABLE_STORAGE_GCS_LIVE`. `AzureLiveAccount` isolates each test in a per-test
+container with a once-per-process stale-container sweep; `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount`
+isolate each test under a timestamped prefix with a once-per-process stale-prefix sweep and bounded-parallel cleanup on
+disposal. No file in the repository holds a credential. Each provider remains unqualified until its live run passes and
+is recorded below:
 
 | Provider | Environment variable | Date | Account / bucket | Commit | Result |
 | --- | --- | --- | --- | --- | --- |
@@ -1461,13 +1468,14 @@ in the repository holds a credential. Each provider remains unqualified until it
 | Google Cloud Storage (per-slot) | `DURABLE_STORAGE_GCS_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
 
 **Orleans interop.** `Orleans.Durable.Storage.Interop.Tests` reads the composition's archive logs with Orleans' own
-Azure journaling provider, `AzureBlobJournalStorage` from the repository's `Orleans.Durable.AzureStorage` project, with read-only access, against the fold of each journal's writes and a `JournaledStateManager`'s
-recovered state ([archive logs §10](components/archive-logs.md#10-verification)); its cases are the evidence of [archive
-logs §7.3](components/archive-logs.md#73-azure-layout)'s observations of plain Orleans. Each case runs on the fake Azure
-transport on every change, on Azurite with the emulators, and on the live account under `DURABLE_STORAGE_AZURE_LIVE`, whose cases
-skip with `AzureLiveAccount`'s reason, which `just emulators` allows, while it is unset; `just emulators` runs the
-project beside `Orleans.Durable.Storage.Cloud.Tests`. The random-sequence property's milestone runs write their seed to
-the test's output, which the run's xUnit report keeps, and a failing case names the seed which replays it on its
+Azure journaling provider, `AzureBlobJournalStorage` from the repository's `Orleans.Durable.AzureStorage` project, with
+read-only access, against the fold of each journal's writes and a `JournaledStateManager`'s recovered state ([archive
+logs §10](components/archive-logs.md#10-verification)); its cases are the evidence of [archive logs
+§7.3](components/archive-logs.md#73-azure-layout)'s observations of plain Orleans. Each case runs on the fake Azure
+transport on every change, on Azurite with the emulators, and on the live account under `DURABLE_STORAGE_AZURE_LIVE`,
+whose cases skip with `AzureLiveAccount`'s reason, which `just emulators` allows, while it is unset; `just emulators`
+runs the project beside `Orleans.Durable.Storage.Cloud.Tests`. The random-sequence property's milestone runs write their
+seed to the test's output, which the run's xUnit report keeps, and a failing case names the seed which replays it on its
 backend. These cases are evidence of [archive logs §7.3](components/archive-logs.md#73-azure-layout)'s layout and
 observations, not of OR-I8: they write through `ArchiveLogWriter` and bypass `DurableJournalStorage`, whose payloads
 OR-I8 governs.
@@ -1481,38 +1489,39 @@ OR-I8 governs.
 every journal written is checked against the fold of its history and for linearizability, and every grain-visible
 outcome matches the history ([orleans §9](compositions/orleans.md#9-verification)). A smoke set runs with the default
 tests: a hand-off whose old primary keeps appending, a kill and takeover, and calls forwarded during a transition. The
-rest are explicit tests with the trait `Category=EndToEnd`, which `just e2e` (`test/Durable.Storage/eng/validate.ps1 -Check EndToEnd`) runs
-with the smoke set at milestones; a scenario which is skipped or loses its trait fails the run. A partition between two
-silos is injected by a grain-call filter, a loss membership does not see: every call between their nodes' grains fails
-as a lost message's response timeout does, a forwarded journal write once its owner answered it and every other call
-before it leaves its silo, while a ledger moves from one silo's node to the other's
+rest are explicit tests with the trait `Category=EndToEnd`, which `just e2e` (`test/Durable.Storage/eng/validate.ps1
+-Check EndToEnd`) runs with the smoke set at milestones; a scenario which is skipped or loses its trait fails the run. A
+partition between two silos is injected by a grain-call filter, a loss membership does not see: every call between their
+nodes' grains fails as a lost message's response timeout does, a forwarded journal write once its owner answered it and
+every other call before it leaves its silo, while a ledger moves from one silo's node to the other's
 (`OrleansControllerTests.AWorkloadStaysLinearizableWhileALedgerMovesAcrossAPartition`). A partition membership sees,
 which declares silos dead, is covered by the kill and takeover scenarios.
 
-**The sample.** `Orleans.Durable.Storage.Samples.Tests` runs `playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling`'s silo
-configuration, its `appsettings.json` and its registration through the composition's public surface, in a three-silo
-`Orleans.TestingHost` cluster over in-memory stores with the default tests: a grain's state written, its silo killed,
-the state recovered on another silo, and the killed silo restarted over its node root. The sample itself, over Azurite
-(`just sample`), is run by hand; its README describes what to watch.
+**The sample.** `Orleans.Durable.Storage.Samples.Tests` runs
+`playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling`'s silo configuration, its `appsettings.json` and
+its registration through the composition's public surface, in a three-silo `Orleans.TestingHost` cluster over in-memory
+stores with the default tests: a grain's state written, its silo killed, the state recovered on another silo, and the
+killed silo restarted over its node root. The sample itself, over Azurite (`just sample`), is run by hand; its README
+describes what to watch.
 
 **Soak.** Long multi-node runs with the oracles enabled establish steady throughput and latency and the absence of
 leaks: memory, handles, disk, WAL retention, and object counts. Soak runs gate final validation of the finished
 system only.
 
 **Linux LazyFS crash soak.** `LazyFsCrashSoakTests` (`Orleans.Durable.Storage.Tests`, trait `Category=LazyFs`,
-explicit, run via `just lazyfs` / `test/Durable.Storage/eng/lazyfs.ps1` with `DURABLE_STORAGE_LAZYFS=1`) runs a three-process Orleans + Clog cluster on
-Linux with each silo's `LedgerStore` root (WAL + WAL-less `RocksDbJournalIndex`) mounted on its own
-[LazyFS](https://github.com/dsrhaslab/lazyfs) FUSE filesystem. LazyFS holds unsynced writes in a user-space page cache
-and commits only files and directories flushed via `fsync`/`fdatasync`. Under concurrent journal appends and reads
-(including contended keys), the test injects `SIGSTOP`/`SIGCONT` pauses, rotating single-silo `SIGKILL` +
-`lazyfs::clear-cache` faults, explicit RocksDB `FlushAsync` followed by unflushed memtable writes, and a simultaneous
-three-silo `SIGKILL` + `lazyfs::clear-cache` power loss. After recovery on the same mounts, it asserts preserved node
-identities, clean WAL recovery and WAL-less RocksDB suffix replay without `JournalIndexCorruptException` or fatal
-storage errors, agreement with slow-path `ArchiveReader` folds, and linearizability of the complete client history
-(with in-flight crashed calls modeled as ambiguous) under `LinearizabilityChecker`. Outside Linux or without
-LazyFS/FUSE, the cases skip cleanly unless `DURABLE_STORAGE_LAZYFS=1` is set. Because FUSE without `direct_io` does not support
-`O_DIRECT`, the soak test mounts WAL files through buffered `RandomAccess` + `fdatasync` (`BufferedPortableWalStorage`)
-so LazyFS's simulated page cache intercepts every unsynced write.
+explicit, run via `just lazyfs` / `test/Durable.Storage/eng/lazyfs.ps1` with `DURABLE_STORAGE_LAZYFS=1`) runs a
+three-process Orleans + Clog cluster on Linux with each silo's `LedgerStore` root (WAL + WAL-less `RocksDbJournalIndex`)
+mounted on its own [LazyFS](https://github.com/dsrhaslab/lazyfs) FUSE filesystem. LazyFS holds unsynced writes in a
+user-space page cache and commits only files and directories flushed via `fsync`/`fdatasync`. Under concurrent journal
+appends and reads (including contended keys), the test injects `SIGSTOP`/`SIGCONT` pauses, rotating single-silo
+`SIGKILL` + `lazyfs::clear-cache` faults, explicit RocksDB `FlushAsync` followed by unflushed memtable writes, and a
+simultaneous three-silo `SIGKILL` + `lazyfs::clear-cache` power loss. After recovery on the same mounts, it asserts
+preserved node identities, clean WAL recovery and WAL-less RocksDB suffix replay without `JournalIndexCorruptException`
+or fatal storage errors, agreement with slow-path `ArchiveReader` folds, and linearizability of the complete client
+history (with in-flight crashed calls modeled as ambiguous) under `LinearizabilityChecker`. Outside Linux or without
+LazyFS/FUSE, the cases skip cleanly unless `DURABLE_STORAGE_LAZYFS=1` is set. Because FUSE without `direct_io` does not
+support `O_DIRECT`, the soak test mounts WAL files through buffered `RandomAccess` + `fdatasync`
+(`BufferedPortableWalStorage`) so LazyFS's simulated page cache intercepts every unsynced write.
 
 **Deployment.** Deployment qualification under retained state and injected faults is
 [deferred](deferred.md#reliability-labs-for-the-orleans-topology). An application or deployment oracle stays
@@ -1539,8 +1548,8 @@ Each test application captures evidence independently of its launcher
 | Fatal error | A report to `FatalErrorHandler` which its test did not take ([conventions §14](conventions.md#14-local-storage-failures-stop-the-process)) | The handler's message, naming the exit code and the site, and for a storage failure the path and operating-system error, in the failure of its test or its test assembly, and every intercepted report in the test's trace |
 | Platform diagnostics | Validation-script runs | Platform decisions at Debug verbosity |
 
-Results live under each test project's `bin/<configuration>/net11.0/TestResults` or, for validation runs, `artifacts/validation/<check>`. Dump capture preserves
-the test result.
+Results live under each test project's `bin/<configuration>/net11.0/TestResults` or, for validation runs,
+`artifacts/validation/<check>`. Dump capture preserves the test result.
 CI retains reports and histories on all outcomes and dumps on failure, with seven-day retention.
 
 ### 11.1 Leak checks
@@ -1653,11 +1662,12 @@ Every change passes its gate locally while CI is unavailable. Expensive work run
 mutation runs, seed exploration, fuzzing campaigns, extended model runs, and benchmarks which need a quiet machine run
 in a nightly window, and a pull request lands without waiting for them. Their findings, such as surviving mutants, are
 fixed in follow-up pull requests. Until the implementation is complete, the implementation plan's [decision
-16](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions) defers them. `test/Durable.Storage/eng/validate.ps1` uses the pinned SDK, runs each selected project
+16](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions)
+defers them. `test/Durable.Storage/eng/validate.ps1` uses the pinned SDK, runs each selected project
 once, and validates its xUnit report. `just check` covers the Release build, formatting verification, default tests, the
-Debug leg, the documentation checks, the ledger model's quick tier when `test/Durable.Storage/specs/ledger-protocol` or its runner changed
-(`just models-changed`), and the ledger traces' validation (`just ledger-traces`, §5.1), which ties a code change to the
-model, as the archive-log, ledger map, and LSM traces' validations do (`just archive-log-traces`,
+Debug leg, the documentation checks, the ledger model's quick tier when `test/Durable.Storage/specs/ledger-protocol` or
+its runner changed (`just models-changed`), and the ledger traces' validation (`just ledger-traces`, §5.1), which ties a
+code change to the model, as the archive-log, ledger map, and LSM traces' validations do (`just archive-log-traces`,
 `just ledger-map-traces`, `just archive-traces`).
 The quick tier holds the positive cases of about a million states or fewer, every mutant, and every witness, and
 runs in about ten minutes on eight workers; `just models` adds the nightly tier's larger positive cases. `just
@@ -1672,10 +1682,10 @@ trace mutants. `just archive-traces` over its twenty default seeds took about 90
 build, 8 s for the twenty simulations, 50 s for their replays, an LSM trace's 60 to 90 steps in 2 to 4 s, and about 10 s
 for the trace mutants.
 
-The Debug leg, `just test-debug` (`test/Durable.Storage/eng/validate.ps1 -Check TestDebug`), is the only gate which runs debug assertions
-(§11.2); `just check` and `just check-full` include it. It builds in Debug each test project which sets `DurableStorageDebugLeg`,
-a simulation project in `SimulationDebug`, and runs it; `just test` runs a simulation project in `SimulationRelease`.
-The leg's projects are:
+The Debug leg, `just test-debug` (`test/Durable.Storage/eng/validate.ps1 -Check TestDebug`), is the only gate which runs
+debug assertions (§11.2); `just check` and `just check-full` include it. It builds in Debug each test project which sets
+`DurableStorageDebugLeg`, a simulation project in `SimulationDebug`, and runs it; `just test` runs a simulation project
+in `SimulationRelease`. The leg's projects are:
 
 - `Orleans.Durable.Storage.Engine.Buffers.Tests` and `Orleans.Durable.Storage.Engine.Ledgers.Tests`, the tests of the
   code which holds debug assertions;
@@ -1701,23 +1711,23 @@ Measured on the `net10.0` build, it took about five there: 4 min 53 s with up-to
 high priority, of which the seed corpus took 1 min 52 s, `Orleans.Durable.Storage.Engine.Ledgers.Tests` 1 min 14 s, and
 `Orleans.Durable.Storage.Engine.Wal.Tests` 1 min 9 s. A Debug build from scratch adds about 40 s.
 
-`test/Durable.Storage/eng/validate.ps1` ends a test session which runs past its project's `DurableStorageTestSessionTimeout`. The timeout is 12
-minutes, and 30 for the seed corpus and the simulated conformance classes, which run their tests one at a time and slow
-several-fold on a loaded machine. The hang dump and each simulation's step, virtual-time, and livelock budgets
-(§7.4) end a hang sooner.
+`test/Durable.Storage/eng/validate.ps1` ends a test session which runs past its project's
+`DurableStorageTestSessionTimeout`. The timeout is 12 minutes, and 30 for the seed corpus and the simulated conformance
+classes, which run their tests one at a time and slow several-fold on a loaded machine. The hang dump and each
+simulation's step, virtual-time, and livelock budgets (§7.4) end a hang sooner.
 
 The every-change seed corpus, `Orleans.Durable.Storage.Simulation.Tests` with its tests run one at a time (§7.1), has a
 budget of three minutes of wall time run on its own on the reference machine, a 32-thread Intel Xeon Platinum 8370C with
 128 GiB under Windows, and longer beside the solution's other test projects. A simulation cost about half a millisecond
 per step there, nearly all of it Clockwork's scheduling, and every execution logs its steps and wall time (§7.4), so a
-change which would exceed the budget moves seeds to exploration with `DURABLE_STORAGE_SIM_SEEDS` rather than growing the corpus.
-Every change runs one to four seeds of each scenario, the seeds its coverage checks and mutants need; a replay check
-reuses a corpus run (`SeededSimulation.AssertReplays`) or runs a smaller workload, since it runs its scenario three
-times; and `just explore` and `just ledger-traces` (seeds 1 to 15 by default) run more. Fault theories which need a long
-setup shape it to the fault, as the WAL-file deletion's smaller files do. On the `net11.0` build the corpus took 2 min
-58 s there, 176 s of it in tests, of which the crash, history, and transition scenarios took 31 s, 27 s, and 23 s. Row
-3.3's compactors, expiry schedules, and expiry mutants were measured on a developer machine, not the reference, with the
-project run alone in Release: the corpus took 3 min 25 s there, against 3 min 22 s before them, and
+change which would exceed the budget moves seeds to exploration with `DURABLE_STORAGE_SIM_SEEDS` rather than growing the
+corpus. Every change runs one to four seeds of each scenario, the seeds its coverage checks and mutants need; a replay
+check reuses a corpus run (`SeededSimulation.AssertReplays`) or runs a smaller workload, since it runs its scenario
+three times; and `just explore` and `just ledger-traces` (seeds 1 to 15 by default) run more. Fault theories which need
+a long setup shape it to the fault, as the WAL-file deletion's smaller files do. On the `net11.0` build the corpus took
+2 min 58 s there, 176 s of it in tests, of which the crash, history, and transition scenarios took 31 s, 27 s, and 23 s.
+Row 3.3's compactors, expiry schedules, and expiry mutants were measured on a developer machine, not the reference, with
+the project run alone in Release: the corpus took 3 min 25 s there, against 3 min 22 s before them, and
 `ArchiveDrainSimulationTests` 16 s, against about 23 s before them, of which its one seed took 7 s, the two drain and
 drop mutants, each on that seed without compactors, 7 s, and the five expiry mutants, each once on its fixed expiry
 schedule, 2 s; their second seeds and the scenario's other seeds run under exploration. Row 3.3b's per-child pushes,
@@ -1829,26 +1839,26 @@ take 45 s together, and the whole project took 88 s. The object store's 41 Accor
 schedule within one preemption, in 7.8 s; the Azure archive-log store's 166 windows, whose SDK pipeline gives each about
 fifty choice points, run every eighth window of racing writes explored, 19 windows in 829 schedules, and the rest under
 their seeded schedules, in 14.4 s, and all 166 explored, 7,601 schedules, in about a minute under
-`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, which runs at milestones and in the nightly window. The race mutants' detection, on the same
-machine: explored, the object store's check-then-write mutant fails its witness on every run at the 12th schedule, by
-one preemption, and the Azure append-condition mutant fails the 7th of Accordant's windows of racing writes at its 14th
-schedule, by one preemption; under seeded schedules, one simulation per case, the first is caught on 32 of 40 seeds and
-the second on 3 of 158 windows; on the thread pool, which the fake Azure transport also serves, the second was caught on
-2, 0, 0, 2, and 0 of the 166 windows over five passes, and in none of five passes of 40 sampled concurrent sequences,
-the shape of `ArchiveLogStoreConformanceTests.ConcurrentGroupsConform`. The memory replica role's 175 Accordant windows,
-in `SimulationRelease`, run 1,674 schedules, every schedule within one preemption, in 16.2 s, which brings the simulated
-conformance classes to about 62 s; the replica's `write-checks-seal-before-landing` mutant fails its witness at the 4th
-schedule, by one preemption, and under seeded schedules on 5 of 40 seeds. A LedgerStore's WAL appends and disk
-completions give each of its windows about forty choice points, 36 on average without a restart and 45 with one, at
-about 20 ms per explored schedule. Its 228 Accordant windows, the restart's among them, run every sixteenth window which
-changes the store explored, 14 windows in 894 schedules, and the other 214 under their seeded schedules, in 22.3 s; all
-228 explored within one preemption take 12,428 schedules in about three and a half minutes, and
-`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, up to two preemptions and 2,000 schedules a window, is estimated from those counts at under
-an hour, which runs in the nightly window. Its 120 sampled cases take 3.1 s, and the class takes 41 s, which brings the
-simulated conformance classes to about 87 s; the whole project ran in 107 s. The LedgerStore mutant, a replica wrapper
-which checks the seal a step before it writes, fails its witness at the 4th schedule, by one preemption; seeded
-schedules catch it on 17 of 40 seeds, and the same witness raced on the thread pool against a LedgerStore over unheld
-storage on 215, 314, and 246 of 2,000 runs in three passes.
+`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, which runs at milestones and in the nightly window. The race mutants' detection,
+on the same machine: explored, the object store's check-then-write mutant fails its witness on every run at the 12th
+schedule, by one preemption, and the Azure append-condition mutant fails the 7th of Accordant's windows of racing writes
+at its 14th schedule, by one preemption; under seeded schedules, one simulation per case, the first is caught on 32 of
+40 seeds and the second on 3 of 158 windows; on the thread pool, which the fake Azure transport also serves, the second
+was caught on 2, 0, 0, 2, and 0 of the 166 windows over five passes, and in none of five passes of 40 sampled concurrent
+sequences, the shape of `ArchiveLogStoreConformanceTests.ConcurrentGroupsConform`. The memory replica role's 175
+Accordant windows, in `SimulationRelease`, run 1,674 schedules, every schedule within one preemption, in 16.2 s, which
+brings the simulated conformance classes to about 62 s; the replica's `write-checks-seal-before-landing` mutant fails
+its witness at the 4th schedule, by one preemption, and under seeded schedules on 5 of 40 seeds. A LedgerStore's WAL
+appends and disk completions give each of its windows about forty choice points, 36 on average without a restart and 45
+with one, at about 20 ms per explored schedule. Its 228 Accordant windows, the restart's among them, run every sixteenth
+window which changes the store explored, 14 windows in 894 schedules, and the other 214 under their seeded schedules, in
+22.3 s; all 228 explored within one preemption take 12,428 schedules in about three and a half minutes, and
+`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, up to two preemptions and 2,000 schedules a window, is estimated from those
+counts at under an hour, which runs in the nightly window. Its 120 sampled cases take 3.1 s, and the class takes 41 s,
+which brings the simulated conformance classes to about 87 s; the whole project ran in 107 s. The LedgerStore mutant, a
+replica wrapper which checks the seal a step before it writes, fails its witness at the 4th schedule, by one preemption;
+seeded schedules catch it on 17 of 40 seeds, and the same witness raced on the thread pool against a LedgerStore over
+unheld storage on 215, 314, and 246 of 2,000 runs in three passes.
 
 The composition, a `Ledger` of quorum two over three yielding memory replicas, gives a window up to 177 choice points,
 about 90 on average; its 92 Accordant windows run every eighth window which changes the ledger explored, 11 windows in
@@ -1895,10 +1905,10 @@ fenced, and crash-recovered states (up to 105 choice points in one window): at t
 caught at its 3rd schedule by one preemption over up to 55 choice points, and `RejectsWaiting`, caught at its 4th
 schedule by one preemption over up to 59 choice points, both passing the default schedule and caught on 40 of 40 seeded
 runs; about 1 s each), taking about 22 to 27 s in `SimulationRelease` and 35 s in `SimulationDebug`; all 28 explored
-under `DURABLE_STORAGE_SCHEDULE_BOUND=deep` take about 1,900 schedules within one preemption and run at milestones and in the
-nightly window. `just explore-schedules` (`test/Durable.Storage/eng/validate.ps1 -Check ExploreSchedules`) runs every simulated conformance
-class, or those a class filter names, under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, at milestones and in the nightly window; the
-file-system store's class alone explores 4,787 schedules in 71 s under it.
+under `DURABLE_STORAGE_SCHEDULE_BOUND=deep` take about 1,900 schedules within one preemption and run at milestones and
+in the nightly window. `just explore-schedules` (`test/Durable.Storage/eng/validate.ps1 -Check ExploreSchedules`) runs
+every simulated conformance class, or those a class filter names, under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, at
+milestones and in the nightly window; the file-system store's class alone explores 4,787 schedules in 71 s under it.
 
 Row 2.3b D adds `JournalSimulationTests`, measured on one developer machine loaded by other work with the class run
 alone in Release. Its corpus is one seed, of 31,667 steps in 13 to 19 s. Each of its ten mutants runs no random work,
@@ -1917,21 +1927,22 @@ replay check 31,347 steps per run, where it took 17,202; the ten mutants 114,056
 where they took 22,085 and 10,416. The class runs 302,432 steps, where it ran 114,138, in about 28 s, where it took 16 s.
 Every fault takes its path on each seed by construction, which seeds 1 to 40 confirm.
 
-`test/Durable.Storage/eng/coverage.ps1` collects Cobertura through Coverlet, requiring a report from each project it measures, reports CRAP
-scores at least 30, and renders ReportGenerator output; simulation projects collect no coverage, since Coverlet would
-instrument the IL which Clockwork rewrites. Branch coverage, CRAP, and mutation scores identify risk; meaningful
-assertions and explored state spaces establish correctness.
+`test/Durable.Storage/eng/coverage.ps1` collects Cobertura through Coverlet, requiring a report from each project it
+measures, reports CRAP scores at least 30, and renders ReportGenerator output; simulation projects collect no coverage,
+since Coverlet would instrument the IL which Clockwork rewrites. Branch coverage, CRAP, and mutation scores identify
+risk; meaningful assertions and explored state spaces establish correctness.
 
-Permanent microbenchmarks live under `test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`. A new benchmark first completes a
-filtered `--job Dry` run; optimization claims compare explicit baselines and report throughput, latency distributions,
-and allocations. Baselines measured before row 0.17 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md) ran on
-`net10.0`, so an optimization re-measures its baseline on `net11.0`. Measurements of a composition report configuration,
-workload, physical growth, and failure outcomes separately.
+Permanent microbenchmarks live under `test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`. A new
+benchmark first completes a filtered `--job Dry` run; optimization claims compare explicit baselines and report
+throughput, latency distributions, and allocations. Baselines measured before row 0.17 of the [implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md) ran
+on `net10.0`, so an optimization re-measures its baseline on `net11.0`. Measurements of a composition report
+configuration, workload, physical growth, and failure outcomes separately.
 
-The documentation checks, `just docs` (`test/Durable.Storage/eng/check-docs.ps1`), run three checks over every Markdown file under
-`test/Durable.Storage` which the repository tracks or which is new and not ignored, and report the failures of all three.
-markdownlint applies its rules as `.markdownlint.jsonc` configures them, with prose wrapped at 120 columns; the copied license
-texts keep their upstream form and skip it. remark-validate-links checks that
+The documentation checks, `just docs` (`test/Durable.Storage/eng/check-docs.ps1`), run three checks over every Markdown
+file under `test/Durable.Storage` which the repository tracks or which is new and not ignored, and report the failures
+of all three. markdownlint applies its rules as `.markdownlint.jsonc` configures them, with prose wrapped at 120
+columns; the copied license texts keep their upstream form and skip it. remark-validate-links checks that
 every relative link names a file which exists and every fragment a heading of its target, under GitHub's heading slugs.
 Every `mermaid` block parses with the Mermaid release GitHub renders diagrams with, which reports each syntax error
 GitHub would show in place of the diagram ([build and packaging §2](build-packaging.md#2-source-and-dependency-policy)).
@@ -1973,7 +1984,7 @@ format coverage; code builds and runtime tests qualify behavior changes.
 | Physical erasure after expiry | An `Expired` journal's rows leave the LSM when compaction reaches them ([LSM-I5](components/archive-lsm.md#5-invariants)); no deadline is specified, and compaction scheduling is [deferred](deferred.md#compaction-scheduling-policy) | Measured, bounded compaction backlog and storage progress before any erasure deadline is stated |
 | Application and deployment | End-to-end and soak (§10): *not yet in code*; reliability labs are [deferred](deferred.md#reliability-labs-for-the-orleans-topology) | Multi-silo tests with the history and linearizability oracles; soak runs; retained-state fault runs with an external oracle |
 | Executables and Native AOT | No executable is specified; executables arrive with the Orleans composition's implementation ([build and packaging](build-packaging.md#3-executable-artifacts)) | Each executable's artifact contract and smoke evidence; for Native AOT, a clean target-native publish and provider-closure integration evidence ([build and packaging §4](build-packaging.md#4-native-aot-qualification)) |
-| Orleans source-tree import | Clog builds `net11.0` alone with preview features; the language, API, and Fast CASPaxos boundaries an import into the Orleans source tree meets are measured in [build and packaging §6](build-packaging.md#6-orleans-source-tree-preparation) | Each boundary resolved for the frameworks and language version the import targets, in the import's own change |
+| Orleans source-tree import | Clog builds `net11.0` alone with preview features; the language, API, and Fast CASPaxos boundaries an import into the Orleans source tree meets are measured in [build and packaging §6](build-packaging.md#6-orleans-packages-and-source-layout) | Each boundary resolved for the frameworks and language version the import targets, in the import's own change |
 | Cloud object stores | The Azure Blob, S3, and Cloud Storage object stores run the object store conformance suite, its contract examples, the integrity test, and the fault examples ([archive LSM §10](components/archive-lsm.md#10-verification)) on Azurite 3.37.0, LocalStack 4.14.0, fake-gcs-server 1.56.1, and Google's Cloud Storage testbench v0.67.0, pinned by the digests of [build and packaging §2](build-packaging.md#2-source-and-dependency-policy), at milestones (§10), and on no live account; each milestone run records its commit, the digests, and its reports in `artifacts/validation/Emulators` (§10). Azurite runs with `--skipApiVersionCheck`, so it serves the SDK's newer service version as the versions it models. fake-gcs-server answers a resumable session's status query unlike the service, so the Cloud Storage client's recovery of an interrupted upload runs on the testbench, which answers an upload whose bytes fail their checksum with 412, so the integrity test runs on fake-gcs-server. The service documents no answer to a status query of a session whose final request failed its condition, so the Cloud Storage store reads each upload's answer back and confirms each 412 by a read. The concurrent groups judge S3's 409 `ConditionalRequestConflict`, which the store throws, as an unknown outcome, so they run unchanged against a live bucket. LocalStack 4.14.0 refuses a replace whose `x-amz-checksum-crc32c` does not match its bytes, but then serves the object it replaced with its length and no bytes, where S3 is expected to keep the object as it was; on LocalStack the replace half of the CRC-32C case therefore pins that answer, so an upgrade which fixes it fails the test, and the shared contract example, which requires the object kept, runs on the other emulators | Each store's suite on a live account, recorded per backend, before production use, including that a create or replace refused for its CRC-32C leaves the object as it was |
 | Provider-specific incomplete evidence | [Invariant evidence](invariants.md#13-invariants-without-evidence) identifies partial coverage: the Azure, DynamoDB, and Firestore MetaStore registers are tested over credential-free fakes, and no MetaStore backend is tested against its emulator or live; Azure Table's applied-write ETag equalling its read ETag waits for Azurite or a live account | Qualify each provider's actual boundary while preserving its layer's contract |
 | Filesystem acknowledged durability | WAL creates directories one level beneath its caller's root and flushes only the root and what lies beneath it, on Linux, macOS, and Windows; the flush is qualified on Linux 6.1 or later on ext4 (`data=ordered` or `data=writeback`) and XFS, and on Windows on local NTFS volumes ([wal §9](components/wal.md#file-system-directories)), and so is its files' direct, write-through I/O, whose descriptor flags `WalDirectIoTests` check on Linux and which every Linux open confirms through `statx`; the cluster claim and the file-system MetaStore flush through it. CI runs Linux on ext4 and Windows on NTFS. macOS serves development and tests only. ReFS, FAT, and exFAT document their directory flush as a no-op that reports success (MS-FSA §2.1.5.7, note 80), and a remote volume reports its server's file system; the WAL refuses each with `PlatformNotSupportedException` | Qualification of each further file system the WAL is to support |
@@ -2028,14 +2039,16 @@ Clockwork's minimizer shrinks only runs whose failure identity it can reproduce.
 a timer which outlives its component is still armed when the checks run, rather than fired and forgotten.
 
 The kit separates a node's lifecycle from what its store promises, so the BookKeeper alignment (Phase 0B of the
-[implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)) changes only the latter. The node publishes its store and traces only
-its replicas; `LedgerStoreInvariants` projects the catalog it checks, tombstones included, and
-`SimulatedLedgerReplicaTransport` hands out each node's `ILedgerStore`, which lists and drops on that node's own
-scheduler lane, from its store. Replicas are created by their first write, under loss, duplication, and crashes, as the
-contract creates them; the kit creates none itself. `SimulatedLedgerReplica` and `SimulatedLedgerReplicaTransport` map
-each `ILedgerReplica` member onto one request, so a contract change changes them and the checks in
-`LedgerStoreInvariants`, while `LedgerStoreNode`, `SimulatedRpc`, the environment, and the driver stay as they are, and
-the pinned snapshot, which records the schedule of the code under simulation, is re-approved.
+[implementation
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md))
+changes only the latter. The node publishes its store and traces only its replicas; `LedgerStoreInvariants` projects the
+catalog it checks, tombstones included, and `SimulatedLedgerReplicaTransport` hands out each node's `ILedgerStore`,
+which lists and drops on that node's own scheduler lane, from its store. Replicas are created by their first write,
+under loss, duplication, and crashes, as the contract creates them; the kit creates none itself.
+`SimulatedLedgerReplica` and `SimulatedLedgerReplicaTransport` map each `ILedgerReplica` member onto one request, so a
+contract change changes them and the checks in `LedgerStoreInvariants`, while `LedgerStoreNode`, `SimulatedRpc`, the
+environment, and the driver stay as they are, and the pinned snapshot, which records the schedule of the code under
+simulation, is re-approved.
 
 Simulation projects run their tests one at a time because concurrent simulations share the process's static state:
 a seed's steps then depend on what another simulation does on another thread, which a pinned trace detected as one
