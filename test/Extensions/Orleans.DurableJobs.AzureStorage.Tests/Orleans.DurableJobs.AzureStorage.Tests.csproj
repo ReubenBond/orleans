@@ -16,7 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Durable.AzureStorage\Orleans.Durable.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.CasPaxos\Orleans.Durable.Storage.CasPaxos.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
