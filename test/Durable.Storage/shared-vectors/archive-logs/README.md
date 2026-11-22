@@ -1,8 +1,8 @@
 # Archive-log vectors
 
 Language-neutral golden vectors for archive logs' durable formats: the position token
-([archive logs §7.2](../../../docs/spec/components/archive-logs.md#72-tokens)) and the Azure layout's metadata and index
-tag ([archive logs §7.3](../../../docs/spec/components/archive-logs.md#73-azure-layout)). Clog's test suites read these
+([archive logs §7.2](../../docs/spec/components/archive-logs.md#72-tokens)) and the Azure layout's metadata and index
+tag ([archive logs §7.3](../../docs/spec/components/archive-logs.md#73-azure-layout)). Clog's test suites read these
 files directly, and the vectors change with the format they pin. The store's record, `durable-storage/store`, is pinned
 with every store's record in [`archive/store-records.json`](../archive/README.md#store-record).
 
@@ -97,6 +97,6 @@ read the same rules from their inputs, and these files seed them.
 Run it from the repository root after installing its pinned dependency:
 
 ```powershell
-python -m pip install -r tests/shared-vectors/archive-logs/requirements.txt
-python tests/shared-vectors/archive-logs/generate_vectors.py
+python -m pip install -r test/Durable.Storage/shared-vectors/archive-logs/requirements.txt
+python test/Durable.Storage/shared-vectors/archive-logs/generate_vectors.py
 ```

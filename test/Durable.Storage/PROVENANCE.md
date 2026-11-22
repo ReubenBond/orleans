@@ -29,7 +29,7 @@ this repository's license. Clog remains authoritative for this code until the in
 | Root build, package, solution, SDK, editor, and Git configuration; `**/packages.lock.json` | Orleans' build, central package management, solution, and repository configuration govern the imported projects. |
 | `.github/`, `.config/dotnet-tools.json` | Orleans' CI and tool manifests. |
 | `docs/implementation-plan.md`, `docs/rust-migration-plan.md`, `clogd.jsonc*` | Clog's planning records and local tool state. |
-| `research/` | Third-party papers. |
+| `research/` | Third-party papers. Code and specification citations of `research/papers/<paper>` name the papers in Clog's repository at the snapshot revision. |
 
 ## Third-party notices
 

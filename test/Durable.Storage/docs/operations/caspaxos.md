@@ -40,20 +40,12 @@ The data plane sizes its quorums independently: a ledger's replicas acknowledge 
 
 ## Build
 
-The host and the client library come from the upstream repository at the commit the `vendor/fast-caspaxos` git
-submodule records.
-
-```powershell
-just sync
-just caspaxos
-```
-
-`just sync` checks the submodule out at its recorded commit. The submodule's `csharp/Directory.Build.props`,
-`Directory.Build.targets`, `Directory.Packages.props`, and `.editorconfig` form the upstream build boundary. Clog builds
-the client closure through project references; the host executable
-(`csharp/src/Orleans.Consensus.CasPaxos.Host`) and its administrative UI are published separately from the submodule's
-source. The host's canonical lifecycle guidance is `csharp/src/Orleans.Consensus.CasPaxos.Grpc/README.md` and
-`csharp/src/Orleans.Consensus.CasPaxos.Host/README.md` at the recorded commit.
+The host, its gRPC register frontend and client, and its administrative UI form Fast CASPaxos' standalone deployment,
+which is built and published from [ReubenBond/fast-caspaxos](https://github.com/ReubenBond/fast-caspaxos) at the
+commit Orleans' consensus family imports (`4dad617`, `src/Consensus/`). An application connects the `caspaxos`
+MetaStore provider to such a cluster by constructing `CasPaxosMetaStoreFactory` over a register service it owns, such as
+the upstream gRPC client's. The host's lifecycle guidance is `csharp/src/Orleans.Consensus.CasPaxos.Grpc/README.md` and
+`csharp/src/Orleans.Consensus.CasPaxos.Host/README.md` at that commit.
 
 ## Host configuration
 

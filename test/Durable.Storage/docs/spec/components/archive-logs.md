@@ -39,11 +39,11 @@ implement.
 `Orleans.Durable.Storage.Engine.Archive.Logs.Control` holds `ArchiveLogWriter`, which makes each key's write,
 `ArchiveLogDrainWorker`, and `ArchiveLogSweeper`. `AzureArchiveLogStore` lives in `Orleans.Durable.Storage.AzureStorage`
 and is configured by the Orleans composition ([orleans §5.13](../compositions/orleans.md#513-archive-log-store)). The
-code implements the stateless contract of §3 (row 3.6 of the [implementation plan](../../implementation-plan.md)): the
+code implements the stateless contract of §3 (row 3.6 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)): the
 memory store, the token codec, the classifier, `ArchiveLogWriter`, `LogArchiveStore` over them with its tokens, pure
 members, and store record, and `AzureArchiveLogStore` with its fake transport and fidelity suite; and the segment
 drains, markers, drops, and sweeper (row 3.7): `ArchiveLogDrainWorker` and `ArchiveLogSweeper`, modeled by
-`specs/archive-logs/ArchiveLogs.qnt`, whose traces the drain simulation's validate. A drain of an open ledger's closed
+`test/Durable.Storage/specs/archive-logs/ArchiveLogs.qnt`, whose traces the drain simulation's validate. A drain of an open ledger's closed
 segments writes its openers too, which supersede only writes already held, since the drain runs only once every older
 overlapping ledger dropped, and `Holds` judges by position, so a reader whose map value still lists an older ledger
 finds its rows held, superseded or applied (design rationale, *Open ledgers' openers*). The Orleans composition's
@@ -393,7 +393,7 @@ LOG-I6 stands.
 
 **A test project of the composition's own.** The interop tests live in `Orleans.Durable.Storage.Interop.Tests`, which
 references the composition, whose names they read the logs by, and so takes Orleans as the composition's tests do
-(build-packaging §2), and links the fake transport, the vectors, and the emulator host from `tests/shared`;
+(build-packaging §2), and links the fake transport, the vectors, and the emulator host from `test/Durable.Storage/shared`;
 `just emulators` runs it beside `Orleans.Durable.Storage.Cloud.Tests`. Putting them in
 `Orleans.Durable.Storage.Cloud.Tests`, with a named exception to the rule that only the composition's projects take
 Orleans, was rejected: the exception admitted any Orleans package into the cloud stores' tests, and the oracle is the
@@ -1245,7 +1245,7 @@ the opener's re-creation gained `If-Match: *`.
 ## 10. Verification
 
 - **Oracles.** The history fold of the decided rows (versions, tokens, and content), compared with each prefix plus the
-  live rows `Holds` keeps, over every store; the chain checker of HI-I4 (`TokenChainChecker`, in `tests/shared/Archive`)
+  live rows `Holds` keeps, over every store; the chain checker of HI-I4 (`TokenChainChecker`, in `test/Durable.Storage/shared/Archive`)
   after every simulation step, with the classifier's contradictions where the writer classifies an unheld write; and
   the classifier tables of §8.3, encoded independently and enumerated over every case of small domains (`g_L` against
   `g` and `g'`; `P_L` at and between unit boundaries and at, below, and above an opener's `P₀`; `b_L` right and wrong;
@@ -1272,7 +1272,7 @@ the opener's re-creation gained `If-Match: *`.
 - **Fuzzing.** The targets `archive-log-token` (the codec in `Orleans.Durable.Storage.Engine.Archive.Logs`),
   `archive-log-chunk-base` and `archive-log-chunk` (the chunk layout's base decoder and chunk check there), and
   `archive-log-metadata` (the metadata reader in
-  `Orleans.Durable.Storage.AzureStorage`), in `fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, which instruments both
+  `Orleans.Durable.Storage.AzureStorage`), in `test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, which instruments both
   assemblies; the base and metadata targets' oracles are independent readings of §7.4's and §7.3's first rule.
   `ArchiveLogsCorpusReplayTests` in `Orleans.Durable.Storage.Engine.Archive.Logs.Tests` replays the corpora on every
   change.
@@ -1382,7 +1382,7 @@ the opener's re-creation gained `If-Match: *`.
   `ArchiveLogDrainWorkerTests.AClosedLedgerUnderBackpressurePastItsRetriesDrainsNothingUntilItsReplicasAnswer`: a closed
   ledger whose replicas answer `Backpressure` past the scan's retries answers `Drained` at its start, writes nothing,
   and cannot drop, then completes with markers over every row once they answer.
-- **Model.** `specs/archive-logs/ArchiveLogs.qnt` models per-segment writes, base rows, racing and straggler drains,
+- **Model.** `test/Durable.Storage/specs/archive-logs/ArchiveLogs.qnt` models per-segment writes, base rows, racing and straggler drains,
   requests which land after their drainer crashed, unknown outcomes, progress markers, drops, the sweeper, readers on a
   stale map and at a lagging tail, and a loader which reads the map, reads the archive, and
   rebases; each `Create`, `Append Block`, and `Put Blob` is one action, so crash cut points match model states. Its

@@ -31,7 +31,7 @@ This file specifies:
 Code: `Orleans.Durable.Storage.Engine.Ledgers` (namespace `Orleans.Durable.Storage.Engine.Ledgers.Objects`;
 `ObjectLedgerSweeper` in `Orleans.Durable.Storage.Engine.Ledgers.Control`), over `IObjectStore` and
 `IAppendableObjectStore` in `Orleans.Durable.Storage.Engine.ObjectStore.Abstractions` (§3.1). In code: the seam it
-implements and the map's `ObjectStore` location (row 7.1 of the [implementation plan](../../implementation-plan.md)),
+implements and the map's `ObjectStore` location (row 7.1 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)),
 the per-slot layout's storage, its store and record, `PrefixedAppendableObjectStore`, and the sweeper (row 7.3),
 the `ObjectLedger` formal model (`ObjectLedger.qnt`, rows 7.3b and 7.4),
 `S3ObjectStore`'s directory-bucket mode for S3 Express One Zone (row 7.2b), the append layout
@@ -336,7 +336,7 @@ vectors):
 `CLOE` v1 extents hold frames, each `kind (DATA 1, ROLL 2, SEAL 3), slot u64, length u32, CRC-32C u32`, then
 `length` bytes of batch for DATA and none otherwise; each append ends with a trailer `first slot u64, count u32, start
 offset u64, previous trailer offset u64, CRC-32C u32`, from which a reader walks an extent backwards one append at a
-time. [Formats §3](../formats.md#3-object-storage-layout) registers both. `tests/shared-vectors/ledgers/object-*.json`
+time. [Formats §3](../formats.md#3-object-storage-layout) registers both. `test/Durable.Storage/shared-vectors/ledgers/object-*.json`
 pins the names, reverse keys, and listing order, the slots' classification and settlement, and the store's record, whose
 decoder the `ledgers-object-store-record` fuzz target checks; `object-extents.json` and `object-extent-rejections.json`
 pin `CLOE` v1 frames, trailers, and rejections, and the `ledgers-object-extent` fuzz target checks their decoders.

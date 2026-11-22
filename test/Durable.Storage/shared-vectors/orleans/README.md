@@ -1,7 +1,7 @@
 # Orleans vectors
 
 Language-neutral golden vectors for the Orleans composition's durable format
-([Orleans §7.3](../../../docs/spec/compositions/orleans.md#73-node-registry-clnr-v1)): the node registry, `CLNR`
+([Orleans §7.3](../../docs/spec/compositions/orleans.md#73-node-registry-clnr-v1)): the node registry, `CLNR`
 version 1. Clog's test suites read these files directly, and the vectors change with the format they pin.
 
 Integers in the header are little-endian. Integers of 64 bits in the vectors are decimal strings, UUIDs are in their
@@ -30,5 +30,5 @@ the CRC-32C of its header and body unless its name says otherwise, so each break
 `generate_registry.py` writes both files from an independent reading of §7.3: it serializes each valid body with the
 Protocol Buffers library from §7.3's schema, and writes each non-canonical body byte by byte. The hand-made inputs which
 seed the `orleans-registry` fuzz target are vectors here too, each named `Seed {name}: …`, so a campaign's merge, which
-owns `fuzz/corpus/orleans-registry` and drops the inputs a seed already covers, never loses them. Run it from the
-repository root after `python -m pip install -r tests/shared-vectors/orleans/requirements.txt`.
+owns `test/Durable.Storage/fuzz/corpus/orleans-registry` and drops the inputs a seed already covers, never loses them. Run it from the
+repository root after `python -m pip install -r test/Durable.Storage/shared-vectors/orleans/requirements.txt`.

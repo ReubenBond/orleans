@@ -192,10 +192,10 @@ Java 21, Node.js, and PowerShell 7 are required:
 .\eng\model-check-quint.ps1 -Model ObjectLedger -Extended
 ```
 
-The Quint runner (`eng/model-check-quint.ps1`, `just quint-models`, `just models`, `just models-quick`,
+The Quint runner (`test/Durable.Storage/eng/model-check-quint.ps1`, `just quint-models`, `just models`, `just models-quick`,
 `just models-changed`, `just models-extended`) type-checks `QuorumCoverage.qnt`, `QuorumCoverageSealing.qnt`,
 `AtomicLedger.qnt`, `LedgerProtocol.qnt`, `LedgerProtocolTrace.qnt`, and `ObjectLedger.qnt` with the pinned Quint
-toolchain (`eng/quint/package-lock.json`) and exhaustively verifies them through the pinned, SHA-256-verified
+toolchain (`test/Durable.Storage/eng/quint/package-lock.json`) and exhaustively verifies them through the pinned, SHA-256-verified
 Apalache/TLC backend. `-Tier` selects `Quick`, `Default` (Quick plus the nightly cases), or `Extended` (`-Extended` is
 a shorthand for `-Tier Extended`), and `-Since` skips unchanged models when their files and the runner did not change
 since a commit's merge base. Each TLC process uses `-Workers` workers (2 by default) and a 4 GiB heap. Results,
@@ -204,7 +204,7 @@ generated Quint instance modules, complete checker logs, and counterexamples are
 
 A positive case succeeds only when TLC reports success, exits zero, and exhausts its queue. An expected invariant or
 witness counterexample succeeds only with TLC's violation exit status and the named invariant or temporal property. For
-weak-fairness liveness (`RecoveriesEnd`, `no-late-copy`, `ignore-dropped`), `eng/model-check-quint.ps1` appends
+weak-fairness liveness (`RecoveriesEnd`, `no-late-copy`, `ignore-dropped`), `test/Durable.Storage/eng/model-check-quint.ps1` appends
 `Fairness` (`WF_vars(...)`) and `LiveSpec` to the Quint-compiled TLA+ module and checks `RecoveriesEnd` with TLC.
 One expected counterexample, the `seal-short` mutant at `K = 2` (`ledger-protocol-mutant-seal-short-k2-RecoveryBounded`),
 lies 44 steps deep beneath billions of states, so it runs as a seeded random simulation (`quint run --seed=1`), which
@@ -297,7 +297,7 @@ before a read which returned its DATA, within one process of the node: a restart
 answer logged before a crash keeps its place, and the model checks that its record was durable; a restart which
 recovers the replica sealed counts as its seal. A `run` test (`traceValid`) replays every event in order and checks the
 model invariants at every step. When a trace fails, `quint test` reports the failing event and
-`eng/model-check-quint.ps1 -Traces` locates the failing step. Every step is checked against `TypeOK`, `NoRevokedAnswer`,
+`test/Durable.Storage/eng/model-check-quint.ps1 -Traces` locates the failing step. Every step is checked against `TypeOK`, `NoRevokedAnswer`,
 `ReadersSeeClose`, `RecoveryBounded`, and `OpenCheckSound`, so each trace is a bounded check of them at the
 implementation's scale, with every freedom trace validation adds. Each trace
 maps one recovery's close of the ledger: the quorum simulation's last recovery, the crash simulation's final one, and
@@ -405,7 +405,7 @@ its older extent deleted, multiple queued slots coalesce into one append, and a 
 
 ## Bounds
 
-`eng/model-check-quint.ps1` runs the ledger protocol models in three tiers (`Quick`, `Default`, and `Extended`),
+`test/Durable.Storage/eng/model-check-quint.ps1` runs the ledger protocol models in three tiers (`Quick`, `Default`, and `Extended`),
 together with all mutants, reachability witnesses, the `unsealed-negatives` regression, the `amnesia` and
 `tombstone-loss` assumptions, and the simulated `seal-short` mutant at `K = 2`. Quint compiles finite integer sets
 without TLC symmetry reduction, so every state count below is unsymmetrized. The `Quick` tier (`just models-quick`,

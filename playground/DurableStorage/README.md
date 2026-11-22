@@ -7,7 +7,7 @@ Orleans' membership (Azure Table). The Aspire dashboard shows each silo's logs a
 
 ## Run it
 
-You need Docker and a clone ready to build (`just sync`, as [AGENTS.md](../AGENTS.md#build-format-and-test) describes).
+You need Docker, and [just](https://github.com/casey/just) run from `test/Durable.Storage` ([AGENTS.md](../../test/Durable.Storage/AGENTS.md#build-format-and-test)).
 
 ```powershell
 just sample
@@ -26,7 +26,7 @@ The read answers the grain's entries and the silo its activation runs on. `KeyVa
 `IDurableDictionary<string, string>`, which Orleans Journaling writes to the grain's journal in Clog, and its
 `[JournalPlacement]` places each activation on the silo whose node is its journal's primary.
 
-Each run is a new cluster: the AppHost, as the deployment, creates each silo's node root anew under `artifacts/sample`,
+Each run is a new cluster: the AppHost, as the deployment, creates each silo's node root anew under `test/Durable.Storage/artifacts/sample`,
 where it survives the silo's restarts within the run. Ctrl+C stops the silos and Azurite.
 
 ## What to watch
@@ -66,14 +66,14 @@ stops a silo gracefully instead, which hands its ledgers off before it stops.
 
 Each ledger keeps three replicas (`DurableStorage:Control:Replicas`), one on each silo. When a silo dies, the takeover
 keeps its dead replica in the successor while the two live ones form a quorum, and repairs it out once a node is free
-([orleans §5.7](../docs/spec/compositions/orleans.md#57-membership-and-replica-placement)), so three silos survive the
+([orleans §5.7](../../test/Durable.Storage/docs/spec/compositions/orleans.md#57-membership-and-replica-placement)), so three silos survive the
 loss of one.
 
 ## Configuration
 
 `appsettings.json` holds what a deployment sets too: the silo's Clog options under `DurableStorage`, where
 `DurableStorage:Node` binds to `DurableStorageOptions` and `DurableStorage:Control` to `ControlOptions` by the keys
-[orleans §6](../docs/spec/compositions/orleans.md#6-configuration) lists, and a key which names no option stops the
+[orleans §6](../../test/Durable.Storage/docs/spec/compositions/orleans.md#6-configuration) lists, and a key which names no option stops the
 silo. The AppHost runs the silos in the Development environment, whose `appsettings.Development.json` tunes the cluster
 to show its behaviour within minutes on one machine. A deployment keeps the defaults:
 
@@ -96,7 +96,7 @@ The AppHost sets what differs per silo: `DurableStorage:Node:Root`, the node's d
 The cluster's archive store lies in that container under its store prefix, which Clog derives from Orleans'
 `ServiceId`; the sample sets its own, `Sample:ServiceId`, since a silo whose service ID is one of Orleans' defaults,
 `default` or localhost clustering's `dev`, and which configures no `DurableStorage:Node:ArchiveStorePrefix`, does not
-start ([orleans §5.13](../docs/spec/compositions/orleans.md#513-archive-log-store)).
+start ([orleans §5.13](../../test/Durable.Storage/docs/spec/compositions/orleans.md#513-archive-log-store)).
 
 ## Deploying it
 
@@ -112,17 +112,17 @@ The sample keeps a deployment's shape on one machine. A deployment differs where
 - **Archive store.** The sample's cluster archives to the LSM. A cluster on archive logs sets
   `DurableStorage:Node:ArchiveStore` to `Logs` and registers its container with `Orleans.Durable.Storage.AzureStorage`'s
   `AddAzureArchiveLogs` on the silo's services, by the container's URI and a `TokenCredential` such as
-  `DefaultAzureCredential` ([orleans §5.13](../docs/spec/compositions/orleans.md#513-archive-log-store)).
+  `DefaultAzureCredential` ([orleans §5.13](../../test/Durable.Storage/docs/spec/compositions/orleans.md#513-archive-log-store)).
 - **Store prefix.** Several clusters may share one container, each under its own store prefix: set each deployment's
   own `ServiceId`, equal on every silo of the cluster and for its whole life, or
   `DurableStorage:Node:ArchiveStorePrefix`.
 - **Cluster.** `DurableStorage:Node:Cluster` is set once for the cluster's life, equal on every silo. The AppHost draws
   a new one each run, which is a new, empty cluster.
 - **Nodes.** Each silo's node root lies on a volume of its own which outlives the silo's pod, and its ordinal is its
-  StatefulSet ordinal ([orleans §5.2](../docs/spec/compositions/orleans.md#52-nodes-and-silos)).
+  StatefulSet ordinal ([orleans §5.2](../../test/Durable.Storage/docs/spec/compositions/orleans.md#52-nodes-and-silos)).
 - **Endpoints.** The sample's silos advertise the loopback address and a port each; a deployment's advertise each pod's
   own IP address.
 
-`tests/Orleans.Durable.Storage.Samples.Tests` runs the sample's configuration in a three-silo test cluster over
+`test/Durable.Storage/Orleans.Durable.Storage.Samples.Tests` runs the sample's configuration in a three-silo test cluster over
 in-memory stores, kills the silo of a grain, and checks that the grain recovers its state on another silo and that the
 killed silo's restart rejoins.

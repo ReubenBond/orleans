@@ -56,7 +56,7 @@ process, built from the ledger's `LedgerMetadata`, which is LG-I7's sender check
 §2.5](ledgers.md#25-reads-ledgerreader)), and `LedgerWriterRegistry` holds each writer in its primary's process
 ([ledgers §2.4](ledgers.md#24-primary-ledgerwriter)). A read below the known contiguous tail asks one replica at a time,
 hedges within a budget, repairs a preferred replica which lacked the batch, and forwards a byte-range read's range (§8.3,
-§8.4; rows 4.1b and 5.1 of the [implementation plan](../../implementation-plan.md)), and an idle writer writes its
+§8.4; rows 4.1b and 5.1 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), and an idle writer writes its
 contiguous tail explicitly (§8.2).
 
 ### Design rationale
@@ -114,7 +114,7 @@ calls a replica's seal its fence.
 > (Apache BookKeeper, *The BookKeeper protocol*, "Closing a ledger as a reader")
 
 Jack Vanlightly's TLA+ specifications of the protocol (`Vanlightly/bookkeeper-tlaplus`, which
-[`specs/ledger-protocol`](../../../specs/ledger-protocol/README.md) adapts) found that BookKeeper 4.13 counted
+[`test/Durable.Storage/specs/ledger-protocol`](../../../specs/ledger-protocol/README.md) adapts) found that BookKeeper 4.13 counted
 `NoSuchEntry` answers from recovery reads which did not fence: an unfenced bookie which answered absent could still
 accept the writer's entry and complete an ack quorum after the ledger closed below it. Recovery here counts an absent
 answer only from a replica whose seal answer it held when it sent the read (LP-I7), which makes every negative final,
@@ -1198,7 +1198,7 @@ answered the seal, before which it accepted the write, so `c ≥ C* − K` and e
 | Recovery backoff | A replica operation of a recovery which fails transiently is repeated after a wait between its step, 20 ms doubling to at most 1 s, and twice the step, at most 1 s, so never less than 20 ms ([conventions §6](../conventions.md#6-retries-and-idempotency)), without bound, on the `Ledger`'s `TimeProvider` | `Ledger` |
 | Write retry (`StorageOutageRetry`) | Exponential backoff with jitter, each wait between its step, 100 ms doubling to at most 5 s, and twice the step, at most 5 s, so never less than 100 ms; unbounded attempts; only the writer's disposal ends the wait. | `LedgerWriter` |
 | Preferred replica | The replica on the caller's own node, which `LedgerReader`'s `localNode` names, when the ledger has one; with none, a read below the known contiguous tail starts at the next replica of a rotation, which starts where a hash of the ledger's ID puts it, so first reads of different ledgers spread across their replicas. | Ledgers, when it constructs the `Ledger` |
-| Read hedge delay | 50 ms, on the `Ledger`'s `TimeProvider`: a ceiling on how long a read below the known contiguous tail waits on the replicas it asked before it hedges them. It measures the whole replica call, the transport's queue and a `TooLarge` round trip included, so it hedges a stalled replica, a local read slower than a hundred times its 0.1 to 0.8 ms ([implementation plan row 5.4](../../implementation-plan.md)), and also a healthy remote read of a 16 to 32 MiB batch or one queued behind a burst; the hedge budget bounds what those hedges cost. An adaptive delay per replica is [deferred](../deferred.md#adaptive-read-hedges). | `LedgerQuorum` |
+| Read hedge delay | 50 ms, on the `Ledger`'s `TimeProvider`: a ceiling on how long a read below the known contiguous tail waits on the replicas it asked before it hedges them. It measures the whole replica call, the transport's queue and a `TooLarge` round trip included, so it hedges a stalled replica, a local read slower than a hundred times its 0.1 to 0.8 ms ([implementation plan row 5.4](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), and also a healthy remote read of a 16 to 32 MiB batch or one queued behind a burst; the hedge budget bounds what those hedges cost. An adaptive delay per replica is [deferred](../deferred.md#adaptive-read-hedges). | `LedgerQuorum` |
 | Read hedge budget | A token bucket per `Ledger` of at most 10 hedges, which each read below the known contiguous tail refills by a tenth of a hedge, so hedges stay near a tenth of those reads once a burst is spent; a read which meets an empty bucket waits on its replicas. | `LedgerQuorum` |
 | `ContiguousTailInterval` | 100 ms, from the writer's `TimeProvider`: the idle time since its last write after which the writer sends its contiguous tail explicitly (§8.2). It trades staleness against calls: an idle ledger's last completions stay unknown to applies on its replica nodes and to readers in other processes for about the interval and one round trip, which read those slots from every replica meanwhile, while each explicit write costs `N` contiguous-tail reads, one per raise of the tail, so at most `N` every interval for a ledger whose writes arrive just over the interval apart and none for one written faster. It is twice the read hedge delay, so a pause no longer than a slow replica call carries its tail on the next write instead. Explicit writes share the control lane with seals, `MaxNodeControlCalls` (8) per node in FIFO order ([orleans §5.12](../compositions/orleans.md#512-replica-transport)): at the default 8 open ledgers per node, a silo whose ledgers go idle together queues about 8 to a node, one per ledger, each a contiguous-tail read which writes nothing to the replica's WAL, so a failover's seal waits behind them for about one round trip, against the seconds failure detection takes; lanes are per node, so explicit writes to a failed node delay no seal to a live one. | `LedgerWriter` |
 | Payload size | The protocol rejects only empty payloads; replicas and transports enforce their own bounds, and Ledgers bounds each batch ([ledgers §7](ledgers.md#7-formats)). | — |
@@ -1223,14 +1223,14 @@ budget and waited (§8.4), from which row 5.4 measures the hedge rate.
 
 ## 10. Verification
 
-Projects: `tests/Orleans.Durable.Storage.Engine.Ledgers.Tests` (the writer's and the sequencer's tests in `Writer/`),
-`tests/Orleans.Durable.Storage.Simulation.Tests`, and `specs/ledger-protocol` (Quint, run by
-`eng/model-check-quint.ps1`). The [ledger model](../../../specs/ledger-protocol/README.md) checks `Ledger`'s
+Projects: `test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests` (the writer's and the sequencer's tests in `Writer/`),
+`test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests`, and `test/Durable.Storage/specs/ledger-protocol` (Quint, run by
+`test/Durable.Storage/eng/model-check-quint.ps1`). The [ledger model](../../../specs/ledger-protocol/README.md) checks `Ledger`'s
 writes, recovery, seal check, and reads below a known contiguous tail against a writer which keeps writing and
 acknowledging after it meets a seal, at every quorum of three replicas and with concurrent recoveries, and each of its
 invariants has a mutant which must produce its counterexample. It checks one ledger with bounded slots, windows, and
 replicas, and abstracts batches into slots; multi-ledger transitions are checked by `LedgerMap.qnt`, and drops by
-`LedgerDrop.qnt` ([`specs/ledgers`](../../../specs/ledgers/README.md)). It refines `AtomicLedger.qnt`, the ledger
+`LedgerDrop.qnt` ([`test/Durable.Storage/specs/ledgers`](../../../specs/ledgers/README.md)). It refines `AtomicLedger.qnt`, the ledger
 storage contract's model, whose seal, readers' checks, and fetchers' reads and drains establish `OpenCheckSound`,
 `CheckTailBelowEnd`, and `BelowTailDecided` by their guards (LL-I5 to LL-I7): an atomic mutant per property relaxes the
 guard it rests on, and a protocol mutant per property (`check-ignores-seal`, `check-stored-tail`, `fetch-stored-tail`)

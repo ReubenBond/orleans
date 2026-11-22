@@ -1,4 +1,9 @@
-# AGENTS.md - Clog
+# AGENTS.md - Durable Storage (Clog)
+
+These rules apply to the `Orleans.Durable.Storage` family: its projects under `src/`, `src/Azure/`, `src/AWS/`, and
+`src/Google/`, the verification assets under `test/Durable.Storage/`, and the sample under `playground/DurableStorage/`.
+The repository-level guidance also applies. Paths below are relative to the repository root; the `Justfile`, scripts,
+and `artifacts/` named here lie under `test/Durable.Storage/`.
 
 Clog is a layered storage system for fine-grained keyed journals: reusable building blocks for durable,
 ordered, replicated logs, composed into dyadic key-range ledgers (live ledgers) and the Archive they drain into (an
@@ -13,7 +18,7 @@ Journaling.
 - [Verification](docs/spec/verification.md): the testing methodology, oracles, models, gates, and
   qualification boundaries.
 - [Build and packaging](docs/spec/build-packaging.md): framework, compiler, artifact, and compatibility policy.
-- [Implementation plan](docs/implementation-plan.md): the ordered pull requests which take the code to the spec,
+- [Implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md): the ordered pull requests which take the code to the spec,
   with each row's status.
 - [Engineering principles](docs/engineering-principles/README.md): how we design, verify, and write code.
 
@@ -36,15 +41,16 @@ compatibility obligation requires an explicit spec change before compatibility c
 | Path | Contents |
 | --- | --- |
 | `src/` | Nine assemblies of the `Orleans.Durable.Storage` family: the Engine (every managed layer, its contracts, and the controllers' decisions), Diagnostics (the fatal-error types), one per technology package (`.FileSystem`, `.AzureStorage`, `.S3`, `.GoogleCloud`, `.CasPaxos`, `.RocksDb`), and the Orleans composition. Inside them, components keep the layering; a layer has an abstractions component only for interfaces several providers implement. The [spec's project map](docs/spec/README.md#26-project-map) lists them. |
-| `tests/` | One test project per layer, plus architecture and model tests; `tests/shared` holds simulation and diagnostics helpers; `tests/Orleans.Durable.Storage.Simulation` is the simulation kit which Clockwork simulation projects reference; `tests/shared-vectors` holds golden vectors. |
-| `specs/` | Quint formal models of the ledger protocol (`specs/ledger-protocol`: BookKeeper quorum and `ObjectLedger`, both refining `AtomicLedger`), of the ledger map and ledger drops (`specs/ledgers`), of the LSM (`specs/archive`), and of archive logs (`specs/archive-logs`). |
-| `benchmarks/` | BenchmarkDotNet microbenchmarks. |
-| `fuzz/` | The SharpFuzz/libFuzzer decoder fuzzing harness: each layer's targets (`fuzz/Orleans.Durable.Storage.Fuzz.<Layer>`) over a shared oracle framework, the campaign executable (`fuzz/Orleans.Durable.Storage.Fuzz`), and each target's corpus (`fuzz/corpus`). |
-| `apphost/` | Aspire host for the cloud storage emulators. |
-| `samples/` | An Orleans app which runs Clog as its journal storage, and the Aspire host which runs it as three silos over Azurite (`just sample`); `tests/Orleans.Durable.Storage.Samples.Tests` is its smoke test. |
-| `eng/` | The scripts the `Justfile` recipes run (setup, validation, coverage, fuzzing, mutation testing, documentation checks, and model checking); `OrleansSimulation.targets` for simulation test projects and `OrleansSimulation.SourceBuild.targets`, which builds the `Microsoft.Orleans.Testing.Simulation` packages a project references from Clockwork's source; `Submodules.targets`, which checks the submodules a project builds from. |
-| `vendor/` | Git submodules pinned to upstream commits and built from source within their upstream build settings: Clockwork (`vendor/Clockwork`, the `Microsoft.Orleans.Testing.Simulation` packages) and Fast CASPaxos (`vendor/fast-caspaxos`, the `Microsoft.Orleans.Consensus.CasPaxos` packages), which builds against Clog's Clockwork through `vendor/Orleans.Consensus.CasPaxos.Embedding.props`. A fix to one goes upstream, and the pin then moves to it; the two pins move together. |
-| `research/` | The LogDrive, Delos, and Delos erratum papers as Markdown. |
+| `test/Durable.Storage/` | One test project per layer, plus architecture and model tests; `test/Durable.Storage/shared` holds simulation and diagnostics helpers; `test/Durable.Storage/Orleans.Durable.Storage.Simulation` is the simulation kit which Clockwork simulation projects reference; `test/Durable.Storage/shared-vectors` holds golden vectors. |
+| `test/Durable.Storage/specs/` | Quint formal models of the ledger protocol (`test/Durable.Storage/specs/ledger-protocol`: BookKeeper quorum and `ObjectLedger`, both refining `AtomicLedger`), of the ledger map and ledger drops (`test/Durable.Storage/specs/ledgers`), of the LSM (`test/Durable.Storage/specs/archive`), and of archive logs (`test/Durable.Storage/specs/archive-logs`). |
+| `test/Durable.Storage/benchmarks/` | BenchmarkDotNet microbenchmarks. |
+| `test/Durable.Storage/fuzz/` | The SharpFuzz/libFuzzer decoder fuzzing harness: each layer's targets (`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.<Layer>`) over a shared oracle framework, the campaign executable (`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz`), and each target's corpus (`test/Durable.Storage/fuzz/corpus`). |
+| `test/Durable.Storage/apphost/` | Aspire host for the cloud storage emulators. |
+| `playground/DurableStorage/` | An Orleans app which runs Clog as its journal storage, and the Aspire host which runs it as three silos over Azurite (`just sample`); `test/Durable.Storage/Orleans.Durable.Storage.Samples.Tests` is its smoke test. |
+| `test/Durable.Storage/eng/` | The scripts the `Justfile` recipes run (validation, coverage, fuzzing, mutation testing, documentation checks, and model checking). |
+| `test/Durable.Storage/docs/` | The specification (`docs/spec`), and the operations, performance, and engineering-principles documents it cites. |
+| `eng/durable-storage/` | The family's build settings, banned APIs, and analyzer configuration, which every Storage project imports. |
+| `src/Consensus/`, `src/Simulation/` | The Fast CASPaxos (`Orleans.Consensus.CasPaxos.*`) and Clockwork (`Orleans.Testing.Simulation.*`) families, imported once and built with their own settings. |
 
 A production project's namespaces are those of the components it compiles, each component's namespace starting with
 `Orleans.Durable.Storage`, and the Engine's folders follow them; an abstractions
@@ -55,32 +61,29 @@ spec's dependency rules over components.
 
 ## Build, format, and test
 
-The [Justfile](Justfile) is the entry point for setup, builds, tests, and every other check; each recipe runs a script
-under `eng/`. Install [just](https://github.com/casey/just) with `winget install Casey.Just`, `cargo install just`, or
+The [Justfile](Justfile) is the entry point for builds, tests, and every other check; run its recipes from
+`test/Durable.Storage/`, and each runs a script under `test/Durable.Storage/eng/` over the Storage solution filter,
+`test/Durable.Storage/Durable.Storage.slnf`. Install [just](https://github.com/casey/just) with `winget install Casey.Just`, `cargo install just`, or
 `brew install just`; its recipes run in PowerShell 7 (`pwsh`).
 
 ```powershell
-just sync            # submodules at their recorded commits, the pinned SDK, and the .NET 10 runtime (eng/sync.ps1)
-just restore         # restore Clog.slnx with the audited lock files (eng/validate.ps1)
+just restore         # restore the Storage solution filter (test/Durable.Storage/eng/validate.ps1)
 just build           # Release build
 just format          # verify formatting and analyzer fixes; just format-fix applies them
 just test            # default tests, with per-project xUnit reports under artifacts/validation
 just test-debug      # Debug build and tests of the Debug leg's projects, so their debug assertions run
-just docs            # Markdown style, relative links and anchors, Mermaid syntax (eng/check-docs.ps1)
+just docs            # Markdown style, relative links and anchors, Mermaid syntax (test/Durable.Storage/eng/check-docs.ps1)
 just check           # build, format, test, test-debug, docs, the ledger protocol models' quick tier if changed, trace validation
 just check-full      # check, with every Quint model's extended bounds
 ```
 
-Run `just sync` in a new clone or worktree, and after a change to a submodule's pin. It changes nothing when the
-checkout is ready, and refuses a submodule with local changes or at a commit which no remote branch holds. A restore or
-build of a project which uses a submodule, through `just` or `dotnet`, fails unless the submodule is initialized, at
-its recorded commit, and clean, and a missing SDK fails through `global.json`; both name `just sync`. Dot-source
-`eng/dotnet-env.ps1` to put the pinned SDK first on `PATH` for a direct `dotnet` command; on Linux it also points
-`TMPDIR` at `artifacts/tmp`, since the WAL refuses tmpfs, which many distributions mount at `/tmp`.
+The repository's `global.json` selects the SDK. Dot-source `test/Durable.Storage/eng/dotnet-env.ps1` before a direct
+`dotnet test` on Linux: it points `TMPDIR` at `artifacts/tmp`, since the WAL refuses tmpfs, which many distributions
+mount at `/tmp`.
 
-The simulation projects (`tests/Orleans.Durable.Storage.Simulation` and each project which sets
+The simulation projects (`test/Durable.Storage/Orleans.Durable.Storage.Simulation` and each project which sets
 `OrleansSimulationInstrumentedTestProject`) and the `src` projects they rewrite build in `SimulationRelease` and
-`SimulationDebug`, which `Clog.slnx` maps from Release and Debug and which define `ORLEANS_DURABLE_STORAGE_SIMULATION`;
+`SimulationDebug`, which the solution maps from Release and Debug and which define `ORLEANS_DURABLE_STORAGE_SIMULATION`;
 `just test` and `just test-debug` run them so, and a direct `dotnet` command names the configuration
 (`-c SimulationRelease`). A seam which only simulation needs inside `src` is an
 `#if ORLEANS_DURABLE_STORAGE_SIMULATION // seam: <name>` block listed in verification §7.2; Debug, Release, and every
@@ -89,10 +92,10 @@ shipped artifact hold none ([build and packaging
 
 Several worktrees run their tests on one machine, and every worktree's test hosts share their project's process name.
 Stop a stale test host, such as one which locks a build's output, by the process ID of a host under this worktree's
-`artifacts` directory, which this filter selects on Windows and Linux from any directory of the worktree:
+`test/Durable.Storage` directory, which this filter selects on Windows and Linux from any directory of the worktree:
 
 ```powershell
-Get-Process Clog.* | Where-Object Path -like (Join-Path ([IO.Path]::GetFullPath((git rev-parse --show-toplevel))) artifacts '*')
+Get-Process Orleans.Durable.Storage.* | Where-Object Path -like (Join-Path ([IO.Path]::GetFullPath((git rev-parse --show-toplevel))) test Durable.Storage '*')
 ```
 
 A host chosen by name alone may belong to another worktree's run, which then ends with no failed test and the exit
@@ -103,23 +106,23 @@ repository-local tool for the mechanical change rather than suppressing the rule
 
 ```powershell
 just caspaxos               # the Fast CASPaxos adapter, its shared simulation, and the architecture suite
-just models                 # ledger protocol Quint models' default set (eng/model-check-quint.ps1: -Tier, -Since, -Only, -Workers)
+just models                 # ledger protocol Quint models' default set (test/Durable.Storage/eng/model-check-quint.ps1: -Tier, -Since, -Only, -Workers)
 just models-quick           # their quick tier: small exhaustive cases, every mutant and witness
-just quint-models           # Quint models of the ledger protocol, Ledgers, the LSM, and archive logs (eng/model-check-quint.ps1: -Model, -Tier, -Since, -Only, -Workers)
-just ledger-traces          # the simulations' ledger traces replayed by quint test, with trace mutants (eng/ledger-traces.ps1; a seed range)
-just archive-log-traces     # the archive-log drain simulation's traces replayed by quint test (eng/archive-log-traces.ps1; a seed range)
-just ledger-map-traces      # the ledger map simulations' traces replayed by quint test, with trace mutants (eng/ledger-map-traces.ps1)
-just archive-traces         # the LSM simulation's traces replayed by quint test, with trace mutants (eng/archive-traces.ps1)
-just coverage               # Cobertura coverage, CRAP >= 30 hotspots, HTML report (eng/coverage.ps1)
-just fuzz all 60            # libFuzzer campaigns per decoder (eng/fuzz.ps1; x64 Windows or Linux; -Merge keeps the corpus)
+just quint-models           # Quint models of the ledger protocol, Ledgers, the LSM, and archive logs (test/Durable.Storage/eng/model-check-quint.ps1: -Model, -Tier, -Since, -Only, -Workers)
+just ledger-traces          # the simulations' ledger traces replayed by quint test, with trace mutants (test/Durable.Storage/eng/ledger-traces.ps1; a seed range)
+just archive-log-traces     # the archive-log drain simulation's traces replayed by quint test (test/Durable.Storage/eng/archive-log-traces.ps1; a seed range)
+just ledger-map-traces      # the ledger map simulations' traces replayed by quint test, with trace mutants (test/Durable.Storage/eng/ledger-map-traces.ps1)
+just archive-traces         # the LSM simulation's traces replayed by quint test, with trace mutants (test/Durable.Storage/eng/archive-traces.ps1)
+just coverage               # Cobertura coverage, CRAP >= 30 hotspots, HTML report (test/Durable.Storage/eng/coverage.ps1)
+just fuzz all 60            # libFuzzer campaigns per decoder (test/Durable.Storage/eng/fuzz.ps1; x64 Windows or Linux; -Merge keeps the corpus)
 just explore 1..500         # the simulation corpora over a seed range (CLOG_SIM_SEEDS)
 just explore-schedules       # the simulated conformance classes' windows explored at CLOG_SCHEDULE_BOUND=deep (a class filter optional)
 just emulators              # the cloud stores' suites and the Orleans interop tests on the AppHost's emulators (Docker; CLOG_EMULATORS=1)
 just e2e                    # the Orleans composition's multi-silo scenarios, the smoke set and the explicit rest
-just bench '*' --job Dry    # the benchmarks a required filter selects (eng/bench.ps1)
-just sample                 # the sample Orleans app: three silos over Azurite, with the Aspire dashboard (Docker; samples/README.md)
-just mutation-since main     # Stryker.NET on the core units' changes since a commit (eng/mutation.ps1); deferred (plan decision 16)
-just mutation-core          # Stryker.NET on the core units in full against eng/mutation-baseline.json; milestones
+just bench '*' --job Dry    # the benchmarks a required filter selects (test/Durable.Storage/eng/bench.ps1)
+just sample                 # the sample Orleans app: three silos over Azurite, with the Aspire dashboard (Docker; playground/DurableStorage/README.md)
+just mutation-since main     # Stryker.NET on the core units' changes since a commit (test/Durable.Storage/eng/mutation.ps1); deferred (plan decision 16)
+just mutation-core          # Stryker.NET on the core units in full against test/Durable.Storage/eng/mutation-baseline.json; milestones
 just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the named units, each a component
 ```
 
@@ -128,8 +131,8 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
 - **Git:** linear history. Rebase before integrating and update branches by fast-forward only; merge
   commits are prohibited. Commits are focused and use Conventional Commit messages.
 - **Frameworks:** every project, the Aspire AppHost and the Clockwork simulation test projects among them, targets
-  `net11.0` alone with the pinned GA SDK. Take the Microsoft.Extensions abstractions from the shared framework, never
-  as package references. The submodules under `vendor/` keep their upstream build boundary.
+  `net11.0` alone. Take the Microsoft.Extensions abstractions from the shared framework, never as package references.
+  The consensus and simulation families keep their own build settings.
 - **Compiler and analyzers:** nullable reference types, preview language features, strict features, and
   the .NET SDK's analyzers and `Microsoft.CodeAnalysis.BannedApiAnalyzers`, with warnings as errors. Every `src`
   project builds with the trim, AOT, and single-file analyzers. Fix a warning with source generation, a static
@@ -145,7 +148,8 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   on bytes a component holds takes `ReadOnlySpan<T>` ([conventions
   §1](docs/spec/conventions.md#1-buffers-and-ownership)). Keep hot paths allocation-conscious.
 - **Wire contracts:** Orleans serialization carries the Orleans composition's replica traffic, and generated
-  serializers stay out of domain abstractions; Fast CASPaxos keeps its upstream gRPC transport.
+  serializers stay out of domain abstractions; Fast CASPaxos is reached through a caller-owned register service, and
+  remote voters over Orleans RPC.
 - **Retries:** use a client SDK's built-in retries, otherwise `Microsoft.Extensions.Resilience` and Polly
   with bounded jittered backoff, cancellation, and an idempotency analysis per operation.
 - **Durable answers:** a crash never revokes an answer. What an answer asserts (a write, a seal, a drop, a commit, a
@@ -167,16 +171,15 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   shape comes from the platform and maps onto Rust for the Roux port
   ([conventions §15](docs/spec/conventions.md#15-outcomes-unions-and-errors)).
 - **Citations in code:** cite the spec's invariant IDs (for example `LG-I5`). Code which implements a
-  paper-defined algorithm or invariant quotes the paper verbatim, citing the file under
-  `research/papers` and its section.
+  paper-defined algorithm or invariant quotes the paper verbatim, citing the paper and its section (`research/papers/<paper>`, in Clog's repository at the snapshot
+  `PROVENANCE.md` names).
 - **Requirements are explicit.** A concern becomes a requirement only through a supported use case, a layer
   contract, a paper-defined invariant, a realistic failure mode, or a measurement. Each layer validates
   only the invariants it owns.
 - **Dependencies:** use the BCL and Microsoft.Extensions (hosting, dependency injection, options, logging, metrics,
   resilience, `TimeProvider`, object pools, hashing) before building our own; a Clog component replaces one only for a
-  requirement it cannot meet, recorded with the rationale. Prefer stable packages; the recorded exception is Orleans,
-  which the Orleans composition takes from its nightly feed at one exact build of its `main` branch, moved only by a
-  pull request of its own ([build and packaging §2](docs/spec/build-packaging.md#2-source-and-dependency-policy)).
+  requirement it cannot meet, recorded with the rationale. Prefer stable packages, versioned centrally in the repository's `Directory.Packages.props`; the Orleans composition
+  references Orleans' projects in this repository ([build and packaging §2](docs/spec/build-packaging.md#2-source-and-dependency-policy)).
   Copied source (as `ArcBuffer` from Orleans) is adapted into Clog namespaces and maintained as Clog code with its own
   tests and attribution.
 
@@ -186,7 +189,7 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
 
 - **Oracles come from the spec**, written once per contract and reused at every layer: an Accordant spec per
   stateful contract, invariant checkers, the fold of the history for every optimization, and per-journal
-  linearizability (the Porcupine algorithm in `tests/shared`). Generators (Accordant, CsCheck, simulation
+  linearizability (the Porcupine algorithm in `test/Durable.Storage/shared`). Generators (Accordant, CsCheck, simulation
   workloads, hand-written scenarios) choose sequences; the oracle decides.
 - **Layers:** Quint models with a mutant per invariant; xUnit v3 unit tests and golden vectors; Verify
   snapshots (pinned at 32.0.0); CsCheck properties, including metamorphic ones; Accordant conformance through the
@@ -195,14 +198,14 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   (verification §4.1; `CLOG_SCHEDULE_BOUND=deep` at milestones, `CLOG_SCHEDULE` replays a schedule); deterministic
   simulation with fault injection on Clockwork;
   integration over real boundaries and Aspire emulators; `Orleans.TestingHost` end-to-end; Stryker.NET mutation
-  testing (core units break below 80%, or below the measured score `eng/mutation-baseline.json` holds while a gap
+  testing (core units break below 80%, or below the measured score `test/Durable.Storage/eng/mutation-baseline.json` holds while a gap
   closes; reviewed equivalent mutants in the same file; each unit a component, configured by a
-  `stryker-config.<Component>.json` beside the `src` project which compiles it, unless that project builds from
-  `vendor/`); and soak runs.
+  `stryker-config.<Component>.json` beside the `src` project which compiles it, unless that project builds on
+  the consensus or simulation family); and soak runs.
 - **Also adopted:** trace validation against the models, coverage-guided fuzzing of decoders, crash-state enumeration,
   and leak checks where they matter most: every test class of the Buffers, the WAL, Ledgers, MetaStore, CASPaxos,
   Archive, archive-log, state database, cloud, and model test projects holds an `ArcBufferLeakCheck`
-  (`tests/shared/LeakChecks`) and releases every buffer it owns, every `MetaStoreEntry` among them, before teardown,
+  (`test/Durable.Storage/shared/LeakChecks`) and releases every buffer it owns, every `MetaStoreEntry` among them, before teardown,
   unless it carries `[NoPageLeakCheck(reason)]`; a property runs each case in `_leaks.InScope(() => ...)` or `_leaks.InScopeAsync(...)`;
   `CLOG_TEST_LEAK_TRACES=1` reports where each leaked page was rented.
 - **Gates:** every change runs the build, formatting, unit, snapshot, property, and conformance
@@ -212,7 +215,7 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
 - **Expensive work runs after hours, off the critical path:** mutation runs (incremental ones included), seed
   exploration, fuzzing campaigns, extended model runs, and quiet-machine benchmarks run in the nightly window, and a
   pull request lands without waiting for them; their findings are fixed in follow-up pull requests (verification §12).
-  Until the implementation is complete, [decision 16](docs/implementation-plan.md#decisions) defers them.
+  Until the implementation is complete, [decision 16](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md#decisions) defers them.
 - **Debug assertions:** Release builds compile `Debug.Assert` away, so the Debug leg (`just test-debug`) builds its
   projects in Debug so their debug assertions run. A failed assertion throws `DebugAssertionException` at its site and
   is recorded, so it fails its seeded simulation at its step with its seed, its test, or its test assembly, even when
@@ -229,7 +232,7 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
 ## Performance
 
 - Claim an optimization only with measurements: throughput, latency distributions, and allocations.
-- Permanent microbenchmarks live in `benchmarks/Orleans.Durable.Storage.Benchmarks`. Validate new ones with `--job Dry`,
+- Permanent microbenchmarks live in `test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks`. Validate new ones with `--job Dry`,
   always pass a filter, and compare against an explicit baseline.
 
 ```powershell

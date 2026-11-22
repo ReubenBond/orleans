@@ -2,7 +2,7 @@
 
 A C# port of [Porcupine](https://github.com/anishathalye/porcupine)'s linearizability checker and visualizer, at
 commit `97cd067defd99df172053ba7f4ca5bbae57fe446`, maintained as Clog code
-([verification §3.4](../../../docs/spec/verification.md#34-linearizability)). Porcupine is Copyright (c) Anish Athalye,
+([verification §3.4](../../docs/spec/verification.md#34-linearizability)). Porcupine is Copyright (c) Anish Athalye,
 under the MIT License in [`PORCUPINE-LICENSE.md`](PORCUPINE-LICENSE.md).
 
 A test project links the sources and embeds the visualizer's assets:
@@ -46,6 +46,6 @@ A test project links the sources and embeds the visualizer's assets:
 ## Validation
 
 `Orleans.Durable.Storage.Testing.Tests` checks Porcupine's published key-value histories
-([`tests/shared-vectors/linearizability`](../../shared-vectors/linearizability/README.md)), ports Porcupine's
+([`test/Durable.Storage/shared-vectors/linearizability`](../../shared-vectors/linearizability/README.md)), ports Porcupine's
 hand-written checker and visualization tests (including the exact visualization data of
 `TestVisualizationMultipleLengths`), and checks generated histories with injected violations.

@@ -35,7 +35,7 @@ sweeper, caches, and the memory object store), and the object store providers in
 Data-plane types use namespace `Orleans.Durable.Storage.Engine.Archive.Lsm` and control-plane types
 `Orleans.Durable.Storage.Engine.Archive.Lsm.Control` (§2). In code: the object store contract, the memory and
 file-system providers, and the manifest's format, view, and committer (row 2.1 of the [implementation
-plan](../../implementation-plan.md)), the run object's format, its writer, and its reader (row 3.1), and the archive
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), the run object's format, its writer, and its reader (row 3.1), and the archive
 store's reads, ledger drops, `ArchiveOptions`, and drains of whole closed segments within the archive's drain memory
 budget (row 3.2), the sweeper with the file-system store's reclamation of its temporary files (row 3.4), and the store's
 prefixes, its empty token, its tag version base, its pure members, and its record (row 2.4), compaction (rows 3.3 and
@@ -656,7 +656,7 @@ The LSM's members of the archive contract ([archive §3](archive.md#3-requiremen
 | Member | The LSM's answer |
 | --- | --- |
 | `ArchivePrefix.Token` | Empty (`Origin`): the LSM tracks no per-key position. |
-| `ArchivePrefix.VersionBase` | The tag `(ledger, slot, index)` of the prefix's last row, encoded as 20 bytes: the ledger `u64`, the slot `u64`, and the index `u32`, little-endian, as sections encode tags (§7), pinned by `tests/shared-vectors/archive/version-bases.json`. Tags are unique and increase in each key's acceptance order ([LG-I6](ledgers.md#5-invariants)), and compaction keeps a key's newest row of a complete ledger and every row after it (LSM-I5), so each base names one state of the key, and, among reads whose map lists no ledger holding a row of the key, it advances with every row the LSM stores and never repeats while the LSM holds the key. |
+| `ArchivePrefix.VersionBase` | The tag `(ledger, slot, index)` of the prefix's last row, encoded as 20 bytes: the ledger `u64`, the slot `u64`, and the index `u32`, little-endian, as sections encode tags (§7), pinned by `test/Durable.Storage/shared-vectors/archive/version-bases.json`. Tags are unique and increase in each key's acceptance order ([LG-I6](ledgers.md#5-invariants)), and compaction keeps a key's newest row of a complete ledger and every row after it (LSM-I5), so each base names one state of the key, and, among reads whose map lists no ledger holding a row of the key, it advances with every row the LSM stores and never repeats while the LSM holds the key. |
 | `ArchivePrefix.HasBase` | True when the key's base is a `Replace`, an empty one included (§8.6). |
 | `ArchivePrefix.Tombstone` | The body of the key's base when the base is a `Delete` with a non-empty body and no `Append` follows it (§8.6). |
 | `ArchivePrefix.Content` | The prefix's content (§8.6). |
@@ -912,7 +912,7 @@ block skips the order check across it. A read of one range's rows, as a push rea
 first keys lie in the range and the last block whose first key lies below it, checking each under the same rules but
 the section's totals, and stops at the first row past the range; the compaction checks each input's totals over the
 rows of all its ranges' reads, once it has read every range. The partial decoders, of the trailer alone and of the
-tail, apply the rules of the parts they read. The vectors are `tests/shared-vectors/archive/run-objects.json` and
+tail, apply the rules of the parts they read. The vectors are `test/Durable.Storage/shared-vectors/archive/run-objects.json` and
 `run-object-rejections.json`, which `generate_run_objects.py` beside them writes from its own reading of these rules,
 and the `archive-run-object` fuzz target judges the decoder by an independent reading of them, and its reads of each
 section's halves by the whole read ([verification §6.1](../verification.md#61-decoder-fuzzing)).
@@ -953,7 +953,7 @@ and incomplete), `complete-at-drained-below`, `bad-object-name` (§4), `bad-sect
 (ledger 0, slot past 2<sup>63</sup> − 2, or index past 2<sup>31</sup> − 1), `tags-unordered` (the lowest above the
 highest), `bad-tail-range` (an empty tail, or one ending past 2<sup>63</sup> − 1), `sections-unordered` (not strictly
 after the previous section's object and offset), and `trailing-bytes`. The vectors are
-`tests/shared-vectors/archive/manifest.json` and `manifest-rejections.json`, and the `archive-manifest` fuzz target
+`test/Durable.Storage/shared-vectors/archive/manifest.json` and `manifest-rejections.json`, and the `archive-manifest` fuzz target
 judges the decoder by an independent reading of these rules ([verification
 §6.1](../verification.md#61-decoder-fuzzing)). The encoder writes the fields across buffer pages and fills the header
 last, and the decoder reads a `ReadOnlySequence<byte>` in place, so a manifest of any size, many pages long, encodes and
@@ -1607,7 +1607,7 @@ durable entries, under the flush rules of [system model
   against every value after `vⱼ`; a drain's goal, once present, stays present; a fold leaves every change of its
   batch with its goal or a failed rule; and the production rules and fold agree, on every change and value, with a
   reference reading of the §2.9 table which shares no code with them (`ManifestCommitRulesTests`,
-  `tests/shared/Archive/Lsm/ManifestReference.cs`). Examples show `IsComplete(S)` after the drain which completes `S`,
+  `test/Durable.Storage/shared/Archive/Lsm/ManifestReference.cs`). Examples show `IsComplete(S)` after the drain which completes `S`,
   whether or not `DrainedBelow` passes `S`.
 - **Committer conformance.** A history oracle of `ManifestCommitter.CommitAsync` runs in deterministic simulation
   (`ManifestCommitterSimulationTests`): two committers share one manifest in the kit's `SimulatedObjectStore`, which

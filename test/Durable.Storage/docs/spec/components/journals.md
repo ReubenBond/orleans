@@ -30,7 +30,7 @@ Code: `Orleans.Durable.Storage.Engine.Journals` (reducer, entry codec, admission
 concrete classes which the composition uses directly. Every type is data plane, in namespace
 `Orleans.Durable.Storage.Engine.Journals`, and uses only the data-plane types of Ledgers and the Archive ([README
 §2.1](../README.md#21-control-plane-and-data-plane)). *In code* (rows 2.3a and 2.3b A to D of the [implementation
-plan](../../implementation-plan.md)), with every body inline and within `MaxBodyBytes`: the row key (`JournalRowKey`);
+plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)), with every body inline and within `MaxBodyBytes`: the row key (`JournalRowKey`);
 versions (`JournalVersion`) with their text form; the entry record of §7 (`JournalEntry`, `JournalEntryRecord`); the
 fold of a history read with the rebase (`JournalState`); a key's planning state (`JournalPlanning`), which its load
 gives with its state (`JournalLoad`); admission on the primary (`LedgerAdmission`), which decides by version, judges an
@@ -545,7 +545,7 @@ equality is version equality.
 
 **Row key.** `xxhash32` of the journal key's strict UTF-8, seed 0, as 4 big-endian bytes, then the UTF-8 (§4.1).
 
-Golden vectors: `tests/shared-vectors/journals/entries.json`, `entry-rejections.json`, `versions.json`,
+Golden vectors: `test/Durable.Storage/shared-vectors/journals/entries.json`, `entry-rejections.json`, `versions.json`,
 `version-rejections.json`, and `row-keys.json` ([formats §6](../formats.md#6-golden-vectors)), each record with the row
 key it was written for, the row it is written as (its row kind, its version before, and its body), and rejections which
 break two rules for the earlier; the `journals-entry` fuzz target, whose input frames a row key and a record, and the

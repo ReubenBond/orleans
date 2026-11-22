@@ -690,7 +690,7 @@ An operation returns what its caller decides on, and throws what its caller prop
   when `Value` is non-null; repeated access agrees; a `default` value holds nothing; where the union declares equality,
   two values are equal exactly when they hold the same case with equal values, `GetHashCode` agrees, and equal fields
   in different cases (`WalTorn(a, b)` and `WalCorruption(a, b)`) differ; and a type-pattern switch in a warmed loop
-  allocates no bytes (`GC.GetAllocatedBytesForCurrentThread`). One generic CsCheck harness in `tests/shared` checks
+  allocates no bytes (`GC.GetAllocatedBytesForCurrentThread`). One generic CsCheck harness in `test/Durable.Storage/shared` checks
   them through an adapter per union, each case in its own page leak scope
   ([verification §11.1](verification.md#111-leak-checks)); a self-test runs it against unions which each break one law,
   and a test fails for any hand-written union in `src` (a `[Union]` type which declares `HasValue`; the compiler marks

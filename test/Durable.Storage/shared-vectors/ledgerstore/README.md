@@ -1,7 +1,7 @@
 # LedgerStore vectors
 
 Language-neutral golden vectors for the LedgerStore's durable formats
-([LedgerStore](../../../docs/spec/components/ledgerstore.md#7-formats)): the node file, the `CLSC` catalog checkpoint,
+([LedgerStore](../../docs/spec/components/ledgerstore.md#7-formats)): the node file, the `CLSC` catalog checkpoint,
 the WAL record, and the `CLSI` slot-index checkpoints. Clog's test suites read these files directly, and the vectors
 change with the formats they pin.
 

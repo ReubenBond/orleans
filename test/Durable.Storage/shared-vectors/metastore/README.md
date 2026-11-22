@@ -1,7 +1,7 @@
 # MetaStore vectors
 
 Language-neutral golden vectors for MetaStore register keys and version tokens
-([MetaStore](../../../docs/spec/components/metastore.md#7-formats)). Clog's test suites read these files
+([MetaStore](../../docs/spec/components/metastore.md#7-formats)). Clog's test suites read these files
 directly, and the vectors change with the mappings they pin.
 
 Clusters are 32 lowercase hexadecimal digits (`{cluster:N}`). Firestore seconds are 64-bit integers, written as

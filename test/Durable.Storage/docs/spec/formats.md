@@ -4,7 +4,7 @@ Every durable format and wire protocol Clog defines, with the section which spec
 which pin it, and the layouts of object storage, the MetaStore, and local storage. Integers are little-endian
 unless a format says otherwise; every CRC is CRC-32C ([conventions](conventions.md#4-integrity)).
 
-Golden vectors live under `tests/shared-vectors/<area>/`. The **Vectors** column names the files which pin a
+Golden vectors live under `test/Durable.Storage/shared-vectors/<area>/`. The **Vectors** column names the files which pin a
 format. A format's owning section gives its byte layout, which may precede its code; its encoder, decoder, golden
 vectors, and fuzz target land together, and until then the format is *Not yet in code*.
 
@@ -35,9 +35,9 @@ vectors, and fuzz target land together, and until then the format is *Not yet in
 | File-system MetaStore register file | `CLFM`, 1 | `{root}/{cluster:N}/{stem}~clfm` | [metastore §7](components/metastore.md#7-formats) | `metastore/register-file-rejections.json`; behavioral tests (`FileSystemMetaStoreTests`) and the `metastore-register` fuzz target |
 | Journal index: WAL-less atomic-flush RocksDB (`key_index`, `tombstones`, and `default` watermarks column families) | — (no format version; derived) | `{root}/index/` | [journals §8.3](components/journals.md#83-warm-state) | `RocksDbJournalIndexTests` |
 | Block cache region files: the LSM blocks, each with a CRC-32C | — (derived) | A directory on the host's volatile disk | [archive LSM §8.7](components/archive-lsm.md#87-caches) | With the implementation |
-| Object-store ledger store record: the store ID and the layout, as two `key=value` lines in the archive store record's form | — | `ledgers/store` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `tests/shared-vectors/ledgers/object-store-records.json` and `object-store-record-rejections.json`; fuzz target `ledgers-object-store-record` |
-| Object-store ledger slot object: a batch with its recorded CRC-32C, or empty, a SEAL; slots reverse-keyed, as the per-slot object profile removed in `047dc2c94` was; the `sealed` and `dropped` markers | — | `ledgers/l/{id:D20}/s/{rev}`, `ledgers/l/{id:D20}/sealed`, and `ledgers/l/{id:D20}/dropped` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `tests/shared-vectors/ledgers/object-names.json` and `object-slots.json`, the profile's revived |
-| Object-store ledger extent: DATA, `ROLL`, and `SEAL` frames, each append ending with a trailer; or its tombstone, one `SEAL` frame in a block blob | `CLOE`, 1 | `ledgers/l/{id:D20}/x/{rev}` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `tests/shared-vectors/ledgers/object-extents.json` and `object-extent-rejections.json`; fuzz target `ledgers-object-extent` |
+| Object-store ledger store record: the store ID and the layout, as two `key=value` lines in the archive store record's form | — | `ledgers/store` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `test/Durable.Storage/shared-vectors/ledgers/object-store-records.json` and `object-store-record-rejections.json`; fuzz target `ledgers-object-store-record` |
+| Object-store ledger slot object: a batch with its recorded CRC-32C, or empty, a SEAL; slots reverse-keyed, as the per-slot object profile removed in `047dc2c94` was; the `sealed` and `dropped` markers | — | `ledgers/l/{id:D20}/s/{rev}`, `ledgers/l/{id:D20}/sealed`, and `ledgers/l/{id:D20}/dropped` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `test/Durable.Storage/shared-vectors/ledgers/object-names.json` and `object-slots.json`, the profile's revived |
+| Object-store ledger extent: DATA, `ROLL`, and `SEAL` frames, each append ending with a trailer; or its tombstone, one `SEAL` frame in a block blob | `CLOE`, 1 | `ledgers/l/{id:D20}/x/{rev}` below the cluster's store prefix | [object-store ledgers §7](components/object-ledgers.md#7-formats) | `test/Durable.Storage/shared-vectors/ledgers/object-extents.json` and `object-extent-rejections.json`; fuzz target `ledgers-object-extent` |
 | Object-store ledger cache: batches with their CRC-32C | — (derived) | Memory, and optionally a directory on the host's volatile disk | [object-store ledgers §8.4](components/object-ledgers.md#84-reads-and-the-cache) | Behavioral and metamorphic tests (`ObjectLedgerCacheTests`) |
 
 Derived formats are rebuilt from authoritative sources when they fail validation: an unusable slot-index or catalog
@@ -55,7 +55,7 @@ with no Protocol Buffers runtime ([orleans §7.3](compositions/orleans.md#73-nod
 | Package or protocol | Service or messages | Project | Carrier | Owner |
 | --- | --- | --- | --- | --- |
 | `orleans.durable.storage.v1` | `NodeRegistry`, `NodeEntry` (durable, not an RPC) | `Orleans.Durable.Storage` | MetaStore register value | [orleans](compositions/orleans.md) |
-| Fast CASPaxos register RPC | Upstream register service, pinned by the `vendor/fast-caspaxos` submodule | Upstream | gRPC | [metastore §8](components/metastore.md#8-mechanism-and-policy) |
+| Fast CASPaxos register service | The consensus family's `IRegisterService` (`src/Consensus/`) | Consensus family | In-process; Orleans RPC for remote voters | [metastore §8](components/metastore.md#8-mechanism-and-policy) |
 | Orleans grain interfaces | Replica calls, forwarded entries and reads (data plane); transitions, commit submissions, and the controller grain's other calls (control plane); transient, Orleans serialization | `Orleans.Durable.Storage` | Orleans silo-to-silo messaging | [orleans §7.2](compositions/orleans.md#72-grain-interfaces), [§5.12](compositions/orleans.md#512-replica-transport) |
 | Cloud service APIs | MetaStore registers, LSM objects, and Azure archive logs, through each service's SDK | `Orleans.Durable.Storage.AzureStorage`, `Orleans.Durable.Storage.S3`, `Orleans.Durable.Storage.GoogleCloud` | HTTPS | [metastore §9](components/metastore.md#9-providers-and-implementations), [archive LSM §9](components/archive-lsm.md#9-providers-and-implementations), [archive logs §9](components/archive-logs.md#9-providers-and-implementations) |
 | Journal entry record | One entry: a CRC-32C over the row key and the record, the kind, the expected version, a `Delete`'s deletion time, and the body; never stored, so it carries no version byte | `Orleans.Durable.Storage.Engine.Journals` | Carried verbatim from the writing process to the key's primary, in process or in the composition's forwarding calls | [journals §7](components/journals.md#7-formats) |
@@ -228,7 +228,7 @@ every run:
 | Replica node grain's answers, each as its surrogate's wire | `orleans-replica-write`, `orleans-replica-read`, `orleans-replica-tail` | None: each case's encoding and refused surrogates, which the targets build |
 
 The `archive-log-token`, `archive-log-chunk-base`, `archive-log-chunk`, and `archive-log-metadata` targets, in
-`fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, are seeded from `archive-logs/tokens.json`, `chunk-bases.json`,
+`test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Archive.Logs`, are seeded from `archive-logs/tokens.json`, `chunk-bases.json`,
 `chunks.json`, `metadata.json`, and `metadata-rejections.json`.
 
 ## 7. Rules for format changes

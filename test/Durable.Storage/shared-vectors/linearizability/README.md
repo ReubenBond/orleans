@@ -1,7 +1,7 @@
 # Linearizability vectors
 
-Published client histories with known verdicts, which pin the linearizability checker in `tests/shared/Linearizability`
-([verification §3.4](../../../docs/spec/verification.md#34-linearizability)) to the Porcupine
+Published client histories with known verdicts, which pin the linearizability checker in `test/Durable.Storage/shared/Linearizability`
+([verification §3.4](../../docs/spec/verification.md#34-linearizability)) to the Porcupine
 checker it ports. `Orleans.Durable.Storage.Testing.Tests` (`PorcupineVectorTests`) reads these files directly.
 
 ## Files

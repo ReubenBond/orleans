@@ -1,9 +1,9 @@
 # Ledgers vectors
 
 Language-neutral golden vectors for the Ledgers layer's durable formats
-([Ledgers](../../../docs/spec/components/ledgers.md#7-formats)): the ledger map, `CLLM` version 1, and the batch, `CLLB`
+([Ledgers](../../docs/spec/components/ledgers.md#7-formats)): the ledger map, `CLLM` version 1, and the batch, `CLLB`
 version 1; and the object-store ledgers' names, slots, and store record
-([object-store ledgers](../../../docs/spec/components/object-ledgers.md#7-formats)). Clog's test suites read
+([object-store ledgers](../../docs/spec/components/object-ledgers.md#7-formats)). Clog's test suites read
 these files directly, and the vectors change with the format they pin.
 
 Integers in the encodings are little-endian. Integers of 64 bits and more in the vectors are decimal strings, a
@@ -22,7 +22,7 @@ range `depth` and `prefix`, `replicas` and `primary` and `sequencer` as UUIDs, `
 when closed, `tail`. Decoding `hex` yields the value, and encoding the value yields `hex`.
 
 `map-rejections.json` holds values which each break one rule, unless a case names two, with the `reason` code of the
-first rule a decoder checks; [ledgers §7](../../../docs/spec/components/ledgers.md#7-formats) lists the rules in that
+first rule a decoder checks; [ledgers §7](../../docs/spec/components/ledgers.md#7-formats) lists the rules in that
 order. Every rejection long enough to hold a CRC carries the CRC-32C of its bytes, except the `crc-mismatch` case.
 
 ## Batch, `CLLB` version 1
@@ -41,7 +41,7 @@ its `body`. Decoding `hex` yields them, and encoding them yields `hex`.
 
 `batch-rejections.json` holds batches which each break one rule, or two where the case's name says so, with the
 `reason` code of the first rule a decoder checks, which it reports in `Data["orleans.durable.storage.decode.reason"]`;
-[ledgers §7](../../../docs/spec/components/ledgers.md#7-formats) lists the batch rules in that order. Every rejection
+[ledgers §7](../../docs/spec/components/ledgers.md#7-formats) lists the batch rules in that order. Every rejection
 which holds a CRC carries the CRC-32C of its bytes, except the `crc-mismatch` case.
 
 ## Segments

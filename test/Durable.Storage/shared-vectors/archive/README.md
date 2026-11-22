@@ -1,8 +1,8 @@
 # Archive LSM vectors
 
 Language-neutral golden vectors for the archive's durable formats: the LSM's manifest, `CLAM` version 1, its run
-object, `CLAR` version 1, and its version base ([Archive LSM](../../../docs/spec/components/archive-lsm.md#7-formats)),
-and every store's record ([Archive §7](../../../docs/spec/components/archive.md#7-formats)). Clog's test suites read
+object, `CLAR` version 1, and its version base ([Archive LSM](../../docs/spec/components/archive-lsm.md#7-formats)),
+and every store's record ([Archive §7](../../docs/spec/components/archive.md#7-formats)). Clog's test suites read
 these files directly, and the vectors change with the format they pin.
 
 Integers in the encodings are little-endian. Integers of 64 bits in the vectors are decimal strings, and byte strings
@@ -97,8 +97,8 @@ a byte before or after it, and a bit flipped a third of the way in; none is a ve
 them. Run it from the repository root after installing its pinned dependency:
 
 ```powershell
-python -m pip install -r tests/shared-vectors/archive/requirements.txt
-python tests/shared-vectors/archive/generate_run_objects.py
+python -m pip install -r test/Durable.Storage/shared-vectors/archive/requirements.txt
+python test/Durable.Storage/shared-vectors/archive/generate_run_objects.py
 ```
 
 ## Store record

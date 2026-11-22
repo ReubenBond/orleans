@@ -1,6 +1,6 @@
 # WAL vectors
 
-Language-neutral golden vectors for WAL files, version 1 ([WAL](../../../docs/spec/components/wal.md#7-formats)):
+Language-neutral golden vectors for WAL files, version 1 ([WAL](../../docs/spec/components/wal.md#7-formats)):
 the header page, data pages of frames, the hole page, and the worked example. Clog's test suites read these files
 directly, and the vectors change with the format they pin.
 

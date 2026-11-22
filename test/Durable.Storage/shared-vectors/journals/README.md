@@ -1,7 +1,7 @@
 # Journals vectors
 
 Language-neutral golden vectors for the Journals layer's formats
-([Journals](../../../docs/spec/components/journals.md#7-formats)): the entry record, the version's text form, and the
+([Journals](../../docs/spec/components/journals.md#7-formats)): the entry record, the version's text form, and the
 row key. Clog's test suites read these files directly, and the vectors change with the format they pin. They were
 written from an independent reading of the format, with xxhash32, CRC-32C, the varint, and base64url implemented apart
 from the C# codec.
@@ -26,7 +26,7 @@ Each record carries the `rowKey` it was written for, in hexadecimal, which its C
 records with their `kind` and `expectedVersion` (`base` and `count`); an `Append` or `Replace` its `payload`; and a
 `Delete` its `deletedAt` in ticks. Decoding `hex` under `rowKey` yields the fields, and encoding the fields for `rowKey`
 yields `hex`. Each record also names the row the primary writes for it
-([Journals §4.2](../../../docs/spec/components/journals.md#42-entries-and-rows)): its `rowKind` (`Append`, `Replace`,
+([Journals §4.2](../../docs/spec/components/journals.md#42-entries-and-rows)): its `rowKind` (`Append`, `Replace`,
 or `Delete`, an `Expired`'s among them), its `versionBefore`, the expected version, and its `rowBody`: an `Append`'s or
 `Replace`'s payload, a `Delete`'s tombstone (its deletion time in UTC ticks, `i64`), and nothing for an `Expired`.
 

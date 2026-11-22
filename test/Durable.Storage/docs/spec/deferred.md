@@ -88,7 +88,7 @@ their nodes on a schedule, not only when WAL release, a replica change, or a con
 own age ([ledgers §8.2](components/ledgers.md#82-appends)), and the WAL is released per ledger through rolls for WAL
 release, which already bound a ledger's life ([orleans §5.9](compositions/orleans.md#59-resource-governance)). An age
 roll would add map writes for no measured need; its policy belongs with the roll policy of row 4.4 of the
-[implementation plan](../implementation-plan.md).
+[implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md).
 
 **Revisit when** row 4.4 sets the roll policy, or a deployment measures live ledgers held open long after their rows
 drained.
@@ -214,7 +214,7 @@ large-object-heap bytes per byte, each generation's collections, the CPU per GiB
 **Why it waits.** Each is an Orleans change. Until the first, a Clog page in a message would leak from Clog's pool on
 the paths above, which OR-I18 and the leak checks forbid; Orleans' own pages leak only to the GC.
 
-**Acceptance.** On the nightly which claims the first change, Clog's transport tests pass under `CalleeFaults`,
+**Acceptance.** On the Orleans revision which claims the first change, Clog's transport tests pass under `CalleeFaults`,
 cancellation, and stopped silos with leak checks over Clog's pool and with Orleans' outstanding pages, its rents less
 its returns, at zero at quiescence; `OrleansBufferOwnershipContractTests` then fails, as it must.
 
@@ -236,9 +236,9 @@ its returns, at zero at quiescence; `OrleansBufferOwnershipContractTests` then f
   Server GC pauses. While separate forwarding lanes keep concurrent 1 KiB and 1 MiB write admission unblocked (zero
   backpressure), shared loopback TCP, thread-pool, and primary GC contention under 4× 64 MiB read saturation raises
   concurrent write p99 to 390.7 ms (1 KiB) and 407.8 ms (1 MiB).
-- **Verdict:** Stays deferred while awaiting an Orleans nightly carrying the ownership contract: write-path Server GC
+- **Verdict:** Stays deferred while awaiting an Orleans revision carrying the ownership contract: write-path Server GC
   pauses stay well below 2% (0.12–1.37%), whereas saturated multi-reader 64 MiB forwarded reads already reach 4.96%
-  primary GC pause share. Revisit as soon as an Orleans nightly carries the ownership contract, or earlier if
+  primary GC pause share. Revisit as soon as Orleans carries the ownership contract, or earlier if
   multi-disk write throughput or forwarded-read traffic makes primary LOH copies a production bottleneck. Adopting the
   contract removes Clog's own releases of the buffers Orleans decodes, in `LedgerReplicaHost`,
   `LedgerReplicaCallResults`, and `RemoteReplicaReadConverter`, in the same pin move, so no pin is released twice.
@@ -274,7 +274,7 @@ reads on one node's read-ahead and block cache. Read latency has distinct modes,
 one estimate would mislead, and an adaptive delay feeds back into the load it measures.
 
 **Revisit when** the measured hedge rate (`orleans.durable.storage.ledger.read.hedges`) or the decided-read p99 is above
-budget (row 5.4 of the [implementation plan](../implementation-plan.md)).
+budget (row 5.4 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)).
 
 ### Object-ledger appends on S3 Express and Cloud Storage
 

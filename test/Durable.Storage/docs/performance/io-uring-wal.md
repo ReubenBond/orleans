@@ -318,10 +318,10 @@ Initialize with `just sync`. From PowerShell at the repository root:
 
 ```powershell
 . ./eng/dotnet-env.ps1
-dotnet build benchmarks/Orleans.Durable.Storage.Benchmarks/Orleans.Durable.Storage.Benchmarks.csproj -c Release
-dotnet run --project benchmarks/Orleans.Durable.Storage.Benchmarks -c Release --no-build -- --wal-perf io-uring 128 64 1000
-dotnet run --project benchmarks/Orleans.Durable.Storage.Benchmarks -c Release --no-build -- --wal-perf io-uring 65536 256 40 window=1024
-Push-Location benchmarks/Orleans.Durable.Storage.Benchmarks
+dotnet build test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks/Orleans.Durable.Storage.Benchmarks.csproj -c Release
+dotnet run --project test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks -c Release --no-build -- --wal-perf io-uring 128 64 1000
+dotnet run --project test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks -c Release --no-build -- --wal-perf io-uring 65536 256 40 window=1024
+Push-Location test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks
 dotnet run -c Release --no-build -- --filter '*WalWriteBenchmarks*' --job Dry
 Pop-Location
 ```
