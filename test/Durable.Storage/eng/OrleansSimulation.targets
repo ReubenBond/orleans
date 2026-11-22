@@ -14,21 +14,21 @@
     configuration.
   -->
   <PropertyGroup>
-    <OrleansSimulationInstrumentationTaskAssembly>$(OrleansSimulationInstrumentationBuildDirectory)bin\$(ClogBaseConfiguration)\net11.0\Orleans.Testing.Simulation.Instrumentation.Build.dll</OrleansSimulationInstrumentationTaskAssembly>
+    <OrleansSimulationInstrumentationTaskAssembly>$(OrleansSimulationInstrumentationBuildDirectory)bin\$(DurableStorageBaseConfiguration)\net11.0\Orleans.Testing.Simulation.Instrumentation.Build.dll</OrleansSimulationInstrumentationTaskAssembly>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Update="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj;$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing\Orleans.Testing.Simulation.Testing.csproj;$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing.MTP\Orleans.Testing.Simulation.Testing.MTP.csproj;$(OrleansSimulationInstrumentationBuildDirectory)Orleans.Testing.Simulation.Instrumentation.Build.csproj"
-                      SetConfiguration="Configuration=$(ClogBaseConfiguration)" />
+                      SetConfiguration="Configuration=$(DurableStorageBaseConfiguration)" />
   </ItemGroup>
 
   <!--
     A simulation test project compiles against the conditional seams of src, which only the simulation configurations
     compile in (test/Durable.Storage/docs/spec/build-packaging.md §1), so a build in another configuration fails before it compiles.
   -->
-  <Target Name="RequireClogSimulationConfiguration" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(ClogSimulationBuild)' != 'true'"
-           Code="CLOG0008"
+  <Target Name="RequireDurableStorageSimulationConfiguration" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(DurableStorageSimulationBuild)' != 'true'"
+           Code="ODS0001"
            Text="$(MSBuildProjectName) is a simulation test project and builds in SimulationRelease or SimulationDebug, not $(Configuration): build it with -c SimulationRelease or -c SimulationDebug, or through Orleans.slnx or test/Durable.Storage/Durable.Storage.slnf, which map Release and Debug to them." />
   </Target>
 

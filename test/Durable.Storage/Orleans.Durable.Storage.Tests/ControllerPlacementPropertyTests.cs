@@ -215,7 +215,7 @@ public sealed class ControllerPlacementPropertyTests : IDisposable
     /// </summary>
     [Fact]
     public Task EveryTransitionAPassSendsSatisfiesORI5() =>
-        SampleAsync(Environment.GetEnvironmentVariable("CLOG_TEST_SEED") is { Length: > 0 } seed ? seed : null, iter: 150);
+        SampleAsync(Environment.GetEnvironmentVariable("DURABLE_STORAGE_TEST_SEED") is { Length: > 0 } seed ? seed : null, iter: 150);
 
     /// <summary>
     /// The seed which found the hand-off oracle stale: a node asks to hand off while membership does not list it, and a later

@@ -1,9 +1,9 @@
-# Clog samples
+# Durable Storage samples
 
-`Orleans.Durable.Storage.Samples.Journaling` is an Orleans app whose journaled grain keeps its state in Clog.
+`Orleans.Durable.Storage.Samples.Journaling` is an Orleans app whose journaled grain keeps its state in Durable Storage.
 `Orleans.Durable.Storage.Samples.AppHost` runs it as three silos on one machine, each with a node disk of its own, over
 Azurite, which holds the cluster's MetaStore registers (Azure Table), the LSM archive's objects (Azure Blob), and
-Orleans' membership (Azure Table). The Aspire dashboard shows each silo's logs and Clog's metrics.
+Orleans' membership (Azure Table). The Aspire dashboard shows each silo's logs and Durable Storage's metrics.
 
 ## Run it
 
@@ -23,7 +23,7 @@ Invoke-RestMethod http://localhost:5082/grains/cart-1
 ```
 
 The read answers the grain's entries and the silo its activation runs on. `KeyValueGrain` holds an
-`IDurableDictionary<string, string>`, which Orleans Journaling writes to the grain's journal in Clog, and its
+`IDurableDictionary<string, string>`, which Orleans Journaling writes to the grain's journal in Durable Storage, and its
 `[JournalPlacement]` places each activation on the silo whose node is its journal's primary.
 
 Each run is a new cluster: the AppHost, as the deployment, creates each silo's node root anew under `test/Durable.Storage/artifacts/sample`,
@@ -71,7 +71,7 @@ loss of one.
 
 ## Configuration
 
-`appsettings.json` holds what a deployment sets too: the silo's Clog options under `DurableStorage`, where
+`appsettings.json` holds what a deployment sets too: the silo's Durable Storage options under `DurableStorage`, where
 `DurableStorage:Node` binds to `DurableStorageOptions` and `DurableStorage:Control` to `ControlOptions` by the keys
 [orleans §6](../../test/Durable.Storage/docs/spec/compositions/orleans.md#6-configuration) lists, and a key which names no option stops the
 silo. The AppHost runs the silos in the Development environment, whose `appsettings.Development.json` tunes the cluster
@@ -88,12 +88,12 @@ to show its behaviour within minutes on one machine. A deployment keeps the defa
 | `DurableStorage:Control:SweepInterval` | 1 minute | 10 minutes | The LSM's sweeps show within the demo |
 
 The AppHost sets what differs per silo: `DurableStorage:Node:Root`, the node's directory on its persistent volume, and
-`DurableStorage:Node:Ordinal`; and `DurableStorage:Node:Cluster`, equal on every silo. `SampleSilo` registers Clog with
+`DurableStorage:Node:Ordinal`; and `DurableStorage:Node:Cluster`, equal on every silo. `SampleSilo` registers Durable Storage with
 `AddDurableJournalStorage(configuration.GetSection("DurableStorage"))`; `Program.cs` supplies the MetaStore
 (`AzureTableMetaStore`) and the LSM's object store (`AzureBlobObjectStore`), whose table and container names lie under
-`Sample`, since the `DurableStorage` section holds Clog's options alone.
+`Sample`, since the `DurableStorage` section holds Durable Storage's options alone.
 
-The cluster's archive store lies in that container under its store prefix, which Clog derives from Orleans'
+The cluster's archive store lies in that container under its store prefix, which Durable Storage derives from Orleans'
 `ServiceId`; the sample sets its own, `Sample:ServiceId`, since a silo whose service ID is one of Orleans' defaults,
 `default` or localhost clustering's `dev`, and which configures no `DurableStorage:Node:ArchiveStorePrefix`, does not
 start ([orleans §5.13](../../test/Durable.Storage/docs/spec/compositions/orleans.md#513-archive-log-store)).

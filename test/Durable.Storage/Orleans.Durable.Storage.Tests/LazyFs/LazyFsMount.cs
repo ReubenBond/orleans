@@ -80,7 +80,7 @@ internal sealed class LazyFsMount : IAsyncDisposable
             return false;
         }
 
-        var envBinary = Environment.GetEnvironmentVariable("CLOG_LAZYFS_BIN");
+        var envBinary = Environment.GetEnvironmentVariable("DURABLE_STORAGE_LAZYFS_BIN");
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string[] candidates =
         [
@@ -101,7 +101,7 @@ internal sealed class LazyFsMount : IAsyncDisposable
 
         if (binaryPath.Length == 0)
         {
-            reason = "LazyFS binary not found (checked CLOG_LAZYFS_BIN, PATH, ~/.local/bin/lazyfs, /usr/local/bin/lazyfs).";
+            reason = "LazyFS binary not found (checked DURABLE_STORAGE_LAZYFS_BIN, PATH, ~/.local/bin/lazyfs, /usr/local/bin/lazyfs).";
             return false;
         }
 

@@ -48,7 +48,7 @@ public sealed class CloudEmulators : IAsyncLifetime
     /// <summary>
     /// The environment variable which runs the emulator suites.
     /// </summary>
-    internal const string EnabledVariable = "CLOG_EMULATORS";
+    internal const string EnabledVariable = "DURABLE_STORAGE_EMULATORS";
 
     /// <summary>
     /// The container, or bucket, which every store of the tests lies in, under a prefix of its own.

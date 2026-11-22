@@ -44,7 +44,7 @@ public sealed class FailureDrainSimulationTests
 {
     private const int FirstSeed = 1;
 
-    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // Every change runs three seeds, and exploration runs more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
 
     // One slot per open ledger, so a ledger's failure-triggered drain waits for a slot only while its own drain runs.

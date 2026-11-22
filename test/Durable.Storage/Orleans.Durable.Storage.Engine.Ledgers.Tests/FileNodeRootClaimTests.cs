@@ -13,9 +13,9 @@ public sealed class FileNodeRootClaimTests : IDisposable
 
     public void Dispose() => _leaks.Dispose();
 
-    private const string ClaimHostRoot = "CLOG_CLAIM_HOST_ROOT";
-    private const string ClaimHostIndex = "CLOG_CLAIM_HOST_INDEX";
-    private const string ClaimHostFlush = "CLOG_CLAIM_HOST_FLUSH";
+    private const string ClaimHostRoot = "DURABLE_STORAGE_CLAIM_HOST_ROOT";
+    private const string ClaimHostIndex = "DURABLE_STORAGE_CLAIM_HOST_INDEX";
+    private const string ClaimHostFlush = "DURABLE_STORAGE_CLAIM_HOST_FLUSH";
     private const int Rounds = 256;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

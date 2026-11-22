@@ -38,7 +38,7 @@ public sealed class WindowScheduleExplorerTests
     }
 
     /// <summary>
-    /// A schedule which fails replays from the deviations the exploration reports, as <c>CLOG_SCHEDULE</c> gives them.
+    /// A schedule which fails replays from the deviations the exploration reports, as <c>DURABLE_STORAGE_SCHEDULE</c> gives them.
     /// </summary>
     [Fact]
     public void AFailingScheduleReplaysFromItsDeviations()

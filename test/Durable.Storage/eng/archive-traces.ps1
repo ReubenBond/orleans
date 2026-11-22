@@ -5,7 +5,7 @@
 # -Traces replays each with quint test and checks that each trace mutant is rejected at the step it changes.
 [CmdletBinding()]
 param(
-    # The simulation seeds (CLOG_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
+    # The simulation seeds (DURABLE_STORAGE_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
     # 1..20, more than the per-change corpus runs.
     [string] $Seeds
 )
@@ -24,8 +24,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."
 }
 
-$env:CLOG_ARCHIVE_TRACES = $traces
-$env:CLOG_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..20' }
+$env:DURABLE_STORAGE_ARCHIVE_TRACES = $traces
+$env:DURABLE_STORAGE_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..20' }
 
 & dotnet test --project $project -c SimulationRelease --no-build -- --filter-class Orleans.Durable.Storage.Simulation.Tests.ArchiveTraceTests
 if ($LASTEXITCODE -ne 0) {

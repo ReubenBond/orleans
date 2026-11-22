@@ -17,7 +17,7 @@ build: restore
 format: restore
     @& ./eng/validate.ps1 -Check Format
 
-# Apply the formatting and analyzer fixes to Clog's source.
+# Apply the formatting and analyzer fixes to Durable Storage's source.
 format-fix: restore
     @& ./eng/validate.ps1 -Check Format -Fix
 
@@ -45,7 +45,7 @@ e2e: restore
 lazyfs rounds="2":
     @& ./eng/lazyfs.ps1 -Rounds {{ rounds }}
 
-# Run the simulation corpora over a range of seeds (CLOG_SIM_SEEDS), for example `just explore 1..500`.
+# Run the simulation corpora over a range of seeds (DURABLE_STORAGE_SIM_SEEDS), for example `just explore 1..500`.
 explore seeds="1..500": restore
     @& ./eng/validate.ps1 -Check Explore -Seeds '{{ seeds }}'
 
@@ -61,7 +61,7 @@ fuzz target="all" duration="60" *options:
 bench filter *options: restore
     @& ./eng/bench.ps1 '{{ filter }}' {{ options }}
 
-# Run the sample Orleans app over Clog: three silos over Azurite, with the Aspire dashboard (Docker; playground/DurableStorage/README.md).
+# Run the sample Orleans app over Durable Storage: three silos over Azurite, with the Aspire dashboard (Docker; playground/DurableStorage/README.md).
 sample: restore
     @& ./eng/sample.ps1
 

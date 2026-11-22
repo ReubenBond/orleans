@@ -24,7 +24,7 @@ namespace Orleans.Durable.Storage;
 /// </para>
 /// <para>
 /// The host owns a forwarded write's record, which Orleans decoded or, on a call within one silo, its proxy pinned: it moves
-/// the record into Clog's page pool and releases it on every path (OR-I18). A read's pages are copies the reply carries,
+/// the record into Durable Storage's page pool and releases it on every path (OR-I18). A read's pages are copies the reply carries,
 /// which the host never releases (<see cref="ForwardedReads"/>).
 /// </para>
 /// </remarks>

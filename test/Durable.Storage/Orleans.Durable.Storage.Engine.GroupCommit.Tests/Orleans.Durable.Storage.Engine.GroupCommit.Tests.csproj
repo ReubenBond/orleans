@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The Debug leg runs these tests in Debug, so the group committer's debug assertions run. -->
   <PropertyGroup>
-    <ClogDebugLeg>true</ClogDebugLeg>
+    <DurableStorageDebugLeg>true</DurableStorageDebugLeg>
   </PropertyGroup>
 
   <ItemGroup>

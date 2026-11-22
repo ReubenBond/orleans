@@ -7,7 +7,7 @@
 # changes.
 [CmdletBinding()]
 param(
-    # The simulation seeds (CLOG_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
+    # The simulation seeds (DURABLE_STORAGE_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
     # 1..10, more than the per-change corpora run.
     [string] $Seeds
 )
@@ -26,8 +26,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."
 }
 
-$env:CLOG_LEDGER_MAP_TRACES = $traces
-$env:CLOG_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..10' }
+$env:DURABLE_STORAGE_LEDGER_MAP_TRACES = $traces
+$env:DURABLE_STORAGE_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..10' }
 
 & dotnet test --project $project -c SimulationRelease --no-build -- `
     --filter-method Orleans.Durable.Storage.Simulation.Tests.LedgerMapCommitterSimulationTests.EveryAnswerHoldsInTheRegistersHistoryUnderFaults `

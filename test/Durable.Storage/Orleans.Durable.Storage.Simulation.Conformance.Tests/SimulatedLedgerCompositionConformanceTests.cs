@@ -58,7 +58,7 @@ public sealed class SimulatedLedgerCompositionConformanceTests
     /// Every concurrent group of Accordant's generation over the composition's inputs, after every shorter sequence,
     /// conforms over healthy replicas: every <see cref="GateStride"/>th group which changes the ledger under every
     /// schedule of its window within the gate's bound, and the rest under their seeded schedules, or every group explored
-    /// under <c>CLOG_SCHEDULE_BOUND=deep</c>. The spec judges a group allowing a failed call to take effect later or
+    /// under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>. The spec judges a group allowing a failed call to take effect later or
     /// never, as an overlapping call may fail one.
     /// </summary>
     [Fact]

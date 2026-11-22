@@ -850,7 +850,7 @@ public sealed class LedgerReplicaConformanceTests : IDisposable
         var seed = Regex.Match(failure.Message, "CsCheck_Seed=(?<seed>[^\\s\"]+)", RegexOptions.None, timeout);
         Assert.True(seed.Success, failure.Message);
         Assert.Matches(
-            new Regex("Replay the shrunk case with CLOG_TEST_SEED=" + Regex.Escape(seed.Groups["seed"].Value) + @"(\s|$)", RegexOptions.None, timeout),
+            new Regex("Replay the shrunk case with DURABLE_STORAGE_TEST_SEED=" + Regex.Escape(seed.Groups["seed"].Value) + @"(\s|$)", RegexOptions.None, timeout),
             failure.Message);
     }
 

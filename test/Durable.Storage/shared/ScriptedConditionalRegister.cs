@@ -184,7 +184,7 @@ internal sealed class ScriptedConditionalRegister : IConditionalRegister
         }
 
         var decide = held.Arrive(expectedVersion, copy, dispatch, writer);
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
         // In a simulation the committer's rewritten await cannot follow a task this unrewritten register completes later,
         // so a held write takes its decision as it arrives (DecideOnArrival) and applies it a scheduler step later, through
         // the kit's yield (verification.md §7.1).

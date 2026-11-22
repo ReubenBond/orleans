@@ -19,7 +19,7 @@ internal sealed class S3ExpressLiveAccount : IAsyncDisposable
     /// The environment variable holding a live S3 Express One Zone directory bucket name (ending in <c>--x-s3</c>)
     /// accessible with the AWS SDK's default credentials and region.
     /// </summary>
-    public const string Variable = "CLOG_S3_EXPRESS_LIVE";
+    public const string Variable = "DURABLE_STORAGE_S3_EXPRESS_LIVE";
 
     /// <summary>The reason a live case skips without <see cref="Variable"/>, which test/Durable.Storage/eng/validate.ps1 allows verbatim.</summary>
     public const string SkipReason =

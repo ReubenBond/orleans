@@ -8,16 +8,16 @@
   -->
   <!--
     Shared test source which runs inside this project's simulations as well as on the thread pool elsewhere takes its
-    simulation branch under CLOG_SIMULATION_TESTS, which this project defines in every configuration (verification.md §7.1).
+    simulation branch under DURABLE_STORAGE_SIMULATION_TESTS, which this project defines in every configuration (verification.md §7.1).
   -->
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);CLOG_SIMULATION_TESTS</DefineConstants>
+    <DefineConstants>$(DefineConstants);DURABLE_STORAGE_SIMULATION_TESTS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <OrleansSimulationInstrumentedTestProject>true</OrleansSimulationInstrumentedTestProject>
     <OrleansSimulationUseBuiltInRules>true</OrleansSimulationUseBuiltInRules>
-    <ClogDebugLeg>true</ClogDebugLeg>
+    <DurableStorageDebugLeg>true</DurableStorageDebugLeg>
   </PropertyGroup>
 
   <!--
@@ -26,7 +26,7 @@
     which hangs sooner.
   -->
   <PropertyGroup>
-    <ClogTestSessionTimeout>30m</ClogTestSessionTimeout>
+    <DurableStorageTestSessionTimeout>30m</DurableStorageTestSessionTimeout>
   </PropertyGroup>
 
   <ItemGroup>

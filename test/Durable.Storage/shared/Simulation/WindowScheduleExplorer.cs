@@ -127,7 +127,7 @@ internal sealed record ScheduleBound(int MaxSchedules, int MaxDeviations)
     /// The environment variable which selects the bound: <c>deep</c> for <see cref="Deep"/>, at milestones and in the
     /// nightly window (verification.md §12); otherwise <see cref="Gate"/>.
     /// </summary>
-    internal const string Variable = "CLOG_SCHEDULE_BOUND";
+    internal const string Variable = "DURABLE_STORAGE_SCHEDULE_BOUND";
 
     /// <summary>
     /// Gets the bound of a gate run: every schedule of a case's windows with at most one preemption, up to 128 of them.
@@ -196,7 +196,7 @@ internal static class WindowScheduleExplorer
     /// The environment variable which replays one schedule of each explored case: its deviations, as
     /// <c>point:choice</c> pairs separated by commas, or <c>default</c>.
     /// </summary>
-    internal const string ScheduleVariable = "CLOG_SCHEDULE";
+    internal const string ScheduleVariable = "DURABLE_STORAGE_SCHEDULE";
 
     /// <summary>
     /// Runs the schedules of a case within <paramref name="bound"/>, stopping at the first which fails.

@@ -1108,7 +1108,7 @@ before its registry (§8.1); a call which meets the disposed store fails with `O
   `SimulatedConditionalRegister`, yielding memory replicas, and `SimulatedArchiveStore`: 28 curated concurrent windows
   covering empty, cross-key, warm and cold populated, limit-reached, deleted/expiry-scan, taken-over, fenced, and
   crash-recovered states explored by `WindowScheduleExplorer` (every third window explored at the gate and the rest
-  seeded; all 28 explored under `CLOG_SCHEDULE_BOUND=deep`), 100 seeded 3-replica quorum cases with latency and archive
+  seeded; all 28 explored under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`), 100 seeded 3-replica quorum cases with latency and archive
   stale-snapshot restarts, and two admission race-mutant witnesses (`LedgerAdmission.RejectionMutant.DecidesWhileLoading`
   and `RejectsWaiting`), each passing the default schedule and caught by one preemption. Drains, compactions, and sweeps
   as spec step functions are not yet in code.

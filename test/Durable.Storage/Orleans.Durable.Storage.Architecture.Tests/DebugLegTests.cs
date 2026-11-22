@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Architecture.Tests;
 
 /// <summary>
 /// Release builds compile <c>Debug.Assert</c> away, so only the Debug leg runs debug assertions: every component
-/// (<see cref="Components"/>) whose code under src holds one is reached by a test project which sets <c>ClogDebugLeg</c>
+/// (<see cref="Components"/>) whose code under src holds one is reached by a test project which sets <c>DurableStorageDebugLeg</c>
 /// (docs/spec/verification.md §12). A test project named for a component, as tests are organized by contract, reaches
 /// that component and what it reaches; any other reaches every component of the projects it references.
 /// </summary>
@@ -19,7 +19,7 @@ public sealed partial class DebugLegTests
         var map = Components.Production;
         var leg = Directory
             .EnumerateFiles(Repository.StorageRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(static project => XDocument.Load(project).Descendants("ClogDebugLeg").Any(static element => element.Value.Trim() == "true"))
+            .Where(static project => XDocument.Load(project).Descendants("DurableStorageDebugLeg").Any(static element => element.Value.Trim() == "true"))
             .ToList();
         var asserting = Repository.ProductionSourceFiles("*.cs")
             .Where(static file => DebugAssertion().IsMatch(File.ReadAllText(file)))

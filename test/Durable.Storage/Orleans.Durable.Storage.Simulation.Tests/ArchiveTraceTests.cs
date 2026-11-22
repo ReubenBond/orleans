@@ -24,7 +24,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// <c>SimulatedObjectStore</c>, which fails requests, leaves outcomes unknown, and lands writes late. The successor then
 /// closes, and, with the faults off, both ledgers drain, drop, and compact, the sweeper sweeps, and the reader reads
 /// again. Each request's effect at the store is recorded at the instant it takes effect and mapped onto the model's
-/// action, and the run's decided ledgers give the model's constants. With <c>CLOG_ARCHIVE_TRACES</c> set, each seed
+/// action, and the run's decided ledgers give the model's constants. With <c>DURABLE_STORAGE_ARCHIVE_TRACES</c> set, each seed
 /// writes the trace as a Quint module whose <c>traceReplay</c> run applies every action in order and checks the model's
 /// invariants after each, the manifest's watermarks and references after each commit, each upload's rows, and each read's
 /// answer against the fold of the decided history at its cut, which <c>test/Durable.Storage/eng/archive-traces.ps1</c> runs with
@@ -78,7 +78,7 @@ public sealed class ArchiveTraceTests
         Assert.Contains(rendered.Steps, static step => step.Action == "sweepFirst");
         Assert.Contains(rendered.Steps, static step => step.Action.StartsWith("readFinish(", StringComparison.Ordinal));
         Assert.Contains(rendered.Steps, static step => step.Action == "drop(2)");
-        if (Environment.GetEnvironmentVariable("CLOG_ARCHIVE_TRACES") is { Length: > 0 } directory)
+        if (Environment.GetEnvironmentVariable("DURABLE_STORAGE_ARCHIVE_TRACES") is { Length: > 0 } directory)
         {
             _ = Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, module + ".qnt"), rendered.Module(module));

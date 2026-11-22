@@ -7,7 +7,7 @@ namespace Orleans.Durable.Storage.AzureStorage.Archive;
 
 /// <summary>
 /// Registers archive logs over one Azure Blob container (orleans.md §5.13, archive-logs.md §3): the
-/// <see cref="IArchiveLogContainer"/>, <see cref="AzureArchiveLogContainer"/>, which opens the keys' logs and Clog's
+/// <see cref="IArchiveLogContainer"/>, <see cref="AzureArchiveLogContainer"/>, which opens the keys' logs and Durable Storage's
 /// objects under the cluster's store prefix, both over one client of the container, which is how both lie in one
 /// container, as <c>LogArchiveStore</c>'s construction contract asks. The composition opens them with its store prefix and
 /// its journal format, so neither is a setting of its own here. The client's options are

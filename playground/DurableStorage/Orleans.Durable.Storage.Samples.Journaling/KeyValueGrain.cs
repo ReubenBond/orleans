@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Samples.Journaling;
 
-/// <summary>A dictionary of strings whose state Orleans Journaling keeps in Clog.</summary>
+/// <summary>A dictionary of strings whose state Orleans Journaling keeps in Durable Storage.</summary>
 public interface IKeyValueGrain : IGrainWithStringKey
 {
     /// <summary>Sets <paramref name="key"/> to <paramref name="value"/> and writes the grain's state.</summary>
@@ -27,8 +27,8 @@ public sealed record KeyValueSnapshot([property: Id(0)] string Silo, [property: 
 
 /// <summary>
 /// The key-value grain: its dictionary is a durable dictionary, which Orleans Journaling writes to the grain's journal in
-/// Clog, and a new activation, on any silo, recovers from that journal. <see cref="JournalPlacementAttribute"/> places
-/// each activation on the silo whose Clog node is its journal's primary, so its writes need no forwarding.
+/// Durable Storage, and a new activation, on any silo, recovers from that journal. <see cref="JournalPlacementAttribute"/> places
+/// each activation on the silo whose Durable Storage node is its journal's primary, so its writes need no forwarding.
 /// </summary>
 [JournalPlacement]
 internal sealed class KeyValueGrain(

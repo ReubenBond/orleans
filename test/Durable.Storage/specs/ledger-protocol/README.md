@@ -233,7 +233,7 @@ every `Q` replicas which answer include a sealed or dropped one (`OpenCheckSound
 ## Trace validation
 
 [`LedgerProtocolTrace.qnt`](LedgerProtocolTrace.qnt) checks that a run of the implementation is a behavior of the model
-([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `CLOG_LEDGER_TRACES` set, the quorum
+([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set, the quorum
 simulation (`QuorumSimulationTests`), the crash simulation (`LedgerStoreSimulationTests`), the `Ledger` simulation
 (`LedgerSimulationTests`), and the scripted runs of serve-time landings (`ServedLandingSimulationTests`), of a reader's
 read repair (`ReadRepairSimulationTests`), and of a reader's learn from its own replica (`LearnTailSimulationTests`)
@@ -311,7 +311,7 @@ in flight. A recovery executor's reads outside its recoveries are a reader's, an
 `c`, begins with the tail its seals carry. Each trace replays in seconds.
 
 `.\eng\ledger-traces.ps1` (`just ledger-traces`) runs the three simulations over their seed corpora, or over
-`CLOG_SIM_SEEDS`, and the scripted runs at their seeds, and `.\eng\model-check-quint.ps1 -Traces` validates each
+`DURABLE_STORAGE_SIM_SEEDS`, and the scripted runs at their seeds, and `.\eng\model-check-quint.ps1 -Traces` validates each
 trace under `artifacts/ledger-traces`. A run which exports its trace sets `LedgerTrace.LogsRecoveredReplicas`, whose
 reading of a
 restarted node's slot table reads each unloaded leaf it covers into a scratch copy before the node serves, so the node

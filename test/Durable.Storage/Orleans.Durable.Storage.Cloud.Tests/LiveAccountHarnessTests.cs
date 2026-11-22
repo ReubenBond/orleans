@@ -14,7 +14,7 @@ public sealed class LiveAccountHarnessTests : IDisposable
 
     /// <summary>
     /// Every live-account harness's <c>SkipReason</c> appears verbatim in <c>test/Durable.Storage/eng/validate.ps1</c>'s allowlist so an
-    /// emulator run with unset <c>CLOG_*_LIVE</c> variables never drifts out of sync.
+    /// emulator run with unset <c>DURABLE_STORAGE_*_LIVE</c> variables never drifts out of sync.
     /// </summary>
     [Fact]
     public void ValidateScriptContainsEveryLiveAccountSkipReasonVerbatim()
@@ -46,7 +46,7 @@ public sealed class LiveAccountHarnessTests : IDisposable
     [InlineData("GS:///", "gs://")]
     public void NormalizeBucketNameReturnsNullForUnsetOrEmptyValues(string? raw, string scheme)
     {
-        Assert.Null(LiveBucketAccount.NormalizeBucketName(raw, scheme, "CLOG_TEST_LIVE"));
+        Assert.Null(LiveBucketAccount.NormalizeBucketName(raw, scheme, "DURABLE_STORAGE_TEST_LIVE"));
     }
 
     [Theory]
@@ -56,7 +56,7 @@ public sealed class LiveAccountHarnessTests : IDisposable
     [InlineData("gs://my-gcs-bucket/", "gs://", "my-gcs-bucket")]
     public void NormalizeBucketNameStripsSchemeWhitespaceAndTrailingSlashes(string raw, string scheme, string expected)
     {
-        Assert.Equal(expected, LiveBucketAccount.NormalizeBucketName(raw, scheme, "CLOG_TEST_LIVE"));
+        Assert.Equal(expected, LiveBucketAccount.NormalizeBucketName(raw, scheme, "DURABLE_STORAGE_TEST_LIVE"));
     }
 
     [Theory]
@@ -66,7 +66,7 @@ public sealed class LiveAccountHarnessTests : IDisposable
     [InlineData("bucket\tname", "gs://")]
     public void NormalizeBucketNameRejectsPathSegmentsAndInternalWhitespace(string raw, string scheme)
     {
-        _ = Assert.Throws<InvalidOperationException>(() => LiveBucketAccount.NormalizeBucketName(raw, scheme, "CLOG_TEST_LIVE"));
+        _ = Assert.Throws<InvalidOperationException>(() => LiveBucketAccount.NormalizeBucketName(raw, scheme, "DURABLE_STORAGE_TEST_LIVE"));
     }
 
     [Fact]

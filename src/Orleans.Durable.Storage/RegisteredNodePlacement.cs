@@ -38,7 +38,7 @@ internal sealed class RegisteredNodePlacementAttribute : PlacementAttribute
 /// </summary>
 /// <remarks>
 /// It places on the registered silo even when the placing silo's grain-manifest view omits it, as it can for a silo
-/// restarted at the same endpoint: every silo defines the Clog grains. It decides from the cached registry alone, and
+/// restarted at the same endpoint: every silo defines the Durable Storage grains. It decides from the cached registry alone, and
 /// refuses before the first read lands.
 /// </remarks>
 internal sealed partial class RegisteredNodePlacementDirector(

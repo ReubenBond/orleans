@@ -33,10 +33,10 @@ internal static class TestDiagnostics
 
     /// <summary>
     /// Gets a value indicating whether Stryker.NET runs this test application: <c>test/Durable.Storage/eng/mutation.ps1</c> sets
-    /// <c>ClogMutationTesting</c> (test/Durable.Storage/docs/spec/verification.md §9).
+    /// <c>DurableStorageMutationTesting</c> (test/Durable.Storage/docs/spec/verification.md §9).
     /// </summary>
     internal static bool UnderMutationTesting { get; } =
-        string.Equals(Environment.GetEnvironmentVariable("ClogMutationTesting"), "true", StringComparison.Ordinal);
+        string.Equals(Environment.GetEnvironmentVariable("DurableStorageMutationTesting"), "true", StringComparison.Ordinal);
 
     /// <summary>
     /// Returns a path in the results directory named after the test and prefixed with the assembly name, so one

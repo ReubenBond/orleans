@@ -3435,7 +3435,7 @@ ASCII, which Clog refuses before admission, each an observation of Orleans (pinn
 §7.3](../components/archive-logs.md#73-azure-layout)). The interop tests run on the fake transport on every change, on
 Azurite and a live account at milestones, and on every Orleans version bump, since Orleans' layout constants are
 internal; a random-sequence property runs at milestones with a recorded seed, and on every change 100 fresh CsCheck
-cases on the fake transport, a recorded seed replaying only through `CLOG_TEST_SEED`. A CsCheck property checks that
+cases on the fake transport, a recorded seed replaying only through `DURABLE_STORAGE_TEST_SEED`. A CsCheck property checks that
 every journal's row key names its log by exactly its identity, over identities across the Unicode scalar range.
 **Replace requests:** a journal driven to 40,000 blocks answers `IsCompactionRequested`, one driven past 49,900 answers
 `ReplaceRequired` through forwarding, which latches the request, and the grain's next write is a `Replace`. **Forwarded

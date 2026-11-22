@@ -20,7 +20,7 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// <see cref="IObjectStore"/>.
 /// </summary>
 /// <remarks>
-/// Each test runs in a container of its own, which it deletes. Without <c>CLOG_EMULATORS=1</c> the Azurite cases skip,
+/// Each test runs in a container of its own, which it deletes. Without <c>DURABLE_STORAGE_EMULATORS=1</c> the Azurite cases skip,
 /// and the live cases run on <see cref="AzureLiveAccount"/>, skipping with its reason while its variable is unset.
 /// </remarks>
 public sealed class AzureAppendableObjectFidelityTests(CloudEmulators emulators) : IDisposable

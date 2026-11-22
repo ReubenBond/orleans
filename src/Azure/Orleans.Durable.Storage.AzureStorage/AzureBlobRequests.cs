@@ -5,19 +5,19 @@ using Azure.Storage.Blobs.Models;
 namespace Orleans.Durable.Storage.AzureStorage;
 
 /// <summary>
-/// The conditions Clog's Azure Blob writes carry and the reading of the service's answers, shared by every store over
+/// The conditions Durable Storage's Azure Blob writes carry and the reading of the service's answers, shared by every store over
 /// Azure Blob Storage.
 /// </summary>
 internal static class AzureBlobRequests
 {
     /// <summary>
-    /// The service version the composition pins its container's client to: the version Clog's emulator and live runs
+    /// The service version the composition pins its container's client to: the version Durable Storage's emulator and live runs
     /// exercise, whose <c>startFrom</c> listing the object store uses.
     /// </summary>
     internal const BlobClientOptions.ServiceVersion PinnedServiceVersion = BlobClientOptions.ServiceVersion.V2026_10_06;
 
     /// <summary>
-    /// The least service version a client of Clog's blobs may use: 2022-11-02, from which <c>Append Block</c> takes
+    /// The least service version a client of Durable Storage's blobs may use: 2022-11-02, from which <c>Append Block</c> takes
     /// <c>x-ms-if-tags</c> and 100 MiB blocks.
     /// </summary>
     internal const BlobClientOptions.ServiceVersion MinimumServiceVersion = BlobClientOptions.ServiceVersion.V2022_11_02;

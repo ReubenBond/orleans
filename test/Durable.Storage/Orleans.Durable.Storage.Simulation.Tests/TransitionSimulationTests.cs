@@ -27,7 +27,7 @@ public sealed class TransitionSimulationTests
     private const int FirstSeed = 1;
 
     // Each seed costs about 20 s of wall time, so every change runs one and exploration runs
-    // more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private const string PathEntry = "path: ";
     private static readonly TimeSpan Deadline = TimeSpan.FromMilliseconds(40);

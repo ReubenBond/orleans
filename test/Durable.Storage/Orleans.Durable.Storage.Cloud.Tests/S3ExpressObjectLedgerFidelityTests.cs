@@ -23,7 +23,7 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// <remarks>
 /// The fake backend runs in every test pass with no emulator or credentials; the live backend runs on
 /// <see cref="S3ExpressLiveAccount"/>, skipping with <see cref="S3ExpressLiveAccount.SkipReason"/> while
-/// <c>CLOG_S3_EXPRESS_LIVE</c> is unset.
+/// <c>DURABLE_STORAGE_S3_EXPRESS_LIVE</c> is unset.
 /// </remarks>
 public sealed class S3ExpressObjectLedgerFidelityTests : IDisposable
 {

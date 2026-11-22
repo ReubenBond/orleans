@@ -16,7 +16,7 @@ namespace Orleans.Durable.Storage.AzureStorage.Archive;
 /// <summary>
 /// Archive logs on Azure append blobs, in Orleans Journaling's own layout (archive-logs.md §7.3, §9.1): the log
 /// <c>{id}</c> is the append blob <c>wal/{id}</c>, holding its current generation's appends, and the block blob
-/// <c>checkpoints/{id}/{g:D20}</c> of each generation an opener created, holding its base, so plain Orleans reads Clog's
+/// <c>checkpoints/{id}/{g:D20}</c> of each generation an opener created, holding its base, so plain Orleans reads Durable Storage's
 /// logs, read-only, with its own Azure provider. All knowledge of Orleans' layout is in this type and
 /// <see cref="AzureArchiveLogMetadata"/>.
 /// </summary>
@@ -144,7 +144,7 @@ public sealed class AzureArchiveLogStore : IArchiveLogStore
         ArgumentNullException.ThrowIfNull(options);
         if (options.Version < AzureBlobRequests.MinimumServiceVersion)
         {
-            throw new ArgumentException($"Clog's Azure stores need service version {AzureBlobRequests.MinimumServiceVersion} or later, not {options.Version}.", nameof(options));
+            throw new ArgumentException($"Durable Storage's Azure stores need service version {AzureBlobRequests.MinimumServiceVersion} or later, not {options.Version}.", nameof(options));
         }
 
         options.Request100ContinueOptions = new Request100ContinueOptions { Mode = Request100ContinueMode.Always, ContentLengthThreshold = ExpectContinueBytes };

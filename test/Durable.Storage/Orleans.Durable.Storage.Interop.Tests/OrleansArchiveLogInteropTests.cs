@@ -24,7 +24,7 @@ namespace Orleans.Durable.Storage.Interop.Tests;
 /// Orleans' own Azure journaling provider, <c>AzureBlobJournalStorage</c>, configured as a plain deployment with read-only
 /// access to the container Clog's <see cref="AzureArchiveLogStore"/> writes through <see cref="ArchiveLogWriter"/>, in the
 /// composition's names (<see cref="OrleansJournalLogNames"/>), reads each journal as the fold of the writes its log holds,
-/// byte for byte. Each case runs on the fake Azure transport on every change, on Azurite under <c>CLOG_EMULATORS=1</c>,
+/// byte for byte. Each case runs on the fake Azure transport on every change, on Azurite under <c>DURABLE_STORAGE_EMULATORS=1</c>,
 /// and on a live account under <see cref="AzureLiveAccount.Variable"/>, each backend's result a test case of its own.
 /// The cases are evidence of archive-logs.md §7.3, not of OR-I8: they write through <see cref="ArchiveLogWriter"/>,
 /// bypassing <c>DurableJournalStorage</c>, whose payloads OR-I8 governs.
@@ -45,7 +45,7 @@ public sealed class OrleansArchiveLogInteropTests(CloudEmulators emulators) : ID
     private const int FakeCases = 100;
 
     /// <summary>The environment variable which replays a CsCheck case by its seed (verification.md §4.1).</summary>
-    private const string SeedVariable = "CLOG_TEST_SEED";
+    private const string SeedVariable = "DURABLE_STORAGE_TEST_SEED";
 
     /// <summary>A log's generation before its first write: none, so its first opener's checkpoint is generation 1's.</summary>
     private const ulong NoGeneration = 0;
@@ -492,7 +492,7 @@ public sealed class OrleansArchiveLogInteropTests(CloudEmulators emulators) : ID
     /// Random sequences of writes, append runs and openers of each kind with appends after them, superseding rows or not,
     /// over three journals, written through <see cref="ArchiveLogWriter"/> from the tokens <see cref="LogArchiveStore"/>
     /// plans: after every write, plain Orleans reads its journal as the fold. On the fake transport it runs on every change
-    /// under CsCheck, whose failure names the seed which replays it through <c>CLOG_TEST_SEED</c>; on Azurite and the live
+    /// under CsCheck, whose failure names the seed which replays it through <c>DURABLE_STORAGE_TEST_SEED</c>; on Azurite and the live
     /// account, at milestones, it runs <see cref="MilestoneCases"/> cases drawn in turn from one seed, which the run
     /// records in its output, and a failing case reports its own seed, which replays it, as the run's first case, on its
     /// backend.

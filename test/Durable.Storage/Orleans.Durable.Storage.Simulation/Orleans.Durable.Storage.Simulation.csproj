@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The deterministic simulation kit (test/Durable.Storage/docs/spec/verification.md §7): simulated nodes, transport, and doubles at Clog's
+    The deterministic simulation kit (test/Durable.Storage/docs/spec/verification.md §7): simulated nodes, transport, and doubles at Durable Storage's
     I/O boundaries. A simulation test project's build rewrites it with the rest of its dependency closure under
     Clockwork's controlled rule sets (eng/OrleansSimulation.targets), so the kit runs only inside a simulation.
   -->
@@ -14,7 +14,7 @@
 
   <!-- The simulation kernel, in the base configuration as its test projects reference it (test/Durable.Storage/eng/OrleansSimulation.targets). -->
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" SetConfiguration="Configuration=$(ClogBaseConfiguration)" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" SetConfiguration="Configuration=$(DurableStorageBaseConfiguration)" />
   </ItemGroup>
 
   <ItemGroup>

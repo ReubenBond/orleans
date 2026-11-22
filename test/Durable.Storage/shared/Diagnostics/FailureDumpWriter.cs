@@ -10,8 +10,8 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Writes a process dump of the test host when a test fails, so the state behind the failure can be inspected
-/// (test/Durable.Storage/docs/spec/verification.md). <c>CLOG_TEST_FAILURE_DUMPS</c> bounds the dumps per process (default 1; 0 disables them) and
-/// <c>CLOG_TEST_FAILURE_DUMP_TYPE</c> selects the dump type (default <c>WithHeap</c>).
+/// (test/Durable.Storage/docs/spec/verification.md). <c>DURABLE_STORAGE_TEST_FAILURE_DUMPS</c> bounds the dumps per process (default 1; 0 disables them) and
+/// <c>DURABLE_STORAGE_TEST_FAILURE_DUMP_TYPE</c> selects the dump type (default <c>WithHeap</c>).
 /// </summary>
 /// <remarks>
 /// xUnit decides a test's outcome after its last extension point has run, so the platform's result message is the
@@ -20,8 +20,8 @@ namespace Orleans.Durable.Storage.Testing;
 /// </remarks>
 internal sealed class FailureDumpWriter : IDataConsumer, IOutputDeviceDataProducer
 {
-    internal const string LimitVariable = "CLOG_TEST_FAILURE_DUMPS";
-    internal const string TypeVariable = "CLOG_TEST_FAILURE_DUMP_TYPE";
+    internal const string LimitVariable = "DURABLE_STORAGE_TEST_FAILURE_DUMPS";
+    internal const string TypeVariable = "DURABLE_STORAGE_TEST_FAILURE_DUMP_TYPE";
 
     private readonly IOutputDevice _output;
     private readonly int _limit;

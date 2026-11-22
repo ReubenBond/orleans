@@ -81,7 +81,7 @@ public sealed class SimulatedLedgerReplicaConformanceTests
     /// Every concurrent group of Accordant's generation over the replica role's inputs and the store's restart, after
     /// every shorter sequence, conforms over a LedgerStore whose disk completions are the scheduler's choices: every
     /// <see cref="GateStride"/>th group which changes the store under every schedule of its window within the gate's
-    /// bound, and the rest under their seeded schedules, or every group explored under <c>CLOG_SCHEDULE_BOUND=deep</c>.
+    /// bound, and the rest under their seeded schedules, or every group explored under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>.
     /// </summary>
     [Fact]
     public async Task EveryConcurrentWindowOfALedgerStoreConformsUnderEveryExploredSchedule()

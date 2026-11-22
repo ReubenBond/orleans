@@ -123,7 +123,7 @@ public sealed class SimulatedAzureArchiveLogStoreConformanceTests
     /// <summary>
     /// Every concurrent group of Accordant's generation over the kit's input set, after every shorter sequence, conforms:
     /// every <see cref="GateStride"/>th group of racing writes under every schedule of its window within the gate's bound,
-    /// and the rest under their seeded schedules, or every group explored under <c>CLOG_SCHEDULE_BOUND=deep</c>, which
+    /// and the rest under their seeded schedules, or every group explored under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>, which
     /// takes about a minute. The fake transport yields to the scheduler before each request, so each interleaving of the
     /// group's requests through the real SDK is a schedule.
     /// </summary>

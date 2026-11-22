@@ -17,8 +17,8 @@ namespace Orleans.Durable.Storage.Engine.Wal.Tests;
 /// </summary>
 public sealed class WalFileSystemLockTests : IDisposable
 {
-    private const string LockHostTry = "CLOG_LOCK_HOST_TRY";
-    private const string LockHostHold = "CLOG_LOCK_HOST_HOLD";
+    private const string LockHostTry = "DURABLE_STORAGE_LOCK_HOST_TRY";
+    private const string LockHostHold = "DURABLE_STORAGE_LOCK_HOST_HOLD";
     private const string Holding = "clog-lock-host=holding";
 
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();

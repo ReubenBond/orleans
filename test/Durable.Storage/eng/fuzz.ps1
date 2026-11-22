@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Runs coverage-guided fuzzing campaigns against Clog's decoders (test/Durable.Storage/docs/spec/verification.md §6.1).
+Runs coverage-guided fuzzing campaigns against Durable Storage's decoders (test/Durable.Storage/docs/spec/verification.md §6.1).
 
 .DESCRIPTION
 Publishes test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz, instruments the decoders (the Engine's WAL, Ledgers, Archive, and Journals namespaces, and the

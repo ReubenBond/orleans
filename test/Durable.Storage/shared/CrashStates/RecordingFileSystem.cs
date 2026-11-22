@@ -130,7 +130,7 @@ internal sealed class RecordingFileSystem : WalFileSystem
 
     private Task YieldAtIoAsync() => YieldsAtIo ? YieldAsync() : Task.CompletedTask;
 
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private static Task YieldAsync() => Orleans.Durable.Storage.Simulation.SimulationTasks.Yield();
 #else
     private static async Task YieldAsync() => await Task.Yield();

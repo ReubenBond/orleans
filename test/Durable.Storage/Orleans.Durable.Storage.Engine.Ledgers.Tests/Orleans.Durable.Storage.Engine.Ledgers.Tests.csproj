@@ -4,7 +4,7 @@
     (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
-    <ClogDebugLeg>true</ClogDebugLeg>
+    <DurableStorageDebugLeg>true</DurableStorageDebugLeg>
   </PropertyGroup>
 
   <ItemGroup>

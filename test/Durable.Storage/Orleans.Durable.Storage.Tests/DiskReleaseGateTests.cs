@@ -58,7 +58,7 @@ public sealed class DiskReleaseGateTests : IDisposable
                 coverage.Add(run);
             }),
             iter: 2000,
-            seed: Environment.GetEnvironmentVariable("CLOG_TEST_SEED") is { Length: > 0 } seed ? seed : null);
+            seed: Environment.GetEnvironmentVariable("DURABLE_STORAGE_TEST_SEED") is { Length: > 0 } seed ? seed : null);
 
         Assert.True(coverage.Opened > 0, "No history opened a retired node's gate.");
         Assert.True(coverage.StaleAfterOpening > 0, "No history tried an install chosen before a retirement after its gate opened.");

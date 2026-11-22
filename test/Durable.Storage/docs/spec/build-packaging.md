@@ -28,7 +28,7 @@ Four build configurations exist for Storage projects. Debug and Release build ev
 artifact is a Release build. `SimulationRelease` and `SimulationDebug` build the Clockwork simulation projects
 (`test/Durable.Storage/Orleans.Durable.Storage.Simulation` and each project which sets
 `OrleansSimulationInstrumentedTestProject`) and the `src` projects they rewrite; the solution maps its Release and
-Debug to them for those projects, and an instrumented project built in another configuration fails (`CLOG0008`). Each
+Debug to them for those projects, and an instrumented project built in another configuration fails (`ODS0001`). Each
 defines `ORLEANS_DURABLE_STORAGE_SIMULATION`, which compiles in the conditional seams of [verification
 §7.2](verification.md#72-seams), and otherwise builds as its base configuration: `SimulationRelease` optimized, and
 `SimulationDebug` unoptimized with `DEBUG`, so debug assertions run under simulation in the Debug leg. Every assembly a

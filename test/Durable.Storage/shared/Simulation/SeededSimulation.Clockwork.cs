@@ -48,9 +48,9 @@ namespace Orleans.Durable.Storage.Testing;
 /// the driver's to judge.
 /// </para>
 /// <para>
-/// <c>CLOG_TEST_SEED</c> replaces the seed; <c>CLOG_SIM_SEEDS</c> replaces a corpus theory's seeds;
+/// <c>DURABLE_STORAGE_TEST_SEED</c> replaces the seed; <c>DURABLE_STORAGE_SIM_SEEDS</c> replaces a corpus theory's seeds;
 /// <c>ORLEANS_SIMULATION_REPLAY_ARTIFACT</c> replays an artifact's exact schedule instead of recording one; and
-/// <c>CLOG_SIM_MINIMIZE</c> minimizes a failure's schedule.
+/// <c>DURABLE_STORAGE_SIM_MINIMIZE</c> minimizes a failure's schedule.
 /// </para>
 /// </remarks>
 internal static partial class SeededSimulation
@@ -59,12 +59,12 @@ internal static partial class SeededSimulation
     /// The environment variable which replaces a corpus theory's seeds: a seed, an inclusive range <c>first..last</c>,
     /// or a comma-separated list of either.
     /// </summary>
-    internal const string SeedsVariable = "CLOG_SIM_SEEDS";
+    internal const string SeedsVariable = "DURABLE_STORAGE_SIM_SEEDS";
 
     /// <summary>
     /// The environment variable which, set to <c>1</c> or <c>true</c>, minimizes a failed run's schedule.
     /// </summary>
-    internal const string MinimizeVariable = "CLOG_SIM_MINIMIZE";
+    internal const string MinimizeVariable = "DURABLE_STORAGE_SIM_MINIMIZE";
 
     /// <summary>
     /// The name of the teardown check that no work outlives the simulation's components (§11.1).
@@ -125,7 +125,7 @@ internal static partial class SeededSimulation
 
     /// <summary>
     /// Returns the seeds of a corpus theory: <paramref name="count"/> seeds from <paramref name="first"/>, or the seeds
-    /// of <c>CLOG_SIM_SEEDS</c> when it is set, for seed exploration and for replaying one row.
+    /// of <c>DURABLE_STORAGE_SIM_SEEDS</c> when it is set, for seed exploration and for replaying one row.
     /// </summary>
     /// <param name="first">The corpus's first seed.</param>
     /// <param name="count">The corpus's size.</param>
@@ -145,12 +145,12 @@ internal static partial class SeededSimulation
 
     /// <summary>
     /// Runs <paramref name="scenario"/> in a Clockwork cluster seeded with <paramref name="seed"/>, or with
-    /// <c>CLOG_TEST_SEED</c> when it is set, and fails with a report when the run fails.
+    /// <c>DURABLE_STORAGE_TEST_SEED</c> when it is set, and fails with a report when the run fails.
     /// </summary>
     /// <param name="seed">The seed.</param>
     /// <param name="scenario">The scenario, which builds its simulation in the environment it receives.</param>
     /// <param name="minimize">
-    /// Whether a failure's schedule is minimized, or <see langword="null"/> to minimize when <c>CLOG_SIM_MINIMIZE</c> is
+    /// Whether a failure's schedule is minimized, or <see langword="null"/> to minimize when <c>DURABLE_STORAGE_SIM_MINIMIZE</c> is
     /// set.
     /// </param>
     /// <returns>The successful run.</returns>
@@ -381,8 +381,8 @@ internal static partial class SeededSimulation
     }
 
     /// <summary>
-    /// Returns the environment variables which make the failing row run with its seed alone: <c>CLOG_SIM_SEEDS</c> makes
-    /// a corpus theory's row exist, and <c>CLOG_TEST_SEED</c> replaces a seed which differs from the row's.
+    /// Returns the environment variables which make the failing row run with its seed alone: <c>DURABLE_STORAGE_SIM_SEEDS</c> makes
+    /// a corpus theory's row exist, and <c>DURABLE_STORAGE_TEST_SEED</c> replaces a seed which differs from the row's.
     /// </summary>
     private static (string Name, string Value)[] ReplayVariables(int seed, int resolved) =>
         resolved == seed

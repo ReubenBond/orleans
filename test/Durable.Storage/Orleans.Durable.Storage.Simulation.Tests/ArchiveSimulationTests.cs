@@ -40,7 +40,7 @@ public sealed class ArchiveSimulationTests
     private const int FirstSeed = 1;
 
     // Each seed costs about 19 s of wall time, so every change runs three and exploration runs
-    // more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
     private const int ReplaySeed = 2;
     private const int Writers = 3;

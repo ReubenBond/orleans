@@ -57,7 +57,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 public sealed class ArchiveDrainSimulationTests
 {
     // Every change runs one seed, which takes every counted path, its drainers at both grid steps, and exploration runs
-    // more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int FirstSeed = 1;
     private const int SeedCount = 1;
 

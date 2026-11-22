@@ -11,7 +11,7 @@ public enum InteropBackend
     /// <summary>The fake Azure transport (<see cref="FakeAzureBlobService"/>), in process, on every change.</summary>
     Fake,
 
-    /// <summary>Azurite, from the AppHost, under <c>CLOG_EMULATORS=1</c>.</summary>
+    /// <summary>Azurite, from the AppHost, under <c>DURABLE_STORAGE_EMULATORS=1</c>.</summary>
     Azurite,
 
     /// <summary>A live storage account, whose blob service endpoint <see cref="AzureLiveAccount.Variable"/> holds.</summary>

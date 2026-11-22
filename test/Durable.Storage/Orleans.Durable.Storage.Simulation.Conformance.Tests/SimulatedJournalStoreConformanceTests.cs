@@ -45,7 +45,7 @@ public sealed class SimulatedJournalStoreConformanceTests
     /// <summary>
     /// The stride of the explored windows at the gate: every third case runs under <see cref="WindowScheduleExplorer"/>
     /// (covering empty, cross-key, cold/warm populated, limit-reached, deleted/expiry-scan, taken-over, fenced, and
-    /// crash-recovered states) and the rest run under their seeded schedules; <c>CLOG_SCHEDULE_BOUND=deep</c> explores
+    /// crash-recovered states) and the rest run under their seeded schedules; <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c> explores
     /// every window.
     /// </summary>
     private const int GateStride = 3;
@@ -55,7 +55,7 @@ public sealed class SimulatedJournalStoreConformanceTests
     /// the archive store's append limit, deleted tombstones eligible for expiry, cross-key batching, ledger takeovers,
     /// fenced writes, and crash recovery conform: every <see cref="GateStride"/>th case under every explored schedule of
     /// <see cref="WindowScheduleExplorer"/> within the active bound and the rest under their seeded schedules, or every
-    /// case explored under <c>CLOG_SCHEDULE_BOUND=deep</c>.
+    /// case explored under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>.
     /// </summary>
     [Fact]
     public async Task EveryConcurrentWindowConformsUnderEveryExploredSchedule()

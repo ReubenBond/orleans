@@ -19,7 +19,7 @@ internal static class AzureLiveAccount
     /// The environment variable which holds a live account's blob service endpoint, such as
     /// <c>https://account.blob.core.windows.net/</c>, on which the signed-in identity holds Storage Blob Data Owner.
     /// </summary>
-    public const string Variable = "CLOG_AZURE_LIVE";
+    public const string Variable = "DURABLE_STORAGE_AZURE_LIVE";
 
     /// <summary>The reason a live case skips without <see cref="Variable"/>, which test/Durable.Storage/eng/validate.ps1 allows verbatim.</summary>
     public const string SkipReason =

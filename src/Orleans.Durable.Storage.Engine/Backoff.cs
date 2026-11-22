@@ -1,7 +1,7 @@
 namespace Orleans.Durable.Storage.Engine;
 
 /// <summary>
-/// The bounded, jittered, exponential backoff of every repetition in Clog (conventions.md §6): the wait before repetition
+/// The bounded, jittered, exponential backoff of every repetition in Durable Storage (conventions.md §6): the wait before repetition
 /// <c>attempt</c> lies between its step, the first wait doubling with each attempt up to the longest, and twice the step,
 /// and never exceeds the longest, so no wait is shorter than the first. A repeater which counts attempts from 0 passes
 /// its own count.

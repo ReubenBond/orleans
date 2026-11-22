@@ -39,6 +39,15 @@ public sealed partial class RetiredNamesTests
 
     private static readonly string[] CodeRoots = ["src/", "test/Durable.Storage/", "playground/DurableStorage/"];
 
+    /// <summary>The roots whose text <see cref="NoBuildOrTestSettingNamesClog"/> reads.</summary>
+    private static readonly string[] SettingRoots = [.. CodeRoots, "eng/durable-storage/"];
+
+    /// <summary>The Clog names which keep their spelling in Durable Storage's text, with the reason each stays.</summary>
+    private static readonly Exemption[] SettingExemptions =
+    [
+        new(@"\bClog\.LogDrivePerf\b", "wal.md cites the benchmark which took its measurement by the name it ran under."),
+    ];
+
     /// <summary>The names which keep their spelling in text, with the reason each stays.</summary>
     private static readonly Exemption[] TextExemptions =
     [
@@ -107,7 +116,7 @@ public sealed partial class RetiredNamesTests
     /// <summary>
     /// No code names a Clog namespace, type, or member: since row 6.3's rename, the code's names are of the
     /// Orleans.Durable.Storage family, and no identifier in a project's C# sources, outside comments and strings, starts
-    /// with Clog. The repository, its solution, and its build tooling keep the name, in text.
+    /// with Clog.
     /// </summary>
     [Fact]
     public void NoCodeNamesAClogName()
@@ -135,6 +144,42 @@ public sealed partial class RetiredNamesTests
     [InlineData("var clog = Clogged;", null)]
     public void TheClogNameCheckFindsANamespaceATypeAndAMember(string code, string? found) =>
         Assert.Equal(found, ClogName().Match(code) is { Success: true } match ? match.Value : null);
+
+    /// <summary>
+    /// No tracked text of Durable Storage, its build settings, or its sample names a Clog setting: an MSBuild property,
+    /// item, or target such as <c>ClogDebugLeg</c>, a <c>CLOG_</c> environment variable, or a <c>CLOG</c> diagnostic ID.
+    /// Their names are of the Durable Storage family: <c>DurableStorage…</c>, <c>DURABLE_STORAGE_…</c>, and <c>ODS…</c>.
+    /// </summary>
+    [Fact]
+    public void NoBuildOrTestSettingNamesClog()
+    {
+        var violations = new List<string>();
+        foreach (var (path, lines) in TrackedText())
+        {
+            if (!SettingRoots.Any(root => path.StartsWith(root, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            var text = string.Join('\n', lines);
+            foreach (var pattern in (Regex[])[ClogName(), ClogSetting()])
+            {
+                violations.AddRange(Violations(pattern.Matches(text), text, SettingExemptions).Select(match =>
+                    string.Create(CultureInfo.InvariantCulture, $"{path}:{LineOf(text, match.Index)}: {match.Value}")));
+            }
+        }
+
+        Assert.True(violations.Count == 0, string.Join('\n', violations));
+        Assert.Empty(StaleExemptions(SettingExemptions));
+    }
+
+    [Theory]
+    [InlineData("<ClogDebugLeg>true</ClogDebugLeg>", "ClogDebugLeg")]
+    [InlineData("$env:CLOG_SIM_SEEDS = '1..500'", "CLOG_SIM_SEEDS")]
+    [InlineData("Code=\"CLOG0008\"", "CLOG0008")]
+    [InlineData("<DurableStorageDebugLeg>true</DurableStorageDebugLeg>", null)]
+    public void TheClogSettingCheckFindsAPropertyAVariableAndADiagnostic(string text, string? found) =>
+        Assert.Equal(found, (ClogName().Match(text) is { Success: true } name ? name : ClogSetting().Match(text)) is { Success: true } match ? match.Value : null);
     /// <summary>
     /// Regression test, #175: the checks read only what git tracks or would track, so a file under an ignored folder, here
     /// the scripts' artifacts directory, is never read, whatever names it holds.
@@ -276,6 +321,10 @@ public sealed partial class RetiredNamesTests
     /// <summary>A Clog namespace, or an identifier which starts with Clog or names it after a prefix, such as <c>AddClog…</c>.</summary>
     [GeneratedRegex(@"\bClog\.[A-Z]\w*(?:\.\w+)*|\b\w*Clog[A-Z]\w*", RegexOptions.None, matchTimeoutMilliseconds: 10_000)]
     private static partial Regex ClogName();
+
+    /// <summary>A Clog environment variable, such as <c>CLOG_SIM_SEEDS</c>, or a Clog diagnostic ID, such as <c>CLOG0008</c>.</summary>
+    [GeneratedRegex(@"\bCLOG(?:_[A-Z]\w*|\d+)\b", RegexOptions.None, matchTimeoutMilliseconds: 10_000)]
+    private static partial Regex ClogSetting();
 
     [GeneratedRegex(@"\b\w*[Dd]rive\w*\b", RegexOptions.None, matchTimeoutMilliseconds: 10_000)]
     private static partial Regex DriveName();

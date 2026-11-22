@@ -23,7 +23,7 @@ namespace Orleans.Durable.Storage.Engine.Ledgers.Tests.Objects;
 /// </summary>
 public sealed class ObjectLedgerMetamorphicTests : IDisposable
 {
-    private const string SeedVariable = "CLOG_TEST_SEED";
+    private const string SeedVariable = "DURABLE_STORAGE_TEST_SEED";
     private static readonly LedgerId Id = new(76);
     private static readonly LedgerId NextId = new(77);
 

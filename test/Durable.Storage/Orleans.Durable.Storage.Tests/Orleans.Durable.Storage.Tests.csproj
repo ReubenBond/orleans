@@ -3,10 +3,10 @@
     The Debug leg runs the node registry committer's and the replica host's debug assertions here (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
-    <ClogDebugLeg>true</ClogDebugLeg>
+    <DurableStorageDebugLeg>true</DurableStorageDebugLeg>
 
     <!-- The multi-silo tests over both archive stores take more than the default session's 12 minutes under the full suite. -->
-    <ClogTestSessionTimeout>25m</ClogTestSessionTimeout>
+    <DurableStorageTestSessionTimeout>25m</DurableStorageTestSessionTimeout>
 
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
@@ -57,7 +57,7 @@
 
   <!--
     Orleans' own buffer, which the replica calls' grain messages carry (orleans.md §5.12), has one name here, so a bare
-    ArcBuffer always means Clog's.
+    ArcBuffer always means Durable Storage's.
   -->
   <ItemGroup>
     <Using Include="Orleans.Serialization.Buffers.ArcBuffer" Alias="OrleansBuffer" />

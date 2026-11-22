@@ -1637,7 +1637,7 @@ durable entries, under the flush rules of [system model
   (`SimulatedFileSystemObjectStoreConformanceTests`). A listing concurrent with creates and deletes names every object
   no concurrent call changes, and of the others only those the calls create or delete (`ObjectStoreConformanceTests`).
   The cloud stores run the suite on their emulators, which `Orleans.Durable.Storage.Cloud.Tests` starts through the
-  AppHost when `CLOG_EMULATORS` is 1 (`just emulators`, Release and Debug, where an emulator which fails to start fails
+  AppHost when `DURABLE_STORAGE_EMULATORS` is 1 (`just emulators`, Release and Debug, where an emulator which fails to start fails
   the run): random sequences and concurrent groups, with and without a transport double which fails requests before they
   land or loses their answers after, judged with unknown outcomes, objects across buffer pages, and the contract's
   examples (`CloudObjectStoreConformanceTests`); and examples of a request refused before it lands, which the client's

@@ -60,10 +60,10 @@ public sealed class SeededSimulationTests
         Assert.Contains("Seed 31 failed after step", failure.Message, StringComparison.Ordinal);
         Assert.Contains("counter 3", failure.Message, StringComparison.Ordinal);
         Assert.Contains(
-            $"CLOG_SIM_SEEDS=31 dotnet test --project test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj -c {TestDiagnostics.Configuration} -- --filter-display-name \"{TestContext.Current.Test!.TestDisplayName}\"",
+            $"DURABLE_STORAGE_SIM_SEEDS=31 dotnet test --project test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj -c {TestDiagnostics.Configuration} -- --filter-display-name \"{TestContext.Current.Test!.TestDisplayName}\"",
             failure.Message,
             StringComparison.Ordinal);
-        Assert.Contains("Not minimized: set CLOG_SIM_MINIMIZE=1", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Not minimized: set DURABLE_STORAGE_SIM_MINIMIZE=1", failure.Message, StringComparison.Ordinal);
         Assert.Null(failure.MinimizedArtifactPath);
         Assert.Contains("InvariantViolationException: the counter stays below three failed after step", File.ReadAllText(failure.HistoryPath!), StringComparison.Ordinal);
 

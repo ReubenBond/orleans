@@ -18,7 +18,7 @@ public sealed class SimulatedChunkArchiveLogStoreConformanceTests
 
     /// <summary>
     /// The stride of the explored windows at the gate: each chunk-layout write lists, creates, and lists again, so
-    /// exploring every group of Accordant's generation takes over two minutes, which <c>CLOG_SCHEDULE_BOUND=deep</c> runs.
+    /// exploring every group of Accordant's generation takes over two minutes, which <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c> runs.
     /// </summary>
     private const int GateStride = 8;
 
@@ -70,7 +70,7 @@ public sealed class SimulatedChunkArchiveLogStoreConformanceTests
     /// <summary>
     /// Every concurrent group of Accordant's generation over the kit's input set, after every shorter sequence, conforms:
     /// every <see cref="GateStride"/>th group of racing writes under every schedule of its window within the gate's bound,
-    /// and the rest under their seeded schedules, or every group explored under <c>CLOG_SCHEDULE_BOUND=deep</c>. The
+    /// and the rest under their seeded schedules, or every group explored under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>. The
     /// simulated object store yields to the scheduler in place of latency, so each interleaving of the group's listings,
     /// reads, and conditional creates is a schedule the exploration runs.
     /// </summary>

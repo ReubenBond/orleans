@@ -40,7 +40,7 @@ public sealed class SimulatedLedgerConformanceTests
     /// <summary>
     /// Every concurrent group of appends and reads of Accordant's generation, after every shorter sequence, conforms:
     /// every <see cref="GateStride"/>th group which appends under every schedule of its window within the gate's bound,
-    /// and the rest under their seeded schedules, or every group explored under <c>CLOG_SCHEDULE_BOUND=deep</c>.
+    /// and the rest under their seeded schedules, or every group explored under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>.
     /// </summary>
     [Fact]
     public async Task EveryConcurrentWindowConformsUnderEveryExploredSchedule()

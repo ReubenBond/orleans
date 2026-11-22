@@ -38,8 +38,8 @@ namespace Orleans.Durable.Storage;
 /// and the read enters its lane again reserving exactly that, within its deadline. A remote write, once granted, copies its
 /// payload into an Orleans buffer, which every granted remote call of the same payload shares and the last of them
 /// releases, so the copies a sender holds stay within its nodes' budgets; Orleans' proxy pins the copy for each message as
-/// the call is made, and the caller copies a read reply's DATA into Clog's page pool and releases what Orleans decoded, so
-/// no Orleans message refers to a Clog page (OR-I18). A remote call's caller's cancellation ends its wait at once, however
+/// the call is made, and the caller copies a read reply's DATA into Durable Storage's page pool and releases what Orleans decoded, so
+/// no Orleans message refers to a Durable Storage page (OR-I18). A remote call's caller's cancellation ends its wait at once, however
 /// Orleans ends the grain call, which it abandons: its request may still land (OR-I16). A
 /// remote call answered <c>Backpressure</c> returns its grant, waits a bounded, jittered backoff, and enters its lane again
 /// while its deadline allows; it is reported only once its attempts are spent. Each result reaches the caller as orleans.md

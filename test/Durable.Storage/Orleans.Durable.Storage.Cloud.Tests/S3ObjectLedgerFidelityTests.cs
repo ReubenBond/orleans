@@ -20,8 +20,8 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// <see cref="ObjectLedgerStorage"/> lifecycle.
 /// </summary>
 /// <remarks>
-/// Without <c>CLOG_EMULATORS=1</c> the LocalStack cases skip; the live cases run on <see cref="S3LiveAccount"/>,
-/// skipping with <see cref="S3LiveAccount.SkipReason"/> while <c>CLOG_S3_LIVE</c> is unset.
+/// Without <c>DURABLE_STORAGE_EMULATORS=1</c> the LocalStack cases skip; the live cases run on <see cref="S3LiveAccount"/>,
+/// skipping with <see cref="S3LiveAccount.SkipReason"/> while <c>DURABLE_STORAGE_S3_LIVE</c> is unset.
 /// </remarks>
 public sealed class S3ObjectLedgerFidelityTests(CloudEmulators emulators) : IDisposable
 {
@@ -267,7 +267,7 @@ public sealed class S3ObjectLedgerFidelityTests(CloudEmulators emulators) : IDis
 /// <summary>The backend an <see cref="S3ObjectLedgerFidelityTests"/> case runs against.</summary>
 public enum S3Backend
 {
-    /// <summary>The AppHost's LocalStack emulator, under <c>CLOG_EMULATORS=1</c>.</summary>
+    /// <summary>The AppHost's LocalStack emulator, under <c>DURABLE_STORAGE_EMULATORS=1</c>.</summary>
     LocalStack,
 
     /// <summary>The live S3 bucket <see cref="S3LiveAccount.Variable"/> names.</summary>

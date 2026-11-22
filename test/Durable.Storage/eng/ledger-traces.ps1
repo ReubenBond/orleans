@@ -8,7 +8,7 @@
 # per run under artifacts/ledger-traces, and model-check-quint.ps1 -Traces checks each and its trace mutants.
 [CmdletBinding()]
 param(
-    # The simulation seeds (CLOG_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
+    # The simulation seeds (DURABLE_STORAGE_SIM_SEEDS): a seed, a range first..last, or a comma-separated list of either. By default
     # 1..15, more than the per-change corpora run.
     [string] $Seeds,
     [ValidateRange(1, 64)] [int] $Workers = 2
@@ -28,8 +28,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."
 }
 
-$env:CLOG_LEDGER_TRACES = $traces
-$env:CLOG_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..15' }
+$env:DURABLE_STORAGE_LEDGER_TRACES = $traces
+$env:DURABLE_STORAGE_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..15' }
 
 & dotnet test --project $project -c SimulationRelease --no-build -- `
     --filter-class Orleans.Durable.Storage.Simulation.Tests.QuorumSimulationTests `

@@ -20,7 +20,7 @@ public sealed class LedgerSimulationTests
     private const int Quorum = 2;
     private const int FirstSeed = 3;
 
-    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // Every change runs three seeds, and exploration runs more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
     private const int ReplaySeed = 5;
     private static readonly LedgerReplicaOptions Options = new() { WindowSize = 4 };

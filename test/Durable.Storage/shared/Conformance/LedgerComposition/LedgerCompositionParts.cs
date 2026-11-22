@@ -269,7 +269,7 @@ internal sealed class FaultyLedgerReplica(
     /// </summary>
     private async Task<bool> WaitForReleaseAsync(Task release)
     {
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
         return await Orleans.Durable.Storage.Simulation.SimulationTasks.CompletesWithinAsync(release, HoldLimit, time);
 #else
         await release.WaitAsync(HoldLimit, time).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);

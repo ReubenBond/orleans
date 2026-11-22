@@ -19,7 +19,7 @@ var table = azurite.GetEndpoint("table");
 var storage = ReferenceExpression.Create(
     $"DefaultEndpointsProtocol=http;AccountName={Account};AccountKey={AccountKey};BlobEndpoint=http://127.0.0.1:{blob.Property(EndpointProperty.Port)}/{Account};TableEndpoint=http://127.0.0.1:{table.Property(EndpointProperty.Port)}/{Account};");
 
-// Each run is a new Clog cluster over a new Azurite: the AppHost, as the deployment, creates each silo's node root anew
+// Each run is a new Durable Storage cluster over a new Azurite: the AppHost, as the deployment, creates each silo's node root anew
 // under test/Durable.Storage/artifacts/sample, where it survives the silo's restarts within the run.
 var roots = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "test", "Durable.Storage", "artifacts", "sample"));
 if (Directory.Exists(roots))

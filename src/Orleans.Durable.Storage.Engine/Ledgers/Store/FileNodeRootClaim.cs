@@ -34,7 +34,7 @@ internal interface INodeRootClaim
 /// <remarks>
 /// <c>{root}/cluster</c> is the node root's cluster claim (LS-I12, ledgerstore.md §7.1). Every file-system call goes through
 /// the WAL's <see cref="WalFileSystem"/>. The node root is an operator's: it exists, durably, before the store opens, and
-/// Clog creates and flushes only the root and what lies beneath it.
+/// Durable Storage creates and flushes only the root and what lies beneath it.
 /// </remarks>
 internal static class FileNodeRootClaim
 {

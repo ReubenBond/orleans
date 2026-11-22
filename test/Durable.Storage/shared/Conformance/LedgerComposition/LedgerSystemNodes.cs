@@ -22,7 +22,7 @@ internal interface ILedgerSystemNodes : IAsyncDisposable
 /// </summary>
 internal sealed class InMemoryLedgerSystemNodes : ILedgerSystemNodes
 {
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private readonly InMemoryLedgerReplicaTransport _transport = new() { YieldsAtLandingAndAnswer = true };
 #else
     private readonly InMemoryLedgerReplicaTransport _transport = new();

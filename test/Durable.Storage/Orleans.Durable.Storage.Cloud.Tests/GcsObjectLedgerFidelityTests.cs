@@ -20,8 +20,8 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// exclusive client filtering, and an end-to-end <see cref="ObjectLedgerStorage"/> lifecycle.
 /// </summary>
 /// <remarks>
-/// Without <c>CLOG_EMULATORS=1</c> the emulator cases skip; the live cases run on <see cref="GcsLiveAccount"/>,
-/// skipping with <see cref="GcsLiveAccount.SkipReason"/> while <c>CLOG_GCS_LIVE</c> is unset.
+/// Without <c>DURABLE_STORAGE_EMULATORS=1</c> the emulator cases skip; the live cases run on <see cref="GcsLiveAccount"/>,
+/// skipping with <see cref="GcsLiveAccount.SkipReason"/> while <c>DURABLE_STORAGE_GCS_LIVE</c> is unset.
 /// </remarks>
 public sealed class GcsObjectLedgerFidelityTests(CloudEmulators emulators) : IDisposable
 {
@@ -307,10 +307,10 @@ public sealed class GcsObjectLedgerFidelityTests(CloudEmulators emulators) : IDi
 /// <summary>The backend a <see cref="GcsObjectLedgerFidelityTests"/> case runs against.</summary>
 public enum GcsBackend
 {
-    /// <summary>The AppHost's <c>fake-gcs-server</c> emulator, under <c>CLOG_EMULATORS=1</c>.</summary>
+    /// <summary>The AppHost's <c>fake-gcs-server</c> emulator, under <c>DURABLE_STORAGE_EMULATORS=1</c>.</summary>
     FakeGcsServer,
 
-    /// <summary>The AppHost's <c>storage-testbench</c> emulator, under <c>CLOG_EMULATORS=1</c>.</summary>
+    /// <summary>The AppHost's <c>storage-testbench</c> emulator, under <c>DURABLE_STORAGE_EMULATORS=1</c>.</summary>
     Testbench,
 
     /// <summary>The live Google Cloud Storage bucket <see cref="GcsLiveAccount.Variable"/> names.</summary>

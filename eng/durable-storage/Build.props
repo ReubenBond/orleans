@@ -33,11 +33,11 @@
   </PropertyGroup>
 
   <!--
-    test/Durable.Storage/eng/mutation.ps1 sets ClogMutationTesting in its environment. Stryker.NET writes each mutated
+    test/Durable.Storage/eng/mutation.ps1 sets DurableStorageMutationTesting in its environment. Stryker.NET writes each mutated
     assembly into its test projects' output directories, so a mutation run builds into a tree of its own and the outputs
     which validation tests stay the ones the build produced.
   -->
-  <PropertyGroup Condition="'$(ClogMutationTesting)' == 'true'">
+  <PropertyGroup Condition="'$(DurableStorageMutationTesting)' == 'true'">
     <BaseOutputPath>$(SourceRoot)Artifacts\durable-storage-mutation\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <BaseIntermediateOutputPath>$(SourceRoot)Artifacts\durable-storage-mutation\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
@@ -54,13 +54,13 @@
   -->
   <PropertyGroup>
     <Configurations>Debug;Release;SimulationDebug;SimulationRelease</Configurations>
-    <ClogSimulationBuild Condition="'$(Configuration)' == 'SimulationDebug' or '$(Configuration)' == 'SimulationRelease'">true</ClogSimulationBuild>
-    <ClogBaseConfiguration Condition="'$(Configuration)' == 'SimulationDebug'">Debug</ClogBaseConfiguration>
-    <ClogBaseConfiguration Condition="'$(Configuration)' == 'SimulationRelease'">Release</ClogBaseConfiguration>
-    <ClogBaseConfiguration Condition="'$(ClogBaseConfiguration)' == ''">$(Configuration)</ClogBaseConfiguration>
+    <DurableStorageSimulationBuild Condition="'$(Configuration)' == 'SimulationDebug' or '$(Configuration)' == 'SimulationRelease'">true</DurableStorageSimulationBuild>
+    <DurableStorageBaseConfiguration Condition="'$(Configuration)' == 'SimulationDebug'">Debug</DurableStorageBaseConfiguration>
+    <DurableStorageBaseConfiguration Condition="'$(Configuration)' == 'SimulationRelease'">Release</DurableStorageBaseConfiguration>
+    <DurableStorageBaseConfiguration Condition="'$(DurableStorageBaseConfiguration)' == ''">$(Configuration)</DurableStorageBaseConfiguration>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(ClogSimulationBuild)' == 'true'">
+  <PropertyGroup Condition="'$(DurableStorageSimulationBuild)' == 'true'">
     <DefineConstants>$(DefineConstants);ORLEANS_DURABLE_STORAGE_SIMULATION</DefineConstants>
   </PropertyGroup>
 
@@ -75,7 +75,7 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(ClogSimulationBuild)' == 'true'">
+  <ItemGroup Condition="'$(DurableStorageSimulationBuild)' == 'true'">
     <AssemblyMetadata Include="OrleansDurableStorageSimulation" Value="true" />
   </ItemGroup>
 

@@ -28,13 +28,13 @@ namespace Orleans.Durable.Storage.Testing;
 /// </code>
 /// </para>
 /// <para>
-/// A failing check reports how many pages are outstanding; with <c>CLOG_TEST_LEAK_TRACES=1</c> it also reports where
+/// A failing check reports how many pages are outstanding; with <c>DURABLE_STORAGE_TEST_LEAK_TRACES=1</c> it also reports where
 /// each was rented, grouped by call site.
 /// </para>
 /// </remarks>
 internal sealed class ArcBufferLeakCheck : ArcBufferPageAccounting, IDisposable
 {
-    internal const string TraceVariable = "CLOG_TEST_LEAK_TRACES";
+    internal const string TraceVariable = "DURABLE_STORAGE_TEST_LEAK_TRACES";
 
     // The call sites a failure reports, the most frequent first.
     private const int ReportedSites = 10;
@@ -77,7 +77,7 @@ internal sealed class ArcBufferLeakCheck : ArcBufferPageAccounting, IDisposable
     /// Starts counting the pages rented in the current execution context and in the work it starts, until the check is
     /// disposed, which restores the accounting it replaced.
     /// </summary>
-    /// <param name="tracesRentals">Whether to record where pages are rented; by default, <c>CLOG_TEST_LEAK_TRACES</c>.</param>
+    /// <param name="tracesRentals">Whether to record where pages are rented; by default, <c>DURABLE_STORAGE_TEST_LEAK_TRACES</c>.</param>
     internal static ArcBufferLeakCheck Start(bool? tracesRentals = null) =>
         new(parent: null, tracesRentals ?? TracesFromEnvironment, assertsAtDisposal: true);
 

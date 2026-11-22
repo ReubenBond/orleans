@@ -79,7 +79,7 @@ public sealed class JournalSimulationTests
 
     // A seed costs about forty-five thousand steps, and the scripted steps take every rare path, and the fault plan every
     // fault, on each seed by construction, so every change runs one, the replay check's smaller run a second, and
-    // exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // exploration runs more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private const int ReplaySeed = 2;
     private const int MutantSeed = 1;

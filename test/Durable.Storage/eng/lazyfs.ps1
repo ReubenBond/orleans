@@ -4,9 +4,9 @@
     Runs the Linux LazyFS + SIGKILL multi-process crash and linearizability soak tests.
 .DESCRIPTION
     Builds Orleans.Durable.Storage.Tests in Release and executes the explicit Category=LazyFs
-    suite with CLOG_LAZYFS=1 so missing FUSE or LazyFS prerequisites fail rather than silently skip.
+    suite with DURABLE_STORAGE_LAZYFS=1 so missing FUSE or LazyFS prerequisites fail rather than silently skip.
     Requires Linux with FUSE (/dev/fuse, fusermount3 or fusermount) and the lazyfs binary on PATH,
-    in ~/.local/bin/lazyfs, or at CLOG_LAZYFS_BIN.
+    in ~/.local/bin/lazyfs, or at DURABLE_STORAGE_LAZYFS_BIN.
 #>
 [CmdletBinding()]
 param(
@@ -28,8 +28,8 @@ $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'dotnet-env.ps1')
 
 $project = Join-Path $root 'Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj'
-$env:CLOG_LAZYFS = '1'
-$env:CLOG_LAZYFS_ROUNDS = "$Rounds"
+$env:DURABLE_STORAGE_LAZYFS = '1'
+$env:DURABLE_STORAGE_LAZYFS_ROUNDS = "$Rounds"
 
 # Keep Microsoft.Testing.Platform IPC sockets under /tmp so long worktree paths do not hit sun_path limits.
 if ([string]::IsNullOrWhiteSpace($env:TESTINGPLATFORM_PIPE_DIRECTORY)) {

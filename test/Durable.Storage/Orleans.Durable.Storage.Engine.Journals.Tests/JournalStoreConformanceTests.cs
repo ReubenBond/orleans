@@ -109,7 +109,7 @@ public sealed class JournalStoreConformanceTests : IDisposable
             timeout);
         Assert.True(report.Success, failure.Message);
         Assert.Matches(new Regex(failingCall, RegexOptions.None, timeout), report.Groups["call"].Value);
-        Assert.Matches(new Regex(@"Replay the shrunk case with CLOG_TEST_SEED=\S+", RegexOptions.None, timeout), failure.Message);
+        Assert.Matches(new Regex(@"Replay the shrunk case with DURABLE_STORAGE_TEST_SEED=\S+", RegexOptions.None, timeout), failure.Message);
     }
 
     /// <summary>Returns a kit of the spec's operations over the targets <paramref name="create"/> starts.</summary>

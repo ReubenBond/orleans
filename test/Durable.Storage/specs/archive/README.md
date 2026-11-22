@@ -102,7 +102,7 @@ compaction which kept none, stands for; the sweeper's listing, manifest read, de
 `sweepSecond`, `sweepDelete`, and `sweepDone`; and a history read is `readMap`, `readManifest`, and `readFinish` at its
 end. `compactKeep` uploads the rows a compaction output holds when they hold every row the reduction keeps, and only
 rows of its inputs: a compactor which judged by an older manifest value, or by the code's coarser rule for an empty
-`Delete`, keeps more, and the invariants judge the rows it kept. With `CLOG_ARCHIVE_TRACES` set, each seed writes a
+`Delete`, keeps more, and the invariants judge the rows it kept. With `DURABLE_STORAGE_ARCHIVE_TRACES` set, each seed writes a
 module `ArchiveTrace{seed}.qnt` whose `traceReplay` run applies every action in order and checks every invariant, each
 upload's rows, the manifest's watermarks and references after each replace, and each read's answer against `reduced` of
 the decided history at its cut. `.\eng\model-check-quint.ps1 -Traces <directory>` replays each trace with `quint test`,

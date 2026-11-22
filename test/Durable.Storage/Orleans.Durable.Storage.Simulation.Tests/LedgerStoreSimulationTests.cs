@@ -50,7 +50,7 @@ public sealed class LedgerStoreSimulationTests
     /// <summary>
     /// The seed every change runs: the lowest from 100 whose run, with each replica created by its first write, fired
     /// every kind of fault; a scripted step after the faults end fires a local storage failure on every seed. A run costs
-    /// about 15 s of wall time, so exploration runs more through CLOG_SIM_SEEDS, and
+    /// about 15 s of wall time, so exploration runs more through DURABLE_STORAGE_SIM_SEEDS, and
     /// <c>just ledger-traces</c> runs seeds 1 to 15 (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     /// </summary>
     private const int CorpusSeed = 113;

@@ -19,7 +19,7 @@ internal readonly union AzureWalMetadataDecoding(AzureWalMetadata, InvalidDataEx
 /// <summary>
 /// The metadata of archive logs on Azure (archive-logs.md §7.3), in Orleans Journaling's own layout: the write-ahead
 /// blob <c>wal/{id}</c> and each generation's checkpoint <c>checkpoints/{id}/{g:D20}</c>, with Orleans' <c>format</c>,
-/// <c>checkpoint</c>, <c>checkpoint_offset</c>, and <c>wal_generation</c>, Clog's <c>durable_kind</c>, <c>durable_tomb</c>,
+/// <c>checkpoint</c>, <c>checkpoint_offset</c>, and <c>wal_generation</c>, Durable Storage's <c>durable_kind</c>, <c>durable_tomb</c>,
 /// <c>durable_base_md5</c>, and <c>durable_key</c>, and the index tag <c>durable-gen</c>. Metadata and the tag are written only when
 /// a generation is created. <c>format</c> is not compared with the store's own: the store's record fixes it for the
 /// cluster's life, and <c>durable_key</c> already tells a blob of another writer.
@@ -104,7 +104,7 @@ internal static class AzureArchiveLogMetadata
     public const string EmptyMd5 = "d41d8cd98f00b204e9800998ecf8427e";
 
     /// <summary>
-    /// Returns whether <paramref name="log"/> names blobs Azure stores under exactly the names Clog forms, version
+    /// Returns whether <paramref name="log"/> names blobs Azure stores under exactly the names Durable Storage forms, version
     /// <see cref="NameRule"/>: at most <see cref="MaxLogNameLength"/> printable ASCII characters, U+0020 to U+007E, since
     /// an opener's write-ahead blob carries its checkpoint's name in its <c>checkpoint</c> metadata, an HTTP header, which
     /// holds only ASCII, and no backslash, which a URI turns into a slash; and <c>/</c>-separated segments, at most 252 so
@@ -194,7 +194,7 @@ internal static class AzureArchiveLogMetadata
 
     /// <summary>
     /// Returns the metadata of a write-ahead blob of <paramref name="generation"/>: Orleans' keys, naming the checkpoint
-    /// when an opener created the generation, and Clog's, with the base's MD5 <paramref name="baseMd5"/> exactly when an
+    /// when an opener created the generation, and Durable Storage's, with the base's MD5 <paramref name="baseMd5"/> exactly when an
     /// opener created it.
     /// </summary>
     /// <exception cref="ArgumentException">An opener comes without its base's MD5, or the reverse.</exception>
@@ -228,7 +228,7 @@ internal static class AzureArchiveLogMetadata
         return metadata;
     }
 
-    /// <summary>Returns the metadata of a checkpoint: Orleans' <c>format</c> and Clog's <c>durable_key</c>.</summary>
+    /// <summary>Returns the metadata of a checkpoint: Orleans' <c>format</c> and Durable Storage's <c>durable_key</c>.</summary>
     public static Dictionary<string, string> ForCheckpoint(string format, ulong keyHash) =>
         new(StringComparer.Ordinal) { [Format] = format, [Key] = Hex(keyHash) };
 

@@ -83,7 +83,7 @@ internal static partial class WalFlock
     /// Returns the exception for an exclusive, non-blocking <c>flock</c> of <paramref name="path"/> which failed with
     /// <paramref name="error"/>: <see cref="WalLockHeldException"/> when another owner holds the lock;
     /// <see cref="PlatformNotSupportedException"/> when the file system takes no <c>flock</c>, so it is not a local
-    /// file system Clog qualifies; and <see cref="IOException"/> otherwise.
+    /// file system Durable Storage qualifies; and <see cref="IOException"/> otherwise.
     /// </summary>
     public static Exception ExclusiveFailure(int error, string path, bool macOs)
     {

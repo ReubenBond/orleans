@@ -39,18 +39,18 @@ namespace Orleans.Durable.Storage.Tests.LazyFs;
 /// rename that was not flushed with <c>fsync</c>/<c>fdatasync</c> is dropped before the silo restarts.
 /// </para>
 /// <para>
-/// Run on Linux via <c>just lazyfs</c> (sets <c>CLOG_LAZYFS=1</c>). When <c>CLOG_LAZYFS</c> is unset and LazyFS or
-/// <c>/dev/fuse</c> is unavailable, tests skip cleanly; when <c>CLOG_LAZYFS=1</c>, a missing LazyFS environment fails
+/// Run on Linux via <c>just lazyfs</c> (sets <c>DURABLE_STORAGE_LAZYFS=1</c>). When <c>DURABLE_STORAGE_LAZYFS</c> is unset and LazyFS or
+/// <c>/dev/fuse</c> is unavailable, tests skip cleanly; when <c>DURABLE_STORAGE_LAZYFS=1</c>, a missing LazyFS environment fails
 /// explicitly.
 /// </para>
 /// </remarks>
 public sealed class LazyFsCrashSoakTests : IDisposable
 {
-    private const string SiloConfigEnvVar = "CLOG_LAZYFS_SILO_CONFIG";
-    private const string ForceRunEnvVar = "CLOG_LAZYFS";
-    private const string RoundsEnvVar = "CLOG_LAZYFS_ROUNDS";
-    private const string ReadyMarker = "CLOG_LAZYFS_SILO_READY:";
-    private const string ReplyMarker = "CLOG_LAZYFS_REPLY:";
+    private const string SiloConfigEnvVar = "DURABLE_STORAGE_LAZYFS_SILO_CONFIG";
+    private const string ForceRunEnvVar = "DURABLE_STORAGE_LAZYFS";
+    private const string RoundsEnvVar = "DURABLE_STORAGE_LAZYFS_ROUNDS";
+    private const string ReadyMarker = "DURABLE_STORAGE_LAZYFS_SILO_READY:";
+    private const string ReplyMarker = "DURABLE_STORAGE_LAZYFS_REPLY:";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

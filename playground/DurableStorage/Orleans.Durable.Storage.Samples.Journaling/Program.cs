@@ -46,7 +46,7 @@ builder.UseOrleans(silo => silo
     .ConfigureEndpoints(IPAddress.Loopback, sample.GetValue<int>("SiloPort"), sample.GetValue<int>("GatewayPort"))
     .AddSampleJournaling(builder.Configuration));
 
-// Clog's meters (Orleans.Durable.Storage, Orleans.Durable.Storage.Engine.Ledgers, Orleans.Durable.Storage.Engine.Journals, Orleans.Durable.Storage.Engine.Wal, Orleans.Durable.Storage.Engine.Archive.Lsm) and the logs reach
+// Durable Storage's meters (Orleans.Durable.Storage, Orleans.Durable.Storage.Engine.Ledgers, Orleans.Durable.Storage.Engine.Journals, Orleans.Durable.Storage.Engine.Wal, Orleans.Durable.Storage.Engine.Archive.Lsm) and the logs reach
 // the Aspire dashboard over OTLP, whose endpoint the AppHost sets.
 builder.Logging.AddOpenTelemetry(static logging => logging.IncludeFormattedMessage = true);
 var telemetry = builder.Services.AddOpenTelemetry()

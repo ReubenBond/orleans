@@ -16,10 +16,10 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// </summary>
 public enum AzureBackend
 {
-    /// <summary>Azurite, from the AppHost, under <c>CLOG_EMULATORS=1</c>.</summary>
+    /// <summary>Azurite, from the AppHost, under <c>DURABLE_STORAGE_EMULATORS=1</c>.</summary>
     Azurite,
 
-    /// <summary>A live storage account, whose blob service endpoint <c>CLOG_AZURE_LIVE</c> holds.</summary>
+    /// <summary>A live storage account, whose blob service endpoint <c>DURABLE_STORAGE_AZURE_LIVE</c> holds.</summary>
     Live,
 }
 
@@ -31,7 +31,7 @@ public enum AzureBackend
 /// collapses, names another blob.
 /// </summary>
 /// <remarks>
-/// Each test runs in a container of its own, which it deletes. Without <c>CLOG_EMULATORS=1</c> the Azurite cases skip,
+/// Each test runs in a container of its own, which it deletes. Without <c>DURABLE_STORAGE_EMULATORS=1</c> the Azurite cases skip,
 /// and the live cases run on <see cref="AzureLiveAccount"/>, skipping with its reason while its variable is unset.
 /// Where Azurite does not model a precondition, its case checks what Azurite does model, pins what it does instead,
 /// and says which: preconditions 7 and 7b hold on Azurite only as far as its case says, and only a live run establishes

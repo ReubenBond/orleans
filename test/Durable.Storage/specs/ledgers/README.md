@@ -128,7 +128,7 @@ derives from `N`. There are no depth cutoffs, sampling, or state constraints tha
 ## Trace validation
 
 `just ledger-map-traces` (`test/Durable.Storage/eng/ledger-map-traces.ps1`) checks the implementation's runs against `LedgerMap.qnt`
-([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `CLOG_LEDGER_MAP_TRACES` set, each
+([verification §5.1](../../docs/spec/verification.md#51-trace-validation)). With `DURABLE_STORAGE_LEDGER_MAP_TRACES` set, each
 seed of the ledger map committer simulation (`LedgerMapCommitterSimulationTests`) and the transition simulation
 (`TransitionSimulationTests`) records a `LedgerMapTrace` (`test/Durable.Storage/Orleans.Durable.Storage.Simulation`) and writes it,
 rendered by `LedgerMapTraceExport`, as a Quint module, `LedgerMapTraceCommitter{seed}.qnt` or

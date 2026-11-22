@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <!--
-    An Orleans silo whose journaled grains store their state in Clog: its node's disk under DurableStorage:Node:Root, its MetaStore
+    An Orleans silo whose journaled grains store their state in Durable Storage: its node's disk under DurableStorage:Node:Root, its MetaStore
     and LSM object store in Azure Storage, Orleans' membership in Azure Table storage. playground/DurableStorage/Orleans.Durable.Storage.Samples.AppHost runs
     three of them on Azurite.
   -->

@@ -42,7 +42,7 @@ internal sealed class ObjectLedgerSystem : ILedgerConformanceSystem, IConformanc
     private long _end = -1;
     private long _ticks;
 
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private static TimeProvider SystemClock => Orleans.Durable.Storage.Simulation.SimulationEnvironment.Clock;
 
     private static CancellationToken Cancellation => CancellationToken.None;

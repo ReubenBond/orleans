@@ -29,7 +29,7 @@ public sealed class AdmissionGate
     /// every later entry attempt is rejected.
     /// </summary>
     /// <remarks>
-    /// A Clog addition: an owner which closes the gate under a lock of its own reads this under the same lock to
+    /// A Durable Storage addition: an owner which closes the gate under a lock of its own reads this under the same lock to
     /// order its own state against closure.
     /// </remarks>
     public bool IsClosed => Volatile.Read(ref _state) < 0;

@@ -8,7 +8,7 @@ namespace Orleans.Testing.Simulation.Conformance.Tests;
 /// run those members on the thread pool, block on a semaphore or task, or await through BCL awaiters. Rewritten, every
 /// synchronous read, write, and flush runs on the simulation's logical thread, and each scenario returns what the same
 /// probe returns uninstrumented, on real threads: results, serialization order, cancellation, exceptions and their
-/// messages, base calls from overrides, and the shapes Clog's streams use. Rewritten without the rules, the base
+/// messages, base calls from overrides, and the shapes Durable Storage's streams use. Rewritten without the rules, the base
 /// <c>ReadAsync</c> reads on a thread-pool thread.
 /// </summary>
 public sealed class StreamConformanceTests : IDisposable
@@ -110,7 +110,7 @@ public sealed class StreamConformanceTests : IDisposable
                 }
             }
 
-            // The shape of Clog's ArcBufferReadStream: synchronous ReadAsync overrides over a locked cursor.
+            // The shape of Durable Storage's ArcBufferReadStream: synchronous ReadAsync overrides over a locked cursor.
             public sealed class CursorReadStream : Stream
             {
                 private readonly object _sync = new object();
@@ -155,7 +155,7 @@ public sealed class StreamConformanceTests : IDisposable
                 public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
             }
 
-            // The shape of Clog's ArcBufferWriteStream: synchronous WriteAsync and FlushAsync overrides.
+            // The shape of Durable Storage's ArcBufferWriteStream: synchronous WriteAsync and FlushAsync overrides.
             public sealed class AppendWriteStream : Stream
             {
                 public List<byte> Written { get; } = new List<byte>();
@@ -366,8 +366,8 @@ public sealed class StreamConformanceTests : IDisposable
                     return read + "|" + stream.Calls + "|" + string.Join(" ", log);
                 }
 
-                // Clog's uses: ReadExactlyAsync and CopyToAsync over its streams, and a ReadAsync(Memory) copy loop.
-                public static async Task<string> ClogShapes()
+                // Durable Storage's uses: ReadExactlyAsync and CopyToAsync over its streams, and a ReadAsync(Memory) copy loop.
+                public static async Task<string> DurableStorageShapes()
                 {
                     byte[] content = new byte[20];
                     for (int i = 0; i < content.Length; i++) content[i] = (byte)i;
@@ -472,12 +472,12 @@ public sealed class StreamConformanceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClogStreamShapesReturnWhatTheBclReturns()
+    public async Task DurableStorageStreamShapesReturnWhatTheBclReturns()
     {
-        string expected = await (Task<string>)_bcl.Value.Method("ClogShapes").Invoke(null, null)!;
+        string expected = await (Task<string>)_bcl.Value.Method("DurableStorageShapes").Invoke(null, null)!;
         using var host = new SimulationHost(Start);
 
-        Assert.Equal(expected, Completed(host.Invoke(_probe.Value.Method("ClogShapes"))));
+        Assert.Equal(expected, Completed(host.Invoke(_probe.Value.Method("DurableStorageShapes"))));
     }
 
     [Fact]

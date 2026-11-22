@@ -2,7 +2,7 @@ using System.Globalization;
 using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Memory;
-#if !CLOG_SIMULATION_TESTS
+#if !DURABLE_STORAGE_SIMULATION_TESTS
 using Orleans.Durable.Storage.Engine.Ledgers.Tests;
 #endif
 
@@ -169,7 +169,7 @@ internal sealed class SkewedLedgerReplica(ILedgerReplica inner, bool leads, Time
 
     // In a simulation the test assembly is not rewritten, so the replica yields and waits through the simulation kit,
     // whose continuations the simulation schedules (verification.md §7.1).
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private static Task YieldAsync() => Orleans.Durable.Storage.Simulation.SimulationTasks.Yield();
 
     private static Task DelayAsync(TimeSpan delay, TimeProvider timeProvider, CancellationToken cancellationToken) =>
@@ -233,7 +233,7 @@ internal interface ISealOrder
 /// </summary>
 /// <remarks>
 /// On the thread pool the quorum runs on a fake clock, which a read advances past each timer it arms, and the writer and
-/// the recording on the system clock. In a simulation (<c>CLOG_SIMULATION_TESTS</c>) all three run on the virtual clock, which
+/// the recording on the system clock. In a simulation (<c>DURABLE_STORAGE_SIMULATION_TESTS</c>) all three run on the virtual clock, which
 /// advances once nothing else can run, and the system uses no cancellation.
 /// </remarks>
 internal sealed class LedgerSystem : ILedgerConformanceSystem, IAsyncDisposable
@@ -259,7 +259,7 @@ internal sealed class LedgerSystem : ILedgerConformanceSystem, IAsyncDisposable
     private const int Alone = 1 << 16;
 
     private readonly ILedgerSystemNodes _nodes;
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private readonly TimeProvider _time = SystemClock;
 #else
     private readonly TimerSignallingTimeProvider _time = new();
@@ -289,7 +289,7 @@ internal sealed class LedgerSystem : ILedgerConformanceSystem, IAsyncDisposable
     private bool _answersLost;
     private bool _requestsLost;
 
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
     private static TimeProvider SystemClock => Orleans.Durable.Storage.Simulation.SimulationEnvironment.Clock;
 
     private static CancellationToken Cancellation => CancellationToken.None;
@@ -535,7 +535,7 @@ internal sealed class LedgerSystem : ILedgerConformanceSystem, IAsyncDisposable
     private async Task<ReplicaRead> ReadPrimaryAsync(Slot slot, Func<Ledger, CancellationToken, ValueTask<ReplicaRead>> readAsync)
     {
         CurrentReadLeaderHeld.Value = _leaderSlots.Holds(slot);
-#if CLOG_SIMULATION_TESTS
+#if DURABLE_STORAGE_SIMULATION_TESTS
         return await readAsync(_primary, Cancellation);
 #else
         var timers = _time.Timers;
@@ -768,7 +768,7 @@ internal sealed class LedgerSystem : ILedgerConformanceSystem, IAsyncDisposable
         }
 
         // The slow replicas' reads which lost answer once their delay passes, so the quorum's disposal does not wait on them.
-#if !CLOG_SIMULATION_TESTS
+#if !DURABLE_STORAGE_SIMULATION_TESTS
         _time.Advance(TimeSpan.FromHours(1));
 #endif
         _coverage?.RecordHedges(_primaryQuorum.ReadHedges);

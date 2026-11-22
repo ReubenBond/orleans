@@ -208,7 +208,7 @@ sequences, and concurrent groups of operations, from a spec's operations and the
 a fresh system; folds the results through `spec.Allows` (or `AllowsConcurrent` for a concurrent group) over the state
 profile; and lets CsCheck shrink a failing sequence. The kit then removes calls while the case still fails, and reports
 the minimal trace, the spec's explanation, the possible states before the failing round, and the CsCheck seed which
-replays the shrunk case through `CLOG_TEST_SEED`, as a seeded simulation replays (§7.4). Each case carries a seed for
+replays the shrunk case through `DURABLE_STORAGE_TEST_SEED`, as a seeded simulation replays (§7.4). Each case carries a seed for
 its system, such as the seed of random faults, which the report prints; an Accordant case's seed derives from its
 description. Each case runs inside a scope its caller gives the kit; the `ILedgerReplica` spec's cases each run in their
 own page leak scope (§11.1), so a case which leaks a page fails, is minimized, and reports its seed. Without a scheduler
@@ -256,10 +256,10 @@ deviation is a preemption; outside every window the case's seeded strategy choos
 the schedules by re-execution, the fewest preemptions first: each schedule with `d` preemptions extends its parent with
 `d − 1` by one preemption after its parent's last, so each runs once, and an exploration ends complete when a level adds
 none, or at the bound. The gate's bound (`ScheduleBound.Gate`) runs every schedule with at most one preemption, up to
-128 per case; `CLOG_SCHEDULE_BOUND=deep` runs up to two, up to 2,000. Stateless exploration rests on a run's choice
+128 per case; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` runs up to two, up to 2,000. Stateless exploration rests on a run's choice
 points depending only on its earlier choices: a schedule whose prefix offers other operations than the run it extends
 diverges, and fails its exploration. A failure reports the case, its seed, the schedule's index among those explored,
-and its preemptions, which `CLOG_SCHEDULE` replays with the case's seed; every exploration reports how many schedules it
+and its preemptions, which `DURABLE_STORAGE_SCHEDULE` replays with the case's seed; every exploration reports how many schedules it
 ran, how many choice points its windows held, and whether it ran every schedule. Doubles at the store boundaries yield
 to the scheduler where they would wait a random latency
 (`SimulatedObjectStore.YieldsForLatency`, `SimulatedConditionalRegister.YieldsForLatency`, the fake Azure transport's
@@ -389,7 +389,7 @@ from below, and the second from above. The trace checks that the end lies in `[c
 The trace is kept with the run's diagnostics.
 
 Quint (`quint test`) then checks each trace against the ledger model ([trace
-validation](../../specs/ledger-protocol/README.md#trace-validation)). With `CLOG_LEDGER_TRACES` set, the quorum, crash,
+validation](../../specs/ledger-protocol/README.md#trace-validation)). With `DURABLE_STORAGE_LEDGER_TRACES` set, the quorum, crash,
 and `Ledger` simulations, and the scripted run of serve-time landings, write each run's trace of its ledger as a Quint
 module (`LedgerTraceExport`), and `LedgerProtocolTrace.qnt` drives `LedgerProtocol.qnt`, with `SeparateAnswers`, through
 the module's events in order, binding each to the action and arguments it names. The trace validates when `quint test`
@@ -481,7 +481,7 @@ whose failures strike before a request lands. Each request of the key's log maps
 drainer's `Create` and `Put Blob` of an opener among them; a segment's start, a marker, and a drop map to theirs; the
 ledger writer's decisions give the model's decided tail, and `ReplaceAsync` its close; a request for another key and a
 repeat of a request which already landed in the model map to no step. After each store request the trace expects the
-model's position to be the store's, and a drain which blocks is a violation. With `CLOG_ARCHIVE_LOG_TRACES` set, each
+model's position to be the store's, and a drain which blocks is a violation. With `DURABLE_STORAGE_ARCHIVE_LOG_TRACES` set, each
 seed writes a Quint module (`ArchiveLogsTrace{seed}.qnt`) which imports the model with those constants and runs its
 actions in order. `test/Durable.Storage/eng/model-check-quint.ps1 -Traces` replays each with `quint test`, which fails at an action not
 enabled, a position the store did not reach, or a state which breaks an invariant, and checks two negative controls
@@ -495,7 +495,7 @@ register applied, in order, interleaved with the proposals answered durable, and
 ledger map committer simulation (`LedgerMapCommitterSimulationTests`), whose ledgers take no writes, and the transition
 simulation (`TransitionSimulationTests`), whose scans read each closed ledger's batches below its recorded `T` for its
 LG-I5 check and, only when the trace is exported and after every check, each open ledger's below its highest durable
-answer. Recording takes no step, so an untraced run's schedule is unchanged. With `CLOG_LEDGER_MAP_TRACES` set, each
+answer. Recording takes no step, so an untraced run's schedule is unchanged. With `DURABLE_STORAGE_LEDGER_MAP_TRACES` set, each
 seed writes a Quint module (`LedgerMapTraceCommitter{seed}.qnt` or `LedgerMapTraceTransition{seed}.qnt`, rendered by
 `LedgerMapTraceExport`) which imports `LedgerMap.qnt` with the constants its run fixes. A write's value becomes the
 model's conditional steps it shows against the value before it, a group commit several: its installs (`takeover`,
@@ -539,7 +539,7 @@ contain the key, and every other read. `compactKeep` is the model's compaction w
 at least the reduction's: a compactor which judged by an older manifest value, or by the implementation's coarser rule,
 which keeps an empty `Delete` while an older ledger is incomplete, keeps rows the reduction would drop, and the
 invariants judge what it kept; the model's exhaustive cases take such compactions as steps too. With
-`CLOG_ARCHIVE_TRACES` set, each seed writes a Quint module (`ArchiveTrace{seed}.qnt`)
+`DURABLE_STORAGE_ARCHIVE_TRACES` set, each seed writes a Quint module (`ArchiveTrace{seed}.qnt`)
 which imports the model with those constants and runs its actions in order, expecting after each step the model's
 invariants, after each upload the object's rows to be the output's, after each manifest replace the model's watermarks
 and references to be the manifest's, and of each read the answer, folded from its prefix and its live rows, to be the
@@ -802,7 +802,7 @@ with the reference rows of its map value's ledgers which the prefix does not hol
 marking held rows, gives the reference's history below the value's next ID. A corpus-wide test checks that reads restart
 on each cause, resume after backpressure, and merge rows the store and the live ledgers both held, and the read-order
 mutant, which takes the map after the store, fails the oracle on every seed. Every change runs one seed, about 19 s of
-wall time, and the mutant on it; exploration runs more through `CLOG_SIM_SEEDS`, and the replay check runs a smaller
+wall time, and the mutant on it; exploration runs more through `DURABLE_STORAGE_SIM_SEEDS`, and the replay check runs a smaller
 workload, since it runs the scenario three times.
 
 Production code follows Clockwork's rules: it awaits a `ValueTask` rather than blocking on it, runs on the default task
@@ -896,14 +896,14 @@ thread over such a task, where the BCL's completes on the thread pool. The same 
 hand-offs to the BCL: `ConfigureAwait(false)`, which resumes off the lane; a `Task.Yield` or `Task.Delay` and a
 `WaitAsync` timeout, whose timer and cancellation callbacks the BCL may run on the thread pool; and
 `CancellationTokenSource.CancelAsync`. Shared test source which also runs inside a simulation, such as the ledger
-harnesses (`test/Durable.Storage/shared/Conformance/LedgerComposition`), uses none of them and, under `CLOG_SIMULATION_TESTS`, which
+harnesses (`test/Durable.Storage/shared/Conformance/LedgerComposition`), uses none of them and, under `DURABLE_STORAGE_SIMULATION_TESTS`, which
 the simulation test projects define in every configuration, yields, delays, and waits for a release
 through `SimulationTasks.Yield`, `Delay`, and `CompletesWithinAsync`. A rewritten caller's wait on a task of the test
 assembly which later operations complete is a wait the scheduler cannot attribute, so it reports a stall when nothing
 else is runnable: a harness settles such work itself before rewritten code waits on it, as `LedgerSystem` lets its
 replicas' late landings finish before the quorum's disposal waits on them. Likewise a rewritten caller's `await` on a
 task of the test assembly which a later continuation of the test assembly completes escapes the coordinator: under
-`CLOG_SIMULATION_TESTS` the scripted register (`ScriptedConditionalRegister`) decides each held write as it arrives and
+`DURABLE_STORAGE_SIMULATION_TESTS` the scripted register (`ScriptedConditionalRegister`) decides each held write as it arrives and
 applies the decision a scheduler step later, through `SimulationTasks.Yield`, rather than waiting for a test's decision.
 A scenario whose clients race runs them in the kit, on its client node's scheduler lane, as the quorum scenario's
 writer, recoveries, seal checker, and reader run in `RecoveryRace`: each of their awaits, timers, and combinators is
@@ -996,10 +996,10 @@ client history, a read is sent again, and once the faults heal every call is ans
 ### 7.4 Seeds and replay
 
 A seed controls a simulation's work, scheduling, and virtual time. `SeededSimulation` wraps Clockwork's seeds and
-replay artifacts: it prints the seed, honors `CLOG_TEST_SEED`, and on failure records the replay command and the
+replay artifacts: it prints the seed, honors `DURABLE_STORAGE_TEST_SEED`, and on failure records the replay command and the
 replay artifact in the results directory. A fixed seed corpus gates every change within a time budget (§12);
 milestones add seed exploration, schedule exploration (the conformance kit's explored windows at
-`CLOG_SCHEDULE_BOUND=deep`, §4.1, which `just explore-schedules` runs), and minimization.
+`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, §4.1, which `just explore-schedules` runs), and minimization.
 
 `SeededSimulation.Run` records a scenario in a Clockwork cluster seeded from the run, with Clockwork's seeded-random
 scheduling. A step is one operation the scheduler dispatches; after each, the driver runs every invariant check the
@@ -1038,14 +1038,14 @@ directory the run's trace (`<test>.seed-<seed>.history.log`) and Clockwork's rep
 `ORLEANS_SIMULATION_REPLAY_ARTIFACT` replays an artifact's exact schedule in place of the seed. Every execution logs its
 steps, virtual time, and wall time.
 
-`CLOG_SIM_MINIMIZE=1` also minimizes a failure's schedule with Clockwork's minimizer, a milestone activity: a candidate
+`DURABLE_STORAGE_SIM_MINIMIZE=1` also minimizes a failure's schedule with Clockwork's minimizer, a milestone activity: a candidate
 counts only when its exact replay fails within the failing run's steps with the same failure: by type, and by the
 invariant it violated, the site of the debug assertion it failed (its first frame's method and IL offset, since sites
 may share a message) and the assertion's message, or its message. The minimized artifact (`.min.cwr.json`), its
 rendered schedule (`.min.trace.txt`), and its trace (`.min.history.log`) join the evidence. A stalled run is not
 minimized, since a longer schedule fails it too.
 
-A corpus theory takes its seeds from `SeededSimulation.Corpus`, which `CLOG_SIM_SEEDS` replaces with seeds or ranges
+A corpus theory takes its seeds from `SeededSimulation.Corpus`, which `DURABLE_STORAGE_SIM_SEEDS` replaces with seeds or ranges
 (`1..500`) for seed exploration, and through which a failure's replay command runs its failing seed alone. The
 corpus theories record each seed once with `Run`; one `RunAndReplay` test per scenario also records its seed a
 second time and replays the first run's artifact exactly, and fails unless all three record the same trace, and a
@@ -1055,11 +1055,11 @@ re-approves it. Simulations record client histories with `HistoryRecorder` on vi
 
 `SeededSimulation.RunCase` runs one conformance case's scenario (§4.1) with every check `Run` makes, seeded with the
 case's seed exactly, which no environment variable replaces, and returns the run, failed or not, without writing
-evidence: the kit runs many cases while it shrinks and explores, and owns their replay through `CLOG_TEST_SEED` and
-`CLOG_SCHEDULE`. It may wrap the run's seeded scheduling strategy before the first step, as the window explorer does.
+evidence: the kit runs many cases while it shrinks and explores, and owns their replay through `DURABLE_STORAGE_TEST_SEED` and
+`DURABLE_STORAGE_SCHEDULE`. It may wrap the run's seeded scheduling strategy before the first step, as the window explorer does.
 
 Projects without Clockwork use `SeededSimulation.RunAsync`, which runs a scenario over `FakeTimeProvider` and
-simulated storage: it prints the seed and honors `CLOG_TEST_SEED`. A run which fails, or whose scenario raised a debug
+simulated storage: it prints the seed and honors `DURABLE_STORAGE_TEST_SEED`. A run which fails, or whose scenario raised a debug
 assertion (§11.2), records the replay command and `<test>.seed-<seed>.history.log`. `RunAndReplayAsync` compares two
 histories from the same seed. Thread-pool timing, real clocks, unseeded randomness, and cross-test shared state fall
 outside such a schedule; a simulation retaining them identifies that limitation.
@@ -1165,7 +1165,7 @@ least two per point: beyond it, the enumerator keeps every point's strictest and
 others with the seed. The LedgerStore workloads' caps exceed their distinct images, so they recover every distinct
 image they enumerate, including each sampled point's sample. For a seeded sample of the states whose recovery wrote,
 every crash state of the recovery's own trace recovers again and is judged at the outer point. The seed follows
-`CLOG_TEST_SEED` (§7.4); a failure reports the crash point, the fate of each unsynced operation, the image, and the
+`DURABLE_STORAGE_TEST_SEED` (§7.4); a failure reports the crash point, the fate of each unsynced operation, the image, and the
 trace.
 
 **Oracles.** Each state recovers through the real code and is judged against the acknowledged history at its crash
@@ -1297,7 +1297,7 @@ replica's configuration captures coverage in isolation (`perTestInIsolation`), a
 test's coverage when it exits, because its longest crash-state, conformance, and competing-process tests miss that
 window. The script fails a run in which Stryker marks any test dubious. Stryker reruns a test for every mutant it
 reaches, so mutation runs leave out the longest crash-state enumeration, a process crash followed by an operating-system
-crash, whose writes the lighter enumerations reach too; the test skips itself when `ClogMutationTesting` is set
+crash, whose writes the lighter enumerations reach too; the test skips itself when `DurableStorageMutationTesting` is set
 (`TestDiagnostics.UnderMutationTesting`), and runs in every ordinary test run.
 
 Stryker tests mutants in test hosts which it reuses from one mutant to the next, and it starts a new host only after a
@@ -1335,12 +1335,12 @@ Stryker.NET 5.0.0 runs on .NET 10, reads each project's language version, `previ
 own Roslyn 5.9, whose `preview` includes unions; Stryker.NET 5.1.0 takes the version each project reports rather than
 resolving it against its own compiler (row 0.20 of the [implementation plan](https://github.com/ReubenBond/clog/blob/6ffb29aa96d2e4d48fc9c34f80790493e548af96/docs/implementation-plan.md)).
 
-A mutation run sets `ClogMutationTesting`, under which the build writes to `Artifacts/durable-storage-mutation` at the repository's root and the test
+A mutation run sets `DurableStorageMutationTesting`, under which the build writes to `Artifacts/durable-storage-mutation` at the repository's root and the test
 applications carry no `testconfig.json`. Stryker writes each mutated assembly into its test projects' output
 directories, so the outputs which validation tests keep the build's assemblies. The crash and hang dump extensions
 (§11) run the test host beneath a controller process which opens a second server connection, and Stryker's runner
 serves one connection per test application; under mutation a failing or crashing test is a killed mutant and Stryker's
-own timeout ends one which hangs, so the run also sets `CLOG_TEST_FAILURE_DUMPS=0`.
+own timeout ends one which hangs, so the run also sets `DURABLE_STORAGE_TEST_FAILURE_DUMPS=0`.
 
 The score is the share of killed and timed-out mutants among every mutant a test ran or could have run against (killed,
 timed out, survived, or uncovered), less the survivors which `test/Durable.Storage/eng/mutation-baseline.json` records as equivalent. Each
@@ -1411,7 +1411,7 @@ io_uring on Linux), RocksDB, and cloud providers against the storage-service emu
 `test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost`. They establish that each boundary behaves as its simulated double assumes.
 Local boundaries run on every change; emulators run at milestones: `just emulators` runs
 `Orleans.Durable.Storage.Cloud.Tests` and `Orleans.Durable.Storage.Interop.Tests` in Release and Debug with
-`CLOG_EMULATORS=1`, which starts the AppHost's emulators through Aspire's testing host, and fails if any test skips: an
+`DURABLE_STORAGE_EMULATORS=1`, which starts the AppHost's emulators through Aspire's testing host, and fails if any test skips: an
 emulator which does not start or answer fails its tests. Without the variable the emulator tests skip, naming it, while
 the stores' stub tests run on every change: canned responses through a transport double pin each request's conditions
 and checksum and each service status's outcome, so the every-change gate, and a mutation run over it, covers the mapping
@@ -1423,15 +1423,15 @@ digest ([build and packaging §2](build-packaging.md#2-source-and-dependency-pol
 **Archive-log fidelity on a live account.** `AzureArchiveLogFidelityTests` (`Orleans.Durable.Storage.Cloud.Tests`) runs
 each precondition of [archive logs §9.1](components/archive-logs.md#91-azure-append-blobs-azurearchivelogstore) on
 Azurite and on a live storage account, each backend's result a test case of its own, at milestones. It runs with the
-`CLOG_AZURE_LIVE` environment variable set to the blob service endpoint of an account, such as
+`DURABLE_STORAGE_AZURE_LIVE` environment variable set to the blob service endpoint of an account, such as
 `https://account.blob.core.windows.net/`, and authenticates with Microsoft Entra ID through `DefaultAzureCredential`,
 which takes the Azure CLI's sign-in on a workstation and a workload identity in CI; the identity holds Storage Blob Data
 Owner on the account, the built-in role which may write blob index tags. No shared key or SAS reaches the tests, and no
 file in the repository holds a credential. Without the variable each live case skips with a reason which names it;
 `just emulators` scopes its skip allowlist per project (`Orleans.Durable.Storage.Interop.Tests` allows only
-`AzureLiveAccount.SkipReason` while `CLOG_AZURE_LIVE` is unset, and `Orleans.Durable.Storage.Cloud.Tests` allows each of
+`AzureLiveAccount.SkipReason` while `DURABLE_STORAGE_AZURE_LIVE` is unset, and `Orleans.Durable.Storage.Cloud.Tests` allows each of
 `AzureLiveAccount`, `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount`'s skip reasons verbatim while its
-corresponding `CLOG_*_LIVE` variable is unset, which `LiveAccountHarnessTests` pins), records the tests it allowed in
+corresponding `DURABLE_STORAGE_*_LIVE` variable is unset, which `LiveAccountHarnessTests` pins), records the tests it allowed in
 its run record, and allows no skip while each variable is set. Precondition 3b's tag condition, 7, and 7b, which Azurite
 does not model, are established only by that run.
 
@@ -1447,24 +1447,24 @@ Live runs, each case recorded per backend:
 `S3ExpressObjectLedgerFidelityTests`, and `GcsObjectLedgerFidelityTests` (`Orleans.Durable.Storage.Cloud.Tests`) run
 each precondition of [object-store ledgers §3.1](components/object-ledgers.md#31-from-the-object-store) and the
 end-to-end `ObjectLedgerStorage` and `AppendObjectLedgerStorage` lifecycles on their emulators (or
-`FakeS3DirectoryBucketService` for S3 Express) and on live accounts gated by `CLOG_AZURE_LIVE`, `CLOG_S3_LIVE`,
-`CLOG_S3_EXPRESS_LIVE`, and `CLOG_GCS_LIVE`. `AzureLiveAccount` isolates each test in a per-test container with a
+`FakeS3DirectoryBucketService` for S3 Express) and on live accounts gated by `DURABLE_STORAGE_AZURE_LIVE`, `DURABLE_STORAGE_S3_LIVE`,
+`DURABLE_STORAGE_S3_EXPRESS_LIVE`, and `DURABLE_STORAGE_GCS_LIVE`. `AzureLiveAccount` isolates each test in a per-test container with a
 once-per-process stale-container sweep; `S3LiveAccount`, `S3ExpressLiveAccount`, and `GcsLiveAccount` isolate each test
 under a timestamped prefix with a once-per-process stale-prefix sweep and bounded-parallel cleanup on disposal. No file
 in the repository holds a credential. Each provider remains unqualified until its live run passes and is recorded below:
 
 | Provider | Environment variable | Date | Account / bucket | Commit | Result |
 | --- | --- | --- | --- | --- | --- |
-| Azure Blob Storage (append & per-slot) | `CLOG_AZURE_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
-| Amazon S3 (per-slot) | `CLOG_S3_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
-| S3 Express One Zone (per-slot) | `CLOG_S3_EXPRESS_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
-| Google Cloud Storage (per-slot) | `CLOG_GCS_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
+| Azure Blob Storage (append & per-slot) | `DURABLE_STORAGE_AZURE_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
+| Amazon S3 (per-slot) | `DURABLE_STORAGE_S3_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
+| S3 Express One Zone (per-slot) | `DURABLE_STORAGE_S3_EXPRESS_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
+| Google Cloud Storage (per-slot) | `DURABLE_STORAGE_GCS_LIVE` | Pending | — | — | Not yet run; awaits live account credentials |
 
 **Orleans interop.** `Orleans.Durable.Storage.Interop.Tests` reads the composition's archive logs with Orleans' own
 Azure journaling provider, `AzureBlobJournalStorage` from the repository's `Orleans.Durable.AzureStorage` project, with read-only access, against the fold of each journal's writes and a `JournaledStateManager`'s
 recovered state ([archive logs §10](components/archive-logs.md#10-verification)); its cases are the evidence of [archive
 logs §7.3](components/archive-logs.md#73-azure-layout)'s observations of plain Orleans. Each case runs on the fake Azure
-transport on every change, on Azurite with the emulators, and on the live account under `CLOG_AZURE_LIVE`, whose cases
+transport on every change, on Azurite with the emulators, and on the live account under `DURABLE_STORAGE_AZURE_LIVE`, whose cases
 skip with `AzureLiveAccount`'s reason, which `just emulators` allows, while it is unset; `just emulators` runs the
 project beside `Orleans.Durable.Storage.Cloud.Tests`. The random-sequence property's milestone runs write their seed to
 the test's output, which the run's xUnit report keeps, and a failing case names the seed which replays it on its
@@ -1474,8 +1474,8 @@ OR-I8 governs.
 
 | Date | Commit | Result |
 | --- | --- | --- |
-| 16 November 2026 | `2a45fd30defe024ceeb858e4a75270b66e4be992`, then in `Orleans.Durable.Storage.Cloud.Tests` | Fake transport 10 of 10 and Azurite 10 of 10, Release and Debug; live not run, `CLOG_AZURE_LIVE` unset |
-| 17 November 2026 | The commit which adds this row, in `Orleans.Durable.Storage.Interop.Tests` | `just emulators` with `CLOG_AZURE_LIVE` set, Release and Debug, no skip: fake transport, Azurite, and live (the account of the fidelity runs) 26 of 26 each: every case, a journal whose identity holds the characters a URI escapes, a non-ASCII identity refused before admission, the state replay in both formats, the observations of [archive logs §7.3](components/archive-logs.md#73-azure-layout), and the random-sequence property, from the recorded seeds `45_QqVr6QYhYwn1W` (Azurite) and `13o4Wl9IMoqfHM01` (live) in Release and `4dJ1sRcChrP2oU7L` and `0Brqn1BnXpgW-uB-1` in Debug. The escaping case found Clog's one disagreement, a checkpoint's non-ASCII name, which no metadata header can carry, fixed by Azure's name rule `azure-blob-2`; no case found Clog and Orleans apart otherwise |
+| 16 November 2026 | `2a45fd30defe024ceeb858e4a75270b66e4be992`, then in `Orleans.Durable.Storage.Cloud.Tests` | Fake transport 10 of 10 and Azurite 10 of 10, Release and Debug; live not run, `DURABLE_STORAGE_AZURE_LIVE` unset |
+| 17 November 2026 | The commit which adds this row, in `Orleans.Durable.Storage.Interop.Tests` | `just emulators` with `DURABLE_STORAGE_AZURE_LIVE` set, Release and Debug, no skip: fake transport, Azurite, and live (the account of the fidelity runs) 26 of 26 each: every case, a journal whose identity holds the characters a URI escapes, a non-ASCII identity refused before admission, the state replay in both formats, the observations of [archive logs §7.3](components/archive-logs.md#73-azure-layout), and the random-sequence property, from the recorded seeds `45_QqVr6QYhYwn1W` (Azurite) and `13o4Wl9IMoqfHM01` (live) in Release and `4dJ1sRcChrP2oU7L` and `0Brqn1BnXpgW-uB-1` in Debug. The escaping case found Clog's one disagreement, a checkpoint's non-ASCII name, which no metadata header can carry, fixed by Azure's name rule `azure-blob-2`; no case found Clog and Orleans apart otherwise |
 
 **End-to-end.** Multi-silo clusters through `Orleans.TestingHost` run over real LedgerStores and real grain calls, and
 every journal written is checked against the fold of its history and for linearizability, and every grain-visible
@@ -1500,7 +1500,7 @@ leaks: memory, handles, disk, WAL retention, and object counts. Soak runs gate f
 system only.
 
 **Linux LazyFS crash soak.** `LazyFsCrashSoakTests` (`Orleans.Durable.Storage.Tests`, trait `Category=LazyFs`,
-explicit, run via `just lazyfs` / `test/Durable.Storage/eng/lazyfs.ps1` with `CLOG_LAZYFS=1`) runs a three-process Orleans + Clog cluster on
+explicit, run via `just lazyfs` / `test/Durable.Storage/eng/lazyfs.ps1` with `DURABLE_STORAGE_LAZYFS=1`) runs a three-process Orleans + Clog cluster on
 Linux with each silo's `LedgerStore` root (WAL + WAL-less `RocksDbJournalIndex`) mounted on its own
 [LazyFS](https://github.com/dsrhaslab/lazyfs) FUSE filesystem. LazyFS holds unsynced writes in a user-space page cache
 and commits only files and directories flushed via `fsync`/`fdatasync`. Under concurrent journal appends and reads
@@ -1510,7 +1510,7 @@ three-silo `SIGKILL` + `lazyfs::clear-cache` power loss. After recovery on the s
 identities, clean WAL recovery and WAL-less RocksDB suffix replay without `JournalIndexCorruptException` or fatal
 storage errors, agreement with slow-path `ArchiveReader` folds, and linearizability of the complete client history
 (with in-flight crashed calls modeled as ambiguous) under `LinearizabilityChecker`. Outside Linux or without
-LazyFS/FUSE, the cases skip cleanly unless `CLOG_LAZYFS=1` is set. Because FUSE without `direct_io` does not support
+LazyFS/FUSE, the cases skip cleanly unless `DURABLE_STORAGE_LAZYFS=1` is set. Because FUSE without `direct_io` does not support
 `O_DIRECT`, the soak test mounts WAL files through buffered `RandomAccess` + `fdatasync` (`BufferedPortableWalStorage`)
 so LazyFS's simulated page cache intercepts every unsynced write.
 
@@ -1530,10 +1530,10 @@ Each test application captures evidence independently of its launcher
 | --- | --- | --- |
 | Crash dump | Abnormal host exit | Heap dump and running-test sequence |
 | Hang dump | Ten minutes without a test starting/finishing | Full dump and hang log, then host termination |
-| Failure dump | Test failure, error, or timeout | WithHeap dump; default one per host, configured by `CLOG_TEST_FAILURE_DUMPS` and `CLOG_TEST_FAILURE_DUMP_TYPE` |
+| Failure dump | Test failure, error, or timeout | WithHeap dump; default one per host, configured by `DURABLE_STORAGE_TEST_FAILURE_DUMPS` and `DURABLE_STORAGE_TEST_FAILURE_DUMP_TYPE` |
 | Test trace | Each test | Logging through `TestOutputLoggerProvider` |
 | Simulation history | Failing seeded simulation | Replay command, history, and (with Clockwork) replay artifact, and on request a minimized artifact and trace (§7.4) |
-| Leak report | A leak check failing at teardown (§11.1) | Outstanding page count, with `CLOG_TEST_LEAK_TRACES=1` the call site of each outstanding rental; Clockwork's pending-work snapshot; the exchanges still in flight; the files still open |
+| Leak report | A leak check failing at teardown (§11.1) | Outstanding page count, with `DURABLE_STORAGE_TEST_LEAK_TRACES=1` the call site of each outstanding rental; Clockwork's pending-work snapshot; the exchanges still in flight; the files still open |
 | Linearizability visualization | Failing `LinearizabilityAssert.Linearizable` | `<test>.linearizability.html`: Porcupine's page of the client history, each partition's longest partial linearizations with the model's states, and annotations (§3.4) |
 | Debug assertion | A failed `Debug.Assert`, `Debug.Fail`, or `Trace.Assert` (§11.2) | The assertion's message and its site's stack in the failure of its test, its seeded simulation (with that run's evidence), or its test assembly |
 | Fatal error | A report to `FatalErrorHandler` which its test did not take ([conventions §14](conventions.md#14-local-storage-failures-stop-the-process)) | The handler's message, naming the exit code and the site, and for a storage failure the path and operating-system error, in the failure of its test or its test assembly, and every intercepted report in the test's trace |
@@ -1553,7 +1553,7 @@ they matter most: buffer-owning paths, lifecycle and crash tests, and simulation
 
 | Check | Establishes | Applied to |
 | --- | --- | --- |
-| `ArcBufferLeakCheck` | Every page rented from the pool, or wrapped around an array, in the test's execution context and the work it starts has returned. A test class holds the check in a field initialized by `Start` and disposes it after the components it owns; a test which has already failed reports that failure instead. `InScope` and `InScopeAsync` run one case of a property in a nested check, which counts its pages in its parent too, restore the parent, and then assert once the case has released what it owns, so a leaking case fails, is shrunk, and reports its seed. `Run(accounting, body)` carries a check into work which starts outside the test's context, such as a test host which serves each request on threads of its own. With `CLOG_TEST_LEAK_TRACES=1`, the check records each rental's call site, deduplicated and capped, and a failure reports the file and line of each outstanding page's call site. | Every test class of `Orleans.Durable.Storage.Engine.Buffers.Tests`, `Orleans.Durable.Storage.Engine.Wal.Tests`, `Orleans.Durable.Storage.Engine.Ledgers.Tests`, `Orleans.Durable.Storage.Engine.MetaStore.Tests`, `Orleans.Durable.Storage.CasPaxos.Tests`, `Orleans.Durable.Storage.Model.Tests`, `Orleans.Durable.Storage.Engine.Archive.Lsm.Tests`, `Orleans.Durable.Storage.Cloud.Tests`, `Orleans.Durable.Storage.Interop.Tests`, and `Orleans.Durable.Storage.Engine.Journals.Tests` not marked `[NoPageLeakCheck(reason)]`, which `PageLeakCheckCoverageTests` enforces in each; the MetaStore's tests dispose every entry they read, whose value is an `ArcBuffer` ([metastore §4](components/metastore.md#4-data-types)); every CsCheck property which rents pages checks each case in its own scope; every simulation, as the teardown check `SeededSimulation` registers after quiescence (§7.4) |
+| `ArcBufferLeakCheck` | Every page rented from the pool, or wrapped around an array, in the test's execution context and the work it starts has returned. A test class holds the check in a field initialized by `Start` and disposes it after the components it owns; a test which has already failed reports that failure instead. `InScope` and `InScopeAsync` run one case of a property in a nested check, which counts its pages in its parent too, restore the parent, and then assert once the case has released what it owns, so a leaking case fails, is shrunk, and reports its seed. `Run(accounting, body)` carries a check into work which starts outside the test's context, such as a test host which serves each request on threads of its own. With `DURABLE_STORAGE_TEST_LEAK_TRACES=1`, the check records each rental's call site, deduplicated and capped, and a failure reports the file and line of each outstanding page's call site. | Every test class of `Orleans.Durable.Storage.Engine.Buffers.Tests`, `Orleans.Durable.Storage.Engine.Wal.Tests`, `Orleans.Durable.Storage.Engine.Ledgers.Tests`, `Orleans.Durable.Storage.Engine.MetaStore.Tests`, `Orleans.Durable.Storage.CasPaxos.Tests`, `Orleans.Durable.Storage.Model.Tests`, `Orleans.Durable.Storage.Engine.Archive.Lsm.Tests`, `Orleans.Durable.Storage.Cloud.Tests`, `Orleans.Durable.Storage.Interop.Tests`, and `Orleans.Durable.Storage.Engine.Journals.Tests` not marked `[NoPageLeakCheck(reason)]`, which `PageLeakCheckCoverageTests` enforces in each; the MetaStore's tests dispose every entry they read, whose value is an `ArcBuffer` ([metastore §4](components/metastore.md#4-data-types)); every CsCheck property which rents pages checks each case in its own scope; every simulation, as the teardown check `SeededSimulation` registers after quiescence (§7.4) |
 | `FileHandleLeakCheck.AssertClosed`, `SimulatedWalStorage.OpenHandleCount` | Once its owner is disposed, every file under a directory opens exclusively, and a simulated storage has no directory or file handle open. On Windows the check sees every handle; on Unix it sees the handles .NET opens, each of which holds an advisory lock, and not native ones such as RocksDB's | WAL and LedgerStore lifecycle and crash tests, the RocksDB state storage, `FileSystemMetaStore` and its lock file, and the CASPaxos SQLite cluster |
 | `SimulationLeakCheck` | Once the scenario's owners are disposed, the work due at that instant runs without advancing virtual time, and then the cluster holds no runnable, waiting, or blocked work, no armed timer, and no unfinished operation; a failure reports Clockwork's pending-work snapshot. `SimulatedLedgerReplicaTransport` checks that a replica is disposed only once no exchange with it is in flight, and names any which is | Every simulation, as the teardown check `SeededSimulation` registers first (§7.4); `AssertQuiescent` checks a cluster a test replicas directly |
 
@@ -1646,7 +1646,7 @@ The self-tests' and the doubles' source files define `DEBUG`, so these tests als
 | --- | --- |
 | Every change | Build on `net11.0`; formatting; unit, snapshot, property, and conformance tests; the simulation seed corpus within its budget; the Debug leg, which evaluates the debug assertions (§11.2); the affected models, the ledger model's quick tier when its specification or runner changed; trace validation of the ledger, archive-log, ledger map, and LSM traces (§5.1); golden vectors and fuzz corpus replay; the documentation checks |
 | Every change, nightly | An incremental mutation run for changed core units; the ledger model's default set, its quick and nightly tiers, for a change to its specification or runner; in the nightly window after the change lands |
-| Milestones | Seed exploration (`just explore`) and schedule exploration (`just explore-schedules`, every simulated conformance class's windows at `CLOG_SCHEDULE_BOUND=deep`, §4.1); full mutation runs; fuzzing campaigns; emulator integration; extended models; end-to-end tests (`just e2e`) |
+| Milestones | Seed exploration (`just explore`) and schedule exploration (`just explore-schedules`, every simulated conformance class's windows at `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, §4.1); full mutation runs; fuzzing campaigns; emulator integration; extended models; end-to-end tests (`just e2e`) |
 | Final validation | Soak runs; long end-to-end runs |
 
 Every change passes its gate locally while CI is unavailable. Expensive work runs after hours, off the critical path:
@@ -1673,7 +1673,7 @@ build, 8 s for the twenty simulations, 50 s for their replays, an LSM trace's 60
 for the trace mutants.
 
 The Debug leg, `just test-debug` (`test/Durable.Storage/eng/validate.ps1 -Check TestDebug`), is the only gate which runs debug assertions
-(§11.2); `just check` and `just check-full` include it. It builds in Debug each test project which sets `ClogDebugLeg`,
+(§11.2); `just check` and `just check-full` include it. It builds in Debug each test project which sets `DurableStorageDebugLeg`,
 a simulation project in `SimulationDebug`, and runs it; `just test` runs a simulation project in `SimulationRelease`.
 The leg's projects are:
 
@@ -1701,7 +1701,7 @@ Measured on the `net10.0` build, it took about five there: 4 min 53 s with up-to
 high priority, of which the seed corpus took 1 min 52 s, `Orleans.Durable.Storage.Engine.Ledgers.Tests` 1 min 14 s, and
 `Orleans.Durable.Storage.Engine.Wal.Tests` 1 min 9 s. A Debug build from scratch adds about 40 s.
 
-`test/Durable.Storage/eng/validate.ps1` ends a test session which runs past its project's `ClogTestSessionTimeout`. The timeout is 12
+`test/Durable.Storage/eng/validate.ps1` ends a test session which runs past its project's `DurableStorageTestSessionTimeout`. The timeout is 12
 minutes, and 30 for the seed corpus and the simulated conformance classes, which run their tests one at a time and slow
 several-fold on a loaded machine. The hang dump and each simulation's step, virtual-time, and livelock budgets
 (§7.4) end a hang sooner.
@@ -1710,7 +1710,7 @@ The every-change seed corpus, `Orleans.Durable.Storage.Simulation.Tests` with it
 budget of three minutes of wall time run on its own on the reference machine, a 32-thread Intel Xeon Platinum 8370C with
 128 GiB under Windows, and longer beside the solution's other test projects. A simulation cost about half a millisecond
 per step there, nearly all of it Clockwork's scheduling, and every execution logs its steps and wall time (§7.4), so a
-change which would exceed the budget moves seeds to exploration with `CLOG_SIM_SEEDS` rather than growing the corpus.
+change which would exceed the budget moves seeds to exploration with `DURABLE_STORAGE_SIM_SEEDS` rather than growing the corpus.
 Every change runs one to four seeds of each scenario, the seeds its coverage checks and mutants need; a replay check
 reuses a corpus run (`SeededSimulation.AssertReplays`) or runs a smaller workload, since it runs its scenario three
 times; and `just explore` and `just ledger-traces` (seeds 1 to 15 by default) run more. Fault theories which need a long
@@ -1829,7 +1829,7 @@ take 45 s together, and the whole project took 88 s. The object store's 41 Accor
 schedule within one preemption, in 7.8 s; the Azure archive-log store's 166 windows, whose SDK pipeline gives each about
 fifty choice points, run every eighth window of racing writes explored, 19 windows in 829 schedules, and the rest under
 their seeded schedules, in 14.4 s, and all 166 explored, 7,601 schedules, in about a minute under
-`CLOG_SCHEDULE_BOUND=deep`, which runs at milestones and in the nightly window. The race mutants' detection, on the same
+`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, which runs at milestones and in the nightly window. The race mutants' detection, on the same
 machine: explored, the object store's check-then-write mutant fails its witness on every run at the 12th schedule, by
 one preemption, and the Azure append-condition mutant fails the 7th of Accordant's windows of racing writes at its 14th
 schedule, by one preemption; under seeded schedules, one simulation per case, the first is caught on 32 of 40 seeds and
@@ -1843,7 +1843,7 @@ completions give each of its windows about forty choice points, 36 on average wi
 about 20 ms per explored schedule. Its 228 Accordant windows, the restart's among them, run every sixteenth window which
 changes the store explored, 14 windows in 894 schedules, and the other 214 under their seeded schedules, in 22.3 s; all
 228 explored within one preemption take 12,428 schedules in about three and a half minutes, and
-`CLOG_SCHEDULE_BOUND=deep`, up to two preemptions and 2,000 schedules a window, is estimated from those counts at under
+`DURABLE_STORAGE_SCHEDULE_BOUND=deep`, up to two preemptions and 2,000 schedules a window, is estimated from those counts at under
 an hour, which runs in the nightly window. Its 120 sampled cases take 3.1 s, and the class takes 41 s, which brings the
 simulated conformance classes to about 87 s; the whole project ran in 107 s. The LedgerStore mutant, a replica wrapper
 which checks the seal a step before it writes, fails its witness at the 4th schedule, by one preemption; seeded
@@ -1884,7 +1884,7 @@ preemption take 391 schedules, its appendable windows (`IAppendableObjectStore`)
 preemption, its `SkipsReplaceLockMutant` fails by one preemption while the default schedule passes, and its 80 sampled
 cases take 0.5 s; the class takes about 32 s on a developer machine. The chunk archive-log store over
 `SimulatedObjectStore` (`SimulatedChunkArchiveLogStoreConformanceTests`) explores every eighth window of Accordant's
-racing writes at the gate (and all 166 under `CLOG_SCHEDULE_BOUND=deep`) and catches
+racing writes at the gate (and all 166 under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`) and catches
 `SimulatedObjectStore.ChecksBeforeWritingMutant` by one preemption, taking about 34 s; and `SimulatedGroupCommitterTests`
 explores concurrent enqueue and merging, leader handoff, cancellation and disposal, failure propagation, and
 `GroupCommitter.RecordsSequenceAfterIoMutant` in about 8 s. `SimulatedJournalStoreConformanceTests` explores 28 curated
@@ -1895,9 +1895,9 @@ fenced, and crash-recovered states (up to 105 choice points in one window): at t
 caught at its 3rd schedule by one preemption over up to 55 choice points, and `RejectsWaiting`, caught at its 4th
 schedule by one preemption over up to 59 choice points, both passing the default schedule and caught on 40 of 40 seeded
 runs; about 1 s each), taking about 22 to 27 s in `SimulationRelease` and 35 s in `SimulationDebug`; all 28 explored
-under `CLOG_SCHEDULE_BOUND=deep` take about 1,900 schedules within one preemption and run at milestones and in the
+under `DURABLE_STORAGE_SCHEDULE_BOUND=deep` take about 1,900 schedules within one preemption and run at milestones and in the
 nightly window. `just explore-schedules` (`test/Durable.Storage/eng/validate.ps1 -Check ExploreSchedules`) runs every simulated conformance
-class, or those a class filter names, under `CLOG_SCHEDULE_BOUND=deep`, at milestones and in the nightly window; the
+class, or those a class filter names, under `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, at milestones and in the nightly window; the
 file-system store's class alone explores 4,787 schedules in 71 s under it.
 
 Row 2.3b D adds `JournalSimulationTests`, measured on one developer machine loaded by other work with the class run
@@ -1960,7 +1960,7 @@ format coverage; code builds and runtime tests qualify behavior changes.
 | Instance-local NVMe disks | The profile, its rules, and its procedures are specified ([orleans §4](compositions/orleans.md#4-restrictions), §8; row 4.8 A), and change nothing a silo does, so the composition's tests cover it as they cover persistent volumes; no cloud is qualified and no measurement made, so no deployment adopts it. A whole-cluster stop which releases the instances is outside the model until row 4.8 B, after row 7.5, rolls every range into object-store ledgers before it, with a multi-silo stop and restart over empty roots | For each cloud, before a deployment there adopts the profile: (1) the events the disk survives and those which release it, from the cloud's documentation and a live run which writes and fsyncs a known pattern through the WAL's storage, brings each event the cloud lets a tenant bring (a reboot in place, an operating-system shutdown without deallocation, a stop, a simulated maintenance or redeploy), and checks the bytes and the node identity after it, every event the run cannot bring, a host failure or power loss among them, taken from the documentation as releasing the disk unless the cloud states otherwise; (2) fsync durability: the cloud's statement that a flushed write survives the host's power loss, by power-loss protection or a cache the flush empties, since no tenant can cut a host's power; (3) the fault domains a deployment can spread instances across, their number at least `N`, and how a silo learns its own for `FailureDomain`; (4) a measurement against the cloud's persistent volume at a comparable cost: the WAL's fsync latency distribution and throughput and the journal write path's (row 5.4's benchmarks), takeover and recovery times, and the cost per node and per GiB, with the expected instance moves over a cluster's life against the node registry's identities ([orleans §8.1](compositions/orleans.md#81-resource-and-request-cost-model)). A cloud qualifies when (1) shows every planned stop of the profile keeping the disk, (2) holds, and (3) gives `N` domains; the profile is adopted there when (4) favors it |
 | Object-store ledger durability | An [object-store ledger](components/object-ledgers.md) keeps one copy, so its acknowledged entries not yet drained have exactly the object store's durability: a zone's loss on a single-zone store (S3 Express One Zone, Azure LRS, Cloud Storage zonal buckets) loses them. The operator chooses the store; a silo records the redundancy the operator states, which nothing verifies. A corrupt or lost batch below a ledger's end blocks its recovery and so its close, as a lost quorum does ([deferred](deferred.md#recovering-a-range-after-a-ledger-loses-its-quorum)). *Not yet in code* | A decision per deployment, recorded with its store; the loss procedure of the lost-quorum row, covering a single copy |
 | Azure seals against appends in flight | An appendable object's "no append lands after `Sealed`" rests on `x-ms-if-tags` on `Append Block` being evaluated atomically against a concurrent `Set Blob Tags`, and a seal's answer for a non-appendable object on `x-ms-if-tags` on `Set Blob Tags` itself ([object store §9.1](components/object-store.md#91-azure-appendable-objects)). Azurite runs the race and passes, but ignores the tag condition on `Set Blob Tags`, so the store reads the blob's type before it seals; neither precondition is established until a live account runs them | `AzureAppendableObjectFidelityTests.NoAppendLandsAfterASealAnswers` and `ASealStopsEveryLaterAppend` on a live account (row 7.6) |
-| Object-store ledger preconditions | The object-store ledger rests on its store's preconditions ([object-store ledgers §3.1](components/object-ledgers.md#31-from-the-object-store)): atomic create-if-absent, empty objects, CRC-32C metadata, strongly consistent reads and ordered listings (including `S3ObjectStore` directory-bucket mode's hierarchical layout over unordered S3 Express directory buckets, [object store §9.2](components/object-store.md#92-s3-directory-buckets)), atomic offset- and tag-conditioned appends on Azure, an atomic tombstone replace (a `Put Blob` replacing an append blob whole), and no lifecycle rule on its prefix. Azurite models blob index tag conditions only in part (the Azure archive-log row); S3 Express listings have no qualified emulator and are exercised against `FakeS3DirectoryBucketService` until row 7.6's live run. Delayed writes recreate objects after a drop, which later sweeps delete. Per-slot and append ledger storage, S3 directory-bucket mode, per-precondition fidelity suites with live-account harnesses (`S3ObjectLedgerFidelityTests` on `CLOG_S3_LIVE`, `S3ExpressObjectLedgerFidelityTests` on `CLOG_S3_EXPRESS_LIVE`, `GcsObjectLedgerFidelityTests` on `CLOG_GCS_LIVE`, and `AzureAppendableObjectFidelityTests` on `CLOG_AZURE_LIVE`), four-way metamorphic equivalence (`ObjectLedgerMetamorphicTests`), and in-memory microbenchmarks (`ObjectLedger*Benchmarks`) are in code (rows 7.2–7.6); live cloud qualification runs and live per-provider latency measurements await cloud credentials | Run each fidelity suite (`CLOG_AZURE_LIVE`, `CLOG_S3_LIVE`, `CLOG_S3_EXPRESS_LIVE`, `CLOG_GCS_LIVE`) on its live provider account and record the results and per-provider latency distributions; each provider remains unqualified until its live run passes |
+| Object-store ledger preconditions | The object-store ledger rests on its store's preconditions ([object-store ledgers §3.1](components/object-ledgers.md#31-from-the-object-store)): atomic create-if-absent, empty objects, CRC-32C metadata, strongly consistent reads and ordered listings (including `S3ObjectStore` directory-bucket mode's hierarchical layout over unordered S3 Express directory buckets, [object store §9.2](components/object-store.md#92-s3-directory-buckets)), atomic offset- and tag-conditioned appends on Azure, an atomic tombstone replace (a `Put Blob` replacing an append blob whole), and no lifecycle rule on its prefix. Azurite models blob index tag conditions only in part (the Azure archive-log row); S3 Express listings have no qualified emulator and are exercised against `FakeS3DirectoryBucketService` until row 7.6's live run. Delayed writes recreate objects after a drop, which later sweeps delete. Per-slot and append ledger storage, S3 directory-bucket mode, per-precondition fidelity suites with live-account harnesses (`S3ObjectLedgerFidelityTests` on `DURABLE_STORAGE_S3_LIVE`, `S3ExpressObjectLedgerFidelityTests` on `DURABLE_STORAGE_S3_EXPRESS_LIVE`, `GcsObjectLedgerFidelityTests` on `DURABLE_STORAGE_GCS_LIVE`, and `AzureAppendableObjectFidelityTests` on `DURABLE_STORAGE_AZURE_LIVE`), four-way metamorphic equivalence (`ObjectLedgerMetamorphicTests`), and in-memory microbenchmarks (`ObjectLedger*Benchmarks`) are in code (rows 7.2–7.6); live cloud qualification runs and live per-provider latency measurements await cloud credentials | Run each fidelity suite (`DURABLE_STORAGE_AZURE_LIVE`, `DURABLE_STORAGE_S3_LIVE`, `DURABLE_STORAGE_S3_EXPRESS_LIVE`, `DURABLE_STORAGE_GCS_LIVE`) on its live provider account and record the results and per-provider latency distributions; each provider remains unqualified until its live run passes |
 | Loss of every catalog checkpoint | A node's tombstones live in its catalog checkpoints once the WAL releases their drop records, and the store keeps at least two valid ones ([LS-I4](components/ledgerstore.md#5-invariants)). Losing or corrupting every one is a detected node loss, counted against its ledgers' `Q − 1` budget ([system model §3](system-model.md#3-failures-tolerated)): the store refuses the open by [LS-I5](components/ledgerstore.md#5-invariants)'s rule, and the disk returns as a new node. A node which reopened without its tombstones under its identity could recreate a dropped ledger's replica, as the ledger model's assumption case `assumption-tombstone-loss` shows (LG-I7), so detection, not the `Q − 1` budget, carries this case. | The tests of [ledgerstore §10](components/ledgerstore.md#10-verification) and the crash-state oracle (§7.5): with every catalog checkpoint deleted, no state reopens the node without a tombstone it recorded |
 | Coordinated restore | Node catalogs, the ledger map's epoch and `NextLedgerId`, watermarks, archive-log positions and drain markers, and the objects the sweepers deleted are each monotonic, and each store relies on the others ([ledgers §8.5](components/ledgers.md#85-replica-lifecycle-on-a-node), [LSM §8.5](components/archive-lsm.md#85-garbage-collection)) | A procedure which restores node roots, the MetaStore, and the LSM prefix or archive-log container from one coordinated cut; restoring any one alone, or a distributed restore, stays unsupported until qualified |
 | Fast CASPaxos durability | Voters and proposers persist their state in SQLite, and `CasPaxosSqliteTests`, `NativeConsensusTests`, and `OrleansNativeConsensusTests` reopen them, but no test restarts an acceptor which lost its unsynced state. Every start creates each database's directory under its operator-created parent and flushes the parent, and each database flushes its own directory. A failed directory flush, acceptor transaction, admission record, or ballot reservation is reported through `ConsensusStorageFailures` and stops the process with code 117 or 118 (`ConsensusStorageFailuresTests`, `SqliteVoterRegistryTests`); the real stop is qualified with the other sites ([metastore §8.1](components/metastore.md#81-fast-caspaxos-semantics)) | An acceptor restart which loses unsynced writes, judged by the Accordant `IConditionalRegister` spec ([MS-I1](components/metastore.md#5-invariants)) |
@@ -1968,7 +1968,7 @@ format coverage; code builds and runtime tests qualify behavior changes.
 | Blocked archive-log drains | A key whose archive-log write no retry can make succeed, such as one whose log is corrupt with no valid copy in the provider's own recovery or whose name the provider refuses, stops its ledger's drain, its drop, and its descendants' drains ([archive logs §6](components/archive-logs.md#6-faults-concurrency-and-cancellation), [orleans §5.9](compositions/orleans.md#59-resource-governance)); the operator procedure restores what the provider kept, and loses the key's drained rows otherwise | A procedure, with operator acceptance, which unblocks the ledger while losing only the named key's rows, and its tests against the history oracle |
 | Archive content at rest | Archive-log content carries only the store's own transport checksum, computed from the verified batch pages, and each base the MD5 its generation records, which every read checks; nothing Clog-specific detects corruption of appends at rest, which reads return as stored, as settled at design sign-off ([JS-I5](components/journals.md#5-invariants), [archive logs §9.1](components/archive-logs.md#91-azure-append-blobs-azurearchivelogstore)) | A decision to add an end-to-end checksum at rest, or the store's own at-rest integrity qualified |
 | Restoring an older archive-log version | An operator who restores a corrupt log from the provider's recovery to a version older than its last held write loses the writes of segments whose ledgers dropped ([LOG-I6](components/archive-logs.md#5-invariants), [archive logs §6](components/archive-logs.md#6-faults-concurrency-and-cancellation)) | A procedure with operator acceptance which names the lost commands, and its tests against the history oracle |
-| Azure archive-log preconditions | The Azure storage rests on the preconditions of [archive logs §9.1](components/archive-logs.md#91-azure-append-blobs-azurearchivelogstore): `x-ms-if-tags` evaluated atomically with `Append Block` and `Put Blob`, `appendpos` honoured with it, 100 MiB blocks, one-version reads, and Orleans' formats concatenable. Azurite models blob index tags and their conditions only in part: on an absent blob it answers an `Append Block` conditioned on tags with 404 and lets such a `Put Blob` create the blob, and its `Get Blob`, racing an append, may report a committed block count other than its content's, so their Azurite cases pin what Azurite does, and the live run (§10) establishes them; beside `If-Match: *` Azurite ignores `x-ms-if-tags` (3b), whose tag condition the live run and the fake transport establish; hierarchical-namespace accounts are unsupported; and a write-ahead blob re-blocked or restored without its `durable-gen` tag is unsupported. Only the fake transport models the rest: requests which land after their own retry, server errors after landing, and a block count or append offset a misbehaving service misreports | `AzureArchiveLogFidelityTests`, one test per precondition, each failure's error code asserted, on Azurite where it models it; the live run, on `CLOG_AZURE_LIVE` with Microsoft Entra ID, at milestones, with each run recorded (§10) |
+| Azure archive-log preconditions | The Azure storage rests on the preconditions of [archive logs §9.1](components/archive-logs.md#91-azure-append-blobs-azurearchivelogstore): `x-ms-if-tags` evaluated atomically with `Append Block` and `Put Blob`, `appendpos` honoured with it, 100 MiB blocks, one-version reads, and Orleans' formats concatenable. Azurite models blob index tags and their conditions only in part: on an absent blob it answers an `Append Block` conditioned on tags with 404 and lets such a `Put Blob` create the blob, and its `Get Blob`, racing an append, may report a committed block count other than its content's, so their Azurite cases pin what Azurite does, and the live run (§10) establishes them; beside `If-Match: *` Azurite ignores `x-ms-if-tags` (3b), whose tag condition the live run and the fake transport establish; hierarchical-namespace accounts are unsupported; and a write-ahead blob re-blocked or restored without its `durable-gen` tag is unsupported. Only the fake transport models the rest: requests which land after their own retry, server errors after landing, and a block count or append offset a misbehaving service misreports | `AzureArchiveLogFidelityTests`, one test per precondition, each failure's error code asserted, on Azurite where it models it; the live run, on `DURABLE_STORAGE_AZURE_LIVE` with Microsoft Entra ID, at milestones, with each run recorded (§10) |
 | Plain-Orleans readers of archive logs | A plain Orleans reader of a Clog-written log which reads the write-ahead blob, then meets a checkpoint the sweeper deleted after a newer generation appeared, throws where Clog's reader answers `Stale` ([archive logs §8.4](components/archive-logs.md#84-history-reads-and-absence)); Orleans' layout constants are internal, so the interop test runs on every Orleans version bump | The interop tests of [archive logs §10](components/archive-logs.md#10-verification) on each Orleans version; a retry in Orleans' reader, or its acceptance |
 | Physical erasure after expiry | An `Expired` journal's rows leave the LSM when compaction reaches them ([LSM-I5](components/archive-lsm.md#5-invariants)); no deadline is specified, and compaction scheduling is [deferred](deferred.md#compaction-scheduling-policy) | Measured, bounded compaction backlog and storage progress before any erasure deadline is stated |
 | Application and deployment | End-to-end and soak (§10): *not yet in code*; reliability labs are [deferred](deferred.md#reliability-labs-for-the-orleans-topology) | Multi-silo tests with the history and linearizability oracles; soak runs; retained-state fault runs with an external oracle |

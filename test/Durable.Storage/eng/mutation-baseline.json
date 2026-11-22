@@ -6,7 +6,7 @@
       "original": "false",
       "replacement": "true",
       "within": "\\.ConfigureAwait\\(false\\)",
-      "reason": "Where a Clog await resumes is unobservable to its callers: they run its operations off any capturing context (orleans §5.12), and Clockwork rewrites the await under simulation (verification §7.1)."
+      "reason": "Where a Durable Storage await resumes is unobservable to its callers: they run its operations off any capturing context (orleans §5.12), and Clockwork rewrites the await under simulation (verification §7.1)."
     },
     {
       "mutator": "Remove checked expression",

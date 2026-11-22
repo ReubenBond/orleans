@@ -21,7 +21,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// requests which fail before they land, and restart from the markers, and a sweeper sweeps; the successor then closes,
 /// and both ledgers complete and drop. Each request of <c>k</c>'s log which reaches the store, each segment a worker starts
 /// and completes, each crash, sweep, drop, decision, and close is recorded as the model's action, and the run's decided
-/// ledgers give the model's constants. With <c>CLOG_ARCHIVE_LOG_TRACES</c> set, each seed writes the trace as a Quint
+/// ledgers give the model's constants. With <c>DURABLE_STORAGE_ARCHIVE_LOG_TRACES</c> set, each seed writes the trace as a Quint
 /// module whose <c>traceReplay</c> run applies every action in order and checks the model's invariants after each, and
 /// the model's position against the store's after each request, which <c>test/Durable.Storage/eng/archive-log-traces.ps1</c> runs with
 /// <c>quint test</c>: an action the model disables, a state which breaks an invariant, or a position the store does not
@@ -79,7 +79,7 @@ public sealed class ArchiveLogTraceTests
 
     private static void Write(Trace trace, string module)
     {
-        if (Environment.GetEnvironmentVariable("CLOG_ARCHIVE_LOG_TRACES") is { Length: > 0 } directory)
+        if (Environment.GetEnvironmentVariable("DURABLE_STORAGE_ARCHIVE_LOG_TRACES") is { Length: > 0 } directory)
         {
             _ = Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, module + ".qnt"), trace.Module(module));

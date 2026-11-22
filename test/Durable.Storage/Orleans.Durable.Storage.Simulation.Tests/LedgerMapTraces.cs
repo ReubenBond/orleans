@@ -9,7 +9,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 internal static class LedgerMapTraces
 {
     /// <summary>The environment variable naming the directory which receives the traces.</summary>
-    public const string Variable = "CLOG_LEDGER_MAP_TRACES";
+    public const string Variable = "DURABLE_STORAGE_LEDGER_MAP_TRACES";
 
     /// <summary>Gets a value indicating whether <see cref="Variable"/> names a directory, so runs export their traces.</summary>
     public static bool Enabled => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Variable));

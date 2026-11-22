@@ -11,14 +11,14 @@ namespace Orleans.Durable.Storage.Simulation.Conformance.Tests;
 /// <remarks>
 /// <para>
 /// A case's seed decides its system's faults and, outside its explored windows, its schedule, so CsCheck shrinks a
-/// failing case's operations and interleaving together, and <c>CLOG_TEST_SEED</c> replays both. Each case is independent
+/// failing case's operations and interleaving together, and <c>DURABLE_STORAGE_TEST_SEED</c> replays both. Each case is independent
 /// of every other: a fresh cluster, virtual clock, and page scope, with every check of the driver
 /// (<see cref="SeededSimulation.RunCase"/>), its page leak and quiescence checks among them.
 /// </para>
 /// <para>
 /// With a <see cref="ScheduleBound"/>, each case runs under every schedule of its concurrent windows within the bound,
 /// which <see cref="WindowScheduleExplorer"/> enumerates, and fails with the first schedule the spec does not allow,
-/// whose deviations <c>CLOG_SCHEDULE</c> replays. Each exploration's count of schedules is kept for the test to report.
+/// whose deviations <c>DURABLE_STORAGE_SCHEDULE</c> replays. Each exploration's count of schedules is kept for the test to report.
 /// </para>
 /// <para>
 /// The kit's cases run one at a time, so a CsCheck sample runs on one thread, since a simulation project runs one

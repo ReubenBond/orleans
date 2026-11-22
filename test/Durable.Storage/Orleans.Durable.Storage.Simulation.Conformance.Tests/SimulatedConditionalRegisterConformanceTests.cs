@@ -131,7 +131,7 @@ public sealed class SimulatedConditionalRegisterConformanceTests
     /// A register which checks a conditional write's version in one request and writes in a second
     /// (<see cref="SimulatedConditionalRegister.ChecksBeforeWritingMutant"/>) breaks MS-I1 when a concurrent write at the
     /// same version lands between them. The exploration of the group's window finds that schedule on every run, and its
-    /// report names the schedule, which <c>CLOG_SCHEDULE</c> replays; the seeded schedules of sampled cases meet it only
+    /// report names the schedule, which <c>DURABLE_STORAGE_SCHEDULE</c> replays; the seeded schedules of sampled cases meet it only
     /// by chance, which the test measures.
     /// </summary>
     [Fact]

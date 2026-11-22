@@ -21,7 +21,7 @@ using Polly.Retry;
 namespace Orleans.Durable.Storage.Hosting;
 
 /// <summary>
-/// The silo lifecycle participant which runs the silo's one Clog node (orleans.md §5.2, OR-I9) and drives its
+/// The silo lifecycle participant which runs the silo's one Durable Storage node (orleans.md §5.2, OR-I9) and drives its
 /// <see cref="LocalNode"/>: at <see cref="ServiceLifecycleStage.RuntimeInitialize"/> it opens the node root's LedgerStore,
 /// which the replica endpoint serves; at <see cref="ServiceLifecycleStage.Active"/> it registers the node through the
 /// controller grain, and the node serves once the registration answers <see cref="NodeRegistrationOutcome.Registered"/>

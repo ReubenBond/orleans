@@ -12,7 +12,7 @@ internal static class LedgerTraces
     /// <summary>
     /// The environment variable naming the directory which receives the traces.
     /// </summary>
-    public const string Variable = "CLOG_LEDGER_TRACES";
+    public const string Variable = "DURABLE_STORAGE_LEDGER_TRACES";
 
     /// <summary>
     /// Gets a value indicating whether <see cref="Variable"/> names a directory, so the run's trace is exported and its

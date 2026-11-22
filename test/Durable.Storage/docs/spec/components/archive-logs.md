@@ -1309,14 +1309,14 @@ the opener's re-creation gained `If-Match: *`.
   log which holds the write, no generation is created twice, no write is corrupt, and a last writer finds the chain
   held, after which the log is the fold of the chain, and stays so once every request still in flight lands.
 - **Azure fidelity** (row 3.6). One test per precondition of §9.1 (`AzureArchiveLogFidelityTests` in
-  `Orleans.Durable.Storage.Cloud.Tests`), on Azurite under `CLOG_EMULATORS=1` and on a live account, whose blob service
-  endpoint `CLOG_AZURE_LIVE` holds, at milestones, each backend's result a test case of its own, each live case
+  `Orleans.Durable.Storage.Cloud.Tests`), on Azurite under `DURABLE_STORAGE_EMULATORS=1` and on a live account, whose blob service
+  endpoint `DURABLE_STORAGE_AZURE_LIVE` holds, at milestones, each backend's result a test case of its own, each live case
   skipping, naming the variable, while it is unset. The live cases authenticate with Microsoft Entra ID through
   `DefaultAzureCredential`, which takes the Azure CLI's sign-in on a workstation and a workload identity in CI, and
   whose identity holds Storage Blob Data Owner on the account, the built-in role which may write blob index tags.
   Precondition 8's test checks the storage's half, that a checkpoint and the appends after it read back as their
   concatenation, and the Orleans interop tests check Orleans' replay of it (row 4.9). The Azurite leg runs with
-  `just emulators`, and the live leg with `CLOG_AZURE_LIVE` set, both at milestones; each live run is recorded in
+  `just emulators`, and the live leg with `DURABLE_STORAGE_AZURE_LIVE` set, both at milestones; each live run is recorded in
   [verification §10](../verification.md#10-integration-end-to-end-and-soak). Verify snapshots pin each request's
   conditions, service version, and the full metadata set after each write kind, over the fake transport.
 - **Orleans interop** (row 4.9). `Orleans.Durable.Storage.Interop.Tests` reads Clog's logs, which `ArchiveLogWriter`
@@ -1339,14 +1339,14 @@ the opener's re-creation gained `If-Match: *`.
   of 8 bytes, so runs split. After each write and read, the fake's checks of what archive logs keep, and its strict
   refusal of any condition it does not model, must hold; the fake, as a client's socket handler does, refuses a request
   with a header which is not ASCII. Each case runs on the fake transport on every change, on Azurite under
-  `CLOG_EMULATORS=1`, and on a live account under `CLOG_AZURE_LIVE`, each backend's result a test case of its own, and
+  `DURABLE_STORAGE_EMULATORS=1`, and on a live account under `DURABLE_STORAGE_AZURE_LIVE`, each backend's result a test case of its own, and
   on every Orleans version bump, since Orleans' layout constants are internal. A random-sequence property writes
   sequences of append runs and openers of each kind, with appends after them and superseded rows, over three journals
   through `ArchiveLogWriter` from the tokens `LogArchiveStore` plans, and reads each journal after every write: on the
   fake transport on every change, 100 fresh cases under CsCheck, whose failure names its seed, which replays it only
-  through `CLOG_TEST_SEED`, and at milestones on Azurite and the live account, twelve cases drawn in turn from one seed
+  through `DURABLE_STORAGE_TEST_SEED`, and at milestones on Azurite and the live account, twelve cases drawn in turn from one seed
   which the run records in its output, a failing case naming its own seed, which replays it on its backend through
-  `CLOG_TEST_SEED`. `OrleansJournalLogNamesTests` checks the composition's mapping: a CsCheck property over identities
+  `DURABLE_STORAGE_TEST_SEED`. `OrleansJournalLogNamesTests` checks the composition's mapping: a CsCheck property over identities
   drawn across the Unicode scalar range, biased toward upper case, white space, `.` and `/` segments, `%`, `+`, `#`,
   `?`, U+FEFF, and supplementary characters, that each journal's row key names its log by exactly its identity, which
   case-folding, trimming, and segment-collapsing mutants each fail; a companion property that a row key with a byte of

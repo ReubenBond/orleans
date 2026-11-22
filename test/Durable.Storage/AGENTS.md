@@ -115,9 +115,9 @@ just ledger-map-traces      # the ledger map simulations' traces replayed by qui
 just archive-traces         # the LSM simulation's traces replayed by quint test, with trace mutants (test/Durable.Storage/eng/archive-traces.ps1)
 just coverage               # Cobertura coverage, CRAP >= 30 hotspots, HTML report (test/Durable.Storage/eng/coverage.ps1)
 just fuzz all 60            # libFuzzer campaigns per decoder (test/Durable.Storage/eng/fuzz.ps1; x64 Windows or Linux; -Merge keeps the corpus)
-just explore 1..500         # the simulation corpora over a seed range (CLOG_SIM_SEEDS)
-just explore-schedules       # the simulated conformance classes' windows explored at CLOG_SCHEDULE_BOUND=deep (a class filter optional)
-just emulators              # the cloud stores' suites and the Orleans interop tests on the AppHost's emulators (Docker; CLOG_EMULATORS=1)
+just explore 1..500         # the simulation corpora over a seed range (DURABLE_STORAGE_SIM_SEEDS)
+just explore-schedules       # the simulated conformance classes' windows explored at DURABLE_STORAGE_SCHEDULE_BOUND=deep (a class filter optional)
+just emulators              # the cloud stores' suites and the Orleans interop tests on the AppHost's emulators (Docker; DURABLE_STORAGE_EMULATORS=1)
 just e2e                    # the Orleans composition's multi-silo scenarios, the smoke set and the explicit rest
 just bench '*' --job Dry    # the benchmarks a required filter selects (test/Durable.Storage/eng/bench.ps1)
 just sample                 # the sample Orleans app: three silos over Azurite, with the Aspire dashboard (Docker; playground/DurableStorage/README.md)
@@ -195,7 +195,7 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   snapshots (pinned at 32.0.0); CsCheck properties, including metamorphic ones; Accordant conformance through the
   CsCheck ⇄ Accordant kit, whose cases run each in a Clockwork simulation of its own where a contract's target can, with
   their concurrent windows' schedules explored within a preemption bound and a race mutant per explored contract
-  (verification §4.1; `CLOG_SCHEDULE_BOUND=deep` at milestones, `CLOG_SCHEDULE` replays a schedule); deterministic
+  (verification §4.1; `DURABLE_STORAGE_SCHEDULE_BOUND=deep` at milestones, `DURABLE_STORAGE_SCHEDULE` replays a schedule); deterministic
   simulation with fault injection on Clockwork;
   integration over real boundaries and Aspire emulators; `Orleans.TestingHost` end-to-end; Stryker.NET mutation
   testing (core units break below 80%, or below the measured score `test/Durable.Storage/eng/mutation-baseline.json` holds while a gap
@@ -207,7 +207,7 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   Archive, archive-log, state database, cloud, and model test projects holds an `ArcBufferLeakCheck`
   (`test/Durable.Storage/shared/LeakChecks`) and releases every buffer it owns, every `MetaStoreEntry` among them, before teardown,
   unless it carries `[NoPageLeakCheck(reason)]`; a property runs each case in `_leaks.InScope(() => ...)` or `_leaks.InScopeAsync(...)`;
-  `CLOG_TEST_LEAK_TRACES=1` reports where each leaked page was rented.
+  `DURABLE_STORAGE_TEST_LEAK_TRACES=1` reports where each leaked page was rented.
 - **Gates:** every change runs the build, formatting, unit, snapshot, property, and conformance
   tests, the simulation seed corpus, the Debug leg, and affected models; milestones add exploration, full mutation,
   fuzzing campaigns, emulators, and end-to-end tests; soak runs are reserved for final validation of the finished
@@ -221,11 +221,11 @@ just mutation Orleans.Durable.Storage.Engine.Ledgers.Store # Stryker.NET on the 
   is recorded, so it fails its seeded simulation at its step with its seed, its test, or its test assembly, even when
   the code under test catches the exception (verification §11.2). A test project whose code under test gains debug
   assertions, or whose tests check that no pages are read after their buffer's release (only Debug builds poison
-  returned pages), joins the leg by setting `ClogDebugLeg` in its project file;
+  returned pages), joins the leg by setting `DurableStorageDebugLeg` in its project file;
   `Orleans.Durable.Storage.Architecture.Tests` checks that the leg reaches every `src` project with debug assertions.
 - Add a regression test for every bug. Every spec invariant links to a test, model, or golden vector in
   [the traceability table](docs/spec/invariants.md). Maintain the models with the protocols they model.
-- Every randomized or simulated test replays from its seed (`CLOG_TEST_SEED`); every run writes crash, hang, and
+- Every randomized or simulated test replays from its seed (`DURABLE_STORAGE_TEST_SEED`); every run writes crash, hang, and
   failure dumps, traces, and simulation histories to its results directory.
 - Judge coverage by branch coverage, CRAP scores, mutation scores, and the quality of assertions, not line count.
 

@@ -18,7 +18,7 @@ namespace Orleans.Durable.Storage.Simulation.Conformance.Tests;
 /// <remarks>
 /// Each case runs in a simulation of its own, seeded by the case (<see cref="SimulatedConformance"/>), and a concurrent
 /// group's calls start as operations of its scheduler, so CsCheck shrinks a failing case's operations and interleaving
-/// together and <c>CLOG_TEST_SEED</c> replays both.
+/// together and <c>DURABLE_STORAGE_TEST_SEED</c> replays both.
 /// </remarks>
 public sealed class SimulatedObjectStoreConformanceTests
 {
@@ -91,7 +91,7 @@ public sealed class SimulatedObjectStoreConformanceTests
     /// A store which checks a conditional write's condition in one request and writes in a second
     /// (<see cref="SimulatedObjectStore.ChecksBeforeWritingMutant"/>) breaks the conditional replace when a concurrent
     /// replace at the same version lands between them. The exploration of the group's window finds that schedule on every
-    /// run, and its report names the schedule, which <c>CLOG_SCHEDULE</c> replays; the seeded schedules of sampled cases
+    /// run, and its report names the schedule, which <c>DURABLE_STORAGE_SCHEDULE</c> replays; the seeded schedules of sampled cases
     /// meet it only by chance, which the test measures.
     /// </summary>
     [Fact]

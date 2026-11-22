@@ -17,7 +17,7 @@
   <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
     <None Remove="$(SourceRoot)test\testconfig.json" />
     <None Include="$(MSBuildThisFileDirectory)testconfig.json"
-          Condition="'$(ClogMutationTesting)' != 'true'"
+          Condition="'$(DurableStorageMutationTesting)' != 'true'"
           Link="testconfig.json"
           TargetPath="$(AssemblyName).testconfig.json"
           CopyToOutputDirectory="PreserveNewest"

@@ -61,7 +61,7 @@ public sealed class ControllerSimulationTests
     private const int NodeCount = 4;
     private const int FirstSeed = 1;
 
-    // Every change runs one seed, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
+    // Every change runs one seed, and exploration runs more through DURABLE_STORAGE_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private static readonly TimeSpan Deadline = TimeSpan.FromMilliseconds(40);
 

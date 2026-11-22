@@ -93,7 +93,7 @@ internal readonly union RemoteReplicaRead(
     /// The slot's DATA, or the range of it a ranged read asked for, in an Orleans buffer (OR-I18), which has at most one
     /// releaser. At the callee it is a copy out of the store's buffer which the reply carries and the callee never
     /// releases. At the caller it is the bytes Orleans decoded or, on a call within one silo, the callee's copy itself;
-    /// <see cref="LedgerReplicaCallResults.Read"/> moves them into Clog's page pool and releases them, so the caller is
+    /// <see cref="LedgerReplicaCallResults.Read"/> moves them into Durable Storage's page pool and releases them, so the caller is
     /// their one releaser and <see cref="Bytes"/> is inactive once it has run. Two are equal when their bytes are, which
     /// tests compare. At the callee it holds the read's host admission, which Orleans' first conversion of the reply to
     /// its surrogate releases (OR-I17); it is no part of the answer.

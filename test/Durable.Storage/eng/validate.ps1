@@ -9,7 +9,7 @@ param(
     # With -Check Format, applies the formatting and analyzer fixes instead of verifying that none is needed.
     [switch] $Fix,
 
-    # With -Check Explore, the seeds CLOG_SIM_SEEDS gives the simulation corpora: a seed, a range first..last, or a
+    # With -Check Explore, the seeds DURABLE_STORAGE_SIM_SEEDS gives the simulation corpora: a seed, a range first..last, or a
     # comma-separated list of either (test/Durable.Storage/docs/spec/verification.md §7.4).
     [string] $Seeds,
 
@@ -82,16 +82,16 @@ function Get-TestProjects {
 }
 
 
-# A test project joins the Debug leg by setting ClogDebugLeg in its project file, which Orleans.Durable.Storage.Architecture.Tests reads too.
+# A test project joins the Debug leg by setting DurableStorageDebugLeg in its project file, which Orleans.Durable.Storage.Architecture.Tests reads too.
 function Test-InDebugLeg {
     param([string] $Project)
     [xml] $xml = Get-Content -LiteralPath $Project -Raw
-    return $xml.SelectNodes('//ClogDebugLeg') | Where-Object { $_.InnerText.Trim() -eq 'true' } | Select-Object -First 1
+    return $xml.SelectNodes('//DurableStorageDebugLeg') | Where-Object { $_.InnerText.Trim() -eq 'true' } | Select-Object -First 1
 }
 
 function Get-ProjectProperties {
     param([string] $Project)
-    $json = & $dotnet msbuild $Project -nologo -getProperty:IsTestProject -getProperty:ClogTestSessionTimeout -getProperty:OrleansSimulationInstrumentedTestProject
+    $json = & $dotnet msbuild $Project -nologo -getProperty:IsTestProject -getProperty:DurableStorageTestSessionTimeout -getProperty:OrleansSimulationInstrumentedTestProject
     if ($LASTEXITCODE -ne 0) {
         throw "Evaluating the properties of $Project failed with exit code $LASTEXITCODE."
     }
@@ -242,7 +242,7 @@ try {
             foreach ($project in Get-TestProjects) {
                 $properties = Get-ProjectProperties $project
                 if ($properties.IsTestProject -eq 'true') {
-                    Invoke-TestProject $project -Configuration (Get-TestConfiguration $properties 'Release') -Timeout $properties.ClogTestSessionTimeout
+                    Invoke-TestProject $project -Configuration (Get-TestConfiguration $properties 'Release') -Timeout $properties.DurableStorageTestSessionTimeout
                 }
                 else {
                     # A library under test/Durable.Storage/, such as the simulation kit, has no tests of its own.
@@ -255,14 +255,14 @@ try {
             # (test/Durable.Storage/docs/spec/verification.md §12).
             $leg = @(Get-TestProjects | Where-Object { Test-InDebugLeg $_ })
             if ($leg.Count -eq 0) {
-                throw 'No test project sets ClogDebugLeg.'
+                throw 'No test project sets DurableStorageDebugLeg.'
             }
 
             foreach ($project in $leg) {
                 $properties = Get-ProjectProperties $project
                 $configuration = Get-TestConfiguration $properties 'Debug'
                 Invoke-Dotnet @('build', $project, '-c', $configuration, '--no-restore')
-                Invoke-TestProject $project -Configuration $configuration -Timeout $properties.ClogTestSessionTimeout
+                Invoke-TestProject $project -Configuration $configuration -Timeout $properties.DurableStorageTestSessionTimeout
             }
         }
         'CasPaxos' {
@@ -270,7 +270,7 @@ try {
                 $project = "test\Durable.Storage\$name\$name.csproj"
                 Restore $project
                 Invoke-Dotnet @('build', $project, '-c', 'Release', '--no-restore')
-                Invoke-TestProject $project -Configuration 'Release' -Timeout (Get-ProjectProperties $project).ClogTestSessionTimeout
+                Invoke-TestProject $project -Configuration 'Release' -Timeout (Get-ProjectProperties $project).DurableStorageTestSessionTimeout
             }
         }
         'Coverage' { Invoke-ValidationScript 'coverage.ps1' }
@@ -279,33 +279,33 @@ try {
             # which the tests start through Aspire's testing host; an emulator which does not start fails its tests
             # (test/Durable.Storage/docs/spec/verification.md §10). Both configurations run, each with its own report, so the Debug build's
             # poisoned pages expose an upload which read its content after its lease ended. With the emulators on, a skipped
-            # test is a failure, except for the live-account cases while their CLOG_*_LIVE env vars (CLOG_AZURE_LIVE,
-            # CLOG_S3_LIVE, CLOG_S3_EXPRESS_LIVE, CLOG_GCS_LIVE) are unset, whose skip reasons match each live-account
+            # test is a failure, except for the live-account cases while their DURABLE_STORAGE_*_LIVE env vars (DURABLE_STORAGE_AZURE_LIVE,
+            # DURABLE_STORAGE_S3_LIVE, DURABLE_STORAGE_S3_EXPRESS_LIVE, DURABLE_STORAGE_GCS_LIVE) are unset, whose skip reasons match each live-account
             # helper's SkipReason verbatim; with them set no skip is allowed. A passing run records its commit, the
             # AppHost's image digests, and the tests whose skip it allowed beside the reports.
             $projects = @('test\Durable.Storage\Orleans.Durable.Storage.Cloud.Tests\Orleans.Durable.Storage.Cloud.Tests.csproj', 'test\Durable.Storage\Orleans.Durable.Storage.Interop.Tests\Orleans.Durable.Storage.Interop.Tests.csproj')
-            $env:CLOG_EMULATORS = '1'
+            $env:DURABLE_STORAGE_EMULATORS = '1'
             $record = Join-Path $artifacts 'validation\Emulators\run.json'
             if (Test-Path -LiteralPath $record -PathType Leaf) {
                 Remove-Item -LiteralPath $record
             }
 
             $azureOnlySkips = @()
-            if ([string]::IsNullOrWhiteSpace($env:CLOG_AZURE_LIVE)) {
-                $azureOnlySkips += 'The live-account fidelity run waits on CLOG_AZURE_LIVE: set it to a storage account''s blob service endpoint, on which the identity DefaultAzureCredential signs in with holds Storage Blob Data Owner.'
+            if ([string]::IsNullOrWhiteSpace($env:DURABLE_STORAGE_AZURE_LIVE)) {
+                $azureOnlySkips += 'The live-account fidelity run waits on DURABLE_STORAGE_AZURE_LIVE: set it to a storage account''s blob service endpoint, on which the identity DefaultAzureCredential signs in with holds Storage Blob Data Owner.'
             }
 
             $cloudSkips = @($azureOnlySkips)
-            if ([string]::IsNullOrWhiteSpace($env:CLOG_S3_LIVE)) {
-                $cloudSkips += 'The live-account S3 fidelity run waits on CLOG_S3_LIVE: set it to a general-purpose S3 bucket name accessible with the AWS SDK''s default credentials and region.'
+            if ([string]::IsNullOrWhiteSpace($env:DURABLE_STORAGE_S3_LIVE)) {
+                $cloudSkips += 'The live-account S3 fidelity run waits on DURABLE_STORAGE_S3_LIVE: set it to a general-purpose S3 bucket name accessible with the AWS SDK''s default credentials and region.'
             }
 
-            if ([string]::IsNullOrWhiteSpace($env:CLOG_S3_EXPRESS_LIVE)) {
-                $cloudSkips += 'The live-account S3 Express fidelity run waits on CLOG_S3_EXPRESS_LIVE: set it to an S3 Express One Zone directory bucket name (ending in ''--x-s3'') accessible with the AWS SDK''s default credentials and region.'
+            if ([string]::IsNullOrWhiteSpace($env:DURABLE_STORAGE_S3_EXPRESS_LIVE)) {
+                $cloudSkips += 'The live-account S3 Express fidelity run waits on DURABLE_STORAGE_S3_EXPRESS_LIVE: set it to an S3 Express One Zone directory bucket name (ending in ''--x-s3'') accessible with the AWS SDK''s default credentials and region.'
             }
 
-            if ([string]::IsNullOrWhiteSpace($env:CLOG_GCS_LIVE)) {
-                $cloudSkips += 'The live-account Cloud Storage fidelity run waits on CLOG_GCS_LIVE: set it to a GCS bucket name accessible with Application Default Credentials.'
+            if ([string]::IsNullOrWhiteSpace($env:DURABLE_STORAGE_GCS_LIVE)) {
+                $cloudSkips += 'The live-account Cloud Storage fidelity run waits on DURABLE_STORAGE_GCS_LIVE: set it to a GCS bucket name accessible with Application Default Credentials.'
             }
 
             $allowedSkipsByProject = @{
@@ -338,7 +338,7 @@ try {
 
             $project = 'test\Durable.Storage\Orleans.Durable.Storage.Simulation.Tests\Orleans.Durable.Storage.Simulation.Tests.csproj'
             Invoke-Dotnet @('build', $project, '-c', 'SimulationRelease', '--no-restore')
-            $env:CLOG_SIM_SEEDS = $Seeds
+            $env:DURABLE_STORAGE_SIM_SEEDS = $Seeds
             Invoke-TestProject $project -Configuration 'SimulationRelease' -Timeout '24h'
         }
 
@@ -348,7 +348,7 @@ try {
             # §12). Milestones and the nightly window run it.
             $project = 'test\Durable.Storage\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj'
             Invoke-Dotnet @('build', $project, '-c', 'SimulationRelease', '--no-restore')
-            $env:CLOG_SCHEDULE_BOUND = 'deep'
+            $env:DURABLE_STORAGE_SCHEDULE_BOUND = 'deep'
             Invoke-TestProject $project -Configuration 'SimulationRelease' -Timeout '24h' -Filter @('--filter-class', $Classes)
         }
     }

@@ -34,7 +34,7 @@ public sealed class ManifestCommitterSimulationTests
     /// </summary>
     public static TheoryData<int> Seeds => SeededSimulation.Corpus(FirstSeed, SeedCount);
 
-    // Every change runs three seeds and exploration runs more through CLOG_SIM_SEEDS
+    // Every change runs three seeds and exploration runs more through DURABLE_STORAGE_SIM_SEEDS
     // (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int FirstSeed = 1;
     private const int SeedCount = 3;

@@ -23,13 +23,13 @@ internal static class FatalErrorProbe
     /// <summary>
     /// The environment variable which names the probe's node root.
     /// </summary>
-    internal const string Variable = "CLOG_FATAL_ERROR_PROBE";
+    internal const string Variable = "DURABLE_STORAGE_FATAL_ERROR_PROBE";
 
     /// <summary>
     /// The environment variable which names how the probe's standard error fails, if it does: <see cref="FailingError"/>
     /// or <see cref="StalledError"/>.
     /// </summary>
-    internal const string ErrorVariable = "CLOG_FATAL_ERROR_PROBE_STDERR";
+    internal const string ErrorVariable = "DURABLE_STORAGE_FATAL_ERROR_PROBE_STDERR";
 
     /// <summary>
     /// The standard error whose every write throws, as a full or failed disk behind it does.

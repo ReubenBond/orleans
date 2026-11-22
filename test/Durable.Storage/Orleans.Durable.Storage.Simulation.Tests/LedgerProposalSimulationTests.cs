@@ -28,7 +28,7 @@ public sealed class LedgerProposalSimulationTests
     private static readonly TimeSpan Deadline = TimeSpan.FromMilliseconds(40);
     private const int FirstSeed = 1;
 
-    // Every change runs three seeds and exploration runs more through CLOG_SIM_SEEDS
+    // Every change runs three seeds and exploration runs more through DURABLE_STORAGE_SIM_SEEDS
     // (test/Durable.Storage/docs/spec/verification.md §7.4, §12); the replay check reuses one of them.
     private const int SeedCount = 3;
 

@@ -8,7 +8,7 @@
     Orleans' build targets add Orleans namespaces to the implicit global usings after the project's items; removing them
     keeps Orleans' names, such as its FatalErrorHandler, from shadowing Storage's in every project which reaches Orleans.
   -->
-  <Target Name="ClogRemoveOrleansUsings" BeforeTargets="GenerateGlobalUsings">
+  <Target Name="DurableStorageRemoveOrleansUsings" BeforeTargets="GenerateGlobalUsings">
     <ItemGroup>
       <Using Remove="Orleans" />
       <Using Remove="Orleans.Hosting" />
@@ -30,12 +30,12 @@
     project to, Release or Debug for a src project, so the Storage references of a project which builds in a simulation
     configuration take its own again; references to other families keep the configuration MSBuild assigns them.
   -->
-  <Target Name="ClogKeepSimulationConfiguration" AfterTargets="AssignProjectConfiguration" Condition="'$(ClogSimulationBuild)' == 'true'">
+  <Target Name="DurableStorageKeepSimulationConfiguration" AfterTargets="AssignProjectConfiguration" Condition="'$(DurableStorageSimulationBuild)' == 'true'">
     <ItemGroup>
-      <_ClogSimulationReference Include="@(ProjectReferenceWithConfiguration)"
+      <_DurableStorageSimulationReference Include="@(ProjectReferenceWithConfiguration)"
                                 Condition="$([System.String]::Copy('%(Filename)').StartsWith('Orleans.Durable.Storage', System.StringComparison.Ordinal))" />
-      <ProjectReferenceWithConfiguration Remove="@(_ClogSimulationReference)" />
-      <ProjectReferenceWithConfiguration Include="@(_ClogSimulationReference)" Configuration="$(Configuration)" SetConfiguration="Configuration=$(Configuration)" />
+      <ProjectReferenceWithConfiguration Remove="@(_DurableStorageSimulationReference)" />
+      <ProjectReferenceWithConfiguration Include="@(_DurableStorageSimulationReference)" Configuration="$(Configuration)" SetConfiguration="Configuration=$(Configuration)" />
     </ItemGroup>
   </Target>
 </Project>

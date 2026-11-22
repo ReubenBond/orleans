@@ -30,7 +30,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// Each case runs inside the kit's scope, such as a leak check's <c>InScopeAsync</c>, so a case which leaks fails like
 /// one the spec rejects. A failing case reports its trace, the failing round, the spec's explanation, and the possible
 /// states before the round. CsCheck shrinks a failure to the smallest failing case it finds, and the report names the seed which replays
-/// it through <c>CLOG_TEST_SEED</c>. A concurrent group runs on the thread pool, so its interleaving does not replay,
+/// it through <c>DURABLE_STORAGE_TEST_SEED</c>. A concurrent group runs on the thread pool, so its interleaving does not replay,
 /// unless an <see cref="IConformanceScheduler"/> runs each case in a simulation of its own and starts the group's calls
 /// on its scheduler, where the case's seed, or the schedule an exploration chose, replays it (§4.1, §7.1).
 /// </para>
@@ -166,7 +166,7 @@ internal sealed class ConformanceKit<TState, TSystem>
             .Array[1, maxRounds]);
 
     /// <summary>
-    /// Runs <paramref name="iterations"/> generated cases, starting from the CsCheck seed in <c>CLOG_TEST_SEED</c> when it
+    /// Runs <paramref name="iterations"/> generated cases, starting from the CsCheck seed in <c>DURABLE_STORAGE_TEST_SEED</c> when it
     /// is set. A failure is shrunk by CsCheck to the smallest failing case it finds, whose seed replays it, and then
     /// minimized by removing its calls one at a time while it still fails.
     /// </summary>
@@ -549,11 +549,11 @@ internal sealed record ConformanceRound(IReadOnlyList<ConformanceCall> Calls)
 }
 
 /// <summary>
-/// Replays a CsCheck case through <c>CLOG_TEST_SEED</c>, as a seeded simulation replays (verification §4.1).
+/// Replays a CsCheck case through <c>DURABLE_STORAGE_TEST_SEED</c>, as a seeded simulation replays (verification §4.1).
 /// </summary>
 internal static partial class ConformanceReplay
 {
-    internal const string SeedVariable = "CLOG_TEST_SEED";
+    internal const string SeedVariable = "DURABLE_STORAGE_TEST_SEED";
 
     /// <summary>
     /// Returns how to replay the case of a CsCheck failure whose message is <paramref name="message"/>.

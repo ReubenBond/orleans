@@ -6,14 +6,14 @@ namespace Orleans.Durable.Storage;
 
 /// <summary>
 /// Moves the replica calls' payloads and DATA replies across the composition's wire boundary (orleans.md §5.12, OR-I18):
-/// a grain message carries Orleans' own <see cref="OrleansBuffer"/>, whose pages come from Orleans' pool, and every Clog
-/// layer takes Clog's <see cref="ArcBuffer"/>, whose pages come from Clog's. Each crossing copies the bytes once, so no
-/// Orleans message refers to a Clog page and no Clog layer holds an Orleans one.
+/// a grain message carries Orleans' own <see cref="OrleansBuffer"/>, whose pages come from Orleans' pool, and every Durable Storage
+/// layer takes Durable Storage's <see cref="ArcBuffer"/>, whose pages come from Durable Storage's. Each crossing copies the bytes once, so no
+/// Orleans message refers to a Durable Storage page and no Durable Storage layer holds an Orleans one.
 /// </summary>
 internal static class WireBuffers
 {
     /// <summary>
-    /// Copies <paramref name="received"/>, a buffer a grain message delivered, into a buffer from Clog's page pool, which
+    /// Copies <paramref name="received"/>, a buffer a grain message delivered, into a buffer from Durable Storage's page pool, which
     /// the caller owns, and releases <paramref name="received"/> on every path, leaving it empty so that releasing it again
     /// is harmless.
     /// </summary>
@@ -78,7 +78,7 @@ internal static class WireBuffers
 
     /// <summary>
     /// Encodes <paramref name="record"/> directly into a buffer from Orleans' page pool for a grain message to carry,
-    /// avoiding an intermediate Clog buffer copy; the caller keeps <paramref name="record"/>, and owns the copy.
+    /// avoiding an intermediate Durable Storage buffer copy; the caller keeps <paramref name="record"/>, and owns the copy.
     /// </summary>
     public static OrleansBuffer CopyToOrleans(JournalEntryRecord record)
     {

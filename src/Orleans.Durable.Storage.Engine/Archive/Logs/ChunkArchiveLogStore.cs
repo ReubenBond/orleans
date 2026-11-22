@@ -27,7 +27,7 @@ namespace Orleans.Durable.Storage.Engine.Archive.Logs;
 /// </para>
 /// <para>
 /// A log's objects are the names exactly two components below <c>{name}/</c>, so a log whose name extends another's with
-/// <c>/</c> keeps its own objects apart. Objects under <c>durable-storage/</c> are Clog's own (§7.5), never a log's.
+/// <c>/</c> keeps its own objects apart. Objects under <c>durable-storage/</c> are Durable Storage's own (§7.5), never a log's.
 /// </para>
 /// </remarks>
 public sealed class ChunkArchiveLogStore : IArchiveLogStore

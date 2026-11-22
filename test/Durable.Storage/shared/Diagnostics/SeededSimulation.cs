@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// Runs seeded simulations so every failure replays from its seed (test/Durable.Storage/docs/spec/verification.md §7.4).
 /// </summary>
 /// <remarks>
-/// The seed is printed before the scenario starts, and <c>CLOG_TEST_SEED</c> replaces it to replay a failure. A
+/// The seed is printed before the scenario starts, and <c>DURABLE_STORAGE_TEST_SEED</c> replaces it to replay a failure. A
 /// failing run prints the replay command and writes its history to the results directory. A seeded simulation must
 /// replay identically: it schedules through its seed and a virtual clock such as <c>FakeTimeProvider</c>, never through
 /// thread-pool timing or the wall clock. <see cref="RunAndReplayAsync"/> checks that. A simulation project on Clockwork
@@ -14,10 +14,10 @@ namespace Orleans.Durable.Storage.Testing;
 /// </remarks>
 internal static partial class SeededSimulation
 {
-    internal const string SeedVariable = "CLOG_TEST_SEED";
+    internal const string SeedVariable = "DURABLE_STORAGE_TEST_SEED";
 
     /// <summary>
-    /// Runs the scenario with <paramref name="seed"/>, or with <c>CLOG_TEST_SEED</c> when it is set. A debug assertion
+    /// Runs the scenario with <paramref name="seed"/>, or with <c>DURABLE_STORAGE_TEST_SEED</c> when it is set. A debug assertion
     /// which the scenario raised fails the run whether or not the code under test caught it, and takes precedence over
     /// a failure which followed it, which it carries as its inner exception (§11.2).
     /// </summary>

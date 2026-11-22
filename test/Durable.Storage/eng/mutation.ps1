@@ -237,7 +237,7 @@ function Measure-Report {
 
 $selected = if ($Project.Count -gt 0) { @($Project | ForEach-Object { $_ -split ',' } | Where-Object { $_ }) } else { @($baseline.Keys | Sort-Object) }
 $saved = @{}
-foreach ($name in @('DOTNET_ROOT', 'PATH', 'ClogMutationTesting', 'CLOG_TEST_FAILURE_DUMPS')) {
+foreach ($name in @('DOTNET_ROOT', 'PATH', 'DurableStorageMutationTesting', 'DURABLE_STORAGE_TEST_FAILURE_DUMPS')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 
@@ -248,8 +248,8 @@ try {
 
     # A mutation build has its own artifacts tree and test configuration (Directory.Build.props,
     # test/Durable.Storage/Directory.Build.props); a killed mutant is a failing test, which needs no failure dump.
-    $env:ClogMutationTesting = 'true'
-    $env:CLOG_TEST_FAILURE_DUMPS = '0'
+    $env:DurableStorageMutationTesting = 'true'
+    $env:DURABLE_STORAGE_TEST_FAILURE_DUMPS = '0'
 
     Push-Location $storage
     try {

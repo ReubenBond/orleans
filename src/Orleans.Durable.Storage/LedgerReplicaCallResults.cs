@@ -32,7 +32,7 @@ internal static class LedgerReplicaCallResults
     };
 
     /// <summary>
-    /// Returns the read's answer, its DATA copied into a buffer from Clog's page pool (OR-I18): the store's answer; a
+    /// Returns the read's answer, its DATA copied into a buffer from Durable Storage's page pool (OR-I18): the store's answer; a
     /// refusal or corruption as its exception; <c>NotThisNode</c> as <see cref="LedgerReplicaUnavailableException"/>; and
     /// a reply which fails its check, empty DATA, DATA longer than the <paramref name="reserved"/> reply, a ranged read's
     /// DATA not of its length, <c>TooLarge</c> for a byte-range read or naming a length the read reserved, <c>OutsideBatch</c> for a
@@ -150,7 +150,7 @@ internal static class LedgerReplicaCallResults
     }
 
     /// <summary>
-    /// Checks a read's DATA against the reply the read reserved and moves it into Clog's page pool; releases
+    /// Checks a read's DATA against the reply the read reserved and moves it into Durable Storage's page pool; releases
     /// <paramref name="received"/>, which the caller owns, on every path.
     /// </summary>
     private static ReplicaRead Received(NodeId node, OrleansBuffer received, int reserved, bool ranged)

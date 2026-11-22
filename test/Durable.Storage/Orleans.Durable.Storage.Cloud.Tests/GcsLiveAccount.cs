@@ -20,7 +20,7 @@ internal sealed class GcsLiveAccount : IAsyncDisposable
     /// The environment variable holding a live Google Cloud Storage bucket name accessible with Application Default
     /// Credentials.
     /// </summary>
-    public const string Variable = "CLOG_GCS_LIVE";
+    public const string Variable = "DURABLE_STORAGE_GCS_LIVE";
 
     /// <summary>The reason a live case skips without <see cref="Variable"/>, which test/Durable.Storage/eng/validate.ps1 allows verbatim.</summary>
     public const string SkipReason =

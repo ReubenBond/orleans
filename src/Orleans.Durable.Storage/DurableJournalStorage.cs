@@ -268,7 +268,7 @@ internal sealed class DurableJournalStorage : IJournalStorage
     private InconsistentStateException Inconsistent(string operation, string? storedEtag, JournalVersion expected, string reason) =>
         new(string.Create(CultureInfo.InvariantCulture, $"Version conflict ({operation}): {reason} (journal '{_key}')."), storedEtag, expected.ToString());
 
-    /// <summary>Copies <paramref name="body"/>, which Orleans owns, into a buffer from Clog's page pool, which the caller owns.</summary>
+    /// <summary>Copies <paramref name="body"/>, which Orleans owns, into a buffer from Durable Storage's page pool, which the caller owns.</summary>
     private static ArcBuffer Copy(ReadOnlySequence<byte> body)
     {
         if (body.IsEmpty)

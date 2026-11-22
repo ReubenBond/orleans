@@ -28,7 +28,7 @@ namespace Orleans.Durable.Storage;
 /// operation ends; a read whose batch fits its reservation holds it until Orleans first converts its DATA reply to its
 /// surrogate (<see cref="RemoteReplicaReadConverter"/>), which Orleans' copy of the response does as the grain method
 /// returns, or, never converted, until the call's deadline passes. The host owns a write's payload, which Orleans decoded
-/// or, on a call within one silo, its proxy pinned: it moves the payload into Clog's page pool for the store and releases
+/// or, on a call within one silo, its proxy pinned: it moves the payload into Durable Storage's page pool for the store and releases
 /// it on every path. A read's DATA is copied out of the store's buffer, which the host releases, into an Orleans buffer
 /// the reply carries, which the host never releases: across silos Orleans' codec writes it without taking ownership and
 /// may write it after the grain method returns, so the GC reclaims its pages; on a call within one silo the reply reaches

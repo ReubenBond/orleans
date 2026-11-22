@@ -34,7 +34,7 @@ public sealed class SimulatedMemoryStoresConformanceTests
     /// Every concurrent group of Accordant's generation over the archive-log store's input set, after every shorter
     /// sequence, conforms over the memory store: every <see cref="GateStride"/>th group of racing writes under every
     /// schedule of its window within the gate's bound, and the rest under their seeded schedules, or every group explored
-    /// under <c>CLOG_SCHEDULE_BOUND=deep</c>.
+    /// under <c>DURABLE_STORAGE_SCHEDULE_BOUND=deep</c>.
     /// </summary>
     [Fact]
     public async Task EveryConcurrentWindowOfTheMemoryArchiveLogStoreConformsUnderEveryExploredSchedule()

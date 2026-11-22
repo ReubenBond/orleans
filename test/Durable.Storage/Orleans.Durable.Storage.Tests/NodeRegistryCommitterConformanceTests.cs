@@ -19,7 +19,7 @@ namespace Orleans.Durable.Storage.Tests;
 /// after applying, failed without applying, or failed and landed later, before the next round's reads or never) and reads
 /// fail. Some histories run under a value limit of a few entries, so registrations are refused. <see cref="NodeRegistryHistoryOracle"/>
 /// judges every answer against the register's values between its submission and its answer, and every step of the
-/// history against OR-I2 and OR-I20. <c>CLOG_TEST_SEED</c> replays a case.
+/// history against OR-I2 and OR-I20. <c>DURABLE_STORAGE_TEST_SEED</c> replays a case.
 /// </summary>
 public sealed class NodeRegistryCommitterConformanceTests : IDisposable
 {
@@ -86,7 +86,7 @@ public sealed class NodeRegistryCommitterConformanceTests : IDisposable
                 }
             },
             iter: 300,
-            seed: Environment.GetEnvironmentVariable("CLOG_TEST_SEED") is { Length: > 0 } seed ? seed : null);
+            seed: Environment.GetEnvironmentVariable("DURABLE_STORAGE_TEST_SEED") is { Length: > 0 } seed ? seed : null);
 
         foreach (var kind in new[]
         {

@@ -4,7 +4,7 @@
     <!-- LibraryImport, for ntdll's RtlAreLongPathsEnabled. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- The Debug leg runs WriteAheadLog's debug assertions and those of the buffers it writes (test/Durable.Storage/docs/spec/verification.md §12). -->
-    <ClogDebugLeg>true</ClogDebugLeg>
+    <DurableStorageDebugLeg>true</DurableStorageDebugLeg>
   </PropertyGroup>
 
   <ItemGroup>
