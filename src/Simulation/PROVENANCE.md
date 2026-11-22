@@ -52,8 +52,9 @@ The import keeps the upstream code, identities, and test oracles. These changes 
   workstation garbage collection, as upstream's do, for their heap-measuring oracles.
 - Under Orleans' analyzers, `ControlledPeriodicTimer` locks a private object instead of `this` (CA2002). The
   `Task.Wait`/`WaitAll`/`WaitAny` shims keep their zero-timeout BCL calls, which reproduce the BCL's result and
-  exception semantics after the controlled scheduler completes the wait, behind a scoped `RS0030` exemption from
-  Orleans' blocking-API list. `BlockingEnumerableConformanceTests` passes the test's cancellation token explicitly
+  exception semantics after the controlled scheduler completes the wait. The kernel therefore takes its own
+  `BannedSymbols.txt` in place of Orleans' blocking-API list; it permits exactly those three non-blocking overloads.
+  `BlockingEnumerableConformanceTests` passes the test's cancellation token explicitly
   (xUnit1069). `dotnet format whitespace` normalizes indentation and final newlines.
 - Tests locate the repository by `Orleans.slnx` and use the Orleans paths above. Each suite carries Orleans' CI traits
   (`Area=Simulation`, `Provider=None`, and `Suite=BVT`, or `SlowBVT` for the instrumentation and conformance suites),

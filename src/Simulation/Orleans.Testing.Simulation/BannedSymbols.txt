@@ -1,0 +1,25 @@
+# The simulation kernel's banned APIs, which replace Orleans' runtime list (src/BannedSymbols.txt) for this project.
+#
+# The kernel implements controlled waits in virtual time. Its Task.Wait, WaitAll, and WaitAny shims complete a wait
+# through the controlled scheduler, then call the BCL's (Task[], int, CancellationToken) and (int, CancellationToken)
+# overloads with a zero timeout, which never block, to reproduce the BCL's exact result and exception semantics. Those
+# three overloads are therefore permitted here; every other blocking overload remains banned.
+
+# Blocking task APIs block a real thread outside the controlled scheduler.
+M:System.Threading.Tasks.Task.Wait;Await the task, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.Wait(System.Int32);Await the task, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken);Await the task, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan);Await the task, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan,System.Threading.CancellationToken);Await the task, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[]);Use Task.WhenAll, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32);Use Task.WhenAll, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Use Task.WhenAll, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.TimeSpan);Use Task.WhenAll, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[]);Use Task.WhenAny, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Int32);Use Task.WhenAny, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Use Task.WhenAny, or complete the wait through the controlled scheduler.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.TimeSpan);Use Task.WhenAny, or complete the wait through the controlled scheduler.
+
+# Legacy serialization entry points are unsafe for Orleans payloads.
+T:System.Runtime.Serialization.Formatters.Binary.BinaryFormatter;Use Orleans.Serialization.Serializer for Orleans payloads or System.Text.Json.JsonSerializer for JSON.
+T:System.Runtime.Serialization.IFormatter;Use Orleans.Serialization.Serializer for Orleans payloads or System.Text.Json.JsonSerializer for JSON.

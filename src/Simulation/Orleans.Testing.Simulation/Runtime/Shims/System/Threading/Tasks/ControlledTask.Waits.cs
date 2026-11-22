@@ -192,9 +192,7 @@ public static partial class ControlledTask
 
         RaceSynchronization.Wait(task);
         // The coordinator has completed the wait in virtual time; this zero-timeout BCL call never blocks and supplies the exact BCL result and exception semantics.
-#pragma warning disable RS0030
         return task.Wait(0, cancellationToken);
-#pragma warning restore RS0030
     }
 
     /// <summary>
@@ -226,9 +224,7 @@ public static partial class ControlledTask
         }
 
         // The coordinator has completed the wait in virtual time; this zero-timeout BCL call never blocks and supplies the exact BCL result and exception semantics.
-#pragma warning disable RS0030
         return Task.WaitAll(tasks, 0, cancellationToken);
-#pragma warning restore RS0030
     }
 
     private static int WaitAnyCore(Task[] tasks, int millisecondsTimeout, CancellationToken cancellationToken)
@@ -249,9 +245,7 @@ public static partial class ControlledTask
         }
 
         // The coordinator has completed the wait in virtual time; this zero-timeout BCL call never blocks and supplies the exact BCL result and exception semantics.
-#pragma warning disable RS0030
         int winner = Task.WaitAny(tasks, 0, CancellationToken.None);
-#pragma warning restore RS0030
         if (winner >= 0)
         {
             RaceSynchronization.Wait(tasks[winner]);

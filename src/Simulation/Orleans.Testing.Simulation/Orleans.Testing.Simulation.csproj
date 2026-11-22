@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The kernel's own BannedSymbols.txt replaces Orleans' runtime list: its wait shims complete waits in virtual time. -->
+    <AdditionalFiles Remove="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..\..\BannedSymbols.txt'))" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- CW1004 holds every completion in this assembly to SimulationCompletion. -->
     <ProjectReference Include="..\Orleans.Testing.Simulation.Analyzers\Orleans.Testing.Simulation.Analyzers.csproj"
                       OutputItemType="Analyzer"
