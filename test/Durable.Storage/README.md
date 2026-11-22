@@ -1,22 +1,24 @@
-# Durable Storage (Clog)
+# Durable Storage
 
-Clog stores journals, fine-grained per-key logs of entries, for applications co-hosted with it, and is the storage for
-Orleans Journaling. Writes are replicated to the local disks of `N` nodes (live ledgers) and migrate to the Archive: an
-LSM tree in cloud object storage, or per-key logs on an Orleans journal provider. The keyspace is divided into dyadic
-ranges, each owned by one sequenced ledger at a time; a ledger map in a replicated register decides ownership, and
-transitions move ranges by sealing and recovering ledgers and writing that register, without copying data.
+Durable Storage, imported from Clog, stores journals, fine-grained per-key logs of entries, for applications co-hosted
+with it, and is the storage for Orleans Journaling. Writes are replicated to the local disks of `N` nodes (live ledgers)
+and migrate to the Archive: an LSM tree in cloud object storage, or per-key logs on an Orleans journal provider. The
+keyspace is divided into dyadic ranges, each owned by one sequenced ledger at a time; a ledger map in a replicated
+register decides ownership, and transitions move ranges by sealing and recovering ledgers and writing that register,
+without copying data.
 
 The `Microsoft.Orleans.Durable.Storage` packages implement it. Start with the [specification](docs/spec/README.md): its
 overview motivates the design, shows how the layers work together, and names the owner of each guarantee.
 [AGENTS.md](AGENTS.md) covers the layout and maintenance rules, and [PROVENANCE.md](PROVENANCE.md) the snapshot this
-tree was imported from.
+tree was imported from. [The Orleans integration record](docs/orleans-integration.md) records the integration's
+revisions, packages, evidence, limitations, and operating procedures.
 
 ## Implementation status
 
 | Part | Status |
 | --- | --- |
-| Buffers, the WAL, ledger replicas (memory, LedgerStore), the ledger protocol (`Ledger`, `LedgerQuorum`, `LedgerWriter`), MetaStore (memory, file system, Fast CASPaxos, Azure, AWS, Google Cloud), state database | Implemented building blocks |
-| Ledgers, the Archive, Journals over ledgers, Orleans composition (including replica traffic over grain calls) | Specified and not yet implemented |
+| Buffers, the WAL, ledger replicas (memory, LedgerStore), the ledger protocol (`Ledger`, `LedgerQuorum`, `LedgerWriter`), MetaStore (memory, file system, Fast CASPaxos hosted on Orleans silos, Azure, AWS, Google Cloud), state database | In code |
+| Ledgers, the Archive (LSM and archive logs), object-store ledgers, Journals over ledgers, Orleans composition (including replica traffic over grain calls) | In code; each part's specification marks what is *Not yet in code* |
 
 [§5 of the specification](docs/spec/README.md#5-implementation-status) tracks the details.
 

@@ -2801,6 +2801,10 @@ catalog, durable storage among them, does not start: its configuration validatio
 over Azure Storage (Azurite in CI) and covers shard creation and discovery, a graceful stop's release and a survivor's
 claim, adoption after a silo's loss, a job's retries and cancellation in its adopted shard, and the grains' recovery
 of their journals from durable storage; `MixedProviderDurableJobsConfigurationTests` covers the refused selection.
+`MixedProviderApplicationTests` deploys it on three silos, over the in-memory MetaStore and over native CASPaxos voters
+hosted on the silos: after a silo's crash, the Jobs wake-ups which survivors adopt from its Azure shards reactivate its
+grains, with no call to them, at their due times; an inbox processes its scheduled message once, a durable task resumes
+from its durable delay and completes, and the grains' journaled state replays to the same values.
 
 ## 7. Wire protocols
 
