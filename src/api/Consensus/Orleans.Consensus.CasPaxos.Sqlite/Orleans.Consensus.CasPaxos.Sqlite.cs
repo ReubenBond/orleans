@@ -54,4 +54,21 @@ namespace Orleans.Consensus.CasPaxos.Sqlite
 
         public Model.Ballot Reserve(int minimumRound) { throw null; }
     }
+
+    public sealed partial class SqliteVoterRegistry
+    {
+        internal SqliteVoterRegistry() { }
+
+        public System.Guid Incarnation { get { throw null; } }
+
+        public bool IsAdmitted { get { throw null; } }
+
+        public string VoterId { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask<System.Guid> AdmitAsync(string voterId, System.Guid incarnation, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask MarkAdmittedAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<SqliteVoterRegistry> OpenAsync(SqliteAcceptorServer acceptor, string voterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
 }
