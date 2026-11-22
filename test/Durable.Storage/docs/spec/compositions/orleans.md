@@ -512,7 +512,12 @@ whatever the provider's name, where an Orleans provider names its options after 
 `IMetaStore` holding the cluster's registers, and on the LSM its `IObjectStore`, from a first-party provider ([MetaStore
 §9](../components/metastore.md#9-providers-and-implementations), [LSM
 §9](../components/archive-lsm.md#9-providers-and-implementations)): `AzureTableMetaStore` and `AzureBlobObjectStore`,
-for example, or the DynamoDB, Firestore, S3, and Cloud Storage providers.
+for example, or the DynamoDB, Firestore, S3, and Cloud Storage providers, or the native Fast CASPaxos MetaStore which the
+cluster's own silos serve (`AddCasPaxosMetaStore` in `Orleans.Durable.Storage.CasPaxos`, [MetaStore
+§8.1](../components/metastore.md#81-fast-caspaxos-semantics)). The native MetaStore's voters recover their databases
+before the runtime initializes and serve once admitted, which the silo waits for after joining membership and before it
+is active, so a node registers at `Active` over consensus which serves; its voters are addressed through Orleans
+membership, never through a register they serve.
 `playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling` is an Orleans app which runs Clog as its journal storage this way.
 `DurableStorageNode`, the silo lifecycle participant in `.Hosting`, owns the node's LedgerStore, replica endpoint,
 registry entry, state database, Journals, primaries, executor, and node control plane. `JournalRouter` sends each
@@ -540,7 +545,7 @@ The composition also meets each layer's other requirements:
 
 | Requirement | Stated by | Met by |
 | --- | --- | --- |
-| Linearizable conditional registers `ledger-map` and `node-registry` | [MetaStore §3](../components/metastore.md#3-requirements-downward) | A configured MetaStore provider: Azure Blob, Azure Table, DynamoDB, Firestore, or Fast CASPaxos |
+| Linearizable conditional registers `ledger-map` and `node-registry` | [MetaStore §3](../components/metastore.md#3-requirements-downward) | A configured MetaStore provider: Azure Blob, Azure Table, DynamoDB, Firestore, or the native Fast CASPaxos MetaStore hosted on the cluster's silos |
 | On the LSM, an object store with no-overwrite creates, conditional replace, ranged reads, listing, and deletion | [Object store §2](../components/object-store.md#2-contract-upward) | A configured provider: Azure Blob Storage, Amazon S3, or Google Cloud Storage |
 | On archive logs, an archive-log store whose appends are conditioned on a generation and an offset, whose generations are created once, and whose reads and properties reads are linearizable | [Archive logs §3](../components/archive-logs.md#3-requirements-downward) | `AzureArchiveLogStore` over Azure append blobs in a container of the cluster's own ([§5.13](#513-archive-log-store)) |
 | A filesystem with directory durability, and a disk which keeps fsynced data with its node identity | [LedgerStore §3](../components/ledgerstore.md#3-requirements-downward) | One persistent volume per node, for example a StatefulSet volume claim |

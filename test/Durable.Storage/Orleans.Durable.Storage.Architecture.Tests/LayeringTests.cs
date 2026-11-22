@@ -39,6 +39,13 @@ public sealed class LayeringTests
         [.. Components.Production.ByName.Values.Where(static component => component.Kind == ComponentKind.Composition).Select(static component => component.Assembly)];
 
     /// <summary>
+    /// The projects which take Orleans' runtime: the compositions', and those of the technology packages Orleans hosts
+    /// (<see cref="Component.HostsOnOrleans"/>).
+    /// </summary>
+    internal static readonly HashSet<string> OrleansHosts =
+        [.. Components.Production.ByName.Values.Where(static component => component.Kind == ComponentKind.Composition || component.HostsOnOrleans).Select(static component => component.Assembly)];
+
+    /// <summary>
     /// The projects which compile the Contracts column of spec README §2.6 for every layer in code.
     /// </summary>
     private static readonly HashSet<string> LayerContracts =
@@ -91,9 +98,10 @@ public sealed class LayeringTests
                 .ToHashSet(StringComparer.Ordinal);
             var reached = Reachable(project);
 
-            // The composition takes Orleans' runtime, which other tests confine to it, by project reference.
+            // The compositions and the technology packages Orleans hosts take Orleans' runtime, which other tests confine to
+            // them, by project reference.
             violations.AddRange(ProjectReferences(projectFile)
-                .Where(reference => !allowed.Contains(reference) && !(Compositions.Contains(project) && IsOrleans(reference, "Orleans.")))
+                .Where(reference => !allowed.Contains(reference) && !(OrleansHosts.Contains(project) && IsOrleans(reference, "Orleans.")))
                 .Select(reference => $"{project} -> {reference} (not a dependency)"));
             violations.AddRange(required.Where(assembly => !reached.Contains(assembly)).Select(assembly => $"{project} does not reach {assembly}"));
         }
@@ -317,23 +325,23 @@ public sealed class LayeringTests
     }
 
     /// <summary>
-    /// Orleans stays in the composition (build-packaging.md §2): a Storage project's restore graph holds an Orleans package
-    /// or project only if the project is the composition's or references it, directly or through other projects, and no
-    /// other production assembly references an Orleans assembly.
+    /// Orleans stays in the composition and the technology packages it hosts (build-packaging.md §2): a Storage project's
+    /// restore graph holds an Orleans package or project only if the project is one of theirs or references one, directly
+    /// or through other projects, and no other production assembly references an Orleans assembly.
     /// </summary>
     [Fact]
     public void OnlyTheCompositionAndTheProjectsWhichReferenceItTakeOrleans()
     {
         var restoredOutside = Repository.StorageProjectFiles()
             .Where(static projectFile => File.Exists(Repository.AssetsFile(projectFile))
-                && !Compositions.Contains(Path.GetFileNameWithoutExtension(projectFile))
-                && !ProjectClosure(projectFile).Any(Compositions.Contains))
+                && !OrleansHosts.Contains(Path.GetFileNameWithoutExtension(projectFile))
+                && !ProjectClosure(projectFile).Any(OrleansHosts.Contains))
             .SelectMany(static projectFile => RestoredLibraries(Repository.AssetsFile(projectFile))
                 .Where(static library => IsOrleans(library, "Microsoft.Orleans.") || IsOrleans(library, "Orleans."))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(package => $"{Path.GetFileNameWithoutExtension(projectFile)} -> {package}"));
         var referencedOutside = Repository.ProductionAssemblies()
-            .Where(static assembly => !Compositions.Contains(assembly.Project))
+            .Where(static assembly => !OrleansHosts.Contains(assembly.Project))
             .SelectMany(static assembly => MetadataReferences.Scan(assembly.Path, static _ => true)
                 .SelectMany(static type => type.AssemblyTypes)
                 .Where(static reference => IsOrleans(reference.Assembly, "Orleans."))

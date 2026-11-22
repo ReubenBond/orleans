@@ -811,7 +811,9 @@ make faulting whole ranges costly.
 
 **What.** Changing the Fast CASPaxos voting membership, replacing a member identity after disk loss, and
 restoring a member or the whole cluster from an older snapshot, each by a procedure which preserves every
-acknowledged promise and allocation ([metastore](components/metastore.md#8-mechanism-and-policy)).
+acknowledged promise and allocation ([metastore](components/metastore.md#8-mechanism-and-policy)). Until then a voter
+restarted on a fresh database under its old identity is refused by the other voters' admission records and its silo
+does not start ([metastore §8.1](components/metastore.md#81-fast-caspaxos-semantics)).
 
 **Revisit when** a deployment must replace a member, change membership without stopping the MetaStore, or
 restore from a backup.

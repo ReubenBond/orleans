@@ -49,6 +49,12 @@ internal sealed record Component(string Name, ComponentKind Kind, string[] Depen
 
     /// <summary>Projects of another Orleans family which the component's project references, such as the consensus family's.</summary>
     public string[] ExternalProjects { get; init; } = [];
+
+    /// <summary>
+    /// Whether the component takes Orleans' runtime although it is no composition: a technology package whose technology
+    /// Orleans hosts, as the native consensus's voters are system targets on silos.
+    /// </summary>
+    public bool HostsOnOrleans { get; init; }
 }
 
 /// <summary>
@@ -265,11 +271,19 @@ internal static partial class Components
         // The group committer beneath the layers whose values it writes: the ledger map's, the manifest's, and the node
         // registry's committers (conventions.md §6), over buffers and the admission gate.
         new("Orleans.Durable.Storage.Engine.GroupCommit", ComponentKind.Layer, ["Orleans.Durable.Storage.Engine.Buffers", "Orleans.Durable.Storage.Engine.Threading"]) { Assembly = Engine },
-        new("Orleans.Durable.Storage.CasPaxos", ComponentKind.Provider, ["Orleans.Durable.Storage.Engine.MetaStore.Abstractions"])
+
+        // The MetaStore's Fast CASPaxos registers and the native consensus which serves them on the cluster's silos
+        // (caspaxos.md): the one technology package which takes Orleans' runtime, since its voters are system targets
+        // addressed over Orleans RPC, which use the runtime's internals under the grants Orleans.Durable holds. Orleans'
+        // code generator writes the voter messages' serializers and proxies in its OrleansCodeGen namespace, and its
+        // consensus SQLite stores report their storage failures through the diagnostics (conventions.md §14).
+        new("Orleans.Durable.Storage.CasPaxos", ComponentKind.Provider, ["Orleans.Durable.Storage.Engine.MetaStore.Abstractions", "Orleans.Durable.Storage.Diagnostics"])
         {
             Assembly = CasPaxos,
-            Technologies = ["Orleans.Consensus.CasPaxos", "Orleans.Consensus.CasPaxos."],
-            ExternalProjects = ["Orleans.Consensus.CasPaxos.Server"],
+            Roots = ["Orleans.Durable.Storage.CasPaxos", "OrleansCodeGen.Orleans.Durable.Storage.CasPaxos", "OrleansCodeGen.OrleansDurableStorageCasPaxos"],
+            Technologies = ["Microsoft.Extensions.Configuration.Binder", "Orleans."],
+            ExternalProjects = ["Orleans.Consensus.CasPaxos.Server", "Orleans.Consensus.CasPaxos.Sqlite"],
+            HostsOnOrleans = true,
         },
         new("Orleans.Durable.Storage.FileSystem", ComponentKind.Provider, ["Orleans.Durable.Storage.Engine.ObjectStore.Abstractions", "Orleans.Durable.Storage.Engine.MetaStore.Abstractions", "Orleans.Durable.Storage.Engine.Wal"])
         {

@@ -135,5 +135,14 @@ public enum FatalErrorSite
 
     /// <summary>The journal index's RocksDB storage: a background integrity check.</summary>
     JournalIndexCheck = 116,
+
+    /// <summary>The native CASPaxos MetaStore's SQLite storage: flushing a database's directory, which makes its entries durable.</summary>
+    ConsensusDirectoryFlush = 117,
+
+    /// <summary>
+    /// The native CASPaxos MetaStore's SQLite storage: a transaction of a voter's acceptor database, its identity binding
+    /// and admissions, or a proposer's ballot reservations.
+    /// </summary>
+    ConsensusTransaction = 118,
 }
 

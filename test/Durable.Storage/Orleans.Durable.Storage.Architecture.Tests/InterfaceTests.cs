@@ -59,6 +59,10 @@ public sealed class InterfaceTests
         // The node root's cluster claim, a file: external I/O, which the test and simulation doubles stand in for.
         "Orleans.Durable.Storage.Engine.Ledgers.Store.INodeRootClaim",
 
+        // A consensus voter's acceptor operations, which Orleans' generated proxy implements across silos and the native
+        // consensus tests' link stands in for (caspaxos.md).
+        "Orleans.Durable.Storage.CasPaxos.Hosting.ICasPaxosVoter",
+
         // The controller grain's contract, which Orleans' generated proxy implements across silos (orleans.md §7.2).
         "Orleans.Durable.Storage.Control.IClusterControllerGrain",
 

@@ -109,13 +109,13 @@ public sealed partial class NamespaceTests
 
     /// <summary>
     /// BCL source generators, such as the regular expression generator, emit types in System namespaces, and Orleans' code
-    /// generator emits the composition's grain message serializers and proxies in <c>OrleansCodeGen</c> namespaces, in the
-    /// composition which owns their protocol (spec README §2.5).
+    /// generator emits the grain message serializers and proxies of the composition and of the technology packages Orleans
+    /// hosts in <c>OrleansCodeGen</c> namespaces, in the project which owns their protocol (spec README §2.5).
     /// </summary>
     private static bool IsAllowedCompiledNamespace(string project, string typeNamespace) =>
         Allowed(project).Any(allowed => IsWithin(typeNamespace, allowed))
         || IsWithin(typeNamespace, "System")
-        || LayeringTests.Compositions.Contains(project) && (IsWithin(typeNamespace, "OrleansCodeGen") || IsWithin(typeNamespace, ConfigurationBindingNamespace));
+        || LayeringTests.OrleansHosts.Contains(project) && (IsWithin(typeNamespace, "OrleansCodeGen") || IsWithin(typeNamespace, ConfigurationBindingNamespace));
 
     private static void CheckSourceNamespaces(
         string root,

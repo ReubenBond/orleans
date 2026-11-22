@@ -22,7 +22,8 @@ public sealed class LocalStorageFailureTests
     /// The storage seams: the types which call the platform's file-system APIs or RocksDB, and report their failures.
     /// They are the WAL's file system with its files; the direct-I/O opens and the directory flushes which the file system
     /// and the io_uring storage call; the io_uring storage, its files, and its ring; the state database's RocksDB
-    /// storage; and the file system's answers, which the seams share and which report nothing.
+    /// storage; the native consensus's SQLite stores, whose failures the consensus stores detect and report through their
+    /// seam; and the file system's answers, which the seams share and which report nothing.
     /// </summary>
     private static readonly string[] Seams =
     [
@@ -35,6 +36,7 @@ public sealed class LocalStorageFailureTests
         "Orleans.Durable.Storage.Engine.Wal.IoUring.IoUringOperation",
         "Orleans.Durable.Storage.Engine.Wal.IoUring.IoUringInterop",
         "Orleans.Durable.Storage.RocksDb.RocksDbJournalIndex",
+        "Orleans.Durable.Storage.CasPaxos.Hosting.ConsensusStorageFailures",
     ];
 
     /// <summary>
@@ -89,6 +91,7 @@ public sealed class LocalStorageFailureTests
     /// </summary>
     private static readonly string[] StorageReporters =
     [
+        "Orleans.Durable.Storage.CasPaxos.Hosting.ConsensusStorageFailures",
         "Orleans.Durable.Storage.Engine.Wal.FileSystem.WalFileSystem",
         "Orleans.Durable.Storage.Engine.Wal.IoUring.IoUringEngine",
         "Orleans.Durable.Storage.Engine.Wal.IoUring.IoUringWalStorage",

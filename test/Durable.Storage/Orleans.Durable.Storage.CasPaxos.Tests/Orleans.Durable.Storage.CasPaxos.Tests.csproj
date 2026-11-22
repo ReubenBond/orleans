@@ -14,12 +14,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Accordant" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\shared\ConditionalRegisterContract.cs" Link="ConditionalRegisterContract.cs" />
     <Compile Include="..\shared\ConditionalRegisterWrites.cs" Link="ConditionalRegisterWrites.cs" />
+    <Compile Include="..\shared\Conformance\MetaStore\*.cs" LinkBase="Conformance\MetaStore" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,18 +1,35 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The MetaStore's conditional registers over Fast CASPaxos (Orleans.Consensus.CasPaxos), through a caller-owned register
-    service. Remote voters are reached over Orleans RPC by the Orleans-hosted consensus integration, so this package's
-    dependency closure holds the consensus kernel and its transport-neutral register services alone.
+    The MetaStore's conditional registers over Fast CASPaxos (Orleans.Consensus.CasPaxos), and the native consensus which
+    serves them in an Orleans cluster: fixed voters hosted on silos behind a system target, proposers on every silo, and
+    SQLite persistence (caspaxos.md). The adapter reaches consensus through a caller-owned register service; the hosting
+    reaches voters over Orleans RPC, so the package's closure holds the consensus kernel, its register services and SQLite
+    stores, and the Orleans runtime, and no other transport.
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.CasPaxos</RootNamespace>
     <Title>Microsoft Orleans Durable Storage CASPaxos Metadata Registers</Title>
-    <Description>Fast CASPaxos conditional register adapter for the metadata registers of Microsoft Orleans Durable Storage.</Description>
+    <Description>Fast CASPaxos conditional registers for the metadata of Microsoft Orleans Durable Storage, with native consensus hosted on Orleans silos over Orleans RPC and SQLite.</Description>
     <PackageTags>$(PackageTags) Consensus CASPaxos</PackageTags>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+
+    <!-- Binds the options from configuration with generated code rather than reflection, within the trim and AOT analyzers. -->
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Diagnostics\Orleans.Durable.Storage.Diagnostics.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Consensus\Orleans.Consensus.CasPaxos.Server\Orleans.Consensus.CasPaxos.Server.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Consensus\Orleans.Consensus.CasPaxos.Sqlite\Orleans.Consensus.CasPaxos.Sqlite.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <!-- The voter's system target uses the runtime's internals under their grants, so it depends on their exact versions. -->
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" PackExactVersion="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.CasPaxos.Tests" />
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Tests" />
   </ItemGroup>
 </Project>

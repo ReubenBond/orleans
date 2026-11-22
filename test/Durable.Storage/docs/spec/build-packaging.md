@@ -66,16 +66,19 @@ to them. The composition reads the Engine's internals under its grant, so its pa
 version (`PackExactVersion`). Orleans' build targets add the namespaces `Orleans`, `Orleans.Hosting`, and
 `Orleans.Runtime` to the implicit global usings; `eng/durable-storage/Build.targets` removes them in every Storage
 project, so Orleans' names, such as its `FatalErrorHandler`, never shadow Storage's. Only the composition and the
-projects which reference it (its tests, its fuzz target, the interop tests, the benchmarks, and the sample), and the
-architecture tests, take Orleans, which `Orleans.Durable.Storage.Architecture.Tests` checks against every production
+projects which reference it (its tests, its fuzz target, the interop tests, the benchmarks, and the sample), the native
+CASPaxos MetaStore (`Orleans.Durable.Storage.CasPaxos`) and its tests, and the architecture tests, take Orleans, which `Orleans.Durable.Storage.Architecture.Tests` checks against every production
 assembly's references.
 
 Fast CASPaxos and Clockwork are imported into the repository once each, as the `Orleans.Consensus.CasPaxos.*` family
 under `src/Consensus/` and the `Orleans.Testing.Simulation.*` family under `src/Simulation/`, each keeping its domain
 boundary and its own build settings. `Orleans.Durable.Storage.CasPaxos` references `Orleans.Consensus.CasPaxos.Server`
-and reaches consensus through a caller-owned `IRegisterService`; its dependency closure holds the consensus kernel and
-its transport-neutral register services. The standalone gRPC, REST, and host deployments of Fast CASPaxos remain
-upstream, and the Orleans-hosted consensus integration reaches remote voters over Orleans RPC. The adapter's tests
+and `Orleans.Consensus.CasPaxos.Sqlite`, reaches consensus through a caller-owned `IRegisterService`, and hosts it on
+the cluster's silos over Orleans RPC: its dependency closure holds the consensus kernel, its transport-neutral register
+services and SQLite stores, Diagnostics, and Orleans' runtime, with `Orleans.Core` and `Orleans.Runtime` at exact
+versions under the internals grants `Orleans.Durable` holds, and no other transport. It is the one technology package
+which takes Orleans; the architecture table records it (`HostsOnOrleans`). The standalone gRPC, REST, and host
+deployments of Fast CASPaxos remain upstream. The adapter's tests
 reach the consensus family's in-process register services through `test/Consensus/Orleans.Consensus.CasPaxos.Testing`
 and `Orleans.Consensus.CasPaxos.Sqlite`. A simulation test project sets `OrleansSimulationInstrumentedTestProject`, and
 the repository's simulation build integration (`eng/OrleansSimulation.targets`, imported by `test/Directory.Build.targets`)
@@ -188,7 +191,7 @@ would change.
 | --- | --- | --- |
 | Language version | `preview` everywhere. Every `src` project but the Engine compiles under C# 15 (`latest`), each against the Engine built with the preview: unions (in the Engine, the composition, and the Azure and file-system packages) and collection expression arguments are released C# 15 features. The WAL's io_uring interop (`IoUringInterop` and its `LibraryImport` stubs), in the Engine, declares pointer types outside an unsafe context, which only C# 15's preview memory-safety model admits. | The WAL's interop marks its pointer declarations unsafe, or the target adopts the preview. A language version before C# 15 has no unions: each becomes the hand-written form of [conventions §15](conventions.md#15-outcomes-unions-and-errors). |
 | .NET 11 APIs | The union support types (`System.Runtime.CompilerServices.IUnion`, `UnionAttribute`) in each assembly which declares a union; `string.StartsWith(char, StringComparison)` in `Orleans.Durable.Storage.FileSystem`; and the Microsoft.Extensions logging, options, and dependency-injection abstractions, which the .NET 11 shared framework carries (§1), in `Orleans.Durable.Storage.Engine.Ledgers`, the LSM, archive logs, `Orleans.Durable.Storage.FileSystem`, the Orleans composition, and its controllers' decisions. Every other platform reference resolves in .NET 10. | For an older framework: the union support types supplied to the compiler, the `StartsWith` call replaced, and the Microsoft.Extensions abstractions taken as packages, which NuGet prunes only from a `net11.0` graph (§1). |
-| Fast CASPaxos | `Orleans.Durable.Storage.CasPaxos` references the transport-neutral `Orleans.Consensus.CasPaxos.Server` project, whose closure is the consensus kernel. | None. |
+| Fast CASPaxos | `Orleans.Durable.Storage.CasPaxos` references the transport-neutral `Orleans.Consensus.CasPaxos.Server` and `.Sqlite` projects and Orleans' runtime, whose voters' system target uses `Orleans.Core`'s and `Orleans.Runtime`'s internals. | None. |
 ## 7. Design rationale
 
 One framework, .NET 11 on its GA SDK, gives every project the runtime and compiler which unions need ([conventions
@@ -205,8 +208,8 @@ it was released after the cutover, although it carries no build-time sponsorship
 Storage references Orleans' projects in the same repository, so the composition builds against the Orleans source it
 ships with: one commit identifies both, a change to the journal storage contract and its adapter is one reviewable
 change, and Orleans' build supplies the code generator and analyzers to the composition as it does to Orleans' other
-packages. Only the composition and the projects which reference it take Orleans, so Orleans cannot reach the storage
-layers, whose dependencies point down.
+packages. Only the composition, the native CASPaxos MetaStore whose voters Orleans hosts, and the projects which
+reference either take Orleans, so Orleans cannot reach the storage layers, whose dependencies point down.
 
 Storage's stricter settings apply to its projects alone. One props file, which the source and test trees import for
 Storage projects, keeps the family's compiler settings and analyzer coverage without changing the warnings of Orleans'
