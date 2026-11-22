@@ -54,6 +54,13 @@
     <OrleansSimulationConfigurationPath Condition="'$(OrleansSimulationConfigurationPath)' == '' and Exists('$(MSBuildProjectDirectory)\orleans-simulation.config.json')">$(MSBuildProjectDirectory)\orleans-simulation.config.json</OrleansSimulationConfigurationPath>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true'">
+    <!-- An instrumented test project's staged closure runs only in its own test output and is never redistributed, so
+         the Authenticode signature a rewrite drops from a signed dependency (CWR0104) is expected there. The
+         instrumentation still reports it as a message; every other diagnostic keeps its severity. -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);CWR0104</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true'">
     <!-- The runner executes before a simulation exists. Keep test-host implementation outside the
          simulated closure while rewriting the test assembly and every application dependency. -->

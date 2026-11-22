@@ -472,9 +472,10 @@ removes matching public-key tokens from references within the rewritten closure.
 public-key qualifiers are removed at the same time, so the transformed closure remains internally
 consistent without signing keys. This is safe for isolated simulation/test artifacts; instrumented
 assemblies are not production replacements. **Authenticode** signatures are detected
-and reported as unsupported - they are never re-applied, and a rewritten assembly does not
+and reported as unsupported (CWR0104) - they are never re-applied, and a rewritten assembly does not
 retain its Authenticode signature; re-sign such outputs with your own toolchain after
-instrumentation.
+instrumentation. An instrumented test project's staged closure runs only in its own test output, so
+the build targets report CWR0104 there as a message rather than a warning.
 
 **ReadyToRun (build/tool scope).** R2R/native sections are detected and always stripped by
 round-tripping the usable managed IL through Cecil before rewriting, producing IL-only staged
