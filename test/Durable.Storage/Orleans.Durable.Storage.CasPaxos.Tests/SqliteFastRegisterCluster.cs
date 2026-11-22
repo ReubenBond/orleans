@@ -8,7 +8,7 @@ using Orleans.Durable.Storage.Testing;
 namespace Orleans.Durable.Storage.CasPaxos.Tests;
 
 /// <summary>
-/// Composes the same five SQLite acceptors and three Fast frontends as upstream HTTP/2 tests.
+/// Composes five SQLite acceptors and three Fast proposers, each an in-process register service.
 /// There is no simulated transport or scheduler; member names, ballot databases, and proposer IDs
 /// are derived from the directory and stable ordinals so reopening restores those identities.
 /// </summary>
@@ -21,11 +21,10 @@ internal sealed class SqliteFastRegisterCluster : IAsyncDisposable
     private readonly List<SqliteAcceptorServer> _acceptors = [];
     private readonly List<SqliteProposerBallotSource> _ballots = [];
     private readonly List<ReplicatedRegisterService> _registers = [];
-    private readonly List<LoopbackRegisterHost> _frontends = [];
 
     internal IReadOnlyList<SqliteAcceptorServer> Acceptors => _acceptors;
 
-    internal IReadOnlyList<LoopbackRegisterHost> Frontends => _frontends;
+    internal IReadOnlyList<ReplicatedRegisterService> Registers => _registers;
 
     internal static async Task<SqliteFastRegisterCluster> OpenAsync(string directory, CancellationToken cancellationToken)
     {
@@ -61,7 +60,6 @@ internal sealed class SqliteFastRegisterCluster : IAsyncDisposable
                         AttemptTimeout = TimeSpan.FromSeconds(5),
                     });
                 cluster._registers.Add(service);
-                cluster._frontends.Add(await LoopbackRegisterHost.StartAsync(service, cancellationToken).ConfigureAwait(false));
             }
 
             return cluster;
@@ -75,31 +73,24 @@ internal sealed class SqliteFastRegisterCluster : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        // Stop ingress before draining register operations, then close allocators and SQLite writers.
-        // Each group starts all disposals so a failed endpoint cannot strand a sibling.
+        // Drain register operations, then close allocators and SQLite writers.
+        // Each group starts all disposals so a failed service cannot strand a sibling.
         try
         {
-            await Task.WhenAll(_frontends.Select(static host => host.DisposeAsync().AsTask())).ConfigureAwait(false);
+            await Task.WhenAll(_registers.Select(static service => service.DisposeAsync().AsTask())).ConfigureAwait(false);
         }
         finally
         {
             try
             {
-                await Task.WhenAll(_registers.Select(static service => service.DisposeAsync().AsTask())).ConfigureAwait(false);
+                foreach (var ballots in _ballots)
+                {
+                    ballots.Dispose();
+                }
             }
             finally
             {
-                try
-                {
-                    foreach (var ballots in _ballots)
-                    {
-                        ballots.Dispose();
-                    }
-                }
-                finally
-                {
-                    await Task.WhenAll(_acceptors.Select(static acceptor => acceptor.DisposeAsync().AsTask())).ConfigureAwait(false);
-                }
+                await Task.WhenAll(_acceptors.Select(static acceptor => acceptor.DisposeAsync().AsTask())).ConfigureAwait(false);
             }
         }
     }

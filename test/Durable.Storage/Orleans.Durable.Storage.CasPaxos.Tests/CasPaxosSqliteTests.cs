@@ -1,17 +1,20 @@
 using System.Buffers;
-using Orleans.Consensus.CasPaxos.Grpc;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Testing;
 
 namespace Orleans.Durable.Storage.CasPaxos.Tests;
 
-public sealed class CasPaxosGrpcSqliteTests : IDisposable
+/// <summary>
+/// The adapter over in-process Fast CASPaxos register services and durable SQLite acceptors and ballot allocators.
+/// Remote voters, addressed over Orleans RPC, are the Orleans-hosted consensus integration's to qualify.
+/// </summary>
+public sealed class CasPaxosSqliteTests : IDisposable
 {
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
 
     [Fact(Timeout = 90_000)]
     [Trait("Category", "Integration")]
-    public async Task EndpointOwnedFactoryUsesFastSqliteQuorumFailsOverAndReopensDurableIdentities()
+    public async Task FactoryUsesFastSqliteQuorumAcrossProposersAndReopensDurableIdentities()
     {
         var directory = Directory.CreateTempSubdirectory("clog-caspaxos-");
         using var watchdog = new CancellationTokenSource(TimeSpan.FromSeconds(60), TimeProvider.System);
@@ -27,17 +30,17 @@ public sealed class CasPaxosGrpcSqliteTests : IDisposable
             await using (var cluster = await SqliteFastRegisterCluster.OpenAsync(directory.FullName, token))
             {
                 Assert.Equal(5, cluster.Acceptors.Count);
-                Assert.Equal(3, cluster.Frontends.Count);
-                using var factory = CreateFactory(cluster.Frontends);
+                Assert.Equal(3, cluster.Registers.Count);
+                using var factory = new CasPaxosMetaStoreFactory(cluster.Registers[0]);
                 var missing = await factory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "missing", token);
                 Assert.Null(await missing.ReadAsync(token));
-                var store = await factory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "http2", token);
+                var store = await factory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "sqlite", token);
                 Assert.True((await store.WriteAsync(null, "first"u8.ToArray(), token)).IsApplied());
 
                 // Inspect the fresh-key create before later reads can replace the accepted ballot.
                 // Idle engines may be retired between calls; Fast includes legitimate classic recovery.
                 var states = await Task.WhenAll(cluster.Acceptors.Select(acceptor =>
-                    acceptor.InspectAsync("0123456789abcdef0123456789abcdef/http2", token).AsTask()));
+                    acceptor.InspectAsync("0123456789abcdef0123456789abcdef/sqlite", token).AsTask()));
                 Assert.InRange(states.Count(static state => state?.AcceptedBallot.IsFastRoundBallot is true), 4, 5);
                 using var first = Assert.IsType<MetaStoreEntry>(await store.ReadAsync(token));
                 Assert.Equal("first"u8.ToArray(), first.Value.ToArray());
@@ -58,37 +61,30 @@ public sealed class CasPaxosGrpcSqliteTests : IDisposable
                     Assert.Empty(readEmpty.Value.ToArray());
                 }
 
-                Assert.NotEmpty(cluster.Frontends.SelectMany(static host => host.Requests));
-
-                // Initial reads may fail over before reaching a server. Stop both earlier origins so
-                // the same factory must reach the sole survivor, irrespective of its initial affinity.
-                await Task.WhenAll(cluster.Frontends.Take(2).Select(host => host.StopAsync(token)));
-                var survivor = cluster.Frontends[2];
-                var requestsBefore = survivor.Requests.Length;
-                using var failedOver = Assert.IsType<MetaStoreEntry>(await store.ReadAsync(token));
-                Assert.Equal(sameBytes.Version, failedOver.Version);
-                Assert.Equal("first"u8.ToArray(), failedOver.Value.ToArray());
-                Assert.EndsWith("/Read", Assert.Single(survivor.Requests.Skip(requestsBefore)).Path, StringComparison.Ordinal);
-                saved = (await store.WriteAsync(failedOver.Version, "after-failover"u8.ToArray(), token)).AppliedVersion();
-                using var afterFailover = Assert.IsType<MetaStoreEntry>(await store.ReadAsync(token));
-                Assert.Equal(saved, afterFailover.Version);
-                Assert.Equal("after-failover"u8.ToArray(), afterFailover.Value.ToArray());
+                // Another proposer, with its own durable ballot allocator, reads the first proposer's write and advances
+                // the register from that version; the first proposer then observes the new version.
+                using var otherFactory = new CasPaxosMetaStoreFactory(cluster.Registers[2]);
+                var other = await otherFactory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "sqlite", token);
+                using var observed = Assert.IsType<MetaStoreEntry>(await other.ReadAsync(token));
+                Assert.Equal(sameBytes.Version, observed.Version);
+                Assert.Equal("first"u8.ToArray(), observed.Value.ToArray());
+                saved = (await other.WriteAsync(observed.Version, "other-proposer"u8.ToArray(), token)).AppliedVersion();
+                using var afterOther = Assert.IsType<MetaStoreEntry>(await store.ReadAsync(token));
+                Assert.Equal(saved, afterOther.Version);
+                Assert.Equal("other-proposer"u8.ToArray(), afterOther.Value.ToArray());
                 Assert.True(priorVersions.Add(saved));
-                Assert.Contains(survivor.Requests.Skip(requestsBefore), static request =>
-                    request.Path.EndsWith("/CompareExchange", StringComparison.Ordinal));
-                Assert.All(cluster.Frontends.SelectMany(static host => host.Requests), static request =>
-                    Assert.Equal("HTTP/2", request.Protocol));
+                Assert.False((await store.WriteAsync(sameBytes.Version, "stale"u8.ToArray(), token)).IsApplied());
             }
 
-            // All frontends, register services, allocators, and acceptor writers have been closed, and so has every SQLite file.
+            // All register services, allocators, and acceptor writers have been closed, and so has every SQLite file.
             // The fixture reuses the same member-N/proposer-N files and proposer identities 1..3.
             FileHandleLeakCheck.AssertClosed(directory.FullName);
             await using var reopened = await SqliteFastRegisterCluster.OpenAsync(directory.FullName, token);
-            using var restoredFactory = CreateFactory(reopened.Frontends);
-            var restoredStore = await restoredFactory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "http2", token);
+            using var restoredFactory = new CasPaxosMetaStoreFactory(reopened.Registers[0]);
+            var restoredStore = await restoredFactory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "sqlite", token);
             using var restored = Assert.IsType<MetaStoreEntry>(await restoredStore.ReadAsync(token));
             Assert.Equal(saved, restored.Version);
-            Assert.Equal("after-failover"u8.ToArray(), restored.Value.ToArray());
+            Assert.Equal("other-proposer"u8.ToArray(), restored.Value.ToArray());
             var restoredEmpty = await restoredFactory.GetRegisterAsync(CasPaxosTestFixture.Cluster, "empty", token);
             using var presentEmpty = Assert.IsType<MetaStoreEntry>(await restoredEmpty.ReadAsync(token));
             Assert.Equal(savedEmpty, presentEmpty.Version);
@@ -102,8 +98,6 @@ public sealed class CasPaxosGrpcSqliteTests : IDisposable
             using var final = Assert.IsType<MetaStoreEntry>(await restoredStore.ReadAsync(token));
             Assert.Equal(advanced.Version, final.Version);
             Assert.Equal("after-restart"u8.ToArray(), final.Value.ToArray());
-            Assert.All(reopened.Frontends.SelectMany(static host => host.Requests), static request =>
-                Assert.Equal("HTTP/2", request.Protocol));
         }
         finally
         {
@@ -112,14 +106,4 @@ public sealed class CasPaxosGrpcSqliteTests : IDisposable
     }
 
     public void Dispose() => _leaks.Dispose();
-
-    private static CasPaxosMetaStoreFactory CreateFactory(IReadOnlyList<LoopbackRegisterHost> frontends) =>
-        new(
-            frontends.Select(static host => host.Address),
-            TimeProvider.System,
-            new GrpcRegisterClientOptions
-            {
-                CallTimeout = TimeSpan.FromSeconds(15),
-                AttemptTimeout = TimeSpan.FromSeconds(5),
-            });
 }

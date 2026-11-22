@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.Time.Testing;
 using Orleans.Consensus.CasPaxos.Server;
 using Orleans.Durable.Storage.Testing;
 
@@ -49,8 +48,7 @@ public sealed class CasPaxosMetaStoreFactoryTests : IDisposable
     public async Task CompleteKeysMatchTheSharedRegisterKeyVectors()
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            FindRepositoryRoot(),
-            "tests",
+            FindStorageRoot(),
             "shared-vectors",
             "metastore",
             "register-keys.json"), TestContext.Current.CancellationToken));
@@ -179,40 +177,20 @@ public sealed class CasPaxosMetaStoreFactoryTests : IDisposable
         Assert.Single(service.Reads);
     }
 
-    [Fact]
-    public async Task Dispose_ClosesOwnedClientForPreviouslyCreatedHandles()
-    {
-        using var factory = new CasPaxosMetaStoreFactory(
-            [new Uri("http://127.0.0.1:1")],
-            new FakeTimeProvider());
-        var store = await factory.GetRegisterAsync(Cluster, "orders", TestContext.Current.CancellationToken);
-
-        factory.Dispose();
-        factory.Dispose();
-
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => _ = await store.ReadAsync(TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => _ = (await store.WriteAsync(
-            null,
-            "value"u8.ToArray(),
-            TestContext.Current.CancellationToken)).IsApplied());
-        await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => factory.GetRegisterAsync(Cluster, "other", TestContext.Current.CancellationToken).AsTask());
-    }
-
     public void Dispose() => _leaks.Dispose();
 
-    private static string FindRepositoryRoot()
+    private static string FindStorageRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
             directory is not null;
             directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
             {
-                return directory.FullName;
+                return Path.Combine(directory.FullName, "test", "Durable.Storage");
             }
         }
 
-        throw new DirectoryNotFoundException("Could not find the Clog repository root.");
+        throw new DirectoryNotFoundException("Could not find the Orleans repository root.");
     }
 }

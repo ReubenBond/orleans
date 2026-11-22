@@ -1,20 +1,19 @@
-using Orleans.Consensus.CasPaxos.Grpc;
 using Orleans.Consensus.CasPaxos.Server;
 using Orleans.Durable.Storage.Engine.MetaStore;
 
 namespace Orleans.Durable.Storage.CasPaxos;
 
 /// <summary>
-/// A MetaStore whose registers share one Fast CASPaxos register client, keyed <c>{cluster:N}/{name}</c>.
+/// A MetaStore whose registers share one Fast CASPaxos register service, keyed <c>{cluster:N}/{name}</c>.
 /// </summary>
 /// <remarks>
-/// A factory constructed from endpoints owns its channels. An injected register service remains
-/// caller-owned, allowing embedded services and the shared upstream simulation to use the same adapter.
+/// The register service is caller-owned, so embedded services, the Orleans-hosted consensus integration, and the shared
+/// consensus simulation use the same adapter. Disposing the factory refuses new registers and leaves the service and
+/// existing registers to their owner.
 /// </remarks>
 public sealed class CasPaxosMetaStoreFactory : IMetaStore, IDisposable
 {
     private readonly IRegisterService _registers;
-    private readonly GrpcRegisterClient? _ownedClient;
     private int _disposed;
 
     /// <summary>
@@ -25,24 +24,6 @@ public sealed class CasPaxosMetaStoreFactory : IMetaStore, IDisposable
     {
         ArgumentNullException.ThrowIfNull(registers);
         _registers = registers;
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CasPaxosMetaStoreFactory"/> class with owned gRPC channels.
-    /// </summary>
-    /// <param name="endpoints">The hosts' gRPC endpoints.</param>
-    /// <param name="timeProvider">The clock used for client deadlines.</param>
-    /// <param name="options">The bounded client operation and transport settings.</param>
-    public CasPaxosMetaStoreFactory(
-        IEnumerable<Uri> endpoints,
-        TimeProvider timeProvider,
-        GrpcRegisterClientOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(endpoints);
-        ArgumentNullException.ThrowIfNull(timeProvider);
-        var client = new GrpcRegisterClient(endpoints.ToArray(), options, timeProvider);
-        _registers = client;
-        _ownedClient = client;
     }
 
     /// <inheritdoc/>
@@ -58,11 +39,5 @@ public sealed class CasPaxosMetaStoreFactory : IMetaStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
-        {
-            _ownedClient?.Dispose();
-        }
-    }
+    public void Dispose() => Volatile.Write(ref _disposed, 1);
 }
