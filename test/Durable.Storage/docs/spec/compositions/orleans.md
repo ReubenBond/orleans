@@ -638,6 +638,10 @@ Every Orleans guarantee the composition uses, and what happens when it does not 
   does not start ([§5.12](#512-replica-transport)).
 - **One journal format per cluster.** Every journal's payloads are in the format key recorded with the cluster's
   archive store; the Journals of a silo configured with another never serve (OR-I8).
+- **Durable Jobs.** The journal storage serves journals without a journal catalog or journal metadata
+  ([§5.5](#55-forwarding-and-journal-outcomes)), which Durable Jobs needs to discover and claim its shards, so a silo
+  keeps its Jobs shards in a named direct provider, Orleans' Azure Blob journal provider, and does not start when Jobs
+  selects the durable storage provider ([§6](#6-configuration)).
 
 ## 5. Design
 
@@ -2771,6 +2775,28 @@ section. The MetaStore and the archive store's stores are the silo's services, c
 | Object-store ledger store | Provider, container or bucket, layout (per-slot, or append on Azure), append extent size, append count, and batch size limits, redundancy, and derived local cache (bytes and optional volatile directory, cleared on startup); the store's objects lie under `ledgers/` below the cluster's store prefix, fixed for the cluster's life by the store's record, whose ID the node registry records | None; `PerSlot`, 128 MiB extent target, 40,000 appends per extent, 100 MiB − 49 B max batch (`MaxAppendLength − 49 B`), `SingleZone`, 1 GiB cache, no directory (`DurableStorageOptions.ObjectLedgers`: `ObjectLedgerStoreOptions`) | [§5.14](#514-object-store-ledgers), [object-store ledgers §4](../components/object-ledgers.md#4-data-types) | `Node:ObjectLedgers:Layout`, `Node:ObjectLedgers:ExtentTargetBytes`, `Node:ObjectLedgers:ExtentMaxAppends`, `Node:ObjectLedgers:MaxBatchBytes`, `Node:ObjectLedgers:CacheBytes`, `Node:ObjectLedgers:CacheDirectory`, `Node:ObjectLedgers:Redundancy` |
 | Object-store ledger window | `K` of the object-store ledgers a transition opens | 2 per-slot, 4 append (`ControlOptions.ObjectLedgerWindow`) | [object-store ledgers §8.6](../components/object-ledgers.md#86-policy-and-cost) | `Control:ObjectLedgerWindow` |
 | Object-store request budget | Requests per second per storage account which the controller grain shares among the nodes, agreeing on every silo | 10,000 (`ControlOptions.ObjectStoreRequestsPerSecond`) | [§5.14](#514-object-store-ledgers) | `Control:ObjectStoreRequestsPerSecond` |
+
+**Durable Jobs.** Durable Jobs lists its shards through its provider's `IJournalStorageCatalog` and claims them through
+conditional journal metadata updates, neither of which the durable storage provider implements
+([§5.5](#55-forwarding-and-journal-outcomes)). A silo whose grain journals use durable storage therefore registers a
+named direct Azure provider for its Jobs shards and selects it:
+
+```csharp
+siloBuilder
+    .AddDurableJournalStorage(configuration.GetSection("DurableStorage"))
+    .AddAzureBlobJournalStorage("jobs", options => options.ContainerName = "jobs")
+    .UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
+```
+
+Grain journals, among them Messaging's and Durable Tasks' state, use durable storage under the default provider name;
+the jobs they schedule, their wake-ups among them, live in the Azure shards, which keep Durable Jobs' creation,
+discovery, metadata-ETag ownership, retries, cancellation, and recovery there. A silo whose Jobs provider has no
+catalog, durable storage among them, does not start: its configuration validation fails with an
+`OrleansConfigurationException` naming the provider and `IJournalStorageCatalog`, before the node starts.
+`MixedProviderDurableJobsTests` in `Orleans.DurableJobs.AzureStorage.Tests` deploys this configuration on four silos
+over Azure Storage (Azurite in CI) and covers shard creation and discovery, a graceful stop's release and a survivor's
+claim, adoption after a silo's loss, a job's retries and cancellation in its adopted shard, and the grains' recovery
+of their journals from durable storage; `MixedProviderDurableJobsConfigurationTests` covers the refused selection.
 
 ## 7. Wire protocols
 
