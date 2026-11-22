@@ -23,4 +23,19 @@
   <ItemGroup Condition="'$(OrleansBuildTimeCodeGen)' != 'true'">
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
+
+  <!--
+    A simulation configuration builds Storage's whole closure in itself (test/Durable.Storage/docs/spec/build-packaging.md
+    §1). In a solution build, MSBuild assigns each project reference the configuration the solution maps the referenced
+    project to, Release or Debug for a src project, so the Storage references of a project which builds in a simulation
+    configuration take its own again; references to other families keep the configuration MSBuild assigns them.
+  -->
+  <Target Name="ClogKeepSimulationConfiguration" AfterTargets="AssignProjectConfiguration" Condition="'$(ClogSimulationBuild)' == 'true'">
+    <ItemGroup>
+      <_ClogSimulationReference Include="@(ProjectReferenceWithConfiguration)"
+                                Condition="$([System.String]::Copy('%(Filename)').StartsWith('Orleans.Durable.Storage', System.StringComparison.Ordinal))" />
+      <ProjectReferenceWithConfiguration Remove="@(_ClogSimulationReference)" />
+      <ProjectReferenceWithConfiguration Include="@(_ClogSimulationReference)" Configuration="$(Configuration)" SetConfiguration="Configuration=$(Configuration)" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -1,7 +1,13 @@
 <Project>
   <!--
-    The simulation kit is a library which simulation test projects reference, not a test application, so it takes the
-    repository's build settings without those of test/Durable.Storage/Directory.Build.props.
+    The simulation kit is a library which simulation test projects reference, not a test application, so it takes
+    Orleans' test settings and the Storage family's build and test analyzer settings without the test-application
+    settings of test/Durable.Storage/Directory.Build.props.
   -->
   <Import Project="..\..\Directory.Build.props" />
+  <Import Project="$(SourceRoot)eng\durable-storage\Build.props" />
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="$(SourceRoot)eng\durable-storage\DurableStorage.Tests.globalconfig" />
+  </ItemGroup>
 </Project>

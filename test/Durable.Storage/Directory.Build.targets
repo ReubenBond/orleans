@@ -7,6 +7,9 @@
 
   <Import Project="$(SourceRoot)eng\durable-storage\Build.targets" />
 
+  <!-- Storage's additions to the simulation build of an instrumented simulation test project. -->
+  <Import Project="$(MSBuildThisFileDirectory)eng\OrleansSimulation.targets" Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true'" />
+
   <!--
     Storage's test applications run under their own testconfig.json, which enables the crash and hang dump extensions
     and keeps xUnit's default parallelism, in place of Orleans' (test/Durable.Storage/docs/spec/verification.md).

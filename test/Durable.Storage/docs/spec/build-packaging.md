@@ -75,10 +75,15 @@ under `src/Consensus/` and the `Orleans.Testing.Simulation.*` family under `src/
 boundary and its own build settings. `Orleans.Durable.Storage.CasPaxos` references `Orleans.Consensus.CasPaxos.Server`
 and reaches consensus through a caller-owned `IRegisterService`; its dependency closure holds the consensus kernel and
 its transport-neutral register services. The standalone gRPC, REST, and host deployments of Fast CASPaxos remain
-upstream, and the Orleans-hosted consensus integration reaches remote voters over Orleans RPC. The simulation kernel,
-its framework-neutral testing support (`.Testing`), its Microsoft Testing Platform integration (`.Testing.MTP`), which
-each simulation test project references itself as a test application, and the instrumentation build targets come from
-the simulation family's projects through the repository's simulation build integration.
+upstream, and the Orleans-hosted consensus integration reaches remote voters over Orleans RPC. The adapter's tests
+reach the consensus family's in-process register services through `test/Consensus/Orleans.Consensus.CasPaxos.Testing`
+and `Orleans.Consensus.CasPaxos.Sqlite`. A simulation test project sets `OrleansSimulationInstrumentedTestProject`, and
+the repository's simulation build integration (`eng/OrleansSimulation.targets`, imported by `test/Directory.Build.targets`)
+references the simulation kernel, its framework-neutral testing support (`.Testing`), and its Microsoft Testing Platform
+integration (`.Testing.MTP`) and test-host hook, and runs the instrumentation build task from source.
+`test/Durable.Storage/eng/OrleansSimulation.targets` adds Storage's part: the kernel and its testing support build in the
+base configuration, the configuration check, the ordinary-IL exclusions, the simulation analyzer bans, and the
+`SeededSimulation` driver and the simulation kit.
 
 The cloud technology packages take their services' SDKs as stable releases: `Azure.Storage.Blobs`
 and `Azure.Data.Tables` in `Orleans.Durable.Storage.AzureStorage`, `AWSSDK.S3` and `AWSSDK.DynamoDBv2` in

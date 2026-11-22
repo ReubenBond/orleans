@@ -76,6 +76,7 @@
     <Project Path="src/Orleans.Durable.Abstractions/Orleans.Durable.Abstractions.csproj" />
     <Project Path="src/Orleans.Durable.Http/Orleans.Durable.Http.csproj" />
     <Project Path="src/Orleans.Durable.Storage/Orleans.Durable.Storage.csproj" />
+    <Project Path="src/Orleans.Durable.Storage.CasPaxos/Orleans.Durable.Storage.CasPaxos.csproj" />
     <Project Path="src/Orleans.Durable.Storage.Diagnostics/Orleans.Durable.Storage.Diagnostics.csproj" />
     <Project Path="src/Orleans.Durable.Storage.Engine/Orleans.Durable.Storage.Engine.csproj" />
     <Project Path="src/Orleans.Durable.Storage.FileSystem/Orleans.Durable.Storage.FileSystem.csproj" />
@@ -227,6 +228,7 @@
   </Folder>
   <Folder Name="/test/Durable.Storage/">
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Architecture.Tests/Orleans.Durable.Storage.Architecture.Tests.csproj" />
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.CasPaxos.Tests/Orleans.Durable.Storage.CasPaxos.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Diagnostics.Tests/Orleans.Durable.Storage.Diagnostics.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj" />
@@ -243,6 +245,19 @@
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Interop.Tests/Orleans.Durable.Storage.Interop.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Model.Tests/Orleans.Durable.Storage.Model.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Samples.Tests/Orleans.Durable.Storage.Samples.Tests.csproj" />
+    <!-- The simulation projects build in the simulation configurations (test/Durable.Storage/docs/spec/build-packaging.md §1). -->
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Simulation/Orleans.Durable.Storage.Simulation.csproj">
+      <BuildType Solution="Release|*" Project="SimulationRelease" />
+      <BuildType Solution="Debug|*" Project="SimulationDebug" />
+    </Project>
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Simulation.Conformance.Tests/Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj">
+      <BuildType Solution="Release|*" Project="SimulationRelease" />
+      <BuildType Solution="Debug|*" Project="SimulationDebug" />
+    </Project>
+    <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj">
+      <BuildType Solution="Release|*" Project="SimulationRelease" />
+      <BuildType Solution="Debug|*" Project="SimulationDebug" />
+    </Project>
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Testing.Tests/Orleans.Durable.Storage.Testing.Tests.csproj" />
     <Project Path="test/Durable.Storage/Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj" />
   </Folder>

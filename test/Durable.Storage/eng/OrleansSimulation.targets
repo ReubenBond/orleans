@@ -1,47 +1,24 @@
 <Project>
   <!--
-    An instrumented simulation test project (OrleansSimulationInstrumentedTestProject=true) consumes Clockwork's
-    Microsoft.Orleans.Testing.Simulation packages from its git submodule (vendor/Clockwork) as the packages would supply
-    them: the simulation kernel and its framework-neutral testing support, mapped to their source projects by
-    test/Durable.Storage/eng/OrleansSimulation.SourceBuild.targets, and Microsoft.Orleans.Testing.Simulation.Instrumentation.Build's props
-    and targets, whose task assembly builds from source. The project references the Microsoft Testing Platform
-    integration (Microsoft.Orleans.Testing.Simulation.Testing.MTP) itself, as a test application does. Directory.Build.targets
-    imports this file after the SDK's targets, where the instrumentation targets find the project's output paths. The
-    submodule's files are imported once the submodule is initialized, so that a project without it reaches the check in
-    test/Durable.Storage/eng/Submodules.targets, which names the fix; at an initialized pin, a missing file fails the import
-    (test/Durable.Storage/docs/spec/build-packaging.md §2).
+    Storage's additions to Orleans' simulation build (eng/OrleansSimulation.targets) for an instrumented simulation test
+    project (OrleansSimulationInstrumentedTestProject=true). test/Durable.Storage/Directory.Build.targets imports this file
+    after Orleans' test targets, which reference the simulation kernel, its framework-neutral and Microsoft Testing
+    Platform test support, and the instrumentation task (test/Durable.Storage/docs/spec/build-packaging.md §2).
+  -->
+
+  <!--
+    The simulation family's projects, the instrumentation task's among them, build in the base configuration, as every
+    other consumer and a solution build build them; the simulation configurations define ORLEANS_DURABLE_STORAGE_SIMULATION,
+    which only Storage's assemblies read. The task loads from that configuration's output: MSBuild evaluates a UsingTask
+    after every property, so this path replaces the one Orleans' simulation targets derive from the project's own
+    configuration.
   -->
   <PropertyGroup>
-    <OrleansSimulationInstrumentationBuildDirectory>$(OrleansSimulationSourceRoot)src\Orleans.Testing.Simulation.Instrumentation.Build\</OrleansSimulationInstrumentationBuildDirectory>
-    <!-- net11.0 is the task project's own target framework, from Clockwork's build settings, which build it in the base configuration. -->
     <OrleansSimulationInstrumentationTaskAssembly>$(OrleansSimulationInstrumentationBuildDirectory)bin\$(ClogBaseConfiguration)\net11.0\Orleans.Testing.Simulation.Instrumentation.Build.dll</OrleansSimulationInstrumentationTaskAssembly>
   </PropertyGroup>
 
-  <!--
-    The task assembly is built in this repository, so each instrumentation runs in a task host process which exits
-    afterwards: a long-lived MSBuild node would lock the assembly and keep running a stale build of it. MSBuild uses
-    the first UsingTask registered for a task name, so these take precedence over upstream's targets' own.
-  -->
-  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationInstrumentTask"
-             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)"
-             TaskFactory="TaskHostFactory" />
-  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationValidateInstrumentedTestTask"
-             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)"
-             TaskFactory="TaskHostFactory" />
-
-  <ImportGroup Condition="Exists('$(OrleansSimulationSourceRoot).git')">
-    <Import Project="$(OrleansSimulationInstrumentationBuildDirectory)build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.props" />
-    <Import Project="$(OrleansSimulationInstrumentationBuildDirectory)build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.targets" />
-  </ImportGroup>
-
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Testing.Simulation" />
-    <PackageReference Include="Microsoft.Orleans.Testing.Simulation.Testing" />
-
-    <!-- Orders the build of the task assembly before instrumentation; nothing of it is referenced or deployed. -->
-    <ProjectReference Include="$(OrleansSimulationInstrumentationBuildDirectory)Orleans.Testing.Simulation.Instrumentation.Build.csproj"
-                      ReferenceOutputAssembly="false"
-                      Private="false"
+    <ProjectReference Update="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj;$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing\Orleans.Testing.Simulation.Testing.csproj;$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing.MTP\Orleans.Testing.Simulation.Testing.MTP.csproj;$(OrleansSimulationInstrumentationBuildDirectory)Orleans.Testing.Simulation.Instrumentation.Build.csproj"
                       SetConfiguration="Configuration=$(ClogBaseConfiguration)" />
   </ItemGroup>
 
@@ -52,25 +29,19 @@
   <Target Name="RequireClogSimulationConfiguration" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(ClogSimulationBuild)' != 'true'"
            Code="CLOG0008"
-           Text="$(MSBuildProjectName) is a simulation test project and builds in SimulationRelease or SimulationDebug, not $(Configuration): build it with -c SimulationRelease or -c SimulationDebug, or through Clog.slnx, which maps Release and Debug to them." />
+           Text="$(MSBuildProjectName) is a simulation test project and builds in SimulationRelease or SimulationDebug, not $(Configuration): build it with -c SimulationRelease or -c SimulationDebug, or through Orleans.slnx or test/Durable.Storage/Durable.Storage.slnf, which map Release and Debug to them." />
   </Target>
 
-  <!-- A simulation test project is a Microsoft Testing Platform application, which names the platform integration itself. -->
-  <Target Name="RequireOrleansSimulationTestingPlatform" BeforeTargets="_GenerateRestoreProjectPathWalk;PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'@(_OrleansSimulationTestingPlatformPackage)' == '' and Exists('$(OrleansSimulationSourceBuildMap)')"
-           Code="CLOG0007"
-           Text="$(MSBuildProjectName) is a simulation test project and references no Microsoft.Orleans.Testing.Simulation.Testing.MTP, the Microsoft Testing Platform integration its test application needs." />
-  </Target>
   <!--
-    Clog's test diagnostics (test/Durable.Storage/Directory.Build.props) run in the test host outside every simulation, so they keep
-    ordinary IL, as do the test-host and simulation-framework assemblies upstream's targets exclude. So does
+    Storage's test diagnostics (test/Durable.Storage/Directory.Build.props) run in the test host outside every simulation,
+    so they keep ordinary IL, as do the test-host assemblies Orleans' simulation targets exclude. So does
     Orleans.Durable.Storage.Diagnostics, which holds the process's fatal-error handler alone, whose interceptor the test
     host installs before every simulation (conventions.md §14): within a simulation it only reads the interceptor and
-    calls it. Coverlet would instrument the IL which Clockwork rewrites, so simulation
-    projects collect no coverage; test/Durable.Storage/eng/coverage.ps1 measures the ordinary suites.
+    calls it. Coverlet would instrument the IL which the simulation rewrites, so simulation projects collect no coverage;
+    test/Durable.Storage/eng/coverage.ps1 measures the ordinary suites.
   -->
   <ItemGroup>
-    <OrleansSimulationExclude Include="Microsoft.Diagnostics.%2A.dll;Orleans.Durable.Storage.Diagnostics.dll" />
+    <OrleansSimulationExclude Include="Orleans.Durable.Storage.Diagnostics.dll" />
     <PackageReference Remove="coverlet.MTP" />
   </ItemGroup>
 
@@ -91,10 +62,10 @@
     reads the Engine's buffer internals, which the Engine grants each simulation test assembly.
   -->
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)..\tests\shared\Simulation\*.cs" LinkBase="Simulation" Visible="false" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\tests\shared\LeakChecks\SimulationLeakCheck.cs;$(MSBuildThisFileDirectory)..\tests\shared\LeakChecks\ArcBufferLeakCheck.cs;$(MSBuildThisFileDirectory)..\tests\shared\LeakChecks\PageRentalSites.cs"
+    <Compile Include="$(MSBuildThisFileDirectory)..\shared\Simulation\*.cs" LinkBase="Simulation" Visible="false" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\shared\LeakChecks\SimulationLeakCheck.cs;$(MSBuildThisFileDirectory)..\shared\LeakChecks\ArcBufferLeakCheck.cs;$(MSBuildThisFileDirectory)..\shared\LeakChecks\PageRentalSites.cs"
              LinkBase="LeakChecks"
              Visible="false" />
-    <ProjectReference Include="$(MSBuildThisFileDirectory)..\tests\Orleans.Durable.Storage.Simulation\Orleans.Durable.Storage.Simulation.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Orleans.Durable.Storage.Simulation\Orleans.Durable.Storage.Simulation.csproj" />
   </ItemGroup>
 </Project>

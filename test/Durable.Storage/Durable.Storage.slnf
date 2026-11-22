@@ -7,6 +7,7 @@
       "src/AWS/Orleans.Durable.Storage.S3/Orleans.Durable.Storage.S3.csproj",
       "src/Azure/Orleans.Durable.Storage.AzureStorage/Orleans.Durable.Storage.AzureStorage.csproj",
       "src/Google/Orleans.Durable.Storage.GoogleCloud/Orleans.Durable.Storage.GoogleCloud.csproj",
+      "src/Orleans.Durable.Storage.CasPaxos/Orleans.Durable.Storage.CasPaxos.csproj",
       "src/Orleans.Durable.Storage.Diagnostics/Orleans.Durable.Storage.Diagnostics.csproj",
       "src/Orleans.Durable.Storage.Engine/Orleans.Durable.Storage.Engine.csproj",
       "src/Orleans.Durable.Storage.FileSystem/Orleans.Durable.Storage.FileSystem.csproj",
@@ -24,6 +25,7 @@
       "test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz.Wal/Orleans.Durable.Storage.Fuzz.Wal.csproj",
       "test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz/Orleans.Durable.Storage.Fuzz.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Architecture.Tests/Orleans.Durable.Storage.Architecture.Tests.csproj",
+      "test/Durable.Storage/Orleans.Durable.Storage.CasPaxos.Tests/Orleans.Durable.Storage.CasPaxos.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Diagnostics.Tests/Orleans.Durable.Storage.Diagnostics.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj",
@@ -40,6 +42,9 @@
       "test/Durable.Storage/Orleans.Durable.Storage.Interop.Tests/Orleans.Durable.Storage.Interop.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Model.Tests/Orleans.Durable.Storage.Model.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Samples.Tests/Orleans.Durable.Storage.Samples.Tests.csproj",
+      "test/Durable.Storage/Orleans.Durable.Storage.Simulation.Conformance.Tests/Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj",
+      "test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj",
+      "test/Durable.Storage/Orleans.Durable.Storage.Simulation/Orleans.Durable.Storage.Simulation.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Testing.Tests/Orleans.Durable.Storage.Testing.Tests.csproj",
       "test/Durable.Storage/Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj"
     ]

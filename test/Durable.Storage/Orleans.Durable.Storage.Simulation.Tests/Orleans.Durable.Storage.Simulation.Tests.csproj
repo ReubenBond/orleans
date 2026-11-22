@@ -29,11 +29,6 @@
     <OrleansSimulationBuiltInRuleSet Include="clockwork.tasks.controlled" />
   </ItemGroup>
 
-  <!-- The test application's Microsoft Testing Platform integration: the simulation's test-host hook. -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Testing.Simulation.Testing.MTP" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
   </ItemGroup>

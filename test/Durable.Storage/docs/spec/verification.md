@@ -669,8 +669,8 @@ network. It is the repository's `Orleans.Testing.Simulation.*` family under `src
 `Microsoft.Orleans.Testing.Simulation.*` packages, built from source with its own build settings
 ([build and packaging §2](build-packaging.md#2-source-and-dependency-policy)). Fast CASPaxos' simulation builds against
 the same projects, so one simulation kernel serves every build: `SimulationClosureTests`,
-over every project's restore graph, checks that each project reaches only that checkout's kernel, and over every
-output, that none holds the legacy kernel's `Clockwork.dll` beside `Orleans.Testing.Simulation.dll`. Renaming the
+over every Storage project's restore graph, checks that each project reaches only the repository's kernel, and over every
+Storage output, that none holds the legacy kernel's `Clockwork.dll` beside `Orleans.Testing.Simulation.dll`. Renaming the
 packages kept the replay format (version 2), the `.cwr.json` artifacts, and the rule, diagnostic, and manifest IDs, so
 the pinned traces replay unchanged.
 
@@ -680,8 +680,8 @@ the runtime which each simulation executable's `runtimeconfig.json` names, .NET 
 built-in rules cover; Clog sets no `OrleansSimulationTargetRuntime`. Each rewritten assembly records the runtimes its
 rules support, and every simulation checks the running runtime against them as it starts, so a roll-forward to another
 runtime fails it with `UnsupportedRuntimeException`. A simulation project sets
-`OrleansSimulationInstrumentedTestProject`, references the Microsoft Testing Platform integration
-(`Microsoft.Orleans.Testing.Simulation.Testing.MTP`), and selects the `clockwork.bcl.deterministic` and
+`OrleansSimulationInstrumentedTestProject`, which brings in the Microsoft Testing Platform integration
+(`Orleans.Testing.Simulation.Testing.MTP`) through `eng/OrleansSimulation.targets`, and selects the `clockwork.bcl.deterministic` and
 `clockwork.tasks.controlled` rule sets. It builds, with the kit and the `src` projects its closure rewrites, in
 `SimulationRelease` or `SimulationDebug`, which compile in the conditional seams of §7.2 ([build and packaging
 §1](build-packaging.md#1-framework-and-toolchain-boundaries)). After an ordinary build, its dependency closure, Clog's
