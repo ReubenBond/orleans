@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Consensus\Orleans.Consensus.CasPaxos.Testing\Orleans.Consensus.CasPaxos.Testing.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Consensus\Orleans.Consensus.CasPaxos.Simulation.Runner\Orleans.Consensus.CasPaxos.Simulation.Runner.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Consensus\Orleans.Consensus.CasPaxos.Simulation\Orleans.Consensus.CasPaxos.Simulation.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Consensus\Orleans.Consensus.CasPaxos.Simulation.Scenarios\Orleans.Consensus.CasPaxos.Simulation.Scenarios.csproj" />
+  </ItemGroup>
+</Project>

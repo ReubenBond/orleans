@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <!--
+    The Microsoft.Orleans.Consensus.CasPaxos family (PROVENANCE.md) is a transport-neutral consensus library rather than an
+    Orleans framework part: it uses neither Orleans code generation, the framework-part attribute, nor the Orleans
+    contracts analyzer. Its packages carry the Durable family's prerelease label until their first release establishes a
+    package-validation baseline.
+  -->
+  <PropertyGroup>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+    <!-- The upstream license notice travels with each package. -->
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+</Project>

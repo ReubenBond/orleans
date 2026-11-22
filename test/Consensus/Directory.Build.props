@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <!-- The consensus family's suites (src/Consensus/PROVENANCE.md) test its net11.0 projects with nullable analysis. -->
+  <PropertyGroup>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsOrleansTestApplication)' == 'true'">
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
+  </ItemGroup>
+</Project>

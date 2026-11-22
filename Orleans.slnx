@@ -72,6 +72,11 @@
     <Project Path="src/Orleans.Durable.Abstractions/Orleans.Durable.Abstractions.csproj" />
     <Project Path="src/Orleans.Durable.Http/Orleans.Durable.Http.csproj" />
   </Folder>
+  <Folder Name="/src/Consensus/">
+    <Project Path="src/Consensus/Orleans.Consensus.CasPaxos/Orleans.Consensus.CasPaxos.csproj" />
+    <Project Path="src/Consensus/Orleans.Consensus.CasPaxos.Server/Orleans.Consensus.CasPaxos.Server.csproj" />
+    <Project Path="src/Consensus/Orleans.Consensus.CasPaxos.Sqlite/Orleans.Consensus.CasPaxos.Sqlite.csproj" />
+  </Folder>
   <Folder Name="/src/Dashboard/">
     <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
     <Project Path="src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.csproj" />
@@ -180,6 +185,16 @@
   </Folder>
   <Folder Name="/templates/">
     <Project Path="templates/Microsoft.Orleans.Templates/Microsoft.Orleans.Templates.csproj" />
+  </Folder>
+  <Folder Name="/test/Consensus/">
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Server.Tests/Orleans.Consensus.CasPaxos.Server.Tests.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Simulation/Orleans.Consensus.CasPaxos.Simulation.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Simulation.Runner/Orleans.Consensus.CasPaxos.Simulation.Runner.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Simulation.Scenarios/Orleans.Consensus.CasPaxos.Simulation.Scenarios.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Simulation.Tests/Orleans.Consensus.CasPaxos.Simulation.Tests.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Sqlite.Tests/Orleans.Consensus.CasPaxos.Sqlite.Tests.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Testing/Orleans.Consensus.CasPaxos.Testing.csproj" />
+    <Project Path="test/Consensus/Orleans.Consensus.CasPaxos.Tests/Orleans.Consensus.CasPaxos.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Dashboard/">
     <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.TestGrains/Orleans.Dashboard.TestGrains.csproj" />

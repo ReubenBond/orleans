@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Consensus\Orleans.Consensus.CasPaxos\Orleans.Consensus.CasPaxos.csproj" />
+  </ItemGroup>
+</Project>

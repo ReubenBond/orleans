@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Consensus.CasPaxos</PackageId>
+    <Description>Transport-neutral Fast CASPaxos protocol kernel: ballots, acceptor and proposer state machines, and quorum rules for linearizable compare-and-swap registers.</Description>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
