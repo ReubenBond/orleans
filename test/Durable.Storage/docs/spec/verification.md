@@ -1658,7 +1658,11 @@ The self-tests' and the doubles' source files define `DEBUG`, so these tests als
 | Milestones | Seed exploration (`just explore`) and schedule exploration (`just explore-schedules`, every simulated conformance class's windows at `DURABLE_STORAGE_SCHEDULE_BOUND=deep`, §4.1); full mutation runs; fuzzing campaigns; emulator integration; extended models; end-to-end tests (`just e2e`) |
 | Final validation | Soak runs; long end-to-end runs |
 
-Every change passes its gate locally while CI is unavailable. Expensive work runs after hours, off the critical path:
+Every change passes its gate locally. Orleans' CI also runs each test project's default tests: its `AssemblyInfo.cs`
+gives them the traits `Area=DurableStorage`, `Provider=None`, and `Suite=BVT`, or `Suite=SlowBVT` for the ledger, WAL,
+simulation, and Orleans composition suites, so the standard test lanes run them in Debug on Linux and Windows. The
+cloud and interop suites' emulator and live-account cases skip there, as they do whenever `DURABLE_STORAGE_EMULATORS`
+is unset; `just emulators` runs them. Expensive work runs after hours, off the critical path:
 mutation runs, seed exploration, fuzzing campaigns, extended model runs, and benchmarks which need a quiet machine run
 in a nightly window, and a pull request lands without waiting for them. Their findings, such as surviving mutants, are
 fixed in follow-up pull requests. Until the implementation is complete, the implementation plan's [decision

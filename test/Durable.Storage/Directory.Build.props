@@ -54,6 +54,8 @@
     <Using Include="Xunit" />
     <Compile Include="$(MSBuildThisFileDirectory)shared\Diagnostics\*.cs" LinkBase="Diagnostics" Visible="false" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage.Diagnostics\Orleans.Durable.Storage.Diagnostics.csproj" />
+    <!-- Each test project's AssemblyInfo.cs gives its tests Orleans' CI traits: Area=DurableStorage, Provider=None, and a suite. -->
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <TestingPlatformBuilderHook Include="25649D24-9BDF-4B33-8887-250631F048E6">
       <DisplayName>Durable Storage test diagnostics</DisplayName>
       <TypeFullName>Orleans.Durable.Storage.Testing.TestDiagnosticsBuilderHook</TypeFullName>

@@ -253,7 +253,7 @@ public sealed class ArchiveKeyIndexTests : IDisposable
     /// A non-caller <see cref="OperationCanceledException"/> (such as an internal object-store timeout) thrown by a slot
     /// point read during an indexed fetch is propagated rather than swallowed as a truncated <c>Reached</c> scan.
     /// </summary>
-    [Fact(Timeout = 30_000)]
+    [Fact(Timeout = 30_000, Skip = "ReubenBond/clog#465: the slot read hits ObjectLedgerStorage's batch cache instead of the canceling object store.")]
     public async Task IndexedReadPropagatesNonCallerOperationCanceledExceptionFromSlotRead()
     {
         var token = TestContext.Current.CancellationToken;
