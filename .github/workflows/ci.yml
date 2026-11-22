@@ -813,6 +813,44 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]
         framework: ${{ matrix.framework }}
+  test-simulation:
+    name: Simulation packaging and lowering
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Cache dependencies
+      uses: ./.github/actions/cache-dependencies
+    - name: Configure test artifacts
+      # Retains staged closures, manifests, and packed feeds for the failure upload below.
+      run: echo "ORLEANS_SIMULATION_TEST_ARTIFACTS=$RUNNER_TEMP/orleans-simulation-artifacts" >> "$GITHUB_ENV"
+    - name: Package smoke tests
+      # Packs the seven simulation packages into an isolated feed, checks their dependency, collision, and ordinary-IL
+      # boundaries, consumes the build package through its MSBuild targets, and installs and runs the tool.
+      env:
+        ORLEANS_SIMULATION_SMOKE_TESTS: "1"
+      run: dotnet run --project test/Simulation/Clockwork.Instrumentation.Tests/Clockwork.Instrumentation.Tests.csproj --configuration Release -- --timeout 900s --filter-namespace Orleans.Testing.Simulation.Instrumentation.Tests.Packaging
+    - name: Conformance (Debug lowering)
+      run: dotnet run --project test/Simulation/Clockwork.Conformance.Tests/Clockwork.Conformance.Tests.csproj --configuration Debug -- --timeout 600s
+    - name: Channel conformance without tiered compilation
+      # Fully optimized framework code inlines small forwarders, so the escape guard's channel exception must not depend on their frames.
+      env:
+        DOTNET_TieredCompilation: '0'
+        DOTNET_ReadyToRun: '0'
+      run: dotnet run --project test/Simulation/Clockwork.Conformance.Tests/Clockwork.Conformance.Tests.csproj --configuration Debug --no-build -- --timeout 600s --filter-class Orleans.Testing.Simulation.Conformance.Tests.ChannelConformanceTests
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      if: failure()
+      with:
+        name: simulation_artifacts
+        retention-days: 7
+        if-no-files-found: ignore
+        path: |
+          ${{ runner.temp }}/orleans-simulation-artifacts/**/*.manifest.json
+          ${{ runner.temp }}/orleans-simulation-artifacts/**/staged/**
+          ${{ runner.temp }}/orleans-simulation-artifacts/**/orleans-simulation/**
   test-codegenerator:
     name: Test Code Generator
     runs-on: ${{ matrix.os }}

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing\Orleans.Testing.Simulation.Testing.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing.MTP\Orleans.Testing.Simulation.Testing.MTP.csproj" />
+  </ItemGroup>
+
+  <Import Project="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Testing.MTP\buildTransitive\Microsoft.Orleans.Testing.Simulation.Testing.MTP.props" />
+</Project>

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>The Orleans simulation command-line tool for deterministic IL instrumentation, explicit scenario recording, exact replay, bounded schedule exploration, trace minimization, and diagnostics. Requires the .NET 11 runtime.</Description>
+    <RootNamespace>Orleans.Testing.Simulation.Tool</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Orleans.Testing.Simulation.Tool</AssemblyName>
+    <TargetFramework>net11.0</TargetFramework>
+
+    <IsPackable>true</IsPackable>
+    <!-- Package validation compares lib/ref framework assets; this package ships its assembly outside them. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-orleans-simulation</ToolCommandName>
+    <PackageId>Microsoft.Orleans.Testing.Simulation.Tool</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>deterministic;testing;replay;schedule-exploration;instrumentation</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Testing.Simulation.Instrumentation\Orleans.Testing.Simulation.Instrumentation.csproj" />
+    <ProjectReference Include="..\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Clockwork.Instrumentation.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

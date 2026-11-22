@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>MSBuild task package that applies Orleans simulation deterministic IL instrumentation to a project's resolved output as an opt-in, out-of-place build step. Set OrleansSimulationInstrumentationEnabled=true to activate. Requires the .NET 11 SDK (dotnet build / dotnet msbuild); the task and its Mono.Cecil-based engine target net11.0 and are not loadable by .NET Framework MSBuild. See docs/compatibility.md.</Description>
+    <RootNamespace>Orleans.Testing.Simulation.Instrumentation.Build</RootNamespace>
+    <AssemblyName>Orleans.Testing.Simulation.Instrumentation.Build</AssemblyName>
+    <TargetFramework>net11.0</TargetFramework>
+
+    <!-- This is a build-time task package: ship the task assembly and its dependencies under
+         tasks/, the props/targets under build/, and advertise no runtime dependencies. -->
+    <IsPackable>true</IsPackable>
+    <!-- Package validation compares lib/ref framework assets; this package ships its assembly outside them. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageId>Microsoft.Orleans.Testing.Simulation.Instrumentation.Build</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MSBuild assemblies are provided by the host; reference them for compile only. -->
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="Runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" ExcludeAssets="Runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The engine and its transitive assemblies are shipped in tasks/, not as package deps. -->
+    <ProjectReference Include="..\Orleans.Testing.Simulation.Instrumentation\Orleans.Testing.Simulation.Instrumentation.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.props" Pack="true" PackagePath="build\" />
+    <None Include="build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.targets" Pack="true" PackagePath="build\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Pack the task assembly and every runtime dependency (engine, kernel, Mono.Cecil) into
+       tasks/net11.0/ so the targets can load them with a single UsingTask AssemblyFile. -->
+  <Target Name="PackOrleansSimulationTaskAssemblies" BeforeTargets="_GetPackageFiles" DependsOnTargets="Build">
+    <ItemGroup>
+      <None Include="$(TargetPath)" Pack="true" PackagePath="tasks/$(TargetFramework)/" />
+      <None Include="@(ReferenceCopyLocalPaths)"
+            Condition="'%(Extension)' == '.dll'"
+            Pack="true"
+            PackagePath="tasks/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+
+</Project>

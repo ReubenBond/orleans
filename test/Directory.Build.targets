@@ -6,6 +6,9 @@
   
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
+  <!-- A simulation test project runs its dependency closure rewritten by the simulation instrumentation (eng/OrleansSimulation.targets). -->
+  <Import Project="$(SourceRoot)eng\OrleansSimulation.targets" Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true'" />
+
   <!-- A run which selects a framework this project doesn't target, such as a framework-selecting dotnet test run, skips it. -->
   <PropertyGroup Condition="'$(TargetFramework)' != '' and '$(TargetFrameworks)' != '' and !$([System.String]::Copy(';$(TargetFrameworks);').Contains(';$(TargetFramework);'))">
     <IsTestProject>false</IsTestProject>

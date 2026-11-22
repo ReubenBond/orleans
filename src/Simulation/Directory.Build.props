@@ -1,0 +1,32 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <!--
+    The Microsoft.Orleans.Testing.Simulation family (PROVENANCE.md) is deterministic-testing infrastructure rather than an
+    Orleans framework part: it uses neither Orleans code generation, the framework-part attribute, nor the Orleans
+    contracts analyzer. Its packages carry the Durable family's prerelease label until their first release establishes a
+    package-validation baseline.
+  -->
+  <PropertyGroup>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
+    <!--
+      The instrumentation engine records its assembly version in manifests and idempotence markers, and the tool reports
+      it, so the family's assembly versions follow the package version rather than Orleans' fixed assembly version.
+    -->
+    <AssemblyVersion></AssemblyVersion>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+</Project>

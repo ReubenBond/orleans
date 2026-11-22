@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fixtures compile with the C# compiler of the SDK that builds Clockwork's consumers, so the async lowering the
+         suite controls is the one they ship. -->
+    <Reference Include="Microsoft.CodeAnalysis" HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll" />
+    <Reference Include="Microsoft.CodeAnalysis.CSharp" HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll" />
+  </ItemGroup>
+
+  <Target Name="RequireSdkCompiler" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll')"
+           Text="The conformance fixtures compile with the SDK's C# compiler, which was not found under '$(RoslynTargetsPath)\bincore'." />
+  </Target>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Instrumentation\Orleans.Testing.Simulation.Instrumentation.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+  </ItemGroup>
+</Project>

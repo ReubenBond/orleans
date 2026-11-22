@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj">
+      <RepositorySourceRole>SimulationKernel</RepositorySourceRole>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="EmbedSimulationKernelProjectPath" BeforeTargets="GetAssemblyAttributes">
+    <ItemGroup>
+      <_SimulationKernelProjectReference
+          Include="@(ProjectReference)"
+          Condition="'%(ProjectReference.RepositorySourceRole)' == 'SimulationKernel'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>SimulationKernelProjectPath</_Parameter1>
+        <_Parameter2>@(_SimulationKernelProjectReference->'%(FullPath)')</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+    <Error Condition="'@(_SimulationKernelProjectReference)' == ''"
+           Text="The simulation kernel ProjectReference must have RepositorySourceRole=SimulationKernel." />
+  </Target>
+</Project>

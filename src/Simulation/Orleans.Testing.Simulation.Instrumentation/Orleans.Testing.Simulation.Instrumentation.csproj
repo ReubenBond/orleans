@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Deterministic Mono.Cecil-based instrumentation engine with versioned rewrite rules, portable-PDB preservation, idempotence markers, deterministic manifests, and built-in BCL and concurrency rule sets. See docs/compatibility.md.</Description>
+    <RootNamespace>Orleans.Testing.Simulation.Instrumentation</RootNamespace>
+    <AssemblyName>Orleans.Testing.Simulation.Instrumentation</AssemblyName>
+    <PackageId>Microsoft.Orleans.Testing.Simulation.Instrumentation</PackageId>
+    <TargetFramework>net11.0</TargetFramework>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Clockwork.Instrumentation.Tests" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

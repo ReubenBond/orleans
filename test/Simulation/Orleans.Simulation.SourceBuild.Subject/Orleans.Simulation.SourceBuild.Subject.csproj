@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Production-shaped code which an instrumented test project's closure includes (Orleans.Simulation.SourceBuild.Tests). -->
+  <PropertyGroup>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+  </PropertyGroup>
+</Project>

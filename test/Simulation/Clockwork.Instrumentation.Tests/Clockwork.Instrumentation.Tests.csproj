@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <!-- Seed the isolated package-smoke feed so trim/AOT/single-file analyzer fixtures restore offline. The version is local:
+         other Orleans projects reference ILLink implicitly, at the SDK's version, and central management cannot name it. -->
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" VersionOverride="11.0.0" PrivateAssets="all" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Instrumentation\Orleans.Testing.Simulation.Instrumentation.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Tool\Orleans.Testing.Simulation.Tool.csproj" />
+  </ItemGroup>
+
+  <!-- The rule-set completeness test enumerates the reference pack this project compiles against. -->
+  <Target Name="EmbedReferencePackDirectory" BeforeTargets="GetAssemblyAttributes">
+    <ItemGroup>
+      <_ClockworkSystemRuntimeReference Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'System.Runtime.dll' and '%(ReferencePath.FrameworkReferenceName)' == 'Microsoft.NETCore.App'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ReferencePackDirectory</_Parameter1>
+        <_Parameter2>@(_ClockworkSystemRuntimeReference->'%(RootDir)%(Directory)')</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+</Project>

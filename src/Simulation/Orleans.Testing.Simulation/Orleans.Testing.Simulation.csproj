@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A deterministic simulation testing framework for distributed systems.</Description>
+    <RootNamespace>Orleans.Testing.Simulation</RootNamespace>
+    <AssemblyName>Orleans.Testing.Simulation</AssemblyName>
+    <PackageId>Microsoft.Orleans.Testing.Simulation</PackageId>
+    <TargetFramework>net11.0</TargetFramework>
+    <PackageTags>simulation;testing;distributed-systems;deterministic;chaos-testing;time-travel</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- SupportedRuntimesMarker reads a loaded assembly's metadata in place. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CW1004 holds every completion in this assembly to SimulationCompletion. -->
+    <ProjectReference Include="..\Orleans.Testing.Simulation.Analyzers\Orleans.Testing.Simulation.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

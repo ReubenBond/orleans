@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup>
+    <TestingPlatformBuilderHook Include="2E7C3A6B-6F8D-4F4B-9D52-1A0D7C8E5B93">
+      <DisplayName>Microsoft.Orleans.Testing.Simulation.Testing.MTP</DisplayName>
+      <TypeFullName>Orleans.Testing.Simulation.Testing.TestingPlatformBuilderHook</TypeFullName>
+    </TestingPlatformBuilderHook>
+  </ItemGroup>
+</Project>

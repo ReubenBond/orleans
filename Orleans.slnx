@@ -130,6 +130,15 @@
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Streaming.Redis/Orleans.Streaming.Redis.csproj" />
   </Folder>
+  <Folder Name="/src/Simulation/">
+    <Project Path="src/Simulation/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Analyzers/Orleans.Testing.Simulation.Analyzers.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Instrumentation/Orleans.Testing.Simulation.Instrumentation.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Instrumentation.Build/Orleans.Testing.Simulation.Instrumentation.Build.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Testing/Orleans.Testing.Simulation.Testing.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Testing.MTP/Orleans.Testing.Simulation.Testing.MTP.csproj" />
+    <Project Path="src/Simulation/Orleans.Testing.Simulation.Tool/Orleans.Testing.Simulation.Tool.csproj" />
+  </Folder>
   <Folder Name="/src/Transactions/">
     <Project Path="src/Orleans.Transactions.TestKit.Base/Orleans.Transactions.TestKit.Base.csproj" />
     <Project Path="src/Orleans.Transactions.TestKit.xUnit/Orleans.Transactions.TestKit.xUnit.csproj" />
@@ -221,6 +230,16 @@
   </Folder>
   <Folder Name="/test/Misc/">
     <Project Path="test/Misc/TestSerializerExternalModels/TestSerializerExternalModels.csproj" />
+  </Folder>
+  <Folder Name="/test/Simulation/">
+    <Project Path="test/Simulation/Clockwork.Analyzers.Tests/Clockwork.Analyzers.Tests.csproj" />
+    <Project Path="test/Simulation/Clockwork.Conformance.Tests/Clockwork.Conformance.Tests.csproj" />
+    <Project Path="test/Simulation/Clockwork.Instrumentation.Tests/Clockwork.Instrumentation.Tests.csproj" />
+    <Project Path="test/Simulation/Clockwork.Runtime.Tests/Clockwork.Runtime.Tests.csproj" />
+    <Project Path="test/Simulation/Clockwork.Testing.Tests/Clockwork.Testing.Tests.csproj" />
+    <Project Path="test/Simulation/Clockwork.Tests/Clockwork.Tests.csproj" />
+    <Project Path="test/Simulation/Orleans.Simulation.SourceBuild.Subject/Orleans.Simulation.SourceBuild.Subject.csproj" />
+    <Project Path="test/Simulation/Orleans.Simulation.SourceBuild.Tests/Orleans.Simulation.SourceBuild.Tests.csproj" />
   </Folder>
   <Folder Name="/test/TestInfrastructure/">
     <Project Path="test/TestInfrastructure/FSharpCodeGenModels/FSharpCodeGenModels.fsproj" />

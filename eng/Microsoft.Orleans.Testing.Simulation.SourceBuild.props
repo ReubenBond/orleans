@@ -1,0 +1,57 @@
+<Project>
+  <!--
+    Side-effect-free source-build inventory for the seven Orleans simulation packages.
+    Importing this file only declares items; it does not add references, imports, or targets.
+  -->
+  <ItemGroup>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation">
+      <PackageId>Microsoft.Orleans.Testing.Simulation</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>SimulationKernel</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Instrumentation">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Instrumentation</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Instrumentation/Orleans.Testing.Simulation.Instrumentation.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Instrumentation</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>InstrumentationRuntime</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Instrumentation.Build">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Instrumentation.Build</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Instrumentation.Build/Orleans.Testing.Simulation.Instrumentation.Build.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Instrumentation.Build</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>InstrumentationBuild</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Analyzers">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Analyzers</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Analyzers/Orleans.Testing.Simulation.Analyzers.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Analyzers</AssemblyName>
+      <TargetFramework>netstandard2.0</TargetFramework>
+      <Role>Analyzer</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Testing">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Testing</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Testing/Orleans.Testing.Simulation.Testing.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Testing</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>TestingSupport</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Testing.MTP">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Testing.MTP</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Testing.MTP/Orleans.Testing.Simulation.Testing.MTP.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Testing.MTP</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>MicrosoftTestingPlatformIntegration</Role>
+    </OrleansSimulationSourceBuildPackage>
+    <OrleansSimulationSourceBuildPackage Include="Microsoft.Orleans.Testing.Simulation.Tool">
+      <PackageId>Microsoft.Orleans.Testing.Simulation.Tool</PackageId>
+      <SourceProject>src/Simulation/Orleans.Testing.Simulation.Tool/Orleans.Testing.Simulation.Tool.csproj</SourceProject>
+      <AssemblyName>Orleans.Testing.Simulation.Tool</AssemblyName>
+      <TargetFramework>net11.0</TargetFramework>
+      <Role>Tool</Role>
+    </OrleansSimulationSourceBuildPackage>
+  </ItemGroup>
+</Project>

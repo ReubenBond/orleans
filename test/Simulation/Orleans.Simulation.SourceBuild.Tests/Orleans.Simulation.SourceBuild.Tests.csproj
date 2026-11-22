@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Proves the source-build opt-in (eng/OrleansSimulation.targets) under Orleans' build: the built-in deterministic rules
+    rewrite this project's dependency closure, while the test assembly and the dependency's own build output keep
+    ordinary IL.
+  -->
+  <PropertyGroup>
+    <OrleansSimulationInstrumentedTestProject>true</OrleansSimulationInstrumentedTestProject>
+    <OrleansSimulationUseBuiltInRules>true</OrleansSimulationUseBuiltInRules>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Simulation.SourceBuild.Subject\Orleans.Simulation.SourceBuild.Subject.csproj" />
+  </ItemGroup>
+
+  <!-- The subject's own build output, which production package closures contain. -->
+  <Target Name="EmbedSubjectBuildOutput" AfterTargets="ResolveProjectReferences" BeforeTargets="GetAssemblyAttributes">
+    <ItemGroup>
+      <_SourceBuildSubjectOutput Include="@(_ResolvedProjectReferencePaths)" Condition="'%(Filename)' == 'Orleans.Simulation.SourceBuild.Subject'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>SourceBuildSubjectOutput</_Parameter1>
+        <_Parameter2>@(_SourceBuildSubjectOutput->'%(FullPath)')</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+    <Error Condition="'@(_SourceBuildSubjectOutput)' == ''" Text="The subject project's build output was not resolved." />
+  </Target>
+</Project>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Microsoft Testing Platform integration for deterministic Orleans simulation test applications, including live progress command-line and output hooks.</Description>
+    <RootNamespace>Orleans.Testing.Simulation.Testing</RootNamespace>
+    <AssemblyName>Orleans.Testing.Simulation.Testing.MTP</AssemblyName>
+    <PackageId>Microsoft.Orleans.Testing.Simulation.Testing.MTP</PackageId>
+    <TargetFramework>net11.0</TargetFramework>
+    <PackageTags>simulation;testing;distributed-systems;deterministic;microsoft-testing-platform</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Testing.Platform" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Testing.Simulation.Testing\Orleans.Testing.Simulation.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="buildTransitive\Microsoft.Orleans.Testing.Simulation.Testing.MTP.props"
+          Pack="true"
+          PackagePath="buildTransitive/Microsoft.Orleans.Testing.Simulation.Testing.MTP.props" />
+    <None Include="buildTransitive\Microsoft.Orleans.Testing.Simulation.Testing.MTP.props"
+          Pack="true"
+          PackagePath="buildMultiTargeting/Microsoft.Orleans.Testing.Simulation.Testing.MTP.props" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="Clockwork.Testing.Tests" />
+  </ItemGroup>
+
+</Project>

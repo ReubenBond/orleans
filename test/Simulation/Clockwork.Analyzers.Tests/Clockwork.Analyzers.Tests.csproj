@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Referenced as a normal assembly (not registered as an analyzer on this project) so the
+         tests can instantiate and drive the analyzer directly over crafted compilations. -->
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Analyzers\Orleans.Testing.Simulation.Analyzers.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Simulation\Orleans.Testing.Simulation.Instrumentation\Orleans.Testing.Simulation.Instrumentation.csproj" />
+  </ItemGroup>
+</Project>

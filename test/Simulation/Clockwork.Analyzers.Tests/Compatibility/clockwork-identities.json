@@ -1,0 +1,124 @@
+{
+  "replay": {
+    "format": "clockwork.replay",
+    "schemaVersion": 2,
+    "simulationSeedProperty": "rootSeed"
+  },
+  "manifests": {
+    "instrumentationSchemaVersion": 3,
+    "closureSchemaVersion": 3,
+    "configurationSchemaVersion": 2,
+    "ruleSetSchemaVersion": 2,
+    "instrumentationEngineName": "Clockwork.Instrumentation",
+    "closureEngineName": "Clockwork.Instrumentation",
+    "rewriteSignatureMetadataKey": "Clockwork.RewriteSignature",
+    "supportedRuntimesMetadataKey": "Clockwork.SupportedRuntimes"
+  },
+  "ruleSets": {
+    "mergedId": "clockwork.merged",
+    "deterministicBcl": {
+      "id": "clockwork.bcl.deterministic",
+      "version": "3.0.0",
+      "ruleIdCount": 27,
+      "ruleIdsSha256": "4ca9cdc8f01694357200ac5bc1bd518663d7092ce71ebc24c3b279f2d40dcf47"
+    },
+    "controlledTasks": {
+      "id": "clockwork.tasks.controlled",
+      "version": "3.0.0",
+      "ruleIdCount": 884,
+      "ruleIdsSha256": "6a30c0586ad69a7fecd6b259f3dccee81c03e5a34a510c577341b0c9f9227193"
+    }
+  },
+  "diagnostics": {
+    "categories": [
+      "Clockwork.Determinism",
+      "Clockwork.Runtime"
+    ],
+    "analyzerIds": [
+      "CW1001",
+      "CW1003",
+      "CW1004"
+    ],
+    "rewriteIds": [
+      {
+        "name": "UnresolvedReplacement",
+        "id": "CWR0001"
+      },
+      {
+        "name": "UnresolvedReference",
+        "id": "CWR0003"
+      },
+      {
+        "name": "SymbolsAbsent",
+        "id": "CWR0004"
+      },
+      {
+        "name": "UnsupportedSymbolForm",
+        "id": "CWR0005"
+      },
+      {
+        "name": "TypeExcluded",
+        "id": "CWR0006"
+      },
+      {
+        "name": "AlreadyRewritten",
+        "id": "CWR0007"
+      },
+      {
+        "name": "IncompatibleRewriteVersion",
+        "id": "CWR0008"
+      },
+      {
+        "name": "ValidationFailed",
+        "id": "CWR0009"
+      },
+      {
+        "name": "RuntimeOutOfRange",
+        "id": "CWR0010"
+      },
+      {
+        "name": "MixedModeAssembly",
+        "id": "CWR0011"
+      },
+      {
+        "name": "ReplacementContractMismatch",
+        "id": "CWR0012"
+      },
+      {
+        "name": "RuntimeAsyncMethod",
+        "id": "CWR0013"
+      },
+      {
+        "name": "ReadyToRunStripped",
+        "id": "CWR0101"
+      },
+      {
+        "name": "StrongNameReSignRequired",
+        "id": "CWR0102"
+      },
+      {
+        "name": "StrongNameReSigned",
+        "id": "CWR0103"
+      },
+      {
+        "name": "AuthenticodeDropped",
+        "id": "CWR0104"
+      },
+      {
+        "name": "StrongNameStripped",
+        "id": "CWR0105"
+      },
+      {
+        "name": "UncontrolledTaskReturn",
+        "id": "CWR0200"
+      },
+      {
+        "name": "AwaitableResolutionFailed",
+        "id": "CWR0201"
+      }
+    ]
+  },
+  "integration": {
+    "progressOutputAppContextKey": "Orleans.Testing.Simulation.ProgressOutput"
+  }
+}

@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <!--
+    The simulation family's suites (src/Simulation/PROVENANCE.md) test the net11.0 kernel with nullable analysis. They run
+    under workstation garbage collection, as upstream does: their memory and leak oracles measure the heap with
+    GC.GetTotalMemory and per-thread allocation counters, whose readings server collection's per-core heaps distort.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net11.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsOrleansTestApplication)' == 'true'">
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,191 @@
+<Project>
+
+  <!--
+    Microsoft.Orleans.Testing.Simulation.Instrumentation.Build - targets.
+
+    Loads the OrleansSimulationInstrumentTask from tasks/net11.0 and runs it out-of-place after Build,
+    but only when OrleansSimulationInstrumentationEnabled=true. Requires the .NET 11 SDK: the task
+    assembly and its Mono.Cecil-based engine target net11.0 and cannot be loaded by .NET
+    Framework MSBuild (Visual Studio's classic msbuild.exe). Use `dotnet build`/`dotnet msbuild`.
+  -->
+
+  <PropertyGroup>
+    <OrleansSimulationInstrumentationTaskAssembly Condition="'$(OrleansSimulationInstrumentationTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net11.0\Orleans.Testing.Simulation.Instrumentation.Build.dll</OrleansSimulationInstrumentationTaskAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationInstrumentTask"
+             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)" />
+  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationValidateInstrumentedTestTask"
+             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)" />
+
+  <PropertyGroup>
+    <!-- A simulation test project always instruments, but rule-set selection remains explicit. -->
+    <OrleansSimulationInstrumentationEnabled Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">true</OrleansSimulationInstrumentationEnabled>
+
+    <!-- The resolved application output directory to instrument (defaults to this project's output). -->
+    <OrleansSimulationUninstrumentedTestDirectory Condition="'$(OrleansSimulationUninstrumentedTestDirectory)' == ''">$(IntermediateOutputPath)orleans-simulation\source\</OrleansSimulationUninstrumentedTestDirectory>
+    <OrleansSimulationUninstrumentedTestDirectoryFullPath>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(OrleansSimulationUninstrumentedTestDirectory)))</OrleansSimulationUninstrumentedTestDirectoryFullPath>
+    <OrleansSimulationSourceDirectory Condition="'$(OrleansSimulationSourceDirectory)' == '' and '$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">$(OrleansSimulationUninstrumentedTestDirectoryFullPath)</OrleansSimulationSourceDirectory>
+    <OrleansSimulationSourceDirectory Condition="'$(OrleansSimulationSourceDirectory)' == ''">$(TargetDir)</OrleansSimulationSourceDirectory>
+    <OrleansSimulationEntryAssemblyName Condition="'$(OrleansSimulationEntryAssemblyName)' == ''">$(TargetName)</OrleansSimulationEntryAssemblyName>
+
+    <!-- OrleansSimulationTargetRuntime (major.minor) names the runtime rules are evaluated against. When it is empty and the
+         configuration file names none, the task derives it from the closure's runtimeconfig.json, which names the
+         runtime the host runs the code on; the target framework does not when the app rolls forward. -->
+
+    <!--
+      Out-of-place staging and manifest defaults. These are defined here (not in the .props file)
+      because they depend on $(IntermediateOutputPath), which the SDK only computes after package
+      .props are imported. Both remain overridable by the consuming project.
+    -->
+    <!-- Out-of-place staging under obj; the task fully owns and recreates this directory. -->
+    <OrleansSimulationStagingDirectory Condition="'$(OrleansSimulationStagingDirectory)' == ''">$(IntermediateOutputPath)orleans-simulation\instrumented\</OrleansSimulationStagingDirectory>
+    <OrleansSimulationStagingDirectoryFullPath>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(OrleansSimulationStagingDirectory)))</OrleansSimulationStagingDirectoryFullPath>
+    <OrleansSimulationStagedTargetPath>$([MSBuild]::NormalizePath($(OrleansSimulationStagingDirectoryFullPath), $(TargetFileName)))</OrleansSimulationStagedTargetPath>
+
+    <!-- Manifest lives outside the staged closure so it never ships with the app. -->
+    <OrleansSimulationManifestPath Condition="'$(OrleansSimulationManifestPath)' == ''">$(IntermediateOutputPath)orleans-simulation\orleans-simulation.manifest.json</OrleansSimulationManifestPath>
+
+    <!-- Written atomically only after the entire closure has been instrumented successfully. -->
+    <OrleansSimulationSuccessPath Condition="'$(OrleansSimulationSuccessPath)' == ''">$(IntermediateOutputPath)orleans-simulation\orleans-simulation.$(OrleansSimulationInstrumentationMode).success</OrleansSimulationSuccessPath>
+    <OrleansSimulationModeStampPath Condition="'$(OrleansSimulationModeStampPath)' == ''">$(IntermediateOutputPath)orleans-simulation\orleans-simulation.mode</OrleansSimulationModeStampPath>
+
+    <!-- Auto-discover a project-adjacent config file when the consumer has not set one. -->
+    <OrleansSimulationConfigurationPath Condition="'$(OrleansSimulationConfigurationPath)' == '' and Exists('$(MSBuildProjectDirectory)\orleans-simulation.config.json')">$(MSBuildProjectDirectory)\orleans-simulation.config.json</OrleansSimulationConfigurationPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true'">
+    <!-- The runner executes before a simulation exists. Keep test-host implementation outside the
+         simulated closure while rewriting the test assembly and every application dependency. -->
+    <OrleansSimulationExclude Include="Microsoft.Testing%2A.dll" />
+    <OrleansSimulationExclude Include="Microsoft.TestPlatform%2A.dll" />
+    <OrleansSimulationExclude Include="Microsoft.ApplicationInsights.dll" />
+    <OrleansSimulationExclude Include="Microsoft.Bcl.AsyncInterfaces.dll" />
+    <OrleansSimulationExclude Include="xunit%2A.dll" />
+    <OrleansSimulationExclude Include="nunit%2A.dll" />
+    <OrleansSimulationExclude Include="MSTest%2A.dll" />
+    <OrleansSimulationExclude Include="TUnit%2A.dll" />
+    <OrleansSimulationExclude Include="testhost.dll" />
+    <OrleansSimulationExclude Include="Orleans.Testing.Simulation%2A.dll" />
+    <OrleansSimulationExclude Include="%2A.Testing.dll" />
+    <OrleansSimulationExclude Include="$(TargetFileName)" />
+    <AssemblyMetadata Include="OrleansSimulationInstrumentationOutputPath" Value="$(OrleansSimulationStagingDirectoryFullPath)" />
+    <AssemblyMetadata Include="OrleansSimulationManifestPath" Value="$(OrleansSimulationManifestPath)" />
+    <AssemblyMetadata Include="OrleansSimulationProjectDirectory" Value="$(MSBuildProjectDirectory)" />
+    <AssemblyMetadata Include="OrleansSimulationIntermediateOutputPath" Value="$(IntermediateOutputPath)" />
+  </ItemGroup>
+
+  <Target Name="OrleansSimulationValidateInstrumentedTestConfiguration"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">
+    <Error Condition="'$(OutputType)' != 'Exe'"
+           Text="Orleans simulation instrumented test projects must be executable test applications (OutputType=Exe)." />
+    <Error Condition="'@(OrleansSimulationRuleSet)' == '' and '@(OrleansSimulationBuiltInRuleSet)' == '' and '$(OrleansSimulationConfigurationPath)' == ''"
+           Text="Orleans simulation instrumented test projects must select at least one @(OrleansSimulationRuleSet) or @(OrleansSimulationBuiltInRuleSet)." />
+  </Target>
+
+  <!-- A previous successful simulation build leaves rewritten files in bin. Restore its pristine
+       snapshot before the next build so incremental compilation and mode changes start from normal IL. -->
+  <Target Name="OrleansSimulationRestoreUninstrumentedTestClosure"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != '' and Exists('$(OrleansSimulationUninstrumentedTestDirectoryFullPath)')">
+    <ItemGroup>
+      <_OrleansSimulationPristineFile Include="$(OrleansSimulationUninstrumentedTestDirectoryFullPath)**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)" />
+    <Copy SourceFiles="@(_OrleansSimulationPristineFile)"
+          DestinationFiles="@(_OrleansSimulationPristineFile->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
+  <!-- Snapshot the complete ordinary test output before rewriting it out of place. -->
+  <Target Name="OrleansSimulationCaptureUninstrumentedTestClosure"
+          AfterTargets="Build"
+          BeforeTargets="OrleansSimulationInstrument"
+          Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">
+    <ItemGroup>
+      <_OrleansSimulationOrdinaryTestFile Include="$(TargetDir)**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(OrleansSimulationUninstrumentedTestDirectoryFullPath)" />
+    <MakeDir Directories="$(OrleansSimulationUninstrumentedTestDirectoryFullPath)" />
+    <Copy SourceFiles="@(_OrleansSimulationOrdinaryTestFile)"
+          DestinationFiles="@(_OrleansSimulationOrdinaryTestFile->'$(OrleansSimulationUninstrumentedTestDirectoryFullPath)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
+  <Target Name="OrleansSimulationWriteInstrumentationModeStamp"
+          BeforeTargets="OrleansSimulationInstrument"
+          Condition="'$(OrleansSimulationInstrumentationEnabled)' == 'true'">
+    <ReadLinesFromFile File="$(OrleansSimulationModeStampPath)"
+                       Condition="Exists('$(OrleansSimulationModeStampPath)')">
+      <Output TaskParameter="Lines" PropertyName="OrleansSimulationPreviousInstrumentationMode" />
+    </ReadLinesFromFile>
+    <Delete Files="$(OrleansSimulationSuccessPath);$(OrleansSimulationManifestPath)"
+            Condition="'$(OrleansSimulationPreviousInstrumentationMode)' != '' and '$(OrleansSimulationPreviousInstrumentationMode)' != '$(OrleansSimulationInstrumentationMode)'" />
+    <WriteLinesToFile File="$(OrleansSimulationModeStampPath)"
+                      Lines="$(OrleansSimulationInstrumentationMode)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <!-- Always invoke the task when enabled; its content-hash cache validates the complete staged closure. -->
+  <Target Name="OrleansSimulationInstrument"
+          AfterTargets="Build"
+          Condition="'$(OrleansSimulationInstrumentationEnabled)' == 'true'">
+
+    <Message Importance="high" Text="Orleans simulation: instrumenting '$(OrleansSimulationSourceDirectory)' -> '$(OrleansSimulationStagingDirectory)'" />
+
+    <OrleansSimulationInstrumentTask
+        SourceDirectory="$(OrleansSimulationSourceDirectory)"
+        StagingDirectory="$(OrleansSimulationStagingDirectory)"
+        ConfigurationPath="$(OrleansSimulationConfigurationPath)"
+        RuleSetPaths="@(OrleansSimulationRuleSet)"
+        BuiltInRuleSets="@(OrleansSimulationBuiltInRuleSet)"
+        BuiltInIncludeFamilies="@(OrleansSimulationBuiltInInclude)"
+        BuiltInExcludeFamilies="@(OrleansSimulationBuiltInExclude)"
+        IncludePatterns="@(OrleansSimulationInclude)"
+        ExcludePatterns="@(OrleansSimulationExclude)"
+        InstrumentationMode="$(OrleansSimulationInstrumentationMode)"
+        TargetRuntime="$(OrleansSimulationTargetRuntime)"
+        EntryAssemblyName="$(OrleansSimulationEntryAssemblyName)"
+        ManifestPath="$(OrleansSimulationManifestPath)"
+        CachePath="$(OrleansSimulationSuccessPath)">
+      <Output TaskParameter="ResolvedManifestPath" PropertyName="OrleansSimulationResolvedManifestPath" />
+      <Output TaskParameter="WasIncremental" PropertyName="OrleansSimulationWasIncremental" />
+    </OrleansSimulationInstrumentTask>
+
+    <Message Importance="normal" Text="Orleans simulation: manifest at '$(OrleansSimulationResolvedManifestPath)' (incremental: $(OrleansSimulationWasIncremental))" />
+  </Target>
+
+  <Target Name="OrleansSimulationValidateInstrumentedTestOutput"
+          AfterTargets="OrleansSimulationInstrument"
+          Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">
+    <Error Condition="!Exists('$(OrleansSimulationSuccessPath)')"
+           Text="Orleans simulation instrumented test output is incomplete: success marker '$(OrleansSimulationSuccessPath)' was not found. Build without --no-build first." />
+    <Error Condition="!Exists('$(OrleansSimulationManifestPath)')"
+           Text="Orleans simulation instrumented test output is incomplete: manifest '$(OrleansSimulationManifestPath)' was not found. Build without --no-build first." />
+    <Error Condition="!Exists('$(OrleansSimulationStagedTargetPath)')"
+           Text="Orleans simulation staged test entry assembly '$(OrleansSimulationStagedTargetPath)' was not found. Build without --no-build first." />
+
+    <OrleansSimulationValidateInstrumentedTestTask
+        StagingDirectory="$(OrleansSimulationStagingDirectoryFullPath)"
+        ManifestPath="$(OrleansSimulationManifestPath)"
+        EntryAssemblyName="$(TargetFileName)" />
+  </Target>
+
+  <!-- Deploy only into this simulation project's test-output copy. Production project outputs and
+       every non-opted-in test project remain ordinary IL, including no-build test executions. -->
+  <Target Name="OrleansSimulationDeployInstrumentedTestClosure"
+          AfterTargets="OrleansSimulationInstrument"
+          DependsOnTargets="OrleansSimulationValidateInstrumentedTestOutput"
+          Condition="'$(OrleansSimulationInstrumentedTestProject)' == 'true' and '$(TargetFramework)' != ''">
+    <ItemGroup>
+      <_OrleansSimulationInstrumentedTestFile Include="$(OrleansSimulationStagingDirectoryFullPath)**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(TargetDir)" />
+    <MakeDir Directories="$(TargetDir)" />
+    <Copy SourceFiles="@(_OrleansSimulationInstrumentedTestFile)"
+          DestinationFiles="@(_OrleansSimulationInstrumentedTestFile->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Message Importance="high"
+             Text="Orleans simulation: deployed the instrumented test closure to '$(TargetDir)'." />
+  </Target>
+
+</Project>

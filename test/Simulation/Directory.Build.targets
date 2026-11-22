@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildTargetsPath Condition="'$(_DirectoryBuildTargetsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildTargetsFile)'))</_ParentDirectoryBuildTargetsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
+
+  <!--
+    The simulation family's suites run test collections in parallel, as upstream does: their isolation collections are
+    designed for it, and a conformance oracle fails under sequential order (ReubenBond/Clockwork#79). This configuration
+    replaces Orleans' sequential test/testconfig.json and otherwise matches it.
+  -->
+  <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
+    <None Remove="$(SourceRoot)test\testconfig.json" />
+    <None Include="$(MSBuildThisFileDirectory)testconfig.json"
+          Link="testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

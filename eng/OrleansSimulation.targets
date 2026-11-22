@@ -1,0 +1,51 @@
+<Project>
+  <!--
+    A test project which sets OrleansSimulationInstrumentedTestProject=true runs its dependency closure rewritten by the
+    Orleans simulation instrumentation (src/Simulation). test/Directory.Build.targets imports this file for such a project
+    after the SDK's targets, where the instrumentation targets find the project's output paths. It supplies, from source,
+    what the simulation packages supply a package consumer: the kernel and its framework-neutral and Microsoft Testing
+    Platform test support, the Microsoft Testing Platform builder hook, and the props and targets of
+    Microsoft.Orleans.Testing.Simulation.Instrumentation.Build, whose task assembly this build compiles. The project selects
+    its rule sets (OrleansSimulationUseBuiltInRules, OrleansSimulationBuiltInRuleSet, or OrleansSimulationRuleSet) and
+    excludes, with OrleansSimulationExclude, the dependencies which keep ordinary IL.
+  -->
+  <PropertyGroup>
+    <_OrleansSimulationFamilyDirectory>$(MSBuildThisFileDirectory)..\src\Simulation\</_OrleansSimulationFamilyDirectory>
+    <OrleansSimulationInstrumentationBuildDirectory>$(_OrleansSimulationFamilyDirectory)Orleans.Testing.Simulation.Instrumentation.Build\</OrleansSimulationInstrumentationBuildDirectory>
+    <!-- net11.0 is the task project's own target framework; it builds in the test project's configuration. -->
+    <OrleansSimulationInstrumentationTaskAssembly>$(OrleansSimulationInstrumentationBuildDirectory)bin\$(Configuration)\net11.0\Orleans.Testing.Simulation.Instrumentation.Build.dll</OrleansSimulationInstrumentationTaskAssembly>
+  </PropertyGroup>
+
+  <!--
+    The task assembly is built in this repository, so each instrumentation runs in a task host process which exits
+    afterwards: a long-lived MSBuild node would lock the assembly and keep running a stale build of it. MSBuild uses the
+    first UsingTask registered for a task name, so these take precedence over those in the imported targets.
+  -->
+  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationInstrumentTask"
+             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)"
+             TaskFactory="TaskHostFactory" />
+  <UsingTask TaskName="Orleans.Testing.Simulation.Instrumentation.Build.OrleansSimulationValidateInstrumentedTestTask"
+             AssemblyFile="$(OrleansSimulationInstrumentationTaskAssembly)"
+             TaskFactory="TaskHostFactory" />
+
+  <Import Project="$(OrleansSimulationInstrumentationBuildDirectory)build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.props" />
+  <Import Project="$(OrleansSimulationInstrumentationBuildDirectory)build\Microsoft.Orleans.Testing.Simulation.Instrumentation.Build.targets" />
+  <Import Project="$(_OrleansSimulationFamilyDirectory)Orleans.Testing.Simulation.Testing.MTP\buildTransitive\Microsoft.Orleans.Testing.Simulation.Testing.MTP.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="$(_OrleansSimulationFamilyDirectory)Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+    <ProjectReference Include="$(_OrleansSimulationFamilyDirectory)Orleans.Testing.Simulation.Testing\Orleans.Testing.Simulation.Testing.csproj" />
+    <ProjectReference Include="$(_OrleansSimulationFamilyDirectory)Orleans.Testing.Simulation.Testing.MTP\Orleans.Testing.Simulation.Testing.MTP.csproj" />
+
+    <!-- Orders the build of the task assembly before instrumentation; nothing of it is referenced or deployed. -->
+    <ProjectReference Include="$(OrleansSimulationInstrumentationBuildDirectory)Orleans.Testing.Simulation.Instrumentation.Build.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+
+    <!--
+      Test-host infrastructure keeps ordinary IL: Orleans' test traits, which the test host reads outside every
+      simulation, and the diagnostics client which the hang and crash dump extensions (test/Directory.Build.props) use.
+    -->
+    <OrleansSimulationExclude Include="TestUtilities.dll;Microsoft.Diagnostics.%2A.dll" />
+  </ItemGroup>
+</Project>

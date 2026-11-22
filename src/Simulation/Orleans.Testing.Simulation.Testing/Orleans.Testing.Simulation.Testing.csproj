@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Framework-neutral test helpers for deterministic Orleans simulation scenarios, including in-memory log capture, stable test identity seeds, failure artifacts, and environment-driven replay.</Description>
+    <RootNamespace>Orleans.Testing.Simulation.Testing</RootNamespace>
+    <AssemblyName>Orleans.Testing.Simulation.Testing</AssemblyName>
+    <PackageId>Microsoft.Orleans.Testing.Simulation.Testing</PackageId>
+    <TargetFramework>net11.0</TargetFramework>
+    <PackageTags>simulation;testing;distributed-systems;deterministic</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Testing.Simulation\Orleans.Testing.Simulation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="Clockwork.Testing.Tests" />
+  </ItemGroup>
+
+</Project>
