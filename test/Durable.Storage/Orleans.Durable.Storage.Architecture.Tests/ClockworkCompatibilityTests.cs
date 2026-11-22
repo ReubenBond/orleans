@@ -199,7 +199,7 @@ public sealed class ClockworkCompatibilityTests
                 $"Clog assembly {entry.Assembly} may not appear in ReviewedPackageIncompatibilities."));
 
         var references = SimulationClosureTests.ProjectReferences(
-            Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Architecture.Tests", "Orleans.Durable.Storage.Architecture.Tests.csproj"));
+            Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests", "Orleans.Durable.Storage.Architecture.Tests.csproj"));
         var rewritten = new SortedSet<string>(StringComparer.Ordinal);
         var matchedReviews = new HashSet<(string Assembly, string Type, string Construct)>();
         var violations = new List<string>();
@@ -207,7 +207,7 @@ public sealed class ClockworkCompatibilityTests
         foreach (var project in SimulationClosureTests.SimulationProjects())
         {
             Assert.True(references.Contains(Path.GetFullPath(project)), $"Orleans.Durable.Storage.Architecture.Tests does not reference {project}.");
-            var (manifest, directory) = SimulationClosureTests.ClockworkOutput(Repository.SimulationOutputAssembly(project));
+            var (manifest, directory) = SimulationClosureTests.ClockworkOutput(project);
             foreach (var assembly in SimulationClosureTests.RewrittenAssemblies(manifest))
             {
                 var name = Path.GetFileNameWithoutExtension(assembly);

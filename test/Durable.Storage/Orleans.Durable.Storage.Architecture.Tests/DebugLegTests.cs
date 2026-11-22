@@ -16,15 +16,12 @@ public sealed partial class DebugLegTests
     [Fact]
     public void EveryComponentWhoseCodeHoldsDebugAssertionsIsReachedByTheDebugLeg()
     {
-        var root = Repository.FindRoot();
         var map = Components.Production;
         var leg = Directory
-            .EnumerateFiles(Path.Combine(root, "tests"), "*.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(Repository.StorageRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(static project => XDocument.Load(project).Descendants("ClogDebugLeg").Any(static element => element.Value.Trim() == "true"))
             .ToList();
-        var asserting = Directory
-            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(file => !IsBuildOutput(Path.GetRelativePath(Path.Combine(root, "src"), file)))
+        var asserting = Repository.ProductionSourceFiles("*.cs")
             .Where(static file => DebugAssertion().IsMatch(File.ReadAllText(file)))
             .Select(static file => Components.OfSource(file)?.Name ?? throw new InvalidOperationException($"{file} declares no type."))
             .ToHashSet(StringComparer.Ordinal);
@@ -50,8 +47,6 @@ public sealed partial class DebugLegTests
         var assemblies = Reached([project]).Select(Path.GetFileNameWithoutExtension).ToHashSet(StringComparer.Ordinal);
         return map.ByName.Values.Where(component => assemblies.Contains(component.Assembly)).Select(static component => component.Name);
     }
-    private static bool IsBuildOutput(string relativePath) =>
-        relativePath.Split(Path.DirectorySeparatorChar)[0] is "bin" or "obj";
 
     /// <summary>
     /// Returns every project <paramref name="projects"/> reference, directly or transitively, with themselves.
@@ -67,16 +62,15 @@ public sealed partial class DebugLegTests
                 continue;
             }
 
-            var directory = Path.GetDirectoryName(project)!;
             foreach (var include in XDocument.Load(project).Descendants("ProjectReference").Select(static element => element.Attribute("Include")?.Value))
             {
-                // A reference through an MSBuild property or a wildcard names no single file this check can follow.
-                if (include is null || include.Contains("$(", StringComparison.Ordinal) || include.Contains('*', StringComparison.Ordinal))
+                // A wildcard names no single file this check can follow.
+                if (include is null || include.Contains('*', StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                var reference = Path.GetFullPath(Path.Combine(directory, include.Replace('\\', Path.DirectorySeparatorChar)));
+                var reference = Repository.ResolveInclude(project, include);
                 if (File.Exists(reference))
                 {
                     pending.Push(reference);

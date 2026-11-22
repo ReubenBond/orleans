@@ -10,7 +10,7 @@ internal static class SpecReadme
     /// </summary>
     public static IReadOnlyList<string[]> Table(string anchor, string[] columns)
     {
-        var lines = File.ReadAllLines(Path.Combine(Repository.FindRoot(), "docs", "spec", "README.md"));
+        var lines = File.ReadAllLines(Path.Combine(Repository.StorageRoot, "docs", "spec", "README.md"));
         var anchorLine = Array.FindIndex(lines, line => line.StartsWith(anchor, StringComparison.Ordinal));
         if (anchorLine < 0)
         {

@@ -27,11 +27,8 @@ public sealed class SimulationClosureTests
 
     private const string FixtureLayer = "Orleans.Durable.Storage.Architecture.Tests.SimulationFixtures";
 
-    /// <summary>Clog's Clockwork, the one checkout which supplies every simulation package of a build.</summary>
-    private const string StandaloneClockwork = "vendor/Clockwork/";
-
-    /// <summary>The simulation kernel's project in Clog's Clockwork.</summary>
-    private const string SimulationKernel = StandaloneClockwork + "src/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj";
+    /// <summary>The simulation kernel's project, the one which supplies every simulation of a build.</summary>
+    private const string SimulationKernel = "src/Simulation/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj";
 
     private const string SimulationKernelAssembly = "Orleans.Testing.Simulation.dll";
 
@@ -76,14 +73,14 @@ public sealed class SimulationClosureTests
     [Fact]
     public void RewrittenAssembliesReferenceOnlyAbstractionsWhichRunUnderTheScheduler()
     {
-        var references = ProjectReferences(Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Architecture.Tests", "Orleans.Durable.Storage.Architecture.Tests.csproj"));
+        var references = ProjectReferences(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests", "Orleans.Durable.Storage.Architecture.Tests.csproj"));
         var rewritten = new SortedSet<string>(StringComparer.Ordinal);
         var escapes = new List<string>();
         foreach (var project in SimulationProjects())
         {
             // The reference orders the simulation project's build, and so its rewrite, before this test's.
             Assert.True(references.Contains(Path.GetFullPath(project)), $"Orleans.Durable.Storage.Architecture.Tests does not reference {project}.");
-            var (manifest, directory) = ClockworkOutput(Repository.SimulationOutputAssembly(project));
+            var (manifest, directory) = ClockworkOutput(project);
             foreach (var assembly in RewrittenAssemblies(manifest))
             {
                 var name = Path.GetFileNameWithoutExtension(assembly);
@@ -111,7 +108,7 @@ public sealed class SimulationClosureTests
     [Fact]
     public void TheSimulationKitReferencesNoHostingType()
     {
-        var kit = Repository.SimulationOutputAssembly(Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Simulation", "Orleans.Durable.Storage.Simulation.csproj"));
+        var kit = Repository.SimulationOutputAssembly(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Simulation", "Orleans.Durable.Storage.Simulation.csproj"));
         var violations = new List<string>();
         foreach (var type in MetadataReferences.Scan(kit, static _ => true))
         {
@@ -137,9 +134,8 @@ public sealed class SimulationClosureTests
     [Fact]
     public void SimulationsNameNoRealDiskEntryPoint()
     {
-        var root = Repository.FindRoot();
         var assemblies = SimulationProjects()
-            .Append(Path.Combine(root, "tests", "Orleans.Durable.Storage.Simulation", "Orleans.Durable.Storage.Simulation.csproj"))
+            .Append(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Simulation", "Orleans.Durable.Storage.Simulation.csproj"))
             .Select(Repository.SimulationOutputAssembly)
             .ToArray();
         Assert.All(assemblies, static assembly => Assert.True(File.Exists(assembly), $"{assembly} does not exist."));
@@ -197,7 +193,7 @@ public sealed class SimulationClosureTests
     [Fact]
     public void ARecordingFileSystemOpensThePortableFilesWithoutReachingTheRealDisk()
     {
-        var walTests = Repository.OutputAssembly(Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Engine.Wal.Tests", "Orleans.Durable.Storage.Engine.Wal.Tests.csproj"));
+        var walTests = Repository.OutputAssembly(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Engine.Wal.Tests", "Orleans.Durable.Storage.Engine.Wal.Tests.csproj"));
         Assert.True(File.Exists(walTests), $"{walTests} has not been built.");
         var recording = MetadataReferences.Scan(walTests, static ns => ns == "Orleans.Durable.Storage.Testing")
             .Where(static type => type.FullName.Split('+')[0] == "Orleans.Durable.Storage.Testing.RecordingFileSystem")
@@ -303,54 +299,53 @@ public sealed class SimulationClosureTests
     }
 
     /// <summary>
-    /// One simulation kernel per build: every project which reaches the Microsoft.Orleans.Testing.Simulation packages
-    /// reaches them in Clog's Clockwork (<c>vendor/Clockwork</c>), Fast CASPaxos' simulation and testing projects among
-    /// them through <c>vendor/Orleans.Consensus.CasPaxos.Embedding.props</c>, and no project reaches another Clockwork
-    /// checkout, such as the one Fast CASPaxos' own submodule pins, or the legacy kernel's project. Each project's
-    /// restore records every project it reaches, so the check reads the assets of every project which has them, and
-    /// requires those of the adapter's tests and the simulation tests, which a restore of Clog.slnx writes.
+    /// One simulation kernel per build: every Storage project which reaches the Microsoft.Orleans.Testing.Simulation
+    /// kernel reaches the repository's (src/Simulation), the CASPaxos adapter's tests through the consensus family's
+    /// simulation and testing projects among them, and none reaches another kernel's project, such as an imported
+    /// Clockwork checkout's or the legacy kernel's. Each project's restore records every project it reaches, so the check
+    /// reads the assets of every Storage project which has them, and requires those of the adapter's tests and the
+    /// simulation tests, which a restore of Orleans.slnx writes.
     /// </summary>
     [Fact]
     public void EveryProjectReachesOnlyOneSimulationKernel()
     {
         var root = Repository.FindRoot();
-        var reached = Directory.EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
-            .Where(file => Path.GetRelativePath(root, file).Split(Path.DirectorySeparatorChar)[0] is "src" or "tests" or "fuzz" or "benchmarks" or "apphost")
+        var reached = Repository.StorageProjectFiles()
             .Select(file => (Project: Path.GetFileNameWithoutExtension(file), Reached: ReachedProjects(root, file)))
             .Where(static project => project.Reached is not null)
             .ToDictionary(static project => project.Project, static project => project.Reached!, StringComparer.Ordinal);
 
         Assert.SkipUnless(
             reached.ContainsKey("Orleans.Durable.Storage.CasPaxos.Tests") && reached.ContainsKey("Orleans.Durable.Storage.Simulation.Tests"),
-            "Restore Clog.slnx (just restore) so every project's assets exist.");
+            "Restore Orleans.slnx so every project's assets exist.");
         Assert.Contains(SimulationKernel, reached["Orleans.Durable.Storage.CasPaxos.Tests"]);
         Assert.Contains(SimulationKernel, reached["Orleans.Durable.Storage.Simulation.Tests"]);
         Assert.Empty(OtherKernels(reached));
     }
 
     [Fact]
-    public void TheKernelCheckFindsAProjectWhichReachesAnotherClockwork() =>
+    public void TheKernelCheckFindsAProjectWhichReachesAnotherKernel() =>
         Assert.Equal(
-            ["Embedded: vendor/fast-caspaxos/vendor/Clockwork/src/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj", "Legacy: vendor/Clockwork/src/Clockwork/Clockwork.csproj"],
+            ["Embedded: vendor/Clockwork/src/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj", "Legacy: vendor/Clockwork/src/Clockwork/Clockwork.csproj"],
             OtherKernels(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
             {
-                ["Clogs"] = [SimulationKernel, "src/Orleans.Durable.Storage.Engine.Wal/Orleans.Durable.Storage.Engine.Wal.csproj"],
-                ["Embedded"] = [SimulationKernel, "vendor/fast-caspaxos/vendor/Clockwork/src/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj"],
-                ["Legacy"] = [StandaloneClockwork + "src/Clockwork/Clockwork.csproj"],
+                ["Storage"] = [SimulationKernel, "src/Orleans.Durable.Storage.Engine/Orleans.Durable.Storage.Engine.csproj"],
+                ["Embedded"] = [SimulationKernel, "vendor/Clockwork/src/Orleans.Testing.Simulation/Orleans.Testing.Simulation.csproj"],
+                ["Legacy"] = ["vendor/Clockwork/src/Clockwork/Clockwork.csproj"],
             }));
 
     /// <summary>
     /// No build output holds the legacy kernel, <c>Clockwork.dll</c>, beside the simulation kernel,
     /// <c>Orleans.Testing.Simulation.dll</c>: each assembly of a simulation's closure, rewritten or not, comes from one
-    /// Clockwork. The check reads every output directory this configuration's build, and its simulation configuration's,
-    /// wrote under <c>artifacts/bin</c>.
+    /// kernel. The check reads the output directory of every Storage project in this configuration and in its simulation
+    /// configuration.
     /// </summary>
     [Fact]
     public void NoOutputHoldsTheLegacyKernelBesideTheSimulationKernel()
     {
-        var bin = Path.Combine(Repository.FindRoot(), "artifacts", "bin");
-        var outputs = Directory.EnumerateDirectories(bin)
-            .SelectMany(static project => new[] { Path.Combine(project, Repository.OutputConfiguration), Path.Combine(project, Repository.SimulationConfiguration) })
+        var outputs = Repository.StorageProjectFiles()
+            .SelectMany(static project => new[] { Repository.OutputAssembly(project), Repository.SimulationOutputAssembly(project) })
+            .Select(static assembly => Path.GetDirectoryName(assembly)!)
             .Where(Directory.Exists)
             .ToArray();
 
@@ -377,12 +372,12 @@ public sealed class SimulationClosureTests
         }
     }
 
-    /// <summary>Each project, with each project it reaches, by path from the root, which is a kernel other than Clog's Clockwork's.</summary>
+    /// <summary>Each project, with each project it reaches, by path from the root, which is a kernel other than the repository's.</summary>
     private static IEnumerable<string> OtherKernels(IReadOnlyDictionary<string, IReadOnlyList<string>> reached) =>
         reached
             .SelectMany(static project => project.Value
-                .Where(static path => path.Split('/').Contains("Clockwork", StringComparer.Ordinal) && !path.StartsWith(StandaloneClockwork + "src/Orleans.Testing.Simulation", StringComparison.Ordinal)
-                    || path.EndsWith("/Clockwork.csproj", StringComparison.Ordinal))
+                .Where(static path => path != SimulationKernel
+                    && (path.EndsWith("/Orleans.Testing.Simulation.csproj", StringComparison.Ordinal) || path.EndsWith("/Clockwork.csproj", StringComparison.Ordinal)))
                 .Select(path => $"{project.Key}: {path}"))
             .Order(StringComparer.Ordinal);
 
@@ -391,42 +386,12 @@ public sealed class SimulationClosureTests
         outputs.Where(static output => File.Exists(Path.Combine(output, SimulationKernelAssembly)) && File.Exists(Path.Combine(output, LegacyKernelAssembly)));
 
     /// <summary>
-    /// eng/OrleansSimulation.SourceBuild.targets declares the Microsoft Testing Platform integration's test-application
-    /// hook, which an import cannot add for a project's reference, as the package's own buildTransitive props declare it.
-    /// </summary>
-    [Fact]
-    public void TheSourceBuildDeclaresTheTestingPlatformHookAsItsPackageDoes()
-    {
-        var root = Repository.FindRoot();
-        var package = Path.Combine(
-            root,
-            "vendor",
-            "Clockwork",
-            "src",
-            "Orleans.Testing.Simulation.Testing.MTP",
-            "buildTransitive",
-            "Microsoft.Orleans.Testing.Simulation.Testing.MTP.props");
-
-        Assert.Equal(Hooks(package), Hooks(Path.Combine(root, "eng", "OrleansSimulation.SourceBuild.targets")));
-
-        static string[] Hooks(string file) =>
-        [
-            .. XDocument.Load(file).Descendants()
-                .Where(static element => element.Name.LocalName == "TestingPlatformBuilderHook")
-                .Select(static element => string.Join(
-                    "|",
-                    element.Attribute("Include")?.Value,
-                    element.Elements().Single(static child => child.Name.LocalName == "DisplayName").Value,
-                    element.Elements().Single(static child => child.Name.LocalName == "TypeFullName").Value)),
-        ];
-    }
-    /// <summary>
     /// The projects <paramref name="projectFile"/> reaches, by path from <paramref name="root"/> with forward slashes, as
     /// its restore's assets list them; null when it has not been restored.
     /// </summary>
     private static IReadOnlyList<string>? ReachedProjects(string root, string projectFile)
     {
-        var assets = Path.Combine(root, "artifacts", "obj", Path.GetFileNameWithoutExtension(projectFile), "project.assets.json");
+        var assets = Repository.AssetsFile(projectFile);
         if (!File.Exists(assets))
         {
             return null;
@@ -444,14 +409,18 @@ public sealed class SimulationClosureTests
     }
 
     /// <summary>
-    /// The test projects whose builds Clockwork rewrites. A props or targets file which turned rewriting on would make
-    /// every project which imports it a simulation project, so the property is set in project files alone.
+    /// The Storage test projects whose builds the simulation instrumentation rewrites. A props or targets file which
+    /// turned rewriting on would make every project which imports it a simulation project, so the property is set in
+    /// project files alone.
     /// </summary>
     internal static List<string> SimulationProjects()
     {
         var root = Repository.FindRoot();
         var projects = new List<string>();
-        foreach (var file in BuildFiles(root))
+        var storageBuildFiles = Repository.TrackedFiles()
+            .Where(static path => Path.GetExtension(path).ToUpperInvariant() is ".CSPROJ" or ".PROPS" or ".TARGETS")
+            .Select(path => Path.GetFullPath(Path.Combine(root, path)));
+        foreach (var file in storageBuildFiles)
         {
             var setsIt = XDocument.Load(file)
                 .Descendants()
@@ -468,29 +437,24 @@ public sealed class SimulationClosureTests
         return projects;
     }
 
-    /// <summary>Clog's project, props, and targets files, outside the submodules and build output.</summary>
+    /// <summary>The repository's project, props, and targets files, every one a Storage project could import.</summary>
     internal static IEnumerable<string> BuildFiles(string root) =>
-        Directory
-            .EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
-            .Where(static file => Path.GetExtension(file).ToUpperInvariant() is ".CSPROJ" or ".PROPS" or ".TARGETS")
-            .Where(file => Path.GetRelativePath(root, file).Split(Path.DirectorySeparatorChar)[0] is not ("vendor" or "artifacts" or ".dotnet" or ".git"))
-            .Where(static file => !file.Split(Path.DirectorySeparatorChar).Any(static part => part is "bin" or "obj" or "node_modules"));
+        Repository.TrackedBuildFiles().Select(path => Path.GetFullPath(Path.Combine(root, path)));
 
     /// <summary>
-    /// The full paths of the projects <paramref name="projectFile"/> references by name. A wildcard include, as the one
-    /// which names every project under src, names no simulation project; an include through a property fails the check,
-    /// which cannot resolve it.
+    /// The full paths of the projects <paramref name="projectFile"/> references by name, or by the repository's
+    /// <c>$(SourceRoot)</c>. A wildcard include, as the one which names every project under src, names no simulation
+    /// project; an include through another property fails the check, which cannot resolve it.
     /// </summary>
     internal static HashSet<string> ProjectReferences(string projectFile)
     {
-        var directory = Path.GetDirectoryName(projectFile)!;
         var references = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (var include in XDocument.Load(projectFile).Descendants("ProjectReference").Select(static element => element.Attribute("Include")?.Value))
         {
-            Assert.False(include is null || include.Contains("$(", StringComparison.Ordinal), $"{projectFile} has a project reference this check cannot resolve: {include}");
+            Assert.False(include is null || include.Replace("$(SourceRoot)", string.Empty, StringComparison.Ordinal).Contains("$(", StringComparison.Ordinal), $"{projectFile} has a project reference this check cannot resolve: {include}");
             if (!include.Contains('*', StringComparison.Ordinal))
             {
-                references.Add(Path.GetFullPath(Path.Combine(directory, include.Replace('\\', Path.DirectorySeparatorChar))));
+                references.Add(Repository.ResolveInclude(projectFile, include));
             }
         }
 
@@ -498,15 +462,20 @@ public sealed class SimulationClosureTests
     }
 
     /// <summary>
-    /// The Clockwork manifest of the simulation assembly at <paramref name="assemblyPath"/>, and the directory of its
-    /// rewritten assemblies, from the paths Clockwork's build stamps on it as assembly metadata.
+    /// The Clockwork manifest of the simulation project <paramref name="projectFile"/>'s assembly, and the directory of
+    /// its rewritten assemblies, from the paths, relative to the project's directory, which the simulation build stamps
+    /// on it as assembly metadata.
     /// </summary>
-    internal static (string Manifest, string Directory) ClockworkOutput(string assemblyPath)
+    internal static (string Manifest, string Directory) ClockworkOutput(string projectFile)
     {
+        var assemblyPath = Repository.SimulationOutputAssembly(projectFile);
         Assert.True(File.Exists(assemblyPath), $"{assemblyPath} has not been built.");
         var metadata = Repository.AssemblyMetadata(assemblyPath);
         Assert.True(metadata.TryGetValue("OrleansSimulationManifestPath", out var manifest), $"{assemblyPath} carries no OrleansSimulationManifestPath.");
         Assert.True(metadata.TryGetValue("OrleansSimulationInstrumentationOutputPath", out var directory), $"{assemblyPath} carries no OrleansSimulationInstrumentationOutputPath.");
+        var projectDirectory = Path.GetDirectoryName(projectFile)!;
+        manifest = Path.GetFullPath(manifest, projectDirectory);
+        directory = Path.GetFullPath(directory, projectDirectory);
         Assert.True(File.Exists(manifest), $"The Clockwork manifest {manifest} does not exist.");
         return (manifest, directory);
     }

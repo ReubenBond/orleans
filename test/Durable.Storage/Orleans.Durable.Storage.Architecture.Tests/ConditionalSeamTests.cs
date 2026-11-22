@@ -29,8 +29,7 @@ public sealed partial class ConditionalSeamTests
     [Fact]
     public void SimulationBuildsOfSrcCarryTheSimulationSentinel()
     {
-        var root = Repository.FindRoot();
-        var built = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+        var built = Repository.ProductionProjectFiles()
             .Select(Repository.SimulationOutputAssembly)
             .Where(File.Exists)
             .ToList();
@@ -45,10 +44,9 @@ public sealed partial class ConditionalSeamTests
     public void EveryConditionalSeamInSrcIsListedAndEveryListedSeamIsInSrc()
     {
         var root = Repository.FindRoot();
-        var sources = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(static file => !file.Split(Path.DirectorySeparatorChar).Any(static part => part is "bin" or "obj"))
+        var sources = Repository.ProductionSourceFiles("*.cs")
             .Select(file => (Path.GetRelativePath(root, file), File.ReadAllText(file)));
-        var listed = ListedSeams(File.ReadAllText(Path.Combine(root, "docs", "spec", "verification.md")));
+        var listed = ListedSeams(File.ReadAllText(Path.Combine(Repository.StorageRoot, "docs", "spec", "verification.md")));
 
         var (seams, violations) = Scan(sources, listed);
 

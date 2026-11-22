@@ -191,8 +191,7 @@ public sealed class LocalStorageFailureTests
     public void EachExitCodeLiesInTheReservedBlockAndOneProductionSiteNamesIt()
     {
         var root = Repository.FindRoot();
-        var sources = Directory
-            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+        var sources = Repository.ProductionSourceFiles("*.cs")
             .Where(static path => !path.EndsWith("SimulatedWalStorage.cs", StringComparison.Ordinal) && !path.EndsWith("FatalErrorSite.cs", StringComparison.Ordinal))
             .Select(path => (Path.GetRelativePath(root, path), File.ReadAllText(path)));
 

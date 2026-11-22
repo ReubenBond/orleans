@@ -45,9 +45,10 @@ public sealed class LayeringTests
         [.. Components.Production.ByName.Values.Where(static component => component.IsContract).Select(static component => component.Assembly)];
 
     /// <summary>
-    /// The packages whose code generators write serializers: Orleans for grain messages, and Protocol Buffers and gRPC.
+    /// The packages and projects whose code generators write serializers: Orleans' for grain messages, as packages or as
+    /// this repository's code generator project, and Protocol Buffers and gRPC.
     /// </summary>
-    private static readonly string[] SerializationPackagePrefixes = ["Microsoft.Orleans.", "Google.Protobuf", "Grpc."];
+    private static readonly string[] SerializationPackagePrefixes = ["Orleans.CodeGenerator", "Google.Protobuf", "Grpc."];
 
     private static readonly string[] ImplicitBuildFiles = ["Directory.Build.props", "Directory.Build.targets"];
 
@@ -90,7 +91,10 @@ public sealed class LayeringTests
                 .ToHashSet(StringComparer.Ordinal);
             var reached = Reachable(project);
 
-            violations.AddRange(ProjectReferences(projectFile).Where(reference => !allowed.Contains(reference)).Select(reference => $"{project} -> {reference} (not a dependency)"));
+            // The composition takes Orleans' runtime, which other tests confine to it, by project reference.
+            violations.AddRange(ProjectReferences(projectFile)
+                .Where(reference => !allowed.Contains(reference) && !(Compositions.Contains(project) && IsOrleans(reference, "Orleans.")))
+                .Select(reference => $"{project} -> {reference} (not a dependency)"));
             violations.AddRange(required.Where(assembly => !reached.Contains(assembly)).Select(assembly => $"{project} does not reach {assembly}"));
         }
 
@@ -142,7 +146,7 @@ public sealed class LayeringTests
             .Distinct(StringComparer.Ordinal));
         Assert.Equal(
             decoded.SelectMany(component => map.Reachable(component).Append(component)).Select(component => map.ByName[component].Assembly).Append("Orleans.Durable.Storage.Fuzz.Abstractions").Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal),
-            Reachable(targets).Order(StringComparer.Ordinal));
+            Reachable(targets).Where(static project => project.StartsWith("Orleans.Durable.Storage", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -162,7 +166,7 @@ public sealed class LayeringTests
         {
             var file = projectFiles[project];
             Assert.DoesNotContain(PackageReferences(file), static package => package.Contains("Orleans", StringComparison.Ordinal));
-            Assert.DoesNotContain(LockedPackages(Path.Combine(Path.GetDirectoryName(file)!, "packages.lock.json")), static package => IsOrleans(package, "Microsoft.Orleans."));
+            Assert.DoesNotContain(RestoredLibraries(Repository.AssetsFile(file)), static library => IsOrleans(library, "Microsoft.Orleans.") || IsOrleans(library, "Orleans."));
         }
 
         Assert.DoesNotContain("Orleans.Durable.Storage", map.Reachable("Orleans.Durable.Storage.Engine.Cluster.Control"));
@@ -277,7 +281,7 @@ public sealed class LayeringTests
     {
         var map = Components.Production;
         var violations = Directory
-            .EnumerateFiles(Path.Combine(Repository.FindRoot(), "tests"), "*.Tests.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(Repository.StorageRoot, "*.Tests.csproj", SearchOption.AllDirectories)
             .Where(path => map.ByName.TryGetValue(Path.GetFileNameWithoutExtension(path)[..^".Tests".Length], out var tested) && tested.Kind != ComponentKind.Composition)
             .SelectMany(static path => ProjectClosure(path)
                 .Where(Compositions.Contains)
@@ -289,8 +293,8 @@ public sealed class LayeringTests
     /// <summary>
     /// "Generated serializers stay in the composition which owns their protocol and out of domain abstractions" (spec
     /// README §2.5), so no project which compiles a contract of spec README §2.6, nor a build file it imports
-    /// implicitly, references a serialization generator's package, and none reaches one transitively: its lock file,
-    /// which records its whole restore graph, holds none.
+    /// implicitly, references a serialization generator's package, and none reaches one transitively: its restore graph
+    /// holds none.
     /// </summary>
     [Fact]
     public void LayerContractsReferenceNoSerializationGenerator()
@@ -303,7 +307,7 @@ public sealed class LayeringTests
                 var projectFile = projectFiles[project];
                 return BuildFiles(root, projectFile)
                     .SelectMany(PackageReferences)
-                    .Concat(LockedPackages(Path.Combine(Path.GetDirectoryName(projectFile)!, "packages.lock.json")))
+                    .Concat(RestoredLibraries(Repository.AssetsFile(projectFile)))
                     .Where(IsSerializationPackage)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Select(package => $"{project} -> {package}");
@@ -313,23 +317,19 @@ public sealed class LayeringTests
     }
 
     /// <summary>
-    /// Orleans stays in the composition (build-packaging.md §2): a project's lock file holds an Orleans package only if
-    /// the project is the composition's or references it, directly or through other projects, and no other production
-    /// assembly references an Orleans assembly.
+    /// Orleans stays in the composition (build-packaging.md §2): a Storage project's restore graph holds an Orleans package
+    /// or project only if the project is the composition's or references it, directly or through other projects, and no
+    /// other production assembly references an Orleans assembly.
     /// </summary>
     [Fact]
     public void OnlyTheCompositionAndTheProjectsWhichReferenceItTakeOrleans()
     {
-        var root = Repository.FindRoot();
-        var lockedOutside = ((string[])["src", "tests", "fuzz", "benchmarks", "apphost", "samples"])
-            .Select(directory => Path.Combine(root, directory))
-            .Where(Directory.Exists)
-            .SelectMany(static directory => Directory.EnumerateFiles(directory, "*.csproj", SearchOption.AllDirectories))
-            .Where(static projectFile => File.Exists(LockFile(projectFile))
+        var restoredOutside = Repository.StorageProjectFiles()
+            .Where(static projectFile => File.Exists(Repository.AssetsFile(projectFile))
                 && !Compositions.Contains(Path.GetFileNameWithoutExtension(projectFile))
                 && !ProjectClosure(projectFile).Any(Compositions.Contains))
-            .SelectMany(static projectFile => LockedPackages(LockFile(projectFile))
-                .Where(static package => IsOrleans(package, "Microsoft.Orleans."))
+            .SelectMany(static projectFile => RestoredLibraries(Repository.AssetsFile(projectFile))
+                .Where(static library => IsOrleans(library, "Microsoft.Orleans.") || IsOrleans(library, "Orleans."))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(package => $"{Path.GetFileNameWithoutExtension(projectFile)} -> {package}"));
         var referencedOutside = Repository.ProductionAssemblies()
@@ -340,10 +340,8 @@ public sealed class LayeringTests
                 .Select(reference => $"{assembly.Project} -> {reference.Assembly}"))
             .Distinct(StringComparer.Ordinal);
 
-        Assert.Empty(lockedOutside);
+        Assert.Empty(restoredOutside);
         Assert.Empty(referencedOutside);
-
-        static string LockFile(string projectFile) => Path.Combine(Path.GetDirectoryName(projectFile)!, "packages.lock.json");
     }
     /// <summary>
     /// Orleans' runtime is the composition's alone; the families which share its prefix, Clog's own assemblies, Fast CASPaxos,
@@ -353,7 +351,7 @@ public sealed class LayeringTests
     [InlineData("Orleans.Core", "Orleans.", true)]
     [InlineData("Orleans.Durable.Journaling", "Orleans.", true)]
     [InlineData("Microsoft.Orleans.Runtime", "Microsoft.Orleans.", true)]
-    [InlineData("Orleans.Consensus.CasPaxos.Grpc", "Orleans.", false)]
+    [InlineData("Orleans.Consensus.CasPaxos.Server", "Orleans.", false)]
     [InlineData("Orleans.Testing.Simulation", "Orleans.", false)]
     [InlineData("Microsoft.Orleans.Consensus.CasPaxos", "Microsoft.Orleans.", false)]
     [InlineData("Microsoft.Orleans.Testing.Simulation.Testing.MTP", "Microsoft.Orleans.", false)]
@@ -363,15 +361,14 @@ public sealed class LayeringTests
     public void OnlyOrleansRuntimeCountsAsOrleans(string name, string prefix, bool isOrleans) =>
         Assert.Equal(isOrleans, IsOrleans(name, prefix));
 
-    /// <summary>The projects under src, by name, each with its project file.</summary>
-    private static Dictionary<string, string> ProductionProjectFiles() => ProjectFiles("src");
+    /// <summary>The Storage projects under src, by name, each with its project file.</summary>
+    private static Dictionary<string, string> ProductionProjectFiles() =>
+        Repository.ProductionProjectFiles().ToDictionary(static path => Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal);
 
-    /// <summary>The projects under fuzz, by name, each with its project file.</summary>
-    private static Dictionary<string, string> FuzzProjectFiles() => ProjectFiles("fuzz");
-
-    private static Dictionary<string, string> ProjectFiles(string directory) =>
+    /// <summary>The fuzz harness's projects, by name, each with its project file.</summary>
+    private static Dictionary<string, string> FuzzProjectFiles() =>
         Directory
-            .EnumerateFiles(Path.Combine(Repository.FindRoot(), directory), "*.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(Path.Combine(Repository.StorageRoot, "fuzz"), "*.csproj", SearchOption.AllDirectories)
             .ToDictionary(static path => Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal);
 
     /// <summary>The projects which a project under src or fuzz references, directly or through other projects.</summary>
@@ -379,9 +376,8 @@ public sealed class LayeringTests
         ProjectClosure(ProductionProjectFiles().GetValueOrDefault(project) ?? FuzzProjectFiles()[project]);
 
     /// <summary>
-    /// The names of the projects <paramref name="projectFile"/> references, directly or through other projects. A
-    /// reference outside the repository's tree, such as Fast CASPaxos' gRPC project under its MSBuild property, ends the
-    /// walk with its name.
+    /// The names of the projects <paramref name="projectFile"/> references, directly or through other projects, Orleans'
+    /// and its sibling families' among them. A reference whose file does not exist ends the walk with its name.
     /// </summary>
     private static HashSet<string> ProjectClosure(string projectFile)
     {
@@ -401,15 +397,17 @@ public sealed class LayeringTests
         return reached;
     }
 
-    // A wildcard include, such as the architecture tests' src\*\*.csproj, names every project it matches.
+    // A wildcard include, such as the architecture tests' production projects, names every project it matches, and an
+    // include may list several paths.
     private static IEnumerable<string> ReferencedProjects(string projectFile) => XDocument
         .Load(projectFile)
         .Descendants("ProjectReference")
         .Select(static element => element.Attribute("Include")?.Value)
         .OfType<string>()
+        .SelectMany(static include => include.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         .SelectMany(include =>
         {
-            var path = Path.Combine(Path.GetDirectoryName(projectFile)!, include.Replace('\\', Path.DirectorySeparatorChar));
+            var path = Repository.ResolveInclude(projectFile, include);
             var wildcard = path.IndexOf('*', StringComparison.Ordinal);
             return wildcard < 0
                 ? [path]
@@ -435,26 +433,21 @@ public sealed class LayeringTests
                 .OfType<string>(),
         ];
 
-    /// <summary>Whether a lock file's dependency is a project, which it names by its package ID.</summary>
-    internal static bool IsProject(JsonElement dependency) =>
-        dependency.TryGetProperty("type", out var type) && type.ValueEquals("Project");
-
     /// <summary>
-    /// Returns every package of every target framework in the lock file <paramref name="lockFile"/>, without the projects it
-    /// references, which a lock file names by their package IDs.
+    /// Returns the name of every package and project in the restore graph <paramref name="assetsFile"/> records, which
+    /// holds the project's whole dependency closure.
     /// </summary>
-    private static string[] LockedPackages(string lockFile)
+    internal static string[] RestoredLibraries(string assetsFile)
     {
-        Assert.True(File.Exists(lockFile), $"{lockFile} does not exist.");
-        using var document = JsonDocument.Parse(File.ReadAllText(lockFile));
+        Assert.True(File.Exists(assetsFile), $"{assetsFile} does not exist: restore the Storage projects first.");
+        using var document = JsonDocument.Parse(File.ReadAllText(assetsFile));
         return
         [
             .. document.RootElement
-                .GetProperty("dependencies")
+                .GetProperty("libraries")
                 .EnumerateObject()
-                .SelectMany(static framework => framework.Value.EnumerateObject())
-                .Where(static package => !IsProject(package.Value))
-                .Select(static package => package.Name),
+                .Select(static library => library.Name[..library.Name.IndexOf('/', StringComparison.Ordinal)])
+                .Distinct(StringComparer.OrdinalIgnoreCase),
         ];
     }
 
@@ -466,8 +459,13 @@ public sealed class LayeringTests
         name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
         && !OrleansSiblingFamilies.Any(family => name.StartsWith(prefix + family, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Whether a package, or a project by its package ID, generates or carries serializers: Orleans' runtime packages,
+    /// which bring its code generator, and the other generators' packages.
+    /// </summary>
     private static bool IsSerializationPackage(string package) =>
-        SerializationPackagePrefixes.Any(prefix => package.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        IsOrleans(package, "Microsoft.Orleans.")
+        || SerializationPackagePrefixes.Any(prefix => package.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Returns <paramref name="projectFile"/> and every <c>Directory.Build.props</c> and <c>Directory.Build.targets</c>

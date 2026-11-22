@@ -26,8 +26,8 @@ public sealed partial class RetiredNamesTests
     /// <summary>Text other repositories own, generated text, encoded data, and this file, which names what it retires.</summary>
     private static readonly string[] SkippedPaths =
     [
-        "vendor/", "research/", "docs/engineering-principles/", "fuzz/corpus/",
-        "tests/Orleans.Durable.Storage.Architecture.Tests/RetiredNamesTests.cs",
+        "test/Durable.Storage/docs/engineering-principles/", "test/Durable.Storage/fuzz/corpus/",
+        "test/Durable.Storage/Orleans.Durable.Storage.Architecture.Tests/RetiredNamesTests.cs",
     ];
 
     private static readonly HashSet<string> TextExtensions = new(
@@ -37,7 +37,7 @@ public sealed partial class RetiredNamesTests
         ],
         StringComparer.OrdinalIgnoreCase);
 
-    private static readonly string[] CodeRoots = ["apphost/", "benchmarks/", "fuzz/", "src/", "tests/"];
+    private static readonly string[] CodeRoots = ["src/", "test/Durable.Storage/", "playground/DurableStorage/"];
 
     /// <summary>The names which keep their spelling in text, with the reason each stays.</summary>
     private static readonly Exemption[] TextExemptions =
@@ -137,13 +137,13 @@ public sealed partial class RetiredNamesTests
         Assert.Equal(found, ClogName().Match(code) is { Success: true } match ? match.Value : null);
     /// <summary>
     /// Regression test, #175: the checks read only what git tracks or would track, so a file under an ignored folder, here
-    /// the repository-local NuGet cache which <c>NuGet.Config</c> names, is never read, whatever names it holds.
+    /// the scripts' artifacts directory, is never read, whatever names it holds.
     /// </summary>
     [Fact]
     public void AFileUnderAnIgnoredFolderIsNotRead()
     {
         var root = Repository.FindRoot();
-        var cache = Path.Combine(root, ".packages");
+        var cache = Path.Combine(Repository.StorageRoot, "artifacts");
         var created = !Directory.Exists(cache);
         var probe = Path.Combine(cache, "clog-retired-names-" + Guid.NewGuid().ToString("N"));
         _ = Directory.CreateDirectory(probe);

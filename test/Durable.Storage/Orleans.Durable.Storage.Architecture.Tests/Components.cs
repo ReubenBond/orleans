@@ -47,7 +47,7 @@ internal sealed record Component(string Name, ComponentKind Kind, string[] Depen
     /// </summary>
     public IReadOnlyDictionary<string, string> Grants { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    /// <summary>Projects outside src which the component's project references, such as a submodule's.</summary>
+    /// <summary>Projects of another Orleans family which the component's project references, such as the consensus family's.</summary>
     public string[] ExternalProjects { get; init; } = [];
 }
 
@@ -178,7 +178,7 @@ internal static partial class Components
     private static readonly Lazy<ComponentMap> ProductionMap = new(static () => new(
         ["Orleans.Durable.Storage", "OrleansCodeGen"],
         Table,
-        ComponentMap.ReadMembers(Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Architecture.Tests", "ComponentMembers.txt"))));
+        ComponentMap.ReadMembers(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests", "ComponentMembers.txt"))));
 
     public static ComponentMap Production => ProductionMap.Value;
 
@@ -268,8 +268,8 @@ internal static partial class Components
         new("Orleans.Durable.Storage.CasPaxos", ComponentKind.Provider, ["Orleans.Durable.Storage.Engine.MetaStore.Abstractions"])
         {
             Assembly = CasPaxos,
-            Technologies = ["Orleans.Consensus.CasPaxos", "Orleans.Consensus.CasPaxos.", "Grpc.", "Google.Protobuf"],
-            ExternalProjects = ["Orleans.Consensus.CasPaxos.Grpc"],
+            Technologies = ["Orleans.Consensus.CasPaxos", "Orleans.Consensus.CasPaxos."],
+            ExternalProjects = ["Orleans.Consensus.CasPaxos.Server"],
         },
         new("Orleans.Durable.Storage.FileSystem", ComponentKind.Provider, ["Orleans.Durable.Storage.Engine.ObjectStore.Abstractions", "Orleans.Durable.Storage.Engine.MetaStore.Abstractions", "Orleans.Durable.Storage.Engine.Wal"])
         {

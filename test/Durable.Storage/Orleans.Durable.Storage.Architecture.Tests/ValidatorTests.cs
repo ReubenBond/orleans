@@ -9,7 +9,7 @@ namespace Orleans.Durable.Storage.Architecture.Tests;
 
 /// <summary>
 /// Keeps every validator's result consumed (conventions.md §15): CA1806 reports a call whose result is ignored only for
-/// the methods <c>dotnet_code_quality.CA1806.additional_use_results_methods</c> lists in <c>.editorconfig</c>, so every
+/// the methods <c>dotnet_code_quality.CA1806.additional_use_results_methods</c> lists in <c>eng/durable-storage/DurableStorage.globalconfig</c>, so every
 /// synchronous method of <c>src</c> which returns <c>InvalidDataException?</c>, a rejection or <see langword="null"/>
 /// when its input is valid, is listed there by its documentation ID, and the SDK's CA1806 reports a canary which
 /// discards one under the repository's settings.
@@ -34,14 +34,14 @@ public sealed class ValidatorTests
         var missing = validators.Except(listed).Order(StringComparer.Ordinal).ToList();
         Assert.True(
             missing.Count == 0,
-            $"Add these validators to {OptionKey} in .editorconfig, separated by '|': {string.Join("|", missing)}");
+            $"Add these validators to {OptionKey} in eng/durable-storage/DurableStorage.globalconfig, separated by '|': {string.Join("|", missing)}");
         var stale = listed.Except(validators).Order(StringComparer.Ordinal).ToList();
         Assert.True(stale.Count == 0, $"{OptionKey} lists methods which no longer return InvalidDataException?: {string.Join(", ", stale)}");
     }
 
     /// <summary>
     /// A canary which discards a listed validator's result draws CA1806 from the SDK's analyzer under the repository's
-    /// <c>.editorconfig</c>, so the list takes effect, at warning severity, which fails the build; one which consumes it
+    /// <c>eng/durable-storage/DurableStorage.globalconfig</c>, so the list takes effect, at warning severity, which fails the build; one which consumes it
     /// draws none.
     /// </summary>
     [Fact]
@@ -86,9 +86,12 @@ public sealed class ValidatorTests
 
     private static IEnumerable<INamedTypeSymbol> Nested(INamedTypeSymbol type) => [type, .. type.GetTypeMembers().SelectMany(Nested)];
 
+    /// <summary>Storage's global analyzer configuration, which every Storage project applies.</summary>
+    private static string AnalyzerConfigPath => Path.Combine(Repository.FindRoot(), "eng", "durable-storage", "DurableStorage.globalconfig");
+
     private static HashSet<string> ListedMethods()
     {
-        var line = File.ReadLines(Path.Combine(Repository.FindRoot(), ".editorconfig"))
+        var line = File.ReadLines(AnalyzerConfigPath)
             .Select(static text => text.Trim())
             .SingleOrDefault(static text => text.StartsWith(OptionKey, StringComparison.Ordinal));
         if (line is null)
@@ -101,15 +104,19 @@ public sealed class ValidatorTests
     }
 
     /// <summary>
-    /// Compiles a canary under <c>src</c> whose method runs <paramref name="statement"/> over a page, with the options
-    /// the repository's <c>.editorconfig</c> gives that path, and returns the CA1806 reports of the SDK's analyzers.
+    /// Compiles a canary in the Engine's directory whose method runs <paramref name="statement"/> over a page, with the
+    /// options Storage's global analyzer configuration gives it, and returns the CA1806 reports of the SDK's analyzers.
     /// </summary>
     private static async Task<ImmutableArray<Diagnostic>> CA1806Async(string statement)
     {
         var root = Repository.FindRoot();
-        var path = Path.Combine(root, "src", "CA1806Canary.cs");
-        var config = AnalyzerConfig.Parse(await File.ReadAllTextAsync(Path.Combine(root, ".editorconfig"), TestContext.Current.CancellationToken), Path.Combine(root, ".editorconfig"));
-        var options = AnalyzerConfigSet.Create(ImmutableArray.Create(config)).GetOptionsForSourcePath(path);
+        var path = Path.Combine(root, "src", Components.Engine, "CA1806Canary.cs");
+        var config = AnalyzerConfig.Parse(await File.ReadAllTextAsync(AnalyzerConfigPath, TestContext.Current.CancellationToken), AnalyzerConfigPath);
+        // A global configuration's options apply to every source file; a section's, to the paths it matches.
+        var set = AnalyzerConfigSet.Create(ImmutableArray.Create(config));
+        var local = set.GetOptionsForSourcePath(path);
+        var treeOptions = set.GlobalConfigOptions.TreeOptions.SetItems(local.TreeOptions);
+        var analyzerOptions = set.GlobalConfigOptions.AnalyzerOptions.SetItems(local.AnalyzerOptions);
         var source = $$"""
             using System.IO;
             using Orleans.Durable.Storage.Engine.Wal;
@@ -132,7 +139,7 @@ public sealed class ValidatorTests
             [tree],
             [.. References.Value.Where(reference => !string.Equals(((PortableExecutableReference)reference).FilePath, engine, StringComparison.OrdinalIgnoreCase)), MetadataReference.CreateFromFile(engine)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable)
-                .WithSpecificDiagnosticOptions(options.TreeOptions));
+                .WithSpecificDiagnosticOptions(treeOptions));
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         var analyzers = typeof(ValidatorTests).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
             .Where(static attribute => attribute.Key == "NetAnalyzer")
@@ -140,17 +147,17 @@ public sealed class ValidatorTests
             .ToImmutableArray();
         Assert.NotEmpty(analyzers);
         var diagnostics = await compilation
-            .WithAnalyzers(analyzers, new AnalyzerOptions([], new ConfigOptionsProvider(options)))
+            .WithAnalyzers(analyzers, new AnalyzerOptions([], new ConfigOptionsProvider(analyzerOptions)))
             .GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken);
         return [.. diagnostics.Where(static diagnostic => diagnostic.Id == "CA1806")];
     }
 
     /// <summary>
-    /// Gives every tree the analyzer options the repository's <c>.editorconfig</c> gives the canary's path.
+    /// Gives every tree the analyzer options Storage's global analyzer configuration gives the canary's path.
     /// </summary>
-    private sealed class ConfigOptionsProvider(AnalyzerConfigOptionsResult result) : AnalyzerConfigOptionsProvider
+    private sealed class ConfigOptionsProvider(ImmutableDictionary<string, string> analyzerOptions) : AnalyzerConfigOptionsProvider
     {
-        private readonly ConfigOptions _options = new(result.AnalyzerOptions);
+        private readonly ConfigOptions _options = new(analyzerOptions);
 
         public override AnalyzerConfigOptions GlobalOptions => _options;
 

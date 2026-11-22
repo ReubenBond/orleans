@@ -44,7 +44,7 @@ public sealed class UnionLawsCoverageTests
     /// </summary>
     private static HashSet<string> CheckedUnions()
     {
-        var tests = Path.Combine(Repository.FindRoot(), "tests");
+        var tests = Repository.StorageRoot;
         var unions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var path in Directory.EnumerateFiles(tests, "*.cs", SearchOption.AllDirectories)
             .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)

@@ -41,7 +41,7 @@ public sealed class LedgerReplicaContractTests
     [Fact]
     public void TheContractsPublicMembersAreItsSnapshot()
     {
-        var directory = Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Architecture.Tests");
+        var directory = Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests");
         var snapshot = Path.Combine(directory, SnapshotName + ".txt");
         var received = Path.Combine(directory, SnapshotName + ".received.txt");
         var rendered = Render(Contract);

@@ -26,7 +26,7 @@ public sealed class CompositionSurfaceTests
     [Fact]
     public void TheCompositionsPublicMembersAreItsSnapshot()
     {
-        var directory = Path.Combine(Repository.FindRoot(), "tests", "Orleans.Durable.Storage.Architecture.Tests");
+        var directory = Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests");
         var snapshot = Path.Combine(directory, SnapshotName + ".txt");
         var received = Path.Combine(directory, SnapshotName + ".received.txt");
         var rendered = LedgerReplicaContractTests.Render(Reached(
@@ -57,7 +57,7 @@ public sealed class CompositionSurfaceTests
     [Fact]
     public void TheConfigurationTableNamesEveryBindableKey()
     {
-        var spec = File.ReadAllText(Path.Combine(Repository.FindRoot(), "docs", "spec", "compositions", "orleans.md"));
+        var spec = File.ReadAllText(Path.Combine(Repository.StorageRoot, "docs", "spec", "compositions", "orleans.md"));
         var start = spec.IndexOf("\n## 6. Configuration", StringComparison.Ordinal);
         var end = spec.IndexOf("\n## 7. ", start, StringComparison.Ordinal);
         var documented = spec[start..end]
@@ -82,15 +82,15 @@ public sealed class CompositionSurfaceTests
     }
 
     /// <summary>
-    /// The samples see the composition as an app does: no <c>src</c> project grants them its internals, so their smoke test
+    /// The samples see the composition as an app does: no Storage <c>src</c> project grants them its internals, so their smoke test
     /// runs on the public surface alone.
     /// </summary>
     [Fact]
     public void NoProductionProjectGrantsTheSamplesItsInternals()
     {
         var src = Path.Combine(Repository.FindRoot(), "src");
-        var grants = Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(src, "*.csproj", SearchOption.AllDirectories))
+        var grants = Repository.ProductionSourceFiles("*.cs")
+            .Concat(Repository.ProductionProjectFiles())
             .Where(static file => File.ReadAllText(file).Contains("\"Orleans.Durable.Storage.Samples", StringComparison.Ordinal))
             .Select(file => Path.GetRelativePath(src, file));
 

@@ -5,8 +5,8 @@ namespace Orleans.Durable.Storage.Architecture.Tests;
 
 /// <summary>
 /// Pins the mutation units of verification.md §9: each is a component (<see cref="Components"/>), so a unit's score
-/// measures one component's tests however many components share its assembly. Beside each src project which builds
-/// nothing under vendor lies one Stryker configuration per component the project compiles,
+/// measures one component's tests however many components share its assembly. Beside each src project lies one Stryker
+/// configuration per component the project compiles, apart from a component which builds on another family's projects,
 /// <c>stryker-config.&lt;Component&gt;.json</c>, whose mutate patterns select exactly that component's source files; and
 /// the baseline (eng/mutation-baseline.json) names units, and files which exist.
 /// </summary>
@@ -57,7 +57,7 @@ public sealed partial class MutationUnitTests
     public void TheBaselineNamesUnitsAndFilesWhichExist()
     {
         var root = Repository.FindRoot();
-        using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "eng", "mutation-baseline.json")));
+        using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(Repository.StorageRoot, "eng", "mutation-baseline.json")));
         var units = Configurations().Select(static configuration => configuration.Unit).ToHashSet(StringComparer.Ordinal);
         var projects = baseline.RootElement.GetProperty("projects").EnumerateObject().ToArray();
         var files = projects
@@ -84,7 +84,7 @@ public sealed partial class MutationUnitTests
         Path.GetRelativePath(project, file).Split(Path.DirectorySeparatorChar)[0] is "bin" or "obj";
 
     private static IEnumerable<UnitConfiguration> Configurations() =>
-        Directory.EnumerateFiles(Path.Combine(Repository.FindRoot(), "src"), "stryker-config*.json", SearchOption.AllDirectories)
+        Repository.ProductionSourceFiles("stryker-config*.json")
             .Select(static path =>
             {
                 using var document = JsonDocument.Parse(File.ReadAllText(path));

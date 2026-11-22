@@ -18,10 +18,8 @@ public sealed class DebugAssertionMarkTests
     public void EachMemberReadsTheRaisedCountOnlyAsOneMark()
     {
         var root = Repository.FindRoot();
-        var violations = new[] { "tests", "fuzz" }
-            .SelectMany(directory => Directory.EnumerateFiles(Path.Combine(root, directory), "*.cs", SearchOption.AllDirectories))
-            .Where(static file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        var violations = Directory.EnumerateFiles(Repository.StorageRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !Repository.IsBuildOutput(file))
             .SelectMany(file => RepeatedReads(Path.GetRelativePath(root, file), File.ReadAllText(file)))
             .ToList();
 

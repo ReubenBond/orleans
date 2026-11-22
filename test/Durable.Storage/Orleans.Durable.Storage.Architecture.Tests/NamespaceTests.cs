@@ -19,7 +19,6 @@ public sealed partial class NamespaceTests
     /// </summary>
     private const string ConfigurationBindingNamespace = "Microsoft.Extensions.Configuration.Binder.SourceGeneration";
 
-    private static readonly string[] ProjectRoots = ["apphost", "benchmarks", "fuzz", "samples", "src", "tests"];
 
     /// <summary>
     /// Source files which several projects link share one namespace instead of any linking project's (spec README §2.6).
@@ -27,8 +26,8 @@ public sealed partial class NamespaceTests
     private static readonly IReadOnlyDictionary<string, string> SharedSourceNamespaces =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [Path.Combine("tests", "shared")] = "Orleans.Durable.Storage.Testing",
-            [Path.Combine("apphost", "shared")] = "Orleans.Durable.Storage.AppHost",
+            [Path.Combine("test", "Durable.Storage", "shared")] = "Orleans.Durable.Storage.Testing",
+            [Path.Combine("test", "Durable.Storage", "apphost", "shared")] = "Orleans.Durable.Storage.AppHost",
         };
 
     /// <summary>
@@ -72,8 +71,7 @@ public sealed partial class NamespaceTests
     public void SourceNamespacesStartWithTheirProjectName()
     {
         var root = Repository.FindRoot();
-        var projectDirectories = ProjectRoots
-            .SelectMany(projectRoot => Directory.EnumerateFiles(Path.Combine(root, projectRoot), "*.csproj", SearchOption.AllDirectories))
+        var projectDirectories = Repository.StorageProjectFiles()
             .ToDictionary(
                 static projectFile => Path.GetDirectoryName(projectFile)!,
                 static projectFile => Path.GetFileNameWithoutExtension(projectFile),

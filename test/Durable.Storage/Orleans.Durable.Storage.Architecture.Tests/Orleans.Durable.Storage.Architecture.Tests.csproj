@@ -8,7 +8,7 @@
   -->
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Durable.Storage*\Orleans.Durable.Storage*.csproj;$(SourceRoot)src\*\Orleans.Durable.Storage.*\Orleans.Durable.Storage.*.csproj" />
-    <!-- A simulation project builds in its simulation configuration (docs/spec/build-packaging.md §1). -->
+    <!-- A simulation project builds in its simulation configuration (test/Durable.Storage/docs/spec/build-packaging.md §1). -->
     <ProjectReference Include="..\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
