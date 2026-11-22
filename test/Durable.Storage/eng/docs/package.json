@@ -1,7 +1,7 @@
 {
   "name": "clog-docs-tools",
   "private": true,
-  "description": "Pinned Markdown, link, and Mermaid checkers for eng/check-docs.ps1.",
+  "description": "Pinned Markdown, link, and Mermaid checkers for test/Durable.Storage/eng/check-docs.ps1.",
   "type": "module",
   "dependencies": {
     "jsdom": "30.1.3",

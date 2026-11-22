@@ -2,7 +2,7 @@
   <!--
     The Durable Storage test infrastructure: its test projects, simulation kit, fuzz targets, benchmarks, and emulator
     host. They take Orleans' test settings (test/Directory.Build.props), then the Storage family's compiler and analyzer
-    settings (eng/durable-storage/Build.props).
+    settings (test/Durable.Storage/eng/durable-storage/Build.props).
   -->
   <PropertyGroup>
     <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
@@ -30,7 +30,7 @@
     test/Durable.Storage/eng/validate.ps1 ends a test session which runs past ClogTestSessionTimeout; a project whose
     tests need longer sets its own. A project which sets ClogDebugLeg to true in its project file joins the Debug leg
     (just test-debug), which builds it in Debug so that the debug assertions of the code it tests run
-    (docs/spec/verification.md §12).
+    (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
     <ClogTestSessionTimeout>12m</ClogTestSessionTimeout>
@@ -38,12 +38,12 @@
 
   <!--
     Every test run captures crash, hang, and failure evidence and seeded-simulation histories; see
-    docs/spec/verification.md. testconfig.json enables the crash and hang dump extensions for every
+    test/Durable.Storage/docs/spec/verification.md. testconfig.json enables the crash and hang dump extensions for every
     run of a test application, however it is launched. Microsoft.Diagnostics.NETCore.Client writes failure dumps; the
     test output logger implements the Microsoft.Extensions.Logging abstractions, which the shared framework supplies.
     Orleans' test settings supply the test framework and the crash and hang dump extensions.
 
-    A mutation build (ClogMutationTesting, set by eng/mutation.ps1) leaves testconfig.json out. The dump extensions
+    A mutation build (ClogMutationTesting, set by test/Durable.Storage/eng/mutation.ps1) leaves testconfig.json out. The dump extensions
     run the test host beneath a controller process which opens a second server connection, and Stryker.NET's runner
     serves exactly one connection per test application; under mutation, failing and crashing tests are the expected
     outcome, which Stryker records as killed mutants.

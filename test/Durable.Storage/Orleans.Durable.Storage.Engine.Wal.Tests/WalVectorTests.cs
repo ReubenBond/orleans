@@ -9,7 +9,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Wal.Tests;
 
 /// <summary>
-/// Checks the shared the WAL vectors under <c>tests/shared-vectors/wal</c> (wal.md §7): header pages, data pages
+/// Checks the shared the WAL vectors under <c>test/Durable.Storage/shared-vectors/wal</c> (wal.md §7): header pages, data pages
 /// of frames, the hole page, and the worked example written by the log itself, with a reviewed rendering of it.
 /// </summary>
 public sealed class WalVectorTests : IDisposable

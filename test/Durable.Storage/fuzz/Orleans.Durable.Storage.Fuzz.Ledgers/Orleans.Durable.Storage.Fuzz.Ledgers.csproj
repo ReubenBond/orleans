@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The fuzz targets of the Ledgers layer's formats: the batch, and the LedgerStore's formats (docs/spec/verification.md
+    The fuzz targets of the Ledgers layer's formats: the batch, and the LedgerStore's formats (test/Durable.Storage/docs/spec/verification.md
     §6.1). They reference the Engine and use the types of the components which decode them alone, whose tests replay
     their corpora and use the batch target's reading of the format's rules as their oracle.
   -->

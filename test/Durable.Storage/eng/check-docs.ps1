@@ -14,7 +14,7 @@ $tools = Join-Path $root 'artifacts' 'tools' 'docs'
 $null = New-Item -ItemType Directory -Force $tools
 $null = Get-Command node, npm, git -ErrorAction Stop
 
-# The checkers are pinned by eng/docs/package-lock.json and installed outside the source tree. The stamp records the
+# The checkers are pinned by test/Durable.Storage/eng/docs/package-lock.json and installed outside the source tree. The stamp records the
 # lock a completed install matches; it is removed before installing, so an interrupted install reinstalls next time.
 $lock = Join-Path $source 'package-lock.json'
 $stamp = Join-Path $tools '.lock-sha256'
@@ -45,9 +45,8 @@ Copy-Item -Path (Join-Path $source '*.mjs') -Destination $tools -Force
 
 Push-Location $root
 try {
-    # Tracked and new, unignored Markdown files present in the working tree; vendored sources keep their upstream form
-    # and links.
-    $files = @(& git ls-files --cached --others --exclude-standard -- '*.md' ':!:vendor/**' | Sort-Object -Unique)
+    # Tracked and new, unignored Markdown files under test/Durable.Storage present in the working tree.
+    $files = @(& git ls-files --cached --others --exclude-standard -- '*.md' | Sort-Object -Unique)
     if ($LASTEXITCODE -ne 0) {
         throw 'git ls-files failed.'
     }

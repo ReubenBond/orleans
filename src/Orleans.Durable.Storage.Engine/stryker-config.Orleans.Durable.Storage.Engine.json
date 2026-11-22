@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.Engine.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Diagnostics.Tests/Orleans.Durable.Storage.Diagnostics.Tests.csproj"
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Diagnostics.Tests/Orleans.Durable.Storage.Diagnostics.Tests.csproj"
     ],
     "mutate": [
       "Backoff.cs",

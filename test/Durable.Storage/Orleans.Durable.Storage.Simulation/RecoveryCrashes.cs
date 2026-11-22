@@ -4,7 +4,7 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// Crashes nodes while one recovery runs (docs/spec/verification.md §5.1, §7.1, §7.3): first the node which first begins
+/// Crashes nodes while one recovery runs (test/Durable.Storage/docs/spec/verification.md §5.1, §7.1, §7.3): first the node which first begins
 /// to serve the recovery's seal, as the seal's WAL write leaves for its disk or once it is durable, and then, once every
 /// node runs again, the node which serves the recovery's first recovery write, likewise, unless a node serves one of the
 /// recovery's first reads before. Each crashed node restarts after a short downtime.

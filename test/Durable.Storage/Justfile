@@ -5,15 +5,11 @@ set windows-shell := ["pwsh", "-NoLogo", "-NoProfile", "-Command"]
 default:
     @& '{{ just_executable() }}' --list
 
-# Bring this clone or worktree to a buildable state: every submodule at its recorded commit and the pinned .NET SDK.
-sync:
-    @& ./eng/sync.ps1
-
-# Restore the solution using the pinned SDK and audited dependencies.
+# Restore the Storage solution filter (Durable.Storage.slnf).
 restore:
     @& ./eng/validate.ps1 -Check Restore
 
-# Compile the solution in Release with configured analyzers.
+# Compile the Storage projects in Release with configured analyzers.
 build: restore
     @& ./eng/validate.ps1 -Check Build
 
@@ -65,7 +61,7 @@ fuzz target="all" duration="60" *options:
 bench filter *options: restore
     @& ./eng/bench.ps1 '{{ filter }}' {{ options }}
 
-# Run the sample Orleans app over Clog: three silos over Azurite, with the Aspire dashboard (Docker; samples/README.md).
+# Run the sample Orleans app over Clog: three silos over Azurite, with the Aspire dashboard (Docker; playground/DurableStorage/README.md).
 sample: restore
     @& ./eng/sample.ps1
 
@@ -77,7 +73,7 @@ models:
 models-quick:
     @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger -Tier Quick
 
-# Run the ledger protocol models' quick tier when specs/ledger-protocol or eng/model-check-quint.ps1 changed since a commit.
+# Run the ledger protocol models' quick tier when test/Durable.Storage/specs/ledger-protocol or test/Durable.Storage/eng/model-check-quint.ps1 changed since a commit.
 models-changed ref="main":
     @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger -Tier Quick -Since {{ ref }}
 
@@ -123,7 +119,7 @@ coverage: build
 mutation +projects:
     @& ./eng/mutation.ps1 -Project {{ replace(projects, " ", ",") }}
 
-# Mutation-test the core units in full against their break thresholds in eng/mutation-baseline.json.
+# Mutation-test the core units in full against their break thresholds in test/Durable.Storage/eng/mutation-baseline.json.
 mutation-core:
     @& ./eng/mutation.ps1
 

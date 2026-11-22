@@ -149,7 +149,7 @@ public sealed class LedgerQuorumRecoveryTests : IDisposable
 
     /// <summary>
     /// The observer a recovery is given receives each replica answer the recovery handles, once, in the order it handles
-    /// them (docs/spec/verification.md §5.1): over the hole of
+    /// them (test/Durable.Storage/docs/spec/verification.md §5.1): over the hole of
     /// <see cref="ARecoveryFindsDataOnAQuorumAboveAHoleWhichOneReplicaFills"/>, the seals' answers, the reads from
     /// <c>c = 1</c> which find replica 0's DATA at position 1 and the end at 3, and the recovery writes which copy
     /// position 1 to the other two replicas, all below the end.

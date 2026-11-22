@@ -6,8 +6,8 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// Renders a <see cref="LedgerMapTrace"/> as a Quint module whose <c>traceReplay</c> run applies the trace's actions to
-/// <c>specs/ledgers/LedgerMap.qnt</c> in order and checks every invariant of the model after each, and the model's
-/// state against the run's after each ledger-map write and each batch (docs/spec/verification.md §5.1). <c>quint test</c>
+/// <c>test/Durable.Storage/specs/ledgers/LedgerMap.qnt</c> in order and checks every invariant of the model after each, and the model's
+/// state against the run's after each ledger-map write and each batch (test/Durable.Storage/docs/spec/verification.md §5.1). <c>quint test</c>
 /// replays it: an action the model disables, a broken invariant, or a state the run did not reach fails the trace.
 /// </summary>
 /// <remarks>
@@ -67,7 +67,7 @@ public static class LedgerMapTraceExport
         translation.Run();
         var text = new StringBuilder()
             .AppendLine(Invariant($"// A ledger map trace of {source}, generated; trace validation replays it against"))
-            .AppendLine("// specs/ledgers/LedgerMap.qnt with quint test (docs/spec/verification.md §5.1). The mapping:")
+            .AppendLine("// test/Durable.Storage/specs/ledgers/LedgerMap.qnt with quint test (test/Durable.Storage/docs/spec/verification.md §5.1). The mapping:")
             .AppendLine("// - The model's ledger i is the ledger whose ID is i; the bootstrap, the first value which lists a ledger, is init.")
             .AppendLine("// - A ledger-map write is the model's steps its value shows, a group commit several: takeover, split, and merge in")
             .AppendLine("//   the order of the IDs they open, the order the committer's fold applied them, then drop in ID order. mapIs then")

@@ -12,7 +12,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// <summary>
 /// The simulation driver's own guarantees: a seed decides the whole run, an invariant is checked after every step, the
 /// run tears its components down and checks what they leave, and a failure leaves a report, the history, and Clockwork's
-/// replay artifact (docs/spec/verification.md §7.4).
+/// replay artifact (test/Durable.Storage/docs/spec/verification.md §7.4).
 /// </summary>
 public sealed class SeededSimulationTests
 {
@@ -60,7 +60,7 @@ public sealed class SeededSimulationTests
         Assert.Contains("Seed 31 failed after step", failure.Message, StringComparison.Ordinal);
         Assert.Contains("counter 3", failure.Message, StringComparison.Ordinal);
         Assert.Contains(
-            $"CLOG_SIM_SEEDS=31 dotnet test --project tests/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj -c {TestDiagnostics.Configuration} -- --filter-display-name \"{TestContext.Current.Test!.TestDisplayName}\"",
+            $"CLOG_SIM_SEEDS=31 dotnet test --project test/Durable.Storage/Orleans.Durable.Storage.Simulation.Tests/Orleans.Durable.Storage.Simulation.Tests.csproj -c {TestDiagnostics.Configuration} -- --filter-display-name \"{TestContext.Current.Test!.TestDisplayName}\"",
             failure.Message,
             StringComparison.Ordinal);
         Assert.Contains("Not minimized: set CLOG_SIM_MINIMIZE=1", failure.Message, StringComparison.Ordinal);

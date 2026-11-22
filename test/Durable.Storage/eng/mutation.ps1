@@ -2,14 +2,14 @@
 
 <#
 .SYNOPSIS
-Runs Stryker.NET mutation testing (docs/spec/verification.md §9).
+Runs Stryker.NET mutation testing (test/Durable.Storage/docs/spec/verification.md §9).
 
 .DESCRIPTION
 Mutates each selected unit, a component of the architecture tests' table, with the configuration beside the src
 project which compiles it, src/<Project>/stryker-config.<Unit>.json, whose mutate patterns select the component's
 source files. It uses the pinned SDK and the Microsoft.Testing.Platform runner, and writes Stryker's reports under
 artifacts/mutation/<Unit>. The score counts killed and timed-out mutants over every mutant a test ran against, less
-the survivors which eng/mutation-baseline.json records as equivalent. A core unit, one which the baseline lists,
+the survivors which test/Durable.Storage/eng/mutation-baseline.json records as equivalent. A core unit, one which the baseline lists,
 fails when its score falls below its break threshold.
 
 .PARAMETER Project
@@ -39,8 +39,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$root = Split-Path $PSScriptRoot -Parent
-$outputRoot = Join-Path $root 'artifacts\mutation'
+# Unit configurations lie beside the src projects; paths are relative to the repository root, as git reports them.
+$storage = Split-Path $PSScriptRoot -Parent
+$root = Split-Path (Split-Path $storage -Parent) -Parent
+$outputRoot = Join-Path $storage 'artifacts\mutation'
 $baselinePath = Join-Path $PSScriptRoot 'mutation-baseline.json'
 $baselineDocument = Get-Content -LiteralPath $baselinePath -Raw | ConvertFrom-Json -AsHashtable
 $baseline = $baselineDocument.projects
@@ -84,7 +86,7 @@ function Get-RelativePath {
 # LibGit2Sharp, which resolves a git worktree to its main checkout and so compares another checkout's files.
 function Get-SinceScope {
     param($Configuration, [string[]] $ChangedPaths)
-    $tests = @('tests/shared/')
+    $tests = @('test/Durable.Storage/shared/')
     foreach ($testProject in $Configuration.Settings.'test-projects') {
         $directory = Split-Path (Join-Path $Configuration.Directory $testProject) -Parent
         $tests += (Get-RelativePath $directory) + '/'
@@ -245,11 +247,11 @@ try {
     . (Join-Path $PSScriptRoot 'dotnet-env.ps1')
 
     # A mutation build has its own artifacts tree and test configuration (Directory.Build.props,
-    # tests/Directory.Build.props); a killed mutant is a failing test, which needs no failure dump.
+    # test/Durable.Storage/Directory.Build.props); a killed mutant is a failing test, which needs no failure dump.
     $env:ClogMutationTesting = 'true'
     $env:CLOG_TEST_FAILURE_DUMPS = '0'
 
-    Push-Location $root
+    Push-Location $storage
     try {
         & dotnet tool restore
         if ($LASTEXITCODE -ne 0) {
@@ -297,7 +299,7 @@ try {
 
                 # A mutant which a snapshot test kills leaves the test's .received file beside its snapshot; accepting
                 # received files (verification §8) would take the mutant's rendering as the snapshot.
-                Get-ChildItem -LiteralPath (Join-Path $root 'tests') -Recurse -File -Filter '*.received.*' |
+                Get-ChildItem -LiteralPath $storage -Recurse -File -Filter '*.received.*' |
                     Where-Object LastWriteTime -GE $started |
                     Remove-Item
             }
@@ -368,10 +370,10 @@ try {
             foreach ($count in @(@('tested', $tested), @('compileErrors', $measure.Counts.CompileError))) {
                 $expected = $baseline[$name][$count[0]]
                 if ($null -eq $expected) {
-                    $failures += "${name}: eng/mutation-baseline.json records no $($count[0]) count; this run's is $($count[1])."
+                    $failures += "${name}: test/Durable.Storage/eng/mutation-baseline.json records no $($count[0]) count; this run's is $($count[1])."
                 }
                 elseif ([Math]::Abs($count[1] - $expected) -gt $countTolerance * [Math]::Max($expected, 1)) {
-                    $failures += "${name}: $($count[0]) $($count[1]) differs from the baseline's $expected by more than $(100 * $countTolerance)%; review the run, then record the count in eng/mutation-baseline.json."
+                    $failures += "${name}: $($count[0]) $($count[1]) differs from the baseline's $expected by more than $(100 * $countTolerance)%; review the run, then record the count in test/Durable.Storage/eng/mutation-baseline.json."
                 }
             }
         }

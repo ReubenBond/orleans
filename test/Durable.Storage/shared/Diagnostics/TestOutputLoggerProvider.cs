@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Routes <c>Microsoft.Extensions.Logging</c> output from code under test into the output of the test which created
-/// the provider, so a failing test's report carries its traces (docs/spec/verification.md).
+/// the provider, so a failing test's report carries its traces (test/Durable.Storage/docs/spec/verification.md).
 /// </summary>
 /// <remarks>
 /// The provider captures the creating test's output, so entries logged on other threads still reach that test.

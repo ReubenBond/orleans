@@ -1,12 +1,12 @@
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// The task combinators a simulation test's own code awaits, run under Clockwork's rewrite (docs/spec/verification.md
+/// The task combinators a simulation test's own code awaits, run under Clockwork's rewrite (test/Durable.Storage/docs/spec/verification.md
 /// §7.1). The build rewrites the kit, not the test assembly, so a combinator the test assembly called would be the BCL's:
 /// its promise runs on the real thread pool whenever a task it waits for runs its continuations asynchronously, as a
 /// task completion source created so does, and it then posts its waiter's continuation to the simulation from outside
 /// it, in no recorded order and possibly after the driver found nothing runnable. Each combinator here is Clockwork's
-/// controlled one, so it completes inside the simulation. eng/BannedSymbols.Simulation.txt bans the BCL's in simulation
+/// controlled one, so it completes inside the simulation. test/Durable.Storage/eng/BannedSymbols.Simulation.txt bans the BCL's in simulation
 /// test projects.
 /// </summary>
 public static class SimulationTasks

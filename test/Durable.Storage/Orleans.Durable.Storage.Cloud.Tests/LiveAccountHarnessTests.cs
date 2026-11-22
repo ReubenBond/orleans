@@ -3,7 +3,7 @@ using Orleans.Durable.Storage.Testing;
 namespace Orleans.Durable.Storage.Cloud.Tests;
 
 /// <summary>
-/// Fast, emulator-free checks on the live-account fidelity harnesses: skip-reason parity with <c>eng/validate.ps1</c>,
+/// Fast, emulator-free checks on the live-account fidelity harnesses: skip-reason parity with <c>test/Durable.Storage/eng/validate.ps1</c>,
 /// bucket-name normalization and validation, and stale run-prefix timestamp detection.
 /// </summary>
 public sealed class LiveAccountHarnessTests : IDisposable
@@ -13,13 +13,13 @@ public sealed class LiveAccountHarnessTests : IDisposable
     public void Dispose() => _leaks.Dispose();
 
     /// <summary>
-    /// Every live-account harness's <c>SkipReason</c> appears verbatim in <c>eng/validate.ps1</c>'s allowlist so an
+    /// Every live-account harness's <c>SkipReason</c> appears verbatim in <c>test/Durable.Storage/eng/validate.ps1</c>'s allowlist so an
     /// emulator run with unset <c>CLOG_*_LIVE</c> variables never drifts out of sync.
     /// </summary>
     [Fact]
     public void ValidateScriptContainsEveryLiveAccountSkipReasonVerbatim()
     {
-        var validatePath = Path.Combine(FindRepoRoot(), "eng", "validate.ps1");
+        var validatePath = Path.Combine(FindStorageRoot(), "eng", "validate.ps1");
         var script = File.ReadAllText(validatePath);
 
         string[] reasons =
@@ -153,19 +153,19 @@ public sealed class LiveAccountHarnessTests : IDisposable
         Assert.Equal(2, Volatile.Read(ref attempts));
     }
 
-    private static string FindRepoRoot()
+    private static string FindStorageRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(current.FullName, "Orleans.slnx")))
             {
-                return current.FullName;
+                return Path.Combine(current.FullName, "test", "Durable.Storage");
             }
 
             current = current.Parent;
         }
 
-        throw new InvalidOperationException($"Could not locate Clog.slnx above '{AppContext.BaseDirectory}'.");
+        throw new InvalidOperationException($"Could not locate Orleans.slnx above '{AppContext.BaseDirectory}'.");
     }
 }

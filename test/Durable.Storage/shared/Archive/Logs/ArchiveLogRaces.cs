@@ -101,7 +101,7 @@ internal static class ArchiveLogRaces
         })).ToList();
 
         // Awaited one by one rather than through Task.WhenAll, which a simulation test assembly does not call
-        // (eng/BannedSymbols.Simulation.txt): every racer ends before the first fault, in start order, is thrown.
+        // (test/Durable.Storage/eng/BannedSymbols.Simulation.txt): every racer ends before the first fault, in start order, is thrown.
         foreach (var racer in racers)
         {
             await racer.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);

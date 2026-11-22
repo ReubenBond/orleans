@@ -12,7 +12,7 @@ namespace Orleans.Durable.Storage.Fuzz.Ledgers;
 /// </summary>
 public sealed class ObjectStoreRecordTarget : FuzzTarget
 {
-    /// <summary>The reasons of <c>tests/shared-vectors/ledgers/object-store-record-rejections.json</c>.</summary>
+    /// <summary>The reasons of <c>test/Durable.Storage/shared-vectors/ledgers/object-store-record-rejections.json</c>.</summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("ledgers", "object-store-record-rejections.json"));
 
     public override string Name => "ledgers-object-store-record";

@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.Engine.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj"
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj"
     ],
     "mutate": [
       "Ledgers/Store/**/*.cs"

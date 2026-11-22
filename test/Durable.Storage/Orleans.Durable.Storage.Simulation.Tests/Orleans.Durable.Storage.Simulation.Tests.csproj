@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The build rewrites this project's dependency closure, the simulation kit among it, under Clockwork's deterministic
-    BCL and controlled-task rule sets, and links SeededSimulation's simulation driver (eng/OrleansSimulation.targets).
+    BCL and controlled-task rule sets, and links SeededSimulation's simulation driver (test/Durable.Storage/eng/OrleansSimulation.targets).
   -->
   <!--
     Shared test source which runs inside this project's simulations as well as on the thread pool elsewhere takes its

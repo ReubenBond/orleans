@@ -8,7 +8,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Archive.Lsm.Tests;
 
 /// <summary>
-/// Checks the shared manifest vectors under <c>tests/shared-vectors/archive</c> (archive §7): each manifest's value
+/// Checks the shared manifest vectors under <c>test/Durable.Storage/shared-vectors/archive</c> (archive §7): each manifest's value
 /// encodes to its bytes and its bytes decode to its value, and each rejection is rejected for its reason, as the
 /// format's independent reading of the rules also gives, which together cover every reason; the snapshots render the
 /// decoded manifests and each rejection's reason and message (verification.md §8).

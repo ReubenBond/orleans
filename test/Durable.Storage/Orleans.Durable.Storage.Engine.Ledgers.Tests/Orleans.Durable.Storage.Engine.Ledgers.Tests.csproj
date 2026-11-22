@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The Debug leg runs the ledger's, the sequencer's, the slot checkpoints', and the batch codec's debug assertions here
-    (docs/spec/verification.md §12).
+    (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>

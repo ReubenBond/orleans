@@ -17,7 +17,7 @@ namespace Orleans.Durable.Storage.Fuzz.Ledgers;
 public sealed class ReplicaCatalogTarget : FuzzTarget
 {
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/ledgerstore/catalog-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/ledgerstore/catalog-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("ledgerstore", "catalog-rejections.json"));
 
@@ -253,7 +253,7 @@ public sealed class ReplicaCatalogTarget : FuzzTarget
 public sealed class StoreRecordTarget : FuzzTarget
 {
     /// <summary>
-    /// The store record reasons of <c>tests/shared-vectors/ledgerstore/record-rejections.json</c>: those of its vectors
+    /// The store record reasons of <c>test/Durable.Storage/shared-vectors/ledgerstore/record-rejections.json</c>: those of its vectors
     /// keyed by the store handle.
     /// </summary>
     private static readonly Lazy<HashSet<string>> StoreReasons = new(static () =>
@@ -413,7 +413,7 @@ public sealed class StoreRecordTarget : FuzzTarget
 public sealed class SlotLeafTarget : FuzzTarget
 {
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/ledgerstore/leaf-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/ledgerstore/leaf-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("ledgerstore", "leaf-rejections.json"));
 
@@ -622,7 +622,7 @@ public sealed class SlotLeafTarget : FuzzTarget
 public sealed class CheckpointRootTarget : FuzzTarget
 {
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/ledgerstore/root-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/ledgerstore/root-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("ledgerstore", "root-rejections.json"));
 

@@ -79,7 +79,7 @@ public sealed class JournalSimulationTests
 
     // A seed costs about forty-five thousand steps, and the scripted steps take every rare path, and the fault plan every
     // fault, on each seed by construction, so every change runs one, the replay check's smaller run a second, and
-    // exploration runs more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private const int ReplaySeed = 2;
     private const int MutantSeed = 1;
@@ -239,7 +239,7 @@ public sealed class JournalSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment, Workload workload, Mutation mutation)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var network = environment.Network;
         network.BaseMessageDelay = TimeSpan.FromMilliseconds(1);
@@ -436,7 +436,7 @@ public sealed class JournalSimulationTests
         /// <summary>
         /// Crashes the process: it answers nothing more, and its executions stop. Cancels on the simulation's thread, since
         /// <see cref="CancellationTokenSource.CancelAsync"/> would run the callbacks the code under test registered on a real
-        /// thread (docs/spec/verification.md §7.1).
+        /// thread (test/Durable.Storage/docs/spec/verification.md §7.1).
         /// </summary>
         public void Crash()
         {

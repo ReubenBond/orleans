@@ -10,8 +10,8 @@ namespace Orleans.Durable.Storage.AppHost;
 internal sealed record EmulatorImage(string Image, string? Tag, string Digest);
 
 /// <summary>
-/// The emulators' images, which apphost/Orleans.Durable.Storage.AppHost and samples/Orleans.Durable.Storage.Samples.AppHost both run, pinned once here
-/// (docs/spec/build-packaging.md §2), and the container of each.
+/// The emulators' images, which test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost and playground/DurableStorage/Orleans.Durable.Storage.Samples.AppHost both run, pinned once here
+/// (test/Durable.Storage/docs/spec/build-packaging.md §2), and the container of each.
 /// </summary>
 internal static class EmulatorImages
 {

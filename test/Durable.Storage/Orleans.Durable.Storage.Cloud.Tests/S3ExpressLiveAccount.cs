@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Cloud.Tests;
 /// </summary>
 /// <remarks>
 /// Without <see cref="Variable"/> each live case skips with <see cref="SkipReason"/>, which the emulator run allows
-/// verbatim while the variable is unset (eng/validate.ps1). Each test isolates its objects under a unique timestamped
+/// verbatim while the variable is unset (test/Durable.Storage/eng/validate.ps1). Each test isolates its objects under a unique timestamped
 /// prefix that is deleted on disposal, and a once-per-process sweep cleans prefixes left behind by aborted runs.
 /// </remarks>
 internal sealed class S3ExpressLiveAccount : IAsyncDisposable
@@ -21,7 +21,7 @@ internal sealed class S3ExpressLiveAccount : IAsyncDisposable
     /// </summary>
     public const string Variable = "CLOG_S3_EXPRESS_LIVE";
 
-    /// <summary>The reason a live case skips without <see cref="Variable"/>, which eng/validate.ps1 allows verbatim.</summary>
+    /// <summary>The reason a live case skips without <see cref="Variable"/>, which test/Durable.Storage/eng/validate.ps1 allows verbatim.</summary>
     public const string SkipReason =
         $"The live-account S3 Express fidelity run waits on {Variable}: set it to an S3 Express One Zone directory bucket name (ending in '--x-s3') accessible with the AWS SDK's default credentials and region.";
 

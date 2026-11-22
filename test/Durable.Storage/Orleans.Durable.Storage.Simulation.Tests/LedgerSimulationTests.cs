@@ -20,7 +20,7 @@ public sealed class LedgerSimulationTests
     private const int Quorum = 2;
     private const int FirstSeed = 3;
 
-    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
     private const int ReplaySeed = 5;
     private static readonly LedgerReplicaOptions Options = new() { WindowSize = 4 };
@@ -75,7 +75,7 @@ public sealed class LedgerSimulationTests
     private static async Task SimulateAsync(SimulationEnvironment environment, bool executorsAfterTheAppends)
     {
         // The scenario's calls carry a cancellable token, as production callers' do, which nothing cancels: the scenario
-        // owns it, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1). CancellationToken.None
+        // owns it, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1). CancellationToken.None
         // would skip the code under test's registrations on it, and change the seeds' schedules.
         using var cancellation = new CancellationTokenSource();
         var cancellationToken = cancellation.Token;

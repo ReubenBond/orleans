@@ -1,7 +1,7 @@
 // -*- mode: Bluespec; -*-
 /**
  * The Archive LSM's manifest, compaction, clock-free garbage collection, and history reads
- * (docs/spec/components/archive-lsm.md §5, §8; docs/spec/components/archive.md §8.1).
+ * (test/Durable.Storage/docs/spec/components/archive-lsm.md §5, §8; test/Durable.Storage/docs/spec/components/archive.md §8.1).
  *
  * One key's decided history lies in two ledgers of one lineage: Ledger1, closed, and its successor Ledger2, open until
  * it closes, as entry kinds "A" (Append), "R" (Replace), and "E" (Expired), each tagged (ledger, slot) as

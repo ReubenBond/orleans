@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Clog's managed storage layers (docs/spec/README.md §2.6), each in the folder of its namespace: buffers, admission and
+    Clog's managed storage layers (test/Durable.Storage/docs/spec/README.md §2.6), each in the folder of its namespace: buffers, admission and
     call budgets, group commit, the WAL, the ledgers and the LedgerStore, the MetaStore's contract and memory store, the
     Archive with the LSM and archive logs, the state database, and Journals. Orleans.Durable.Storage.Architecture.Tests checks the
-    dependencies between the layers over their types (tests/Orleans.Durable.Storage.Architecture.Tests/Components.cs).
+    dependencies between the layers over their types (test/Durable.Storage/Orleans.Durable.Storage.Architecture.Tests/Components.cs).
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.Engine</RootNamespace>

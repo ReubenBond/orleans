@@ -223,7 +223,7 @@ internal sealed class LiveReplica
     /// Reports the published state of the slots below <paramref name="count"/>, those which hold DATA and those which are
     /// faulty, without reading their records: what the replica's recovery established (LS-I5). Deterministic simulation
     /// logs it when a node restarts, so trace validation checks that the restart kept every answer
-    /// (docs/spec/verification.md §5.1). It reads each unloaded leaf into a scratch copy rather than loading it, so the
+    /// (test/Durable.Storage/docs/spec/verification.md §5.1). It reads each unloaded leaf into a scratch copy rather than loading it, so the
     /// slot table, its resident leaves, and the replica's counters stay as a run which never asks would leave them.
     /// </summary>
     internal async ValueTask<(IReadOnlyList<long> Data, IReadOnlyList<long> Faulty)> SlotStatesAsync(long count, CancellationToken cancellationToken)
@@ -277,7 +277,7 @@ internal sealed class LiveReplica
     /// <summary>
     /// Returns the WAL page which holds <paramref name="slot"/>'s latest record, or <see langword="null"/> when the slot
     /// holds none, without reading the record. Deterministic simulation damages that page so a replica answers the slot
-    /// corrupt by construction (docs/spec/verification.md §5.1).
+    /// corrupt by construction (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     internal async ValueTask<WalPage?> RecordPageAsync(long slot, CancellationToken cancellationToken)
     {

@@ -192,12 +192,12 @@ public sealed class PorcupineVisualizationTests
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
             {
-                return File.ReadAllText(Path.Combine(directory.FullName, "tests", "shared", "Linearizability", "Visualization", name));
+                return File.ReadAllText(Path.Combine(directory.FullName, "test", "Durable.Storage", "shared", "Linearizability", "Visualization", name));
             }
         }
 
-        throw new DirectoryNotFoundException("Could not find the Clog repository root.");
+        throw new DirectoryNotFoundException("Could not find the Orleans repository root.");
     }
 }

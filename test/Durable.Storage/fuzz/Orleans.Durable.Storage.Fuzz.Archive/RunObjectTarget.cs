@@ -16,7 +16,7 @@ namespace Orleans.Durable.Storage.Fuzz.Archive;
 /// </summary>
 public sealed class RunObjectTarget : FuzzTarget
 {
-    /// <summary>The reasons of <c>tests/shared-vectors/archive/run-object-rejections.json</c>.</summary>
+    /// <summary>The reasons of <c>test/Durable.Storage/shared-vectors/archive/run-object-rejections.json</c>.</summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () =>
         GoldenVectors.Find().Cases("archive", "run-object-rejections.json").Select(static vector => GoldenVectors.Text(vector, "reason")).ToHashSet(StringComparer.Ordinal));
 

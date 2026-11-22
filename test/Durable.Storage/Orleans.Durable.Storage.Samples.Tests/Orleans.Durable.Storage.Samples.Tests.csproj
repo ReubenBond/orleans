@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The smoke test of samples/Orleans.Durable.Storage.Samples.Journaling: its silo configuration, over in-memory stores, starts a cluster in
+    The smoke test of playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling: its silo configuration, over in-memory stores, starts a cluster in
     which a grain's state survives its silo's death and restart. It sees the composition only through its public surface.
   -->
   <PropertyGroup>

@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
 /// Shows that the quiescence check runs the work due at the current instant and fails on any work left for later
-/// (docs/spec/verification.md §11.1).
+/// (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 public sealed class SimulationLeakCheckTests
 {

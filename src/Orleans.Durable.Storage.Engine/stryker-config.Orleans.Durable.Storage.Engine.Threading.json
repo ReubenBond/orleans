@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.Engine.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Engine.Threading.Tests/Orleans.Durable.Storage.Engine.Threading.Tests.csproj"
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Engine.Threading.Tests/Orleans.Durable.Storage.Engine.Threading.Tests.csproj"
     ],
     "mutate": [
       "Threading/**/*.cs"

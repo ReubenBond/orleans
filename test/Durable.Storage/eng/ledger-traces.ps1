@@ -1,7 +1,7 @@
 #Requires -Version 7.3
 
 # Generates the simulation's ledger traces and validates each against the ledger model with Quint/TLC
-# (docs/spec/verification.md §5.1): the quorum, crash, and Ledger simulations, and the scripted runs whose crashed process
+# (test/Durable.Storage/docs/spec/verification.md §5.1): the quorum, crash, and Ledger simulations, and the scripted runs whose crashed process
 # answers from records it never answered (ServedLandingSimulationTests), whose reader repairs its preferred replica
 # (ReadRepairSimulationTests), and whose reader learns the tail from its own replica (LearnTailSimulationTests), each at
 # its own seed, write one LedgerTraceData module
@@ -22,7 +22,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $traces = Join-Path $root 'artifacts' 'ledger-traces'
 Remove-Item -LiteralPath $traces -Recurse -Force -ErrorAction SilentlyContinue
 
-$project = Join-Path $root 'tests' 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
+$project = Join-Path $root 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
 & dotnet build $project -c SimulationRelease --no-restore
 if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."

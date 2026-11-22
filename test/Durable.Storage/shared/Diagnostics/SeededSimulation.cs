@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
-/// Runs seeded simulations so every failure replays from its seed (docs/spec/verification.md §7.4).
+/// Runs seeded simulations so every failure replays from its seed (test/Durable.Storage/docs/spec/verification.md §7.4).
 /// </summary>
 /// <remarks>
 /// The seed is printed before the scenario starts, and <c>CLOG_TEST_SEED</c> replaces it to replay a failure. A
@@ -117,7 +117,7 @@ internal static partial class SeededSimulation
     private static string DisplayNameCommand()
     {
         var name = TestContext.Current.Test?.TestDisplayName ?? "*";
-        var project = Invariant($"tests/{TestDiagnostics.AssemblyName}/{TestDiagnostics.AssemblyName}.csproj");
+        var project = Invariant($"test/Durable.Storage/{TestDiagnostics.AssemblyName}/{TestDiagnostics.AssemblyName}.csproj");
         return Invariant(
             $"dotnet test --project {project} -c {TestDiagnostics.Configuration} -- --filter-display-name \"{name}\"");
     }

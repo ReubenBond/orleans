@@ -4,30 +4,30 @@ using System.Text.Json;
 namespace Orleans.Durable.Storage.Fuzz;
 
 /// <summary>
-/// Reads the golden vectors under <c>tests/shared-vectors</c> (formats.md §6), which seed every target's corpus: 64-bit
+/// Reads the golden vectors under <c>test/Durable.Storage/shared-vectors</c> (formats.md §6), which seed every target's corpus: 64-bit
 /// integers are decimal strings and byte strings are lowercase hexadecimal.
 /// </summary>
-public sealed class GoldenVectors(string repositoryRoot)
+public sealed class GoldenVectors(string storageRoot)
 {
     /// <summary>
-    /// Gets the root of the repository the vectors belong to.
+    /// Gets the Durable Storage root, <c>test/Durable.Storage</c>, which holds the vectors and corpora.
     /// </summary>
-    public string RepositoryRoot { get; } = repositoryRoot;
+    public string StorageRoot { get; } = storageRoot;
 
     /// <summary>
-    /// Finds the repository holding the running harness: the nearest directory above it with <c>Clog.slnx</c>.
+    /// Finds the Durable Storage root in the repository holding the running harness: the nearest directory above it with <c>Orleans.slnx</c>.
     /// </summary>
     public static GoldenVectors Find()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
             {
-                return new GoldenVectors(directory.FullName);
+                return new GoldenVectors(Path.Combine(directory.FullName, "test", "Durable.Storage"));
             }
         }
 
-        throw new DirectoryNotFoundException("Could not find the Clog repository root above the harness.");
+        throw new DirectoryNotFoundException("Could not find the Orleans repository root above the harness.");
     }
 
     public static byte[] Hex(JsonElement element, string property = "hex") =>
@@ -58,7 +58,7 @@ public sealed class GoldenVectors(string repositoryRoot)
     /// </summary>
     public JsonElement[] Cases(string area, string file)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot, "tests", "shared-vectors", area, file)));
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(StorageRoot, "shared-vectors", area, file)));
         return [.. document.RootElement.GetProperty("cases").EnumerateArray().Select(static element => element.Clone())];
     }
 
@@ -77,7 +77,7 @@ public sealed class GoldenVectors(string repositoryRoot)
     /// </summary>
     public JsonElement Document(string area, string file)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot, "tests", "shared-vectors", area, file)));
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(StorageRoot, "shared-vectors", area, file)));
         return document.RootElement.Clone();
     }
 }

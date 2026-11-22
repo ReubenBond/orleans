@@ -360,7 +360,7 @@ public sealed class LedgerStoreCheckpointTests : IDisposable
     /// <summary>
     /// Reading the slot states, which a traced simulation logs when a node restarts, reads each unloaded leaf into a
     /// scratch copy, a damaged one recomputed from the WAL: the replica which reported them loads and recomputes the same
-    /// leaves, at the same operations, as one which did not (docs/spec/verification.md §5.1).
+    /// leaves, at the same operations, as one which did not (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     [Theory]
     [InlineData(false)]

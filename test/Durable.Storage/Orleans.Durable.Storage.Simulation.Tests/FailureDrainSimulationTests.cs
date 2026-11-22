@@ -44,7 +44,7 @@ public sealed class FailureDrainSimulationTests
 {
     private const int FirstSeed = 1;
 
-    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // Every change runs three seeds, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
 
     // One slot per open ledger, so a ledger's failure-triggered drain waits for a slot only while its own drain runs.
@@ -74,7 +74,7 @@ public sealed class FailureDrainSimulationTests
 
     /// <summary>
     /// Gets the seed corpus of each failure: the death's, and the first seed of each scripted failure, whose path its
-    /// construction forces on every seed (docs/spec/verification.md §12).
+    /// construction forces on every seed (test/Durable.Storage/docs/spec/verification.md §12).
     /// </summary>
     public static TheoryData<Failure, int> Cases
     {
@@ -147,7 +147,7 @@ public sealed class FailureDrainSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment, Failure failure, FailureDrainMutant mutant)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var network = environment.Network;
         network.BaseMessageDelay = TimeSpan.FromMilliseconds(1);

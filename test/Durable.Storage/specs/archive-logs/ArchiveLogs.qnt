@@ -1,7 +1,7 @@
 // -*- mode: Bluespec; -*-
 /**
  * Archive logs: per-segment writes of one key's log, racing and straggler drains, crashes, progress markers, drops, the
- * sweeper, readers, and Journals' loader (docs/spec/components/archive-logs.md §2.3–§2.5, §6, §8.1–§8.5; journals.md
+ * sweeper, readers, and Journals' loader (test/Durable.Storage/docs/spec/components/archive-logs.md §2.3–§2.5, §6, §8.1–§8.5; journals.md
  * §8.3).
  *
  * One key's decided history lies in two ledgers of one lineage: Ledger1, closed, and its successor Ledger2, open until it

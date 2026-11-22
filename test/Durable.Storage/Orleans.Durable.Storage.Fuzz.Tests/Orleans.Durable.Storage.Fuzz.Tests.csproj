@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Corpus replay reaches the slot checkpoints' debug assertions, which the Debug leg runs (docs/spec/verification.md §12). -->
+  <!-- Corpus replay reaches the slot checkpoints' debug assertions, which the Debug leg runs (test/Durable.Storage/docs/spec/verification.md §12). -->
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>
   </PropertyGroup>

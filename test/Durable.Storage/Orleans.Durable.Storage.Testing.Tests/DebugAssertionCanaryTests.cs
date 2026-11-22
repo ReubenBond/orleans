@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Testing.Tests;
 /// <summary>
 /// Runs canaries which raise debug assertions in a child test host, as xUnit and Microsoft.Testing.Platform run them,
 /// and checks what the host reports: the test which swallowed an assertion fails alone, and an assertion outside every
-/// test fails the test assembly at its cleanup (docs/spec/verification.md §11.2).
+/// test fails the test assembly at its cleanup (test/Durable.Storage/docs/spec/verification.md §11.2).
 /// </summary>
 /// <remarks>
 /// The canaries are explicit, so ordinary runs leave them out; the child host runs one with <c>--explicit only</c>.

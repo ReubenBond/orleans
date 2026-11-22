@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// Checks simulated LedgerStore nodes after every step against the invariants of ledgerstore.md §5 which their
-/// catalogs and ledgers show (docs/spec/verification.md §3.2).
+/// catalogs and ledgers show (test/Durable.Storage/docs/spec/verification.md §3.2).
 /// </summary>
 /// <remarks>
 /// <para>

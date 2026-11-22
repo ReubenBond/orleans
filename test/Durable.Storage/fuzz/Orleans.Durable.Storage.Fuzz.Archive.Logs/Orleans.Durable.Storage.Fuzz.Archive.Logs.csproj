@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The fuzz targets of archive logs' formats (docs/spec/verification.md §6.1, archive-logs.md §10): the token codec in
+    The fuzz targets of archive logs' formats (test/Durable.Storage/docs/spec/verification.md §6.1, archive-logs.md §10): the token codec in
     Orleans.Durable.Storage.Engine.Archive.Logs and Azure's metadata reader in Orleans.Durable.Storage.AzureStorage. Archive logs' tests replay their corpora.
   -->
   <ItemGroup>

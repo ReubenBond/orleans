@@ -13,7 +13,7 @@ param(
     # Runs only cases whose names match this wildcard pattern.
     [string] $Only = '*',
     # Replays each trace module in this directory against its model with quint test, and checks that every trace mutant
-    # is rejected at the step it changes, instead of model checking (docs/spec/verification.md §5.1).
+    # is rejected at the step it changes, instead of model checking (test/Durable.Storage/docs/spec/verification.md §5.1).
     [string] $Traces
 )
 
@@ -43,22 +43,24 @@ foreach ($m in $Model) {
 }
 $selectedModels = if ($Model -contains 'all') { @($specs.Keys) } else { $Model }
 if ($Since -and -not $Traces) {
+    # git names paths from the repository's root, which holds test/Durable.Storage.
+    $repository = Split-Path (Split-Path $root -Parent) -Parent
     $base = git -C $root merge-base $Since HEAD
     if ($LASTEXITCODE -ne 0) {
         throw "No merge base with $Since."
     }
 
     $specPrefixes = @($selectedModels | ForEach-Object {
-        [System.IO.Path]::GetRelativePath($root, $specs[$_]).Replace('\', '/') + '/'
+        [System.IO.Path]::GetRelativePath($repository, $specs[$_]).Replace('\', '/') + '/'
     } | Select-Object -Unique)
-    $changed = @(git -C $root diff --name-only $base) + @(git -C $root ls-files --others --exclude-standard)
+    $changed = @(git -C $root diff --name-only $base) + @(git -C $repository ls-files --others --exclude-standard)
     $relevant = $changed | Where-Object {
         $path = $_
-        $path -eq 'eng/model-check-quint.ps1' -or $path -like 'eng/quint/*' -or
+        $path -eq 'test/Durable.Storage/eng/model-check-quint.ps1' -or $path -like 'test/Durable.Storage/eng/quint/*' -or
             ($specPrefixes | Where-Object { $path.StartsWith($_) })
     }
     if (-not $relevant) {
-        Write-Host "Neither $($specPrefixes -join ', ') nor eng/model-check-quint.ps1 changed since $Since; the selected models are unchanged."
+        Write-Host "Neither $($specPrefixes -join ', ') nor test/Durable.Storage/eng/model-check-quint.ps1 changed since $Since; the selected models are unchanged."
         exit 0
     }
 }
@@ -67,7 +69,7 @@ $tools = Join-Path $root 'artifacts' 'tools' 'quint'
 $null = New-Item -ItemType Directory -Force $output, $tools
 $null = Get-Command java, node, npm -ErrorAction Stop
 
-# Quint is pinned by eng/quint/package-lock.json and installed outside the source tree.
+# Quint is pinned by test/Durable.Storage/eng/quint/package-lock.json and installed outside the source tree.
 $lock = Join-Path $PSScriptRoot 'quint' 'package-lock.json'
 $stamp = Join-Path $tools '.lock-sha256'
 $lockHash = (Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash
@@ -90,7 +92,7 @@ if (-not (Test-Path -LiteralPath $stamp) -or (Get-Content -LiteralPath $stamp -R
 $quint = Join-Path $tools 'node_modules' '@informalsystems' 'quint' 'dist' 'src' 'cli.js'
 
 # Trace validation runs each trace's replay on Quint's own simulator, whose TypeScript backend takes a run of hundreds of
-# actions, which nest past the Rust backend's recursion limit (docs/spec/verification.md §5.1). An archive-log trace
+# actions, which nest past the Rust backend's recursion limit (test/Durable.Storage/docs/spec/verification.md §5.1). An archive-log trace
 # (ArchiveLogsTrace*) must replay, and a copy which repeats its first drainStart, while its drainer is in that segment,
 # must fail, so a replay which accepted any trace would not pass. A ledger map trace (LedgerMapTrace*) and an LSM trace
 # (ArchiveTrace*) must replay, and each of their models' trace mutants must be rejected at the step it changes.

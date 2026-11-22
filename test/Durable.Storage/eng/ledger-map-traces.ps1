@@ -1,7 +1,7 @@
 #Requires -Version 7.3
 
 # Generates the ledger map committer and transition simulations' traces and validates each against
-# specs/ledgers/LedgerMap.qnt (docs/spec/verification.md §5.1): LedgerMapCommitterSimulationTests and
+# test/Durable.Storage/specs/ledgers/LedgerMap.qnt (test/Durable.Storage/docs/spec/verification.md §5.1): LedgerMapCommitterSimulationTests and
 # TransitionSimulationTests write one Quint module per seed under artifacts/ledger-map-traces, and
 # model-check-quint.ps1 -Traces replays each with quint test and checks that each trace mutant is rejected at the step it
 # changes.
@@ -20,7 +20,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $traces = Join-Path $root 'artifacts' 'ledger-map-traces'
 Remove-Item -LiteralPath $traces -Recurse -Force -ErrorAction SilentlyContinue
 
-$project = Join-Path $root 'tests' 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
+$project = Join-Path $root 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
 & dotnet build $project -c SimulationRelease --no-restore
 if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."

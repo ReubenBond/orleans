@@ -13,7 +13,7 @@ namespace Orleans.Durable.Storage.Fuzz.Ledgers;
 /// </summary>
 public sealed class LedgerMapTarget : FuzzTarget
 {
-    /// <summary>The reasons of <c>tests/shared-vectors/ledgers/map-rejections.json</c>.</summary>
+    /// <summary>The reasons of <c>test/Durable.Storage/shared-vectors/ledgers/map-rejections.json</c>.</summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () =>
         GoldenVectors.Find().Cases("ledgers", "map-rejections.json").Select(static vector => GoldenVectors.Text(vector, "reason")).ToHashSet(StringComparer.Ordinal));
 

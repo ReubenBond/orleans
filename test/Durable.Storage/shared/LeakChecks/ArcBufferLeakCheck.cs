@@ -8,7 +8,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// <summary>
 /// Establishes that a test returned every <see cref="ArcBuffer"/> page it rented: every page rented from the pool, or
 /// wrapped around an array, under the check was released by its last owner (BUF-I1, BUF-I2;
-/// docs/spec/verification.md §11.1).
+/// test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 /// <remarks>
 /// <para>

@@ -3,7 +3,7 @@
     The conformance kit's simulated cases (verification.md §4.1): each case runs in a simulation of its own
     (SimulatedConformance.cs), with its concurrent windows' schedules explored within a preemption bound. The build
     rewrites this project's dependency closure, the simulation kit among it, under Clockwork's deterministic BCL and
-    controlled-task rule sets, and links SeededSimulation's simulation driver (eng/OrleansSimulation.targets). The
+    controlled-task rule sets, and links SeededSimulation's simulation driver (test/Durable.Storage/eng/OrleansSimulation.targets). The
     project runs beside the seed corpus (Orleans.Durable.Storage.Simulation.Tests).
   -->
   <!--

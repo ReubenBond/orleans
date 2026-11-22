@@ -100,7 +100,7 @@ public sealed class LedgerReader : IAsyncDisposable
     /// <summary>
     /// Gets the observer every recovery of a ledger this reader opens on nodes calls with each replica answer it handles,
     /// fixed when the reader is built, or <see langword="null"/>; deterministic simulation logs them for trace validation
-    /// (docs/spec/verification.md §5.1).
+    /// (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     internal Action<RecoveryStep>? RecoveryObserver { get; init; }
 

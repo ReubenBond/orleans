@@ -52,7 +52,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// </para>
 /// <para>
 /// Each scripted step forces a path the review of the controllers required, so the run's steps are its cost
-/// (docs/spec/verification.md §12): the rounds are two, the retirement runs while the map holds the target's few ledgers
+/// (test/Durable.Storage/docs/spec/verification.md §12): the rounds are two, the retirement runs while the map holds the target's few ledgers
 /// and repairs the fewest, and the timeout is the shortest which no reply reaches.
 /// </para>
 /// </remarks>
@@ -61,7 +61,7 @@ public sealed class ControllerSimulationTests
     private const int NodeCount = 4;
     private const int FirstSeed = 1;
 
-    // Every change runs one seed, and exploration runs more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // Every change runs one seed, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private static readonly TimeSpan Deadline = TimeSpan.FromMilliseconds(40);
 
@@ -221,7 +221,7 @@ public sealed class ControllerSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment, Mutant mutant, MembershipChange? change = null)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var network = environment.Network;
         network.BaseMessageDelay = TimeSpan.FromMilliseconds(1);

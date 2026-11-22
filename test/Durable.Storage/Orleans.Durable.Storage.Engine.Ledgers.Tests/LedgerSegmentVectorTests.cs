@@ -9,7 +9,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Ledgers.Tests;
 
 /// <summary>
-/// Checks the shared segment vectors under <c>tests/shared-vectors/ledgers</c> (ledgers.md §7): each segment's batches
+/// Checks the shared segment vectors under <c>test/Durable.Storage/shared-vectors/ledgers</c> (ledgers.md §7): each segment's batches
 /// resolve, through a <see cref="LedgerSegmentView"/> from contiguous bytes and from pages of one byte, to the rows,
 /// versions, and tokens it records, and its batches' rows encode back to its bytes; each rejection is rejected at its batch
 /// for its reason, the rejections together covering every segment rule in ledgers.md §7's order; the snapshots render the

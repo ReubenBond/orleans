@@ -1,6 +1,6 @@
 #Requires -Version 7.3
 
-# Generates the LSM simulation's traces and validates each against specs/archive/Archive.qnt (docs/spec/verification.md
+# Generates the LSM simulation's traces and validates each against test/Durable.Storage/specs/archive/Archive.qnt (test/Durable.Storage/docs/spec/verification.md
 # §5.1): ArchiveTraceTests writes one Quint module per seed under artifacts/archive-traces, and model-check-quint.ps1
 # -Traces replays each with quint test and checks that each trace mutant is rejected at the step it changes.
 [CmdletBinding()]
@@ -18,7 +18,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $traces = Join-Path $root 'artifacts' 'archive-traces'
 Remove-Item -LiteralPath $traces -Recurse -Force -ErrorAction SilentlyContinue
 
-$project = Join-Path $root 'tests' 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
+$project = Join-Path $root 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
 & dotnet build $project -c SimulationRelease --no-restore
 if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."

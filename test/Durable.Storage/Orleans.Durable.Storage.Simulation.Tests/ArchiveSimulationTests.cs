@@ -40,7 +40,7 @@ public sealed class ArchiveSimulationTests
     private const int FirstSeed = 1;
 
     // Each seed costs about 19 s of wall time, so every change runs three and exploration runs
-    // more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 3;
     private const int ReplaySeed = 2;
     private const int Writers = 3;
@@ -157,7 +157,7 @@ public sealed class ArchiveSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment, Workload workload, bool mapAfterStore, ArchiveChains.ChainMutant chainMutant = ArchiveChains.ChainMutant.None, Action<bool>? onCompleted = null)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var network = environment.Network;
         network.BaseMessageDelay = TimeSpan.FromMilliseconds(1);

@@ -11,7 +11,7 @@ namespace Orleans.Durable.Storage.Simulation;
 /// <summary>
 /// A simulated node which hosts one LedgerStore over <see cref="SimulatedWalStorage"/>, with per-node faults: process
 /// and operating-system crashes, restarts from durable state, pauses, isolation, media damage, and local storage
-/// failures, which stop the node's process (docs/spec/verification.md §7.2, §7.3).
+/// failures, which stop the node's process (test/Durable.Storage/docs/spec/verification.md §7.2, §7.3).
 /// </summary>
 /// <remarks>
 /// <para>

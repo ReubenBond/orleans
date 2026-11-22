@@ -12,7 +12,7 @@ namespace Orleans.Durable.Storage.Testing.Tests;
 /// <summary>
 /// The debug assertion hook's guarantees: a failed assertion throws at its site with its message, and each record fails
 /// its seeded run, its test, or its test assembly, whether or not the code under test caught its exception
-/// (docs/spec/verification.md §11.2).
+/// (test/Durable.Storage/docs/spec/verification.md §11.2).
 /// </summary>
 public sealed class DebugAssertionsTests
 {

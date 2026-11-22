@@ -6,14 +6,14 @@ namespace Orleans.Durable.Storage.Fuzz;
 
 /// <summary>
 /// Runs a decoder's target under libFuzzer, replays inputs through it, or writes its seeds (verification.md §6.1).
-/// <c>eng/fuzz.ps1</c> runs campaigns.
+/// <c>test/Durable.Storage/eng/fuzz.ps1</c> runs campaigns.
 /// </summary>
 internal static class Program
 {
     private const string Usage =
         """
         Usage:
-          Orleans.Durable.Storage.Fuzz <target>                       Fuzz the target under libfuzzer-dotnet (eng/fuzz.ps1 starts it).
+          Orleans.Durable.Storage.Fuzz <target>                       Fuzz the target under libfuzzer-dotnet (test/Durable.Storage/eng/fuzz.ps1 starts it).
           Orleans.Durable.Storage.Fuzz replay <target> <path>...      Check each input file, or every file below each directory.
           Orleans.Durable.Storage.Fuzz seed <target> <directory>      Write the target's seeds from the golden vectors.
           Orleans.Durable.Storage.Fuzz list                           List the targets and the longest input each campaign generates.
@@ -114,7 +114,7 @@ internal static class Program
     {
         if (Environment.GetEnvironmentVariable(LibFuzzerVariable) is null)
         {
-            return Fail($"'{target.Name}' runs under libfuzzer-dotnet; run a campaign with eng/fuzz.ps1, or check inputs with 'replay'.");
+            return Fail($"'{target.Name}' runs under libfuzzer-dotnet; run a campaign with test/Durable.Storage/eng/fuzz.ps1, or check inputs with 'replay'.");
         }
 
         Fuzzer.LibFuzzer.Run(input => _ = target.Check(input));

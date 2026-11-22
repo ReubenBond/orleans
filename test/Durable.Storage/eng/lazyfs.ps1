@@ -27,7 +27,7 @@ if (-not $IsLinux) {
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'dotnet-env.ps1')
 
-$project = Join-Path $root 'tests/Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj'
+$project = Join-Path $root 'Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj'
 $env:CLOG_LAZYFS = '1'
 $env:CLOG_LAZYFS_ROUNDS = "$Rounds"
 
@@ -41,6 +41,6 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-$exe = Join-Path $root "artifacts/bin/Orleans.Durable.Storage.Tests/$($Configuration.ToLowerInvariant())/Orleans.Durable.Storage.Tests"
+$exe = Join-Path $root "Orleans.Durable.Storage.Tests/bin/$Configuration/net11.0/Orleans.Durable.Storage.Tests"
 & $exe --filter-trait Category=LazyFs --explicit on
 exit $LASTEXITCODE

@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Writes a process dump of the test host when a test fails, so the state behind the failure can be inspected
-/// (docs/spec/verification.md). <c>CLOG_TEST_FAILURE_DUMPS</c> bounds the dumps per process (default 1; 0 disables them) and
+/// (test/Durable.Storage/docs/spec/verification.md). <c>CLOG_TEST_FAILURE_DUMPS</c> bounds the dumps per process (default 1; 0 disables them) and
 /// <c>CLOG_TEST_FAILURE_DUMP_TYPE</c> selects the dump type (default <c>WithHeap</c>).
 /// </summary>
 /// <remarks>

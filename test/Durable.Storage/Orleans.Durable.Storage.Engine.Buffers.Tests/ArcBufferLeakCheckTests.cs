@@ -4,7 +4,7 @@ using Xunit.Sdk;
 namespace Orleans.Durable.Storage.Engine.Buffers.Tests;
 
 /// <summary>
-/// Tests of the page accounting behind the leak checks (BUF-I1, BUF-I2; docs/spec/verification.md §11.1): a page is
+/// Tests of the page accounting behind the leak checks (BUF-I1, BUF-I2; test/Durable.Storage/docs/spec/verification.md §11.1): a page is
 /// attributed to the accounting current where it is rented and returns to it wherever it is released.
 /// </summary>
 public sealed class ArcBufferLeakCheckTests : IDisposable

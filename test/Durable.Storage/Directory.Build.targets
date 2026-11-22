@@ -9,7 +9,7 @@
 
   <!--
     Storage's test applications run under their own testconfig.json, which enables the crash and hang dump extensions
-    and keeps xUnit's default parallelism, in place of Orleans' (docs/spec/verification.md).
+    and keeps xUnit's default parallelism, in place of Orleans' (test/Durable.Storage/docs/spec/verification.md).
   -->
   <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
     <None Remove="$(SourceRoot)test\testconfig.json" />

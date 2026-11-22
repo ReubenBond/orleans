@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- The Debug leg runs History's debug assertions here (docs/spec/verification.md §12). -->
+  <!-- The Debug leg runs History's debug assertions here (test/Durable.Storage/docs/spec/verification.md §12). -->
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>
   </PropertyGroup>

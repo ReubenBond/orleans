@@ -1,7 +1,7 @@
 // -*- mode: Bluespec; -*-
 /**
  * The ledger map and per-key history
- * (docs/spec/components/ledgers.md §5, §8; archive-lsm.md §2.5, §8.3).
+ * (test/Durable.Storage/docs/spec/components/ledgers.md §5, §8; archive-lsm.md §2.5, §8.3).
  *
  * Keys are KeyBits-bit integers, and every ledger owns a dyadic range: the
  * keys whose top `depth` bits equal `prefix`. One conditional ledger-map write
@@ -13,7 +13,7 @@
  * ones overlap. Ledgers carry no predecessor links.
  *
  * An append lands atomically at its ledger's next slot; the seal and recovery
- * which make landing and closing exclusive are checked by specs/ledger.
+ * which make landing and closing exclusive are checked by test/Durable.Storage/specs/ledger.
  * A ledger's primary admits an entry for key k iff its JSN is one past the
  * fold of k's history over the ledgers whose IDs are at most its own. A
   * ledger's primary may outlive its closing; only the seal stops its appends.

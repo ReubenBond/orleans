@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Engine.Wal.Tests;
 
 /// <summary>
 /// Shows that the handle checks see an open handle and pass once it is closed, so a test which passes them proves its
-/// owner closed every handle (docs/spec/verification.md §11.1).
+/// owner closed every handle (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 public sealed class HandleLeakCheckTests : IDisposable
 {

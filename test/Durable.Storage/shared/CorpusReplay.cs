@@ -41,7 +41,7 @@ internal static class CorpusReplay
     }
 
     /// <summary>
-    /// Checks every input of a target's committed corpus, <c>fuzz/corpus/{target}</c> and its <c>regressions</c>. The
+    /// Checks every input of a target's committed corpus, <c>test/Durable.Storage/fuzz/corpus/{target}</c> and its <c>regressions</c>. The
     /// seeds stay in the golden vectors, so no committed input is a copy of one.
     /// </summary>
     /// <param name="targets">The layer's targets.</param>
@@ -50,7 +50,7 @@ internal static class CorpusReplay
     public static async Task ReplayCorpusAsync(IEnumerable<FuzzTarget> targets, string name, Func<Func<Task>, Task>? eachInput = null)
     {
         var target = targets.Single(target => target.Name == name);
-        var directory = Path.Combine(Vectors.RepositoryRoot, "fuzz", "corpus", name);
+        var directory = Path.Combine(Vectors.StorageRoot, "fuzz", "corpus", name);
         var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal).ToArray();
         Assert.NotEmpty(files);
         var seeds = target.Seeds(Vectors).Select(Convert.ToHexString).ToHashSet(StringComparer.Ordinal);

@@ -2,8 +2,8 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.Engine.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj",
-      "../../tests/Orleans.Durable.Storage.Model.Tests/Orleans.Durable.Storage.Model.Tests.csproj"
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj",
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Model.Tests/Orleans.Durable.Storage.Model.Tests.csproj"
     ],
     "mutate": [
       "MetaStore/InMemoryConditionalRegister.cs",

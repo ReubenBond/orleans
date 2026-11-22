@@ -11,7 +11,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Archive.Lsm.Tests;
 
 /// <summary>
-/// Checks the shared run object vectors under <c>tests/shared-vectors/archive</c> (archive §7): each object's bytes
+/// Checks the shared run object vectors under <c>test/Durable.Storage/shared-vectors/archive</c> (archive §7): each object's bytes
 /// decode to its value, as the format's independent reading of the rules also reads them, and the writer encodes each
 /// value it can write as its bytes; each rejection is rejected for its reason, by the whole read, the partial decoders,
 /// and the independent reading, which together cover every reason in §7's order. The snapshots render the decoded objects
@@ -121,7 +121,7 @@ public sealed partial class RunObjectVectorTests : IDisposable
     [Fact]
     public void TheReasonsAreArchiveSevensInItsOrder()
     {
-        var archive = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "spec", "components", "archive-lsm.md"));
+        var archive = File.ReadAllText(Path.Combine(StorageRoot(), "docs", "spec", "components", "archive-lsm.md"));
         var table = archive[archive.IndexOf("**Run object**", StringComparison.Ordinal)..];
         table = table[table.IndexOf("| Reason | Rule |", StringComparison.Ordinal)..];
         table = table[..table.IndexOf("\n\n", StringComparison.Ordinal)];

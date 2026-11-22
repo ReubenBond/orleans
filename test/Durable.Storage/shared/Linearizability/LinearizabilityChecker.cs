@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Checks histories for linearizability against a <see cref="LinearizabilityModel{TState, TInput, TOutput}"/> with
-/// Porcupine's algorithm (docs/spec/verification.md §3.4).
+/// Porcupine's algorithm (test/Durable.Storage/docs/spec/verification.md §3.4).
 /// </summary>
 /// <remarks>
 /// <para>

@@ -1,7 +1,7 @@
 {
   "name": "clog-quint-tools",
   "private": true,
-  "description": "Pinned Quint toolchain for eng/model-check-quint.ps1.",
+  "description": "Pinned Quint toolchain for test/Durable.Storage/eng/model-check-quint.ps1.",
   "dependencies": {
     "@informalsystems/quint": "0.33.0"
   }

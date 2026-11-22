@@ -30,7 +30,7 @@ public readonly record struct LedgerMapTraceBatch(long Slot, byte? Key, bool Sta
 
 /// <summary>
 /// A simulation's ledger map trace, which <see cref="LedgerMapTraceExport"/> renders for validation against
-/// <c>specs/ledgers/LedgerMap.qnt</c> (docs/spec/verification.md §5.1): every value the register applied, in order,
+/// <c>test/Durable.Storage/specs/ledgers/LedgerMap.qnt</c> (test/Durable.Storage/docs/spec/verification.md §5.1): every value the register applied, in order,
 /// interleaved with the proposals answered durable, and each traced ledger's decided batches. Recording takes no step of
 /// the simulation, so it leaves a run's schedule as it is.
 /// </summary>

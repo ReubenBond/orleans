@@ -1,7 +1,7 @@
 <Project>
   <!--
     The simulation kit is a library which simulation test projects reference, not a test application, so it takes the
-    repository's build settings without those of tests/Directory.Build.props.
+    repository's build settings without those of test/Durable.Storage/Directory.Build.props.
   -->
   <Import Project="..\..\Directory.Build.props" />
 </Project>

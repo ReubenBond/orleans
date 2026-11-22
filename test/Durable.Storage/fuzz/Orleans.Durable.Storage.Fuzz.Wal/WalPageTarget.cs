@@ -14,7 +14,7 @@ namespace Orleans.Durable.Storage.Fuzz.Wal;
 public sealed class WalPageTarget : FuzzTarget
 {
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/wal/page-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/wal/page-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("wal", "page-rejections.json"));
 

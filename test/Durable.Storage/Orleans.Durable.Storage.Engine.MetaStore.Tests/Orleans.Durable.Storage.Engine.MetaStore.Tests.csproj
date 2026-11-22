@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The Debug leg runs these tests in Debug, where Orleans.Durable.Storage.Engine.Buffers poisons each page as it returns to its pool, so a provider
-    which read a write's value after the write completed would land the poison (docs/spec/verification.md §12).
+    which read a write's value after the write completed would land the poison (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>

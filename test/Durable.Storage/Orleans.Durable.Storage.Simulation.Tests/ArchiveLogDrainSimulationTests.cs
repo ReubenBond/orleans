@@ -49,7 +49,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// </remarks>
 public sealed class ArchiveLogDrainSimulationTests
 {
-    // Every change runs two seeds, and exploration runs more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // Every change runs two seeds, and exploration runs more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int FirstSeed = 1;
     private const int SeedCount = 2;
     private const int Rounds = 4;

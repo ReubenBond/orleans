@@ -7,7 +7,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// One simulation run's shared state: its Clockwork cluster, its transport, the trace it records, the components whose
-/// lifetimes it owns, and the checks it runs after every step and at teardown (docs/spec/verification.md §7).
+/// lifetimes it owns, and the checks it runs after every step and at teardown (test/Durable.Storage/docs/spec/verification.md §7).
 /// </summary>
 /// <remarks>
 /// <para>

@@ -9,7 +9,7 @@ using Orleans.Durable.Storage.Testing;
 namespace Orleans.Durable.Storage.Engine.Ledgers.Tests.Objects;
 
 /// <summary>
-/// The object-store ledgers' golden vectors (object-ledgers.md §7, §8.1; <c>tests/shared-vectors/ledgers</c>): the names
+/// The object-store ledgers' golden vectors (object-ledgers.md §7, §8.1; <c>test/Durable.Storage/shared-vectors/ledgers</c>): the names
 /// and reverse keys, their listing order, the slots' classification and settlement, and the store's record.
 /// </summary>
 public sealed class ObjectLedgerVectorTests : IDisposable

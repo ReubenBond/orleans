@@ -10,27 +10,27 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = Split-Path $PSScriptRoot -Parent
+$repositoryRoot = Split-Path $PSScriptRoot -Parent  # test/Durable.Storage
 $resultsDirectory = Join-Path $repositoryRoot 'artifacts\TestResults'
 $reportDirectory = Join-Path $repositoryRoot 'artifacts\coverage-report'
 $testProjects = @(
     @{
-        Path = 'tests\Orleans.Durable.Storage.Engine.Buffers.Tests\Orleans.Durable.Storage.Engine.Buffers.Tests.csproj'
+        Path = 'Orleans.Durable.Storage.Engine.Buffers.Tests\Orleans.Durable.Storage.Engine.Buffers.Tests.csproj'
         Prefix = 'Orleans.Durable.Storage.Engine.Buffers.Tests'
         Include = '[Orleans.Durable.Storage.Engine]Orleans.Durable.Storage.Engine.Buffers*'
     },
     @{
-        Path = 'tests\Orleans.Durable.Storage.Engine.Wal.Tests\Orleans.Durable.Storage.Engine.Wal.Tests.csproj'
+        Path = 'Orleans.Durable.Storage.Engine.Wal.Tests\Orleans.Durable.Storage.Engine.Wal.Tests.csproj'
         Prefix = 'Orleans.Durable.Storage.Engine.Wal.Tests'
         Include = '[Orleans.Durable.Storage.Engine]Orleans.Durable.Storage.Engine.Wal*'
     },
     @{
-        Path = 'tests\Orleans.Durable.Storage.Engine.Ledgers.Tests\Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj'
+        Path = 'Orleans.Durable.Storage.Engine.Ledgers.Tests\Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj'
         Prefix = 'Orleans.Durable.Storage.Engine.Ledgers.Tests'
         Include = '[Orleans.Durable.Storage.Engine]Orleans.Durable.Storage.Engine.Ledgers*'
     },
     @{
-        Path = 'tests\Orleans.Durable.Storage.CasPaxos.Tests\Orleans.Durable.Storage.CasPaxos.Tests.csproj'
+        Path = 'Orleans.Durable.Storage.CasPaxos.Tests\Orleans.Durable.Storage.CasPaxos.Tests.csproj'
         Prefix = 'Orleans.Durable.Storage.CasPaxos.Tests'
         Include = '[Orleans.Durable.Storage.CasPaxos]*'
     }

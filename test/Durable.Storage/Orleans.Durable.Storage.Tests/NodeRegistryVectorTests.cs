@@ -13,7 +13,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// Checks the shared node registry vectors under <c>tests/shared-vectors/orleans</c> (orleans.md §7.3): each value encodes
+/// Checks the shared node registry vectors under <c>test/Durable.Storage/shared-vectors/orleans</c> (orleans.md §7.3): each value encodes
 /// to its bytes and its bytes decode to it, contiguous and from segments; each rejection is rejected for the reason of the
 /// first rule it breaks, contiguous, from segments, and through a register's read, as the independent reading of the rules
 /// names it; and together the rejections cover §7.3's table of reasons, in its order, with pairs of adjacent rules which
@@ -165,7 +165,7 @@ public sealed partial class NodeRegistryVectorTests : IDisposable
     /// <summary>Returns the reason codes of orleans.md §7.3's table, in order.</summary>
     private static string[] SpecReasons()
     {
-        var spec = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "spec", "compositions", "orleans.md"));
+        var spec = File.ReadAllText(Path.Combine(StorageRoot(), "docs", "spec", "compositions", "orleans.md"));
         var start = spec.IndexOf("### 7.3 Node registry", StringComparison.Ordinal);
         var section = spec[start..spec.IndexOf("## 8. Operation", start, StringComparison.Ordinal)];
         return [.. ReasonRow().Matches(section).Select(static match => match.Groups["reason"].Value)];

@@ -27,7 +27,7 @@ public sealed class TransitionSimulationTests
     private const int FirstSeed = 1;
 
     // Each seed costs about 20 s of wall time, so every change runs one and exploration runs
-    // more through CLOG_SIM_SEEDS (docs/spec/verification.md §7.4, §12).
+    // more through CLOG_SIM_SEEDS (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     private const int SeedCount = 1;
     private const string PathEntry = "path: ";
     private static readonly TimeSpan Deadline = TimeSpan.FromMilliseconds(40);
@@ -110,7 +110,7 @@ public sealed class TransitionSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment, Workload workload)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var network = environment.Network;
         network.BaseMessageDelay = TimeSpan.FromMilliseconds(1);
@@ -208,7 +208,7 @@ public sealed class TransitionSimulationTests
         private readonly List<LedgerMapSubmission> _submissions = [];
 
         // The register's values and the durable answers in the order the run met them, and the ledgers' batches, which
-        // trace validation replays against the ledger map model (docs/spec/verification.md §5.1). Recording takes no step.
+        // trace validation replays against the ledger map model (test/Durable.Storage/docs/spec/verification.md §5.1). Recording takes no step.
         private readonly LedgerMapTrace _mapTrace = new();
         private bool _running = true;
         private bool _faulty = true;
@@ -482,7 +482,7 @@ public sealed class TransitionSimulationTests
 
         /// <summary>
         /// Cancels on the simulation's thread: <see cref="CancellationTokenSource.CancelAsync"/> would run the callbacks
-        /// the system under test registered on a real thread (docs/spec/verification.md §7.1).
+        /// the system under test registered on a real thread (test/Durable.Storage/docs/spec/verification.md §7.1).
         /// </summary>
         private static void Interrupt(CancellationTokenSource interruption) => interruption.Cancel();
 

@@ -4,7 +4,7 @@ using System.Text;
 namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
-/// Asserts that client histories are linearizable (docs/spec/verification.md §3.4).
+/// Asserts that client histories are linearizable (test/Durable.Storage/docs/spec/verification.md §3.4).
 /// </summary>
 internal static class LinearizabilityAssert
 {

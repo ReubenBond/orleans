@@ -10,28 +10,24 @@ param(
     [switch] $Fix,
 
     # With -Check Explore, the seeds CLOG_SIM_SEEDS gives the simulation corpora: a seed, a range first..last, or a
-    # comma-separated list of either (docs/spec/verification.md §7.4).
+    # comma-separated list of either (test/Durable.Storage/docs/spec/verification.md §7.4).
     [string] $Seeds,
 
     # With -Check ExploreSchedules, the conformance classes to explore: a class name, or a wildcard at its start or end, as
-    # the test host's --filter-class takes it (docs/spec/verification.md §4.1, §12).
+    # the test host's --filter-class takes it (test/Durable.Storage/docs/spec/verification.md §4.1, §12).
     [string] $Classes = '*ConformanceTests'
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$root = Split-Path $PSScriptRoot -Parent
+# Durable Storage's verification assets live under test/Durable.Storage; commands run from the repository root, over the
+# Storage solution filter, and write their reports and evidence under test/Durable.Storage/artifacts.
+$storage = Split-Path $PSScriptRoot -Parent
+$root = Split-Path (Split-Path $storage -Parent) -Parent
+$solution = 'test\Durable.Storage\Durable.Storage.slnf'
+$artifacts = Join-Path $storage 'artifacts'
 . (Join-Path $PSScriptRoot 'dotnet-env.ps1')
 $dotnet = (Get-Command dotnet -ErrorAction Stop).Source
-
-# Aspire's lock graph includes host-specific dashboard packages (#25).
-if (-not $IsWindows) {
-    $hostId = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
-    $env:ClogRestoreLockDirectory = (Join-Path $root "artifacts\validation\locks\$hostId") + [IO.Path]::DirectorySeparatorChar
-    $null = New-Item -ItemType Directory -Force -Path $env:ClogRestoreLockDirectory
-    $env:RestoreLockedMode = 'false'
-    Write-Host "Using host-specific restore locks: $env:ClogRestoreLockDirectory"
-}
 
 function Invoke-Dotnet {
     param([string[]] $Arguments)
@@ -44,12 +40,7 @@ function Invoke-Dotnet {
 
 function Restore {
     param([string] $Target)
-    $arguments = @('restore', $Target)
-    if ($IsWindows) {
-        $arguments += '--locked-mode'
-    }
-
-    Invoke-Dotnet $arguments
+    Invoke-Dotnet @('restore', $Target)
 }
 
 function Invoke-ValidationScript {
@@ -60,7 +51,7 @@ function Invoke-ValidationScript {
     }
 }
 
-# Dumps, crash sequences, hang logs, platform diagnostics, and seeded-simulation histories (docs/spec/verification.md).
+# Dumps, crash sequences, hang logs, platform diagnostics, and seeded-simulation histories (test/Durable.Storage/docs/spec/verification.md).
 function Get-Evidence {
     param([string] $Directory, [string] $Name)
     Get-ChildItem -LiteralPath $Directory -File -Filter "$Name*" |
@@ -80,9 +71,9 @@ function Write-Evidence {
 }
 
 function Get-TestProjects {
-    [xml] $solution = Get-Content -LiteralPath (Join-Path $root 'Clog.slnx') -Raw
-    $projects = @($solution.SelectNodes('//Project') | Where-Object { $_.Path -like 'tests/*' } |
-        ForEach-Object { $_.Path.Replace('/', [IO.Path]::DirectorySeparatorChar) })
+    $filter = Get-Content -LiteralPath (Join-Path $root $solution) -Raw | ConvertFrom-Json
+    $projects = @($filter.solution.projects | Where-Object { $_ -like 'test/Durable.Storage/*' -and $_ -notlike 'test/Durable.Storage/fuzz/*' -and $_ -notlike 'test/Durable.Storage/benchmarks/*' -and $_ -notlike 'test/Durable.Storage/apphost/*' } |
+        ForEach-Object { $_.Replace('/', [IO.Path]::DirectorySeparatorChar) })
     if ($projects.Count -eq 0) {
         throw 'The solution contains no test projects.'
     }
@@ -109,7 +100,7 @@ function Get-ProjectProperties {
 }
 
 # A simulation test project builds and runs in the simulation configuration of the check's configuration, which
-# compiles the conditional seams in (docs/spec/build-packaging.md §1); every other project in the configuration itself.
+# compiles the conditional seams in (test/Durable.Storage/docs/spec/build-packaging.md §1); every other project in the configuration itself.
 function Get-TestConfiguration {
     param($Properties, [ValidateSet('Debug', 'Release')] [string] $Configuration)
     return $Properties.OrleansSimulationInstrumentedTestProject -eq 'true' ? "Simulation$Configuration" : $Configuration
@@ -134,7 +125,7 @@ function Invoke-TestProject {
         [string] $Subdirectory)
     $Project = $Project.Replace('\', [IO.Path]::DirectorySeparatorChar)
     $name = [IO.Path]::GetFileNameWithoutExtension($Project)
-    $directory = Join-Path $root "artifacts\validation\$Check"
+    $directory = Join-Path $artifacts "validation\$Check"
     if ($Subdirectory) {
         $directory = Join-Path $directory $Subdirectory
     }
@@ -208,8 +199,8 @@ function Write-EmulatorRecord {
     param([string] $Record, [string[]] $Configurations, [string[]] $Projects)
     $commit = (git -C $root rev-parse HEAD).Trim()
     $dirty = [bool] (git -C $root status --porcelain)
-    # Both AppHosts take their images from apphost/shared/EmulatorImages.cs, which pins each by digest.
-    $apphost = Get-Content -LiteralPath (Join-Path $root 'apphost\shared\EmulatorImages.cs') -Raw
+    # Both AppHosts take their images from test/Durable.Storage/apphost/shared/EmulatorImages.cs, which pins each by digest.
+    $apphost = Get-Content -LiteralPath (Join-Path $storage 'apphost\shared\EmulatorImages.cs') -Raw
     $pattern = 'EmulatorImage (?<name>\w+) \{ get; \} = new\("(?<image>[^"]+)", (?:"(?<tag>[^"]+)"|null), "(?<digest>[0-9a-f]{64})"\)'
     $images = @([regex]::Matches($apphost, $pattern) | ForEach-Object {
             [ordered] @{
@@ -225,7 +216,7 @@ function Write-EmulatorRecord {
 
     $reports = @(foreach ($configuration in $Configurations) {
             foreach ($project in $Projects) {
-                "artifacts/validation/Emulators/$configuration/$([IO.Path]::GetFileNameWithoutExtension($project)).xml"
+                "test/Durable.Storage/artifacts/validation/Emulators/$configuration/$([IO.Path]::GetFileNameWithoutExtension($project)).xml"
             }
         })
     [ordered] @{
@@ -242,11 +233,11 @@ function Write-EmulatorRecord {
 Push-Location $root
 try {
     switch ($Check) {
-        'Restore' { Restore 'Clog.slnx' }
-        'Build' { Invoke-Dotnet @('build', 'Clog.slnx', '-c', 'Release', '--no-restore') }
-        # MSBuildWorkspace also opens the submodules' projects, which the solution reaches through references; their
-        # code keeps upstream's formatting (docs/spec/build-packaging.md §2).
-        'Format' { Invoke-Dotnet (@('format', 'Clog.slnx', '--no-restore', '--exclude', 'vendor/') + ($Fix ? @() : @('--verify-no-changes'))) }
+        'Restore' { Restore $solution }
+        'Build' { Invoke-Dotnet @('build', $solution, '-c', 'Release', '--no-restore') }
+        # MSBuildWorkspace also opens the Orleans projects the Storage projects reference; Orleans' own formatting check
+        # covers them, so this check formats Storage's directories alone.
+        'Format' { Invoke-Dotnet (@('format', $solution, '--no-restore', '--include', 'src/Orleans.Durable.Storage*/', 'src/Azure/Orleans.Durable.Storage.AzureStorage/', 'src/AWS/Orleans.Durable.Storage.S3/', 'src/Google/Orleans.Durable.Storage.GoogleCloud/', 'test/Durable.Storage/', 'playground/DurableStorage/') + ($Fix ? @() : @('--verify-no-changes'))) }
         'Test' {
             foreach ($project in Get-TestProjects) {
                 $properties = Get-ProjectProperties $project
@@ -254,14 +245,14 @@ try {
                     Invoke-TestProject $project -Configuration (Get-TestConfiguration $properties 'Release') -Timeout $properties.ClogTestSessionTimeout
                 }
                 else {
-                    # A library under tests/, such as the simulation kit, has no tests of its own.
+                    # A library under test/Durable.Storage/, such as the simulation kit, has no tests of its own.
                     Write-Host "$project is not a test project."
                 }
             }
         }
         'TestDebug' {
             # Release builds compile Debug.Assert away, so the Debug leg builds its projects in Debug and runs them
-            # (docs/spec/verification.md §12).
+            # (test/Durable.Storage/docs/spec/verification.md §12).
             $leg = @(Get-TestProjects | Where-Object { Test-InDebugLeg $_ })
             if ($leg.Count -eq 0) {
                 throw 'No test project sets ClogDebugLeg.'
@@ -276,7 +267,7 @@ try {
         }
         'CasPaxos' {
             foreach ($name in @('Orleans.Durable.Storage.CasPaxos.Tests', 'Orleans.Durable.Storage.Architecture.Tests')) {
-                $project = "tests\$name\$name.csproj"
+                $project = "test\Durable.Storage\$name\$name.csproj"
                 Restore $project
                 Invoke-Dotnet @('build', $project, '-c', 'Release', '--no-restore')
                 Invoke-TestProject $project -Configuration 'Release' -Timeout (Get-ProjectProperties $project).ClogTestSessionTimeout
@@ -286,15 +277,15 @@ try {
         'Emulators' {
             # The cloud providers, and plain Orleans over the composition's archive logs, against the AppHost's emulators,
             # which the tests start through Aspire's testing host; an emulator which does not start fails its tests
-            # (docs/spec/verification.md §10). Both configurations run, each with its own report, so the Debug build's
+            # (test/Durable.Storage/docs/spec/verification.md §10). Both configurations run, each with its own report, so the Debug build's
             # poisoned pages expose an upload which read its content after its lease ended. With the emulators on, a skipped
             # test is a failure, except for the live-account cases while their CLOG_*_LIVE env vars (CLOG_AZURE_LIVE,
             # CLOG_S3_LIVE, CLOG_S3_EXPRESS_LIVE, CLOG_GCS_LIVE) are unset, whose skip reasons match each live-account
             # helper's SkipReason verbatim; with them set no skip is allowed. A passing run records its commit, the
             # AppHost's image digests, and the tests whose skip it allowed beside the reports.
-            $projects = @('tests\Orleans.Durable.Storage.Cloud.Tests\Orleans.Durable.Storage.Cloud.Tests.csproj', 'tests\Orleans.Durable.Storage.Interop.Tests\Orleans.Durable.Storage.Interop.Tests.csproj')
+            $projects = @('test\Durable.Storage\Orleans.Durable.Storage.Cloud.Tests\Orleans.Durable.Storage.Cloud.Tests.csproj', 'test\Durable.Storage\Orleans.Durable.Storage.Interop.Tests\Orleans.Durable.Storage.Interop.Tests.csproj')
             $env:CLOG_EMULATORS = '1'
-            $record = Join-Path $root 'artifacts\validation\Emulators\run.json'
+            $record = Join-Path $artifacts 'validation\Emulators\run.json'
             if (Test-Path -LiteralPath $record -PathType Leaf) {
                 Remove-Item -LiteralPath $record
             }
@@ -318,8 +309,8 @@ try {
             }
 
             $allowedSkipsByProject = @{
-                'tests\Orleans.Durable.Storage.Cloud.Tests\Orleans.Durable.Storage.Cloud.Tests.csproj' = $cloudSkips
-                'tests\Orleans.Durable.Storage.Interop.Tests\Orleans.Durable.Storage.Interop.Tests.csproj' = $azureOnlySkips
+                'test\Durable.Storage\Orleans.Durable.Storage.Cloud.Tests\Orleans.Durable.Storage.Cloud.Tests.csproj' = $cloudSkips
+                'test\Durable.Storage\Orleans.Durable.Storage.Interop.Tests\Orleans.Durable.Storage.Interop.Tests.csproj' = $azureOnlySkips
             }
             $script:AllowedSkipped = @()
             $configurations = @('Release', 'Debug')
@@ -334,9 +325,9 @@ try {
         }
         'EndToEnd' {
             # The Orleans composition's multi-silo scenarios, each checked against its history: the smoke set the default
-            # tests run, and the explicit rest, a milestone's end-to-end run (docs/spec/verification.md §12). A skipped
+            # tests run, and the explicit rest, a milestone's end-to-end run (test/Durable.Storage/docs/spec/verification.md §12). A skipped
             # scenario fails the run, and so does one which loses its trait.
-            $project = 'tests\Orleans.Durable.Storage.Tests\Orleans.Durable.Storage.Tests.csproj'
+            $project = 'test\Durable.Storage\Orleans.Durable.Storage.Tests\Orleans.Durable.Storage.Tests.csproj'
             Invoke-Dotnet @('build', $project, '-c', 'Release', '--no-restore')
             Invoke-TestProject $project -Configuration 'Release' -Timeout '2h' -Explicit 'on' -Filter @('--filter-trait', 'Category=EndToEnd') -MinimumTests 14 -NoSkips
         }
@@ -345,7 +336,7 @@ try {
                 throw 'The Explore check takes -Seeds, for example 1..500.'
             }
 
-            $project = 'tests\Orleans.Durable.Storage.Simulation.Tests\Orleans.Durable.Storage.Simulation.Tests.csproj'
+            $project = 'test\Durable.Storage\Orleans.Durable.Storage.Simulation.Tests\Orleans.Durable.Storage.Simulation.Tests.csproj'
             Invoke-Dotnet @('build', $project, '-c', 'SimulationRelease', '--no-restore')
             $env:CLOG_SIM_SEEDS = $Seeds
             Invoke-TestProject $project -Configuration 'SimulationRelease' -Timeout '24h'
@@ -355,7 +346,7 @@ try {
             # The simulated conformance classes under the deep bound: every concurrent window explored, up to two
             # preemptions and 2,000 schedules a window, where the gate explores a stride within one (verification.md §4.1,
             # §12). Milestones and the nightly window run it.
-            $project = 'tests\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj'
+            $project = 'test\Durable.Storage\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj'
             Invoke-Dotnet @('build', $project, '-c', 'SimulationRelease', '--no-restore')
             $env:CLOG_SCHEDULE_BOUND = 'deep'
             Invoke-TestProject $project -Configuration 'SimulationRelease' -Timeout '24h' -Filter @('--filter-class', $Classes)

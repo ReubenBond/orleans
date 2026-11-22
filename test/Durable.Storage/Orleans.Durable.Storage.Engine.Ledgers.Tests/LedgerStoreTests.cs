@@ -190,7 +190,7 @@ public sealed class LedgerStoreTests : IDisposable
 
     /// <summary>
     /// Disposing a store closes the WAL's files, every replica's checkpoint files, and their directories, whether the
-    /// store shut down cleanly or after a drop (docs/spec/verification.md §11.1).
+    /// store shut down cleanly or after a drop (test/Durable.Storage/docs/spec/verification.md §11.1).
     /// </summary>
     [Fact]
     public async Task DisposalClosesEveryFileAndDirectory()

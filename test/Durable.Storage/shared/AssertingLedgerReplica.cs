@@ -11,7 +11,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// <summary>
 /// A replica which fails a debug assertion on every write and forwards every other operation to the replica it wraps:
 /// a mutant on product code's path, whose exception a quorum counts as one replica's failure
-/// (docs/spec/verification.md §11.2).
+/// (test/Durable.Storage/docs/spec/verification.md §11.2).
 /// </summary>
 /// <param name="inner">The replica it wraps, which it owns.</param>
 internal sealed class AssertingLedgerReplica(ILedgerReplica inner) : ILedgerReplica

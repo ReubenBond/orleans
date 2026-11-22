@@ -13,7 +13,7 @@ namespace Orleans.Durable.Storage.Simulation;
 /// writes whose outcome is unknown, which apply before the caller hears, never, or later, and writes whose retrying client
 /// meets its own landed attempt as <see cref="ObjectCreateOutcome.Exists"/>, <see cref="ObjectReplaceOutcome.Mismatch"/>,
 /// or <see cref="ObjectAppendOutcome.LengthMismatch"/> (archive §3, §6; object-ledgers.md §3.1;
-/// docs/spec/verification.md §7.2).
+/// test/Durable.Storage/docs/spec/verification.md §7.2).
 /// </summary>
 /// <remarks>
 /// <para>

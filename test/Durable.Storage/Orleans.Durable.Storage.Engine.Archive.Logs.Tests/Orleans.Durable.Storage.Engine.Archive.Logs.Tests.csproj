@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The Debug leg runs the packer's debug assertions here, and checks that no page is read after its buffer's release
-    (docs/spec/verification.md §12).
+    (test/Durable.Storage/docs/spec/verification.md §12).
   -->
   <PropertyGroup>
     <ClogDebugLeg>true</ClogDebugLeg>

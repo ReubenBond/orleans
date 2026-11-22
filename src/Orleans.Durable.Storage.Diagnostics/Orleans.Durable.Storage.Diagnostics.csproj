@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The process's fatal-error handler (conventions.md §14), the assembly beneath every other: it references no project
-    and no package, and simulations leave it ordinary IL (eng/OrleansSimulation.targets).
+    and no package, and simulations leave it ordinary IL (test/Durable.Storage/eng/OrleansSimulation.targets).
   -->
   <PropertyGroup>
     <RootNamespace>Orleans.Durable.Storage.Diagnostics</RootNamespace>

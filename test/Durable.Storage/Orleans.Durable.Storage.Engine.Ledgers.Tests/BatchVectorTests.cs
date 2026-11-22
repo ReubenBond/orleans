@@ -10,7 +10,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Ledgers.Tests;
 
 /// <summary>
-/// Checks the shared batch vectors under <c>tests/shared-vectors/ledgers</c> (ledgers.md §7): each batch's segment state
+/// Checks the shared batch vectors under <c>test/Durable.Storage/shared-vectors/ledgers</c> (ledgers.md §7): each batch's segment state
 /// and rows encode to its bytes and its bytes decode to them, from one page and from pages of one byte, and each
 /// rejection is rejected for its reason, which together cover every reason of the batch rules in their order; the
 /// snapshots render the decoded batches and each rejection's reason and message (verification.md §8).

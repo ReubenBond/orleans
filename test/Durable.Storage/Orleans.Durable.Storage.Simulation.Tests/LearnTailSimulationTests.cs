@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// <see cref="LedgerWriter"/> appends three batches and, once idle, writes its contiguous tail explicitly to every
 /// replica; the reader on the second node learns that tail from the replica there and reads the last batch from it. Its
 /// ledger trace maps the learn to the model's fetcher, which learns a replica's retained tail (<c>LearnTail</c>), so trace
-/// validation checks the learned tail against the model (docs/spec/verification.md §5.1).
+/// validation checks the learned tail against the model (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 /// <remarks>
 /// The random corpora's readers learn no tail from one replica; this run fixes one which does. <c>just ledger-traces</c>

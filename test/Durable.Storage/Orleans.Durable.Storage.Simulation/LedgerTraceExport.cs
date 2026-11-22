@@ -7,7 +7,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// Renders one ledger's <see cref="LedgerTrace"/> events as the Quint module <c>LedgerTraceData</c>, which
-/// <c>specs/ledger-protocol/LedgerProtocolTrace.qnt</c> validates against the ledger model (docs/spec/verification.md §5.1).
+/// <c>test/Durable.Storage/specs/ledger-protocol/LedgerProtocolTrace.qnt</c> validates against the ledger model (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -872,7 +872,7 @@ public static class LedgerTraceExport
 
         /// <summary>
         /// Finds the requests in flight to a node whose records reached its disk before the node crashed, without an answer
-        /// the trace logged, and the event which first shows each (docs/spec/verification.md §5.1): the node's restart,
+        /// the trace logged, and the event which first shows each (test/Durable.Storage/docs/spec/verification.md §5.1): the node's restart,
         /// which recovered DATA no answer of the node held or a seal none reported, or, in the process the crash ended, a
         /// read which returned such DATA or an answer which reported such a seal, which no answer of the request's own
         /// follows in that process. A writer write, a recovery write of the position, or a seal counts when no delivery of

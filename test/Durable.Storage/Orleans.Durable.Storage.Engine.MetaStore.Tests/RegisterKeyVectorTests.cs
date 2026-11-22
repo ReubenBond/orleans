@@ -10,7 +10,7 @@ using ProtobufTimestamp = Google.Protobuf.WellKnownTypes.Timestamp;
 namespace Orleans.Durable.Storage.Engine.MetaStore.Tests;
 
 /// <summary>
-/// Checks the shared register-key vectors <c>tests/shared-vectors/metastore/register-keys.json</c> (metastore.md §7;
+/// Checks the shared register-key vectors <c>test/Durable.Storage/shared-vectors/metastore/register-keys.json</c> (metastore.md §7;
 /// MS-I4).
 /// </summary>
 [NoPageLeakCheck("Keys and versions are strings; the tests rent no pages.")]
@@ -124,21 +124,21 @@ public sealed class RegisterKeyVectorTests
 
     private static async Task<JsonDocument> LoadVectorAsync() =>
         JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(FindRepositoryRoot(), "tests", "shared-vectors", "metastore", "register-keys.json"),
+            Path.Combine(FindStorageRoot(), "shared-vectors", "metastore", "register-keys.json"),
             TestContext.Current.CancellationToken));
 
-    private static string FindRepositoryRoot()
+    private static string FindStorageRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
             directory is not null;
             directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
             {
-                return directory.FullName;
+                return Path.Combine(directory.FullName, "test", "Durable.Storage");
             }
         }
 
-        throw new DirectoryNotFoundException("Could not find the Clog repository root.");
+        throw new DirectoryNotFoundException("Could not find the Orleans repository root.");
     }
 }

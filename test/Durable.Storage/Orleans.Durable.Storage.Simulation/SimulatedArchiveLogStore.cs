@@ -5,7 +5,7 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// A process's view of an archive-log store in simulation (archive-logs.md §6, §10; docs/spec/verification.md §7.2): it
+/// A process's view of an archive-log store in simulation (archive-logs.md §6, §10; test/Durable.Storage/docs/spec/verification.md §7.2): it
 /// delays each write and properties read by a random latency, now and then long enough that the request lands as a
 /// straggler's, after its drain's segment completed elsewhere; a straggler's write runs detached from its caller, so a
 /// caller cancelled as a crash abandons it and it lands later, after the drain restarted; it holds every request at a gate a

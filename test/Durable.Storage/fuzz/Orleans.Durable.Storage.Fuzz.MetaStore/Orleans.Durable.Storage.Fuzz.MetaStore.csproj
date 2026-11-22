@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The fuzz targets of the MetaStore's formats (docs/spec/verification.md §6.1). They reference the provider package
+    The fuzz targets of the MetaStore's formats (test/Durable.Storage/docs/spec/verification.md §6.1). They reference the provider package
     whose format they decode, the file-system package, alone; the MetaStore's tests replay their corpora.
   -->
   <ItemGroup>

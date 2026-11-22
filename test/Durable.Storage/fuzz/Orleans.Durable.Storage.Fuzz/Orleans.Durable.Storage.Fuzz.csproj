@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The libFuzzer harness of docs/spec/verification.md §6.1: one executable over every layer's fuzz targets.
-    eng/fuzz.ps1 publishes it, instruments the decoder assemblies with SharpFuzz, and runs it under libfuzzer-dotnet.
+    The libFuzzer harness of test/Durable.Storage/docs/spec/verification.md §6.1: one executable over every layer's fuzz targets.
+    test/Durable.Storage/eng/fuzz.ps1 publishes it, instruments the decoder assemblies with SharpFuzz, and runs it under libfuzzer-dotnet.
     Each layer's tests replay its own targets' corpora.
   -->
   <PropertyGroup>

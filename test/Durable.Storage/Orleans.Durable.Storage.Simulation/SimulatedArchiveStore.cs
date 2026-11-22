@@ -7,7 +7,7 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// A simulated archive store over the memory store (archive.md §3, §9; docs/spec/verification.md §7.2): each read
+/// A simulated archive store over the memory store (archive.md §3, §9; test/Durable.Storage/docs/spec/verification.md §7.2): each read
 /// reaches the store after a random latency, reads it at one instant, and returns after another, or answers
 /// <see cref="ArchiveStoreRead.Stale"/>, as a store whose own snapshot proved out of date does, at
 /// <see cref="StaleRate"/>. Drains give it each key's rows of closed segments through <see cref="Drain"/>, which applies at once; its pure

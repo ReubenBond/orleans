@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// <summary>
 /// Keeps page leak checks from depending on each test class remembering to opt in: in an assembly whose tests own
 /// buffers, every test class holds an <see cref="ArcBufferLeakCheck"/> and disposes it, or names why it needs none
-/// (docs/spec/verification.md §11.1).
+/// (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 [NoPageLeakCheck("It reflects over the assembly's test classes and rents no pages.")]
 public sealed class PageLeakCheckCoverageTests

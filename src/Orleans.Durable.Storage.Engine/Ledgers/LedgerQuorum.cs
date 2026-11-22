@@ -86,7 +86,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
     /// <param name="recoveryObserver">
     /// The observer of every recovery's steps, which receives each replica answer a recovery handles, serially and before the
     /// recovery acts on it, or <see langword="null"/>; deterministic simulation logs them for trace validation
-    /// (docs/spec/verification.md §5.1).
+    /// (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </param>
     /// <param name="verifyBatch">
     /// Whether a batch's bytes pass the integrity check of the format above the protocol, which read repair and recovery
@@ -147,7 +147,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
     /// <paramref name="localNode"/>, when the map lists one there, is the preferred replica of its reads below the known
     /// contiguous tail (ledger-protocol.md §8.4); otherwise the first replica of such a read rotates from a start the
     /// ledger's ID derives, so first reads of different ledgers spread across their replicas. Every recovery calls
-    /// <paramref name="recoveryObserver"/>, when given, with each replica answer it handles (docs/spec/verification.md
+    /// <paramref name="recoveryObserver"/>, when given, with each replica answer it handles (test/Durable.Storage/docs/spec/verification.md
     /// §5.1). Read repair and recovery copy only a batch <paramref name="verifyBatch"/> accepts.
     /// </summary>
     /// <exception cref="ArgumentException">

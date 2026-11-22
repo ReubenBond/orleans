@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// <summary>
 /// Establishes at a simulation's teardown that no background work outlives its owners: once the owners are disposed,
 /// the cluster runs the work due at the current instant, without advancing its clock, and then holds no runnable,
-/// waiting, or blocked work, no armed timer, and no unfinished operation (docs/spec/verification.md §11.1).
+/// waiting, or blocked work, no armed timer, and no unfinished operation (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 /// <remarks>
 /// A scenario first drains its environment: it ends every pause and heals the network, so disposal finds every node

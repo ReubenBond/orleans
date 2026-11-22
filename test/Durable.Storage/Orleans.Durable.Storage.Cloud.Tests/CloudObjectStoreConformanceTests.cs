@@ -35,7 +35,7 @@ public sealed class CloudObjectStoreConformanceTests(CloudEmulators emulators) :
     /// Gets the examples LocalStack runs: every one but a refused replace's, after which LocalStack serves the object it
     /// replaced with its length and no bytes, which
     /// <see cref="CloudObjectStoreFaultTests.AWriteWhoseCrc32CIsWrongIsRefusedAndLeavesTheObjectAsItWas"/> pins
-    /// (docs/spec/verification.md §13).
+    /// (test/Durable.Storage/docs/spec/verification.md §13).
     /// </summary>
     public static TheoryData<string> S3Examples =>
         [.. ObjectStoreContract.Examples.Select(static row => row.Data).Where(static example => example != nameof(ObjectStoreContract.AWrongCrc32CIsRefusedAndLeavesTheObjectAsItWas))];

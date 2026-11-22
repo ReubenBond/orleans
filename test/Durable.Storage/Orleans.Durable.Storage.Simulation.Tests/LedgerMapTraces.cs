@@ -3,8 +3,8 @@ using System.Globalization;
 namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
-/// Writes a simulation's ledger map trace as the Quint module which replays it against <c>specs/ledgers/LedgerMap.qnt</c>,
-/// when <see cref="Variable"/> names a directory (docs/spec/verification.md §5.1); <c>eng/ledger-map-traces.ps1</c> sets it.
+/// Writes a simulation's ledger map trace as the Quint module which replays it against <c>test/Durable.Storage/specs/ledgers/LedgerMap.qnt</c>,
+/// when <see cref="Variable"/> names a directory (test/Durable.Storage/docs/spec/verification.md §5.1); <c>test/Durable.Storage/eng/ledger-map-traces.ps1</c> sets it.
 /// </summary>
 internal static class LedgerMapTraces
 {

@@ -9,7 +9,7 @@ namespace Orleans.Durable.Storage.Simulation;
 /// <summary>
 /// A writer, recovery executors, a seal checker, and a reader of the recovered positions, racing the partition of one
 /// replica, the pause of another, the crashes of nodes while they serve the first recovery's seal and while that
-/// recovery runs, and message loss and duplication until the faults heal (docs/spec/verification.md §7.1).
+/// recovery runs, and message loss and duplication until the faults heal (test/Durable.Storage/docs/spec/verification.md §7.1).
 /// </summary>
 /// <remarks>
 /// The race is the client process's work, so it runs on the client node's scheduler lane: the build rewrites the kit, so

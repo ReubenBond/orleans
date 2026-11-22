@@ -19,11 +19,11 @@ namespace Orleans.Durable.Storage.Testing;
 /// <content>
 /// Runs scenarios in Clockwork clusters: the seed decides every schedule, network, and fault choice, every invariant is
 /// checked after every step, the run tears its components down and checks what they leave, and a failure leaves
-/// Clockwork's replay artifact in the results directory (docs/spec/verification.md §7.4).
+/// Clockwork's replay artifact in the results directory (test/Durable.Storage/docs/spec/verification.md §7.4).
 /// </content>
 /// <remarks>
 /// <para>
-/// <c>eng/OrleansSimulation.targets</c> links this file into simulation projects only. It runs in the test host, outside every
+/// <c>test/Durable.Storage/eng/OrleansSimulation.targets</c> links this file into simulation projects only. It runs in the test host, outside every
 /// simulation, so it keeps ordinary IL: it drives the cluster from the test thread, and the scenario it starts on the
 /// cluster's scheduler lane resumes there after each <c>await</c>. The driver observes the test's cancellation token
 /// between steps. A scenario passes rewritten code only tokens it owns: the test host cancels its own token on a thread
@@ -573,7 +573,7 @@ internal static partial class SeededSimulation
             if (Interlocked.CompareExchange(ref _active, this, null) is not null)
             {
                 throw new InvalidOperationException(
-                    "A simulation started while another was running; simulations run one at a time (docs/spec/verification.md §7.1).");
+                    "A simulation started while another was running; simulations run one at a time (test/Durable.Storage/docs/spec/verification.md §7.1).");
             }
 
             _scenarioFactory = scenario;

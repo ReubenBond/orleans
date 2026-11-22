@@ -4,7 +4,7 @@
 Runs the BenchmarkDotNet microbenchmarks which a filter selects, with the pinned SDK.
 
 .DESCRIPTION
-Builds benchmarks/Orleans.Durable.Storage.Benchmarks in Release without restoring (just restore does), and passes the filter and any
+Builds test/Durable.Storage/benchmarks/Orleans.Durable.Storage.Benchmarks in Release without restoring (just restore does), and passes the filter and any
 further options to BenchmarkDotNet. Validate a new benchmark with --job Dry, and compare against an explicit
 baseline (AGENTS.md, "Performance").
 

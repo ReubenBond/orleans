@@ -3,7 +3,7 @@
  * The ledger storage contract's abstract model (ledger-protocol.md §2.7,
  * LL-I1 to LL-I9).
  *
- * Models one ledger as specs/ledgers/LedgerMap.qnt models it, where appends
+ * Models one ledger as test/Durable.Storage/specs/ledgers/LedgerMap.qnt models it, where appends
  * land atomically and sealing and recovery are left to the storage below,
  * together with the seal readers observe, readers' tail checks, and fetchers'
  * reads and drains below a learned contiguous tail. LedgerProtocol.qnt checks

@@ -19,7 +19,7 @@ public sealed class FuzzTargetsTests
     public void EveryCorpusBelongsToATarget() =>
         Assert.Equal(
             FuzzTargets.All.Select(static target => target.Name).Order(StringComparer.Ordinal),
-            Directory.EnumerateDirectories(Path.Combine(Vectors.RepositoryRoot, "fuzz", "corpus")).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            Directory.EnumerateDirectories(Path.Combine(Vectors.StorageRoot, "fuzz", "corpus")).Select(Path.GetFileName).Order(StringComparer.Ordinal));
 
     /// <summary>
     /// A campaign's longest input covers every seed, so libFuzzer mutates each seed whole.

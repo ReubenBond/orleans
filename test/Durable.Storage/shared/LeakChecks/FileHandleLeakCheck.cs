@@ -4,7 +4,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Establishes that a component closed every file under a directory when it was disposed: each file then opens with
-/// no sharing, which an open handle refuses (docs/spec/verification.md §11.1).
+/// no sharing, which an open handle refuses (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 /// <remarks>
 /// Windows refuses an exclusive open while any handle to the file is open. On Unix, .NET takes an advisory

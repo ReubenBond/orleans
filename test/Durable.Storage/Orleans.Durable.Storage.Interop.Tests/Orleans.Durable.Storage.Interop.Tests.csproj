@@ -3,7 +3,7 @@
     Plain Orleans reading the Orleans composition's archive logs (archive-logs.md §10, orleans.md §5.13): Orleans' own
     Azure journaling provider over the logs Clog writes, on the fake Azure transport on every change, and on Azurite,
     through the AppHost's emulators when CLOG_EMULATORS is 1 (just emulators), and on a live account under CLOG_AZURE_LIVE,
-    at milestones (docs/spec/verification.md §10). It references the composition, whose names it reads the logs by, and
+    at milestones (test/Durable.Storage/docs/spec/verification.md §10). It references the composition, whose names it reads the logs by, and
     so takes Orleans as the composition's tests do (build-packaging.md §2). The Debug leg runs it in Debug, where
     Orleans.Durable.Storage.Engine.Buffers poisons each page as it returns to its pool.
   -->

@@ -1,5 +1,5 @@
 // -*- mode: Bluespec; -*-
-// Trace validation of LedgerProtocol (docs/spec/verification.md §5.1): Quint's
+// Trace validation of LedgerProtocol (test/Durable.Storage/docs/spec/verification.md §5.1): Quint's
 // TypeScript runner replays each simulation's LedgerTrace as a sequence of
 // LedgerProtocol actions (with SeparateAnswers and TailWrites), advancing any
 // silent steps between logged events and asserting TraceInvariants after every

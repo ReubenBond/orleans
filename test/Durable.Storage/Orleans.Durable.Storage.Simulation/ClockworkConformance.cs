@@ -2,7 +2,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// The constructs Clog's rewritten code relies on, each written as Clog's code writes it, so a test runs it under
-/// Clockwork's rewrite and checks what it does (docs/spec/verification.md §7.1).
+/// Clockwork's rewrite and checks what it does (test/Durable.Storage/docs/spec/verification.md §7.1).
 /// </summary>
 public static partial class ClockworkConformance
 {

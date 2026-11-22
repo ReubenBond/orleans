@@ -8,7 +8,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Checks a system against an Accordant spec over operation sequences and concurrent groups which CsCheck generates and
-/// shrinks, or which Accordant generates (docs/spec/verification.md).
+/// shrinks, or which Accordant generates (test/Durable.Storage/docs/spec/verification.md).
 /// </summary>
 /// <typeparam name="TState">The spec's state.</typeparam>
 /// <typeparam name="TSystem">The system under test, created afresh for every case.</typeparam>
@@ -478,7 +478,7 @@ internal sealed class ConformanceKit<TState, TSystem>
         else
         {
             // Awaited one by one rather than through Task.WhenAll, which a simulation test assembly does not call
-            // (eng/BannedSymbols.Simulation.txt): every call ends before the first fault, in call order, is thrown.
+            // (test/Durable.Storage/eng/BannedSymbols.Simulation.txt): every call ends before the first fault, in call order, is thrown.
             _scheduler?.GroupStarting();
             var started = calls.Select(call => _scheduler is { } scheduler
                 ? scheduler.Start(() => ExecuteAsync(system, call))

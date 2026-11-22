@@ -28,7 +28,7 @@ public sealed class QuorumSimulationTests
     /// <summary>
     /// The simulation build deploys Clog's assemblies and the kit rewritten, and leaves ordinary IL in the test assembly,
     /// which starts each simulation, and in the fatal-error handler's assembly, whose interceptor the test host installs
-    /// (eng/OrleansSimulation.targets' exclusion).
+    /// (test/Durable.Storage/eng/OrleansSimulation.targets' exclusion).
     /// </summary>
     [Fact]
     public void TheBuildRewritesTheStorageAndTheKitButNotTheTests()
@@ -79,7 +79,7 @@ public sealed class QuorumSimulationTests
     /// <summary>
     /// Across the corpus, a node crashes while it serves the first recovery's seal and one while that recovery runs, and
     /// each restarts, so the race's checks and its ledger trace cover a seal or a recovery write whose record a crash
-    /// left in flight (docs/spec/verification.md §5.1).
+    /// left in flight (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     [Fact]
     public void TheCorpusCrashesNodesWhileTheyServeASealAndWhileARecoveryRuns()
@@ -139,7 +139,7 @@ public sealed class QuorumSimulationTests
     /// <summary>
     /// Seed 1's ledger trace, rendered as the module trace validation checks, is pinned, so that a change to how the
     /// export orders a node's answers, derives its deliveries and landed writes, or shapes its records shows as a reviewed
-    /// diff (docs/spec/verification.md §5.1).
+    /// diff (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     /// <returns>A task which completes once the snapshot is verified.</returns>
     [Fact]
@@ -168,7 +168,7 @@ public sealed class QuorumSimulationTests
     private static async Task SimulateAsync(SimulationEnvironment environment, Action<string>? rendered = null, bool exports = true)
     {
         // The scenario's calls carry a cancellable token, as production callers' do, which nothing cancels: the scenario
-        // owns it, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1). CancellationToken.None
+        // owns it, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1). CancellationToken.None
         // would skip the code under test's registrations on it, and change the seeds' schedules.
         using var cancellation = new CancellationTokenSource();
         var cancellationToken = cancellation.Token;

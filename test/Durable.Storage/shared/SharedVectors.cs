@@ -5,7 +5,7 @@ using Orleans.Durable.Storage.Engine;
 namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
-/// Reads the language-neutral golden vectors under <c>tests/shared-vectors</c> (formats.md §6): 64-bit integers are
+/// Reads the language-neutral golden vectors under <c>test/Durable.Storage/shared-vectors</c> (formats.md §6): 64-bit integers are
 /// decimal strings and byte strings are lowercase hexadecimal.
 /// </summary>
 internal static class SharedVectors
@@ -26,7 +26,7 @@ internal static class SharedVectors
     /// <summary>
     /// Returns the path of a vector file.
     /// </summary>
-    internal static string FilePath(string area, string file) => Path.Combine(RepositoryRoot(), "tests", "shared-vectors", area, file);
+    internal static string FilePath(string area, string file) => Path.Combine(StorageRoot(), "shared-vectors", area, file);
 
     internal static string Name(JsonElement element) => element.TryGetProperty("name", out var name) ? name.GetString()! : "the vector";
 
@@ -64,18 +64,18 @@ internal static class SharedVectors
     }
 
     /// <summary>
-    /// Returns the repository root: the nearest directory above the test output which holds <c>Clog.slnx</c>.
+    /// Returns the Durable Storage root, <c>test/Durable.Storage</c>, in the repository above the test output: the nearest directory which holds <c>Orleans.slnx</c>.
     /// </summary>
-    internal static string RepositoryRoot()
+    internal static string StorageRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Clog.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
             {
-                return directory.FullName;
+                return Path.Combine(directory.FullName, "test", "Durable.Storage");
             }
         }
 
-        throw new DirectoryNotFoundException("Could not find the Clog repository root.");
+        throw new DirectoryNotFoundException("Could not find the Orleans repository root.");
     }
 }

@@ -1,7 +1,7 @@
 #Requires -Version 7.3
 
-# Generates the archive-log drain simulation's traces and validates each against specs/archive-logs/ArchiveLogs.qnt
-# (docs/spec/verification.md §5.1): ArchiveLogTraceTests writes one Quint module per seed under
+# Generates the archive-log drain simulation's traces and validates each against test/Durable.Storage/specs/archive-logs/ArchiveLogs.qnt
+# (test/Durable.Storage/docs/spec/verification.md §5.1): ArchiveLogTraceTests writes one Quint module per seed under
 # artifacts/archive-log-traces, and model-check-quint.ps1 -Traces replays each with quint test.
 [CmdletBinding()]
 param(
@@ -18,7 +18,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $traces = Join-Path $root 'artifacts' 'archive-log-traces'
 Remove-Item -LiteralPath $traces -Recurse -Force -ErrorAction SilentlyContinue
 
-$project = Join-Path $root 'tests' 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
+$project = Join-Path $root 'Orleans.Durable.Storage.Simulation.Tests' 'Orleans.Durable.Storage.Simulation.Tests.csproj'
 & dotnet build $project -c SimulationRelease --no-restore
 if ($LASTEXITCODE -ne 0) {
     throw "Building the simulation tests failed with exit code $LASTEXITCODE."

@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
 /// <see cref="LedgerTraceExport"/> renders a trace as the records LedgerProtocolTrace.qnt binds to the ledger model's
-/// actions, deriving across events what no single event shows (docs/spec/verification.md §5.1).
+/// actions, deriving across events what no single event shows (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 public sealed class LedgerTraceExportTests
 {

@@ -3,7 +3,7 @@ using Orleans.Durable.Storage.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Azurite at the image apphost/Orleans.Durable.Storage.AppHost pins, through the file both AppHosts share (docs/spec/build-packaging.md §2).
+// Azurite at the image test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost pins, through the file both AppHosts share (test/Durable.Storage/docs/spec/build-packaging.md §2).
 var azurite = builder.AddEmulator("azurite", EmulatorImages.Azurite)
     .WithArgs("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--skipApiVersionCheck")
     .WithEndpoint(targetPort: 10000, name: "blob", scheme: "http")
@@ -20,8 +20,8 @@ var storage = ReferenceExpression.Create(
     $"DefaultEndpointsProtocol=http;AccountName={Account};AccountKey={AccountKey};BlobEndpoint=http://127.0.0.1:{blob.Property(EndpointProperty.Port)}/{Account};TableEndpoint=http://127.0.0.1:{table.Property(EndpointProperty.Port)}/{Account};");
 
 // Each run is a new Clog cluster over a new Azurite: the AppHost, as the deployment, creates each silo's node root anew
-// under artifacts/sample, where it survives the silo's restarts within the run.
-var roots = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "artifacts", "sample"));
+// under test/Durable.Storage/artifacts/sample, where it survives the silo's restarts within the run.
+var roots = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "test", "Durable.Storage", "artifacts", "sample"));
 if (Directory.Exists(roots))
 {
     Directory.Delete(roots, recursive: true);

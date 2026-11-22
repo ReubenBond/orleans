@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.5" />
 
-  <!-- Runs samples/Orleans.Durable.Storage.Samples.Journaling as three silos over Azurite, with the Aspire dashboard (just sample). -->
+  <!-- Runs playground/DurableStorage/Orleans.Durable.Storage.Samples.Journaling as three silos over Azurite, with the Aspire dashboard (just sample). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>

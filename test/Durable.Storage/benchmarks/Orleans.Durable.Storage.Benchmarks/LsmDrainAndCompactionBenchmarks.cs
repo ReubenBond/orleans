@@ -18,7 +18,7 @@ namespace Orleans.Durable.Storage.Benchmarks;
 /// <summary>
 /// Measures <see cref="DrainWorker"/> throughput draining a closed 4 MiB ledger segment into <see cref="LsmArchiveStore"/>
 /// across 100 vs 10,000 distinct journals, verifying that object-store PUTs per segment remain 1 (independent of journal
-/// count; docs/spec/README.md §1, archive-lsm.md §8.2).
+/// count; test/Durable.Storage/docs/spec/README.md §1, archive-lsm.md §8.2).
 /// </summary>
 [MemoryDiagnoser]
 public class LsmDrainBenchmarks : IAsyncDisposable

@@ -11,7 +11,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// Runs a ledger's quorum over three LedgerStore nodes whose processes and operating systems crash and restart from
 /// what their disks kept, up to every node at once, and whose local storage operations fail, which stops their processes, while writers and readers use the ledger and a controller creates
 /// and drops other replicas, across a network which loses, duplicates, delays, and partitions messages
-/// (docs/spec/verification.md §7.3).
+/// (test/Durable.Storage/docs/spec/verification.md §7.3).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -51,7 +51,7 @@ public sealed class LedgerStoreSimulationTests
     /// The seed every change runs: the lowest from 100 whose run, with each replica created by its first write, fired
     /// every kind of fault; a scripted step after the faults end fires a local storage failure on every seed. A run costs
     /// about 15 s of wall time, so exploration runs more through CLOG_SIM_SEEDS, and
-    /// <c>just ledger-traces</c> runs seeds 1 to 15 (docs/spec/verification.md §7.4, §12).
+    /// <c>just ledger-traces</c> runs seeds 1 to 15 (test/Durable.Storage/docs/spec/verification.md §7.4, §12).
     /// </summary>
     private const int CorpusSeed = 113;
     private const int ReplaySeed = 1;
@@ -106,7 +106,7 @@ public sealed class LedgerStoreSimulationTests
     private static async Task SimulateAsync(SimulationEnvironment environment, Scale scale)
     {
         // The scenario's calls carry a cancellable token, as production callers' do, which nothing cancels: the scenario
-        // owns it, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1). CancellationToken.None
+        // owns it, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1). CancellationToken.None
         // would skip the code under test's registrations on it, and change the seeds' schedules.
         using var cancellation = new CancellationTokenSource();
         var cancellationToken = cancellation.Token;
@@ -390,7 +390,7 @@ public sealed class LedgerStoreSimulationTests
         /// the record of its highest DATA slot lies in a WAL file its recovery classified, and the page holding the record
         /// is damaged. A read of the slot on the node answers corrupt, and the node restarts again holding it faulty, so
         /// every seed's trace holds a slot a replica answered corrupt before its node restarted holding it (LS-I5, LR-I2),
-        /// which the trace mutant mutant-restart-damage-as-missing changes (docs/spec/verification.md §5.1).
+        /// which the trace mutant mutant-restart-damage-as-missing changes (test/Durable.Storage/docs/spec/verification.md §5.1).
         /// </summary>
         /// <returns>The number of restarts the step took.</returns>
         public async Task<int> RestartHoldingADamagedSlotAsync(SimulatedLedgerReplicaTransport replicas, LedgerStoreNode node)

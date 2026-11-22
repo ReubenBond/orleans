@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Registers Clog's test diagnostics with Microsoft.Testing.Platform and installs the debug assertion hook and the local storage failure recorder. The generated
-/// entry point calls it because <c>tests/Directory.Build.props</c> declares it as a <c>TestingPlatformBuilderHook</c>.
+/// entry point calls it because <c>test/Durable.Storage/Directory.Build.props</c> declares it as a <c>TestingPlatformBuilderHook</c>.
 /// </summary>
 internal static class TestDiagnosticsBuilderHook
 {

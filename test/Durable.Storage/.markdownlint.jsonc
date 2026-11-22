@@ -1,4 +1,4 @@
-// Markdown style shared by every Markdown file; eng/check-docs.ps1 and editors' markdownlint read it.
+// Markdown style shared by every Markdown file; test/Durable.Storage/eng/check-docs.ps1 and editors' markdownlint read it.
 {
   "default": true,
   // Prose wraps at 120 columns; tables and code keep their lines whole.

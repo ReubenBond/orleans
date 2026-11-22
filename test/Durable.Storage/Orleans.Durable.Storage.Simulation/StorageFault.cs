@@ -4,7 +4,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// The kind of local storage operation whose failure a <see cref="LedgerStoreNode"/> injects, each a fault hook of
-/// <see cref="SimulatedWalStorage"/> (docs/spec/verification.md §7.3).
+/// <see cref="SimulatedWalStorage"/> (test/Durable.Storage/docs/spec/verification.md §7.3).
 /// </summary>
 public enum StorageFault
 {

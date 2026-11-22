@@ -138,7 +138,7 @@ public sealed class FileSystemConditionalRegisterTests : IDisposable
         using var final = Assert.IsType<MetaStoreEntry>(await registers[0].ReadAsync(TestContext.Current.CancellationToken));
         Assert.Equal(Writers * Increments, BitConverter.ToInt32(final.Value.ToArray()));
 
-        // Every write released the register's lock file and closed the register (docs/spec/verification.md §11.1).
+        // Every write released the register's lock file and closed the register (test/Durable.Storage/docs/spec/verification.md §11.1).
         FileHandleLeakCheck.AssertClosed(_root.FullName);
     }
 

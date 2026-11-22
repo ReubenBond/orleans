@@ -33,7 +33,7 @@ public enum Emulator
 }
 
 /// <summary>
-/// The emulators of <c>apphost/Orleans.Durable.Storage.AppHost</c>, started once for the test assembly through Aspire's testing host when
+/// The emulators of <c>test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost</c>, started once for the test assembly through Aspire's testing host when
 /// <see cref="EnabledVariable"/> is 1, and the clients the tests reach them and stubbed services through.
 /// </summary>
 /// <remarks>

@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
 /// <see cref="LedgerMapTraceExport"/> renders a ledger map trace as the Quint module which replays it against
-/// <c>specs/ledgers/LedgerMap.qnt</c> (docs/spec/verification.md §5.1), mapping each write's value onto the model's
+/// <c>test/Durable.Storage/specs/ledgers/LedgerMap.qnt</c> (test/Durable.Storage/docs/spec/verification.md §5.1), mapping each write's value onto the model's
 /// steps and each decided batch onto a write or a marker.
 /// </summary>
 public sealed class LedgerMapTraceExportTests

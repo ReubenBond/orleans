@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-Runs coverage-guided fuzzing campaigns against Clog's decoders (docs/spec/verification.md §6.1).
+Runs coverage-guided fuzzing campaigns against Clog's decoders (test/Durable.Storage/docs/spec/verification.md §6.1).
 
 .DESCRIPTION
-Publishes fuzz/Orleans.Durable.Storage.Fuzz, instruments the decoders (the Engine's WAL, Ledgers, Archive, and Journals namespaces, and the
+Publishes test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz, instruments the decoders (the Engine's WAL, Ledgers, Archive, and Journals namespaces, and the
 file-system and Azure packages and the composition) with the SharpFuzz command-line tool from the repository's tool
 manifest, and runs each target under
 libfuzzer-dotnet, a libFuzzer driver which passes inputs to the .NET harness through shared memory. Each campaign reads
-the committed corpus under fuzz/corpus/<target> and the seeds the golden vectors give, and writes new inputs, findings,
+the committed corpus under test/Durable.Storage/fuzz/corpus/<target> and the seeds the golden vectors give, and writes new inputs, findings,
 and its log under artifacts/fuzz/<target>. Each campaign passes libFuzzer a random seed, or -Seed, and reports it, so a
 campaign replays with the same seed and corpus. Inputs run up to the longest seed or the target's own bound, whichever
 is longer. With -Merge, the committed corpus is replaced by the inputs of itself and the campaign which add coverage
@@ -21,7 +21,7 @@ libfuzzer-dotnet release ships drivers for those platforms only. Elsewhere, buil
 
 A finding stops its campaign and leaves the input in artifacts/fuzz/<target>/findings. Reproduce it with
   dotnet artifacts/fuzz/publish/Orleans.Durable.Storage.Fuzz.dll replay <target> <file>
-then commit the input under fuzz/corpus/<target>/regressions and fix the decoder with a regression test.
+then commit the input under test/Durable.Storage/fuzz/corpus/<target>/regressions and fix the decoder with a regression test.
 
 .EXAMPLE
 ./eng/fuzz.ps1 -Target ledgerstore-catalog -Duration 300
@@ -31,7 +31,7 @@ then commit the input under fuzz/corpus/<target>/regressions and fix the decoder
 #>
 [CmdletBinding()]
 param(
-    # Target names, or 'all'. 'dotnet run --project fuzz/Orleans.Durable.Storage.Fuzz -- list' lists them.
+    # Target names, or 'all'. 'dotnet run --project test/Durable.Storage/fuzz/Orleans.Durable.Storage.Fuzz -- list' lists them.
     [Parameter(Mandatory)]
     [string[]] $Target,
 

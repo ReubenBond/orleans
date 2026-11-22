@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// Carries requests from one simulated node to another across Clockwork's network, and their answers back
-/// (docs/spec/verification.md §7.2).
+/// (test/Durable.Storage/docs/spec/verification.md §7.2).
 /// </summary>
 /// <remarks>
 /// <para>

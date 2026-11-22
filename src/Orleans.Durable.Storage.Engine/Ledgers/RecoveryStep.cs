@@ -57,7 +57,7 @@ internal enum RecoveryAnswer
 /// recovery handles them (the observer <see cref="LedgerQuorum"/> is built with), so its first
 /// <c>N − Q + 1</c> seal steps with a tail are the answers the recovery's <c>c</c> comes from (LP-I6), and every call
 /// returns before the recovery does. Deterministic simulation maps the recovery onto the ledger model's steps through it
-/// (docs/spec/verification.md §5.1).
+/// (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 /// <param name="Kind">The kind of answer.</param>
 /// <param name="Replica">The replica's index in the ledger's replicas.</param>

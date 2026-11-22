@@ -381,7 +381,7 @@ public sealed class CloudObjectStoreFaultTests(CloudEmulators emulators) : IDisp
     /// unknown outcome, and Azure, whose <c>Put Blob</c> takes no CRC-32C, refuses them before any request with
     /// <see cref="ObjectContentChangedException"/>. The
     /// content's own CRC-32C then writes it. LocalStack refuses the replace but then serves the object it replaced with its
-    /// length and no bytes, which the test pins, so an upgrade which fixes it fails here (docs/spec/verification.md §13).
+    /// length and no bytes, which the test pins, so an upgrade which fixes it fails here (test/Durable.Storage/docs/spec/verification.md §13).
     /// </summary>
     [Theory]
     [InlineData(Emulator.Azurite)]

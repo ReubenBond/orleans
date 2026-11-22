@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     The fuzz targets of the Orleans composition's formats, the node registry and the journal and replica node grains' answers
-    (docs/spec/verification.md §6.1). It references the composition, which decodes them; the composition's tests replay
+    (test/Durable.Storage/docs/spec/verification.md §6.1). It references the composition, which decodes them; the composition's tests replay
     their corpora.
   -->
   <ItemGroup>

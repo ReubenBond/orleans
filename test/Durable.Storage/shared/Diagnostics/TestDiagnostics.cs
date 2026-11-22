@@ -4,7 +4,7 @@ using System.Text;
 namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
-/// Locates and names the evidence a test run leaves behind (docs/spec/verification.md).
+/// Locates and names the evidence a test run leaves behind (test/Durable.Storage/docs/spec/verification.md).
 /// </summary>
 internal static class TestDiagnostics
 {
@@ -32,8 +32,8 @@ internal static class TestDiagnostics
         Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Release";
 
     /// <summary>
-    /// Gets a value indicating whether Stryker.NET runs this test application: <c>eng/mutation.ps1</c> sets
-    /// <c>ClogMutationTesting</c> (docs/spec/verification.md §9).
+    /// Gets a value indicating whether Stryker.NET runs this test application: <c>test/Durable.Storage/eng/mutation.ps1</c> sets
+    /// <c>ClogMutationTesting</c> (test/Durable.Storage/docs/spec/verification.md §9).
     /// </summary>
     internal static bool UnderMutationTesting { get; } =
         string.Equals(Environment.GetEnvironmentVariable("ClogMutationTesting"), "true", StringComparison.Ordinal);

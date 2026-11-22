@@ -9,7 +9,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Ledgers.Tests;
 
 /// <summary>
-/// Checks the shared ledger map vectors under <c>tests/shared-vectors/ledgers</c> (ledgers.md §7): each value encodes to
+/// Checks the shared ledger map vectors under <c>test/Durable.Storage/shared-vectors/ledgers</c> (ledgers.md §7): each value encodes to
 /// its bytes and its bytes decode to it, contiguous and from pages of one byte, and each rejection is rejected for the
 /// reason of the first rule it breaks, which together cover every reason; the snapshots render the decoded values and
 /// each rejection's reason and message (verification.md §8).

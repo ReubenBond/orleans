@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace Orleans.Durable.Storage.Testing.Tests;
 
 /// <summary>
-/// Checks Porcupine's published key-value histories (tests/shared-vectors/linearizability) and reaches Porcupine's
+/// Checks Porcupine's published key-value histories (test/Durable.Storage/shared-vectors/linearizability) and reaches Porcupine's
 /// verdicts, partitioned by key and, where Porcupine checks it quickly, as one unpartitioned map.
 /// </summary>
 public sealed partial class PorcupineVectorTests

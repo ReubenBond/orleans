@@ -16,7 +16,7 @@ public sealed class RegisterFileTarget : FuzzTarget
     private static readonly Guid Version = new("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0");
 
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/metastore/register-file-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/metastore/register-file-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("metastore", "register-file-rejections.json"));
 

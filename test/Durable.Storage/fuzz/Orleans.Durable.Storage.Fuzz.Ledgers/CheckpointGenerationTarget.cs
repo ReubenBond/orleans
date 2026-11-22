@@ -23,7 +23,7 @@ namespace Orleans.Durable.Storage.Fuzz.Ledgers;
 /// reference of a length some leaf has, within its file, and numbered within the slot space; and every object in its root's
 /// generation or an older one, below 2<sup>63</sup>, and disjoint from the tree's other objects. The loader must load exactly the walk's
 /// leaves, or find no usable root exactly when the walk finds a rule broken, rejecting a usable root's tree for the reason
-/// of the first rule the walk finds it breaks, a reason <c>tests/shared-vectors/ledgerstore/tree-rejections.json</c>
+/// of the first rule the walk finds it breaks, a reason <c>test/Durable.Storage/shared-vectors/ledgerstore/tree-rejections.json</c>
 /// names, and the byte ranges it reads while loading must be pairwise disjoint. Each
 /// leaf then reads as its bytes or fails its CRC, and the writer preserves what was loaded.
 /// </remarks>
@@ -36,7 +36,7 @@ public sealed class CheckpointGenerationTarget : FuzzTarget
     private static readonly byte[] Magic = "CLSI"u8.ToArray();
 
     /// <summary>
-    /// The reasons of <c>tests/shared-vectors/ledgerstore/tree-rejections.json</c>.
+    /// The reasons of <c>test/Durable.Storage/shared-vectors/ledgerstore/tree-rejections.json</c>.
     /// </summary>
     private static readonly Lazy<HashSet<string>> TreeReasons = new(static () => GoldenVectors.Find().Reasons("ledgerstore", "tree-rejections.json"));
 

@@ -12,7 +12,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Ledgers.Tests;
 
 /// <summary>
-/// Checks the shared LedgerStore vectors under <c>tests/shared-vectors/ledgerstore</c> (ledgerstore.md §7.1–§7.4):
+/// Checks the shared LedgerStore vectors under <c>test/Durable.Storage/shared-vectors/ledgerstore</c> (ledgerstore.md §7.1–§7.4):
 /// the node file, the <c>CLSC</c> catalog checkpoint, the slot and store WAL records, slot-index leaves, generation files,
 /// root slots, and the trees of unusable roots.
 /// </summary>

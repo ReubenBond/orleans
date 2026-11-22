@@ -13,7 +13,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Records where pages are rented, deduplicated by call site, for leak reports
-/// (docs/spec/verification.md §11.1).
+/// (test/Durable.Storage/docs/spec/verification.md §11.1).
 /// </summary>
 /// <remarks>
 /// A rental captures its stack without source information and maps it to a call-site identifier, so a run which rents

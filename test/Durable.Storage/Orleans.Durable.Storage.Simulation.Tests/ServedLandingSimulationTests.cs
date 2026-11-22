@@ -8,7 +8,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// A scripted run in which one node's process answers from records whose own requests it never answered, and then
 /// crashes: a writer write, a recovery write, and a seal each reach the node's disk while the node holds its answer, the
 /// node serves other requests which show each record, and a crash discards the held answers before the node restarts
-/// (docs/spec/verification.md §5.1). Its ledger trace names each such request at the serve which first shows it, so
+/// (test/Durable.Storage/docs/spec/verification.md §5.1). Its ledger trace names each such request at the serve which first shows it, so
 /// trace validation takes each serve-time silent step (DeliverWrite, DeliverCopy, and DeliverSeal without a reply).
 /// </summary>
 /// <remarks>

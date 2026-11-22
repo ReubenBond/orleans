@@ -212,7 +212,7 @@ internal static class PorcupineVisualization
     {
         using var stream = typeof(PorcupineVisualization).Assembly.GetManifestResourceStream(ResourcePrefix + name)
             ?? throw new InvalidOperationException(
-                $"The test assembly does not embed {ResourcePrefix}{name}; embed tests/shared/Linearizability/Visualization/{name} with that logical name.");
+                $"The test assembly does not embed {ResourcePrefix}{name}; embed test/Durable.Storage/shared/Linearizability/Visualization/{name} with that logical name.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return reader.ReadToEnd();
     }

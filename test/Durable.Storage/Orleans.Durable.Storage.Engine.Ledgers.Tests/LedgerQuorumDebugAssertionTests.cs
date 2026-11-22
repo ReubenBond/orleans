@@ -6,7 +6,7 @@ namespace Orleans.Durable.Storage.Engine.Ledgers.Tests;
 
 /// <summary>
 /// A debug assertion which fails under a quorum's replica is recorded even though the quorum counts its exception as
-/// that replica's failure and acknowledges the write, so it fails its test (docs/spec/verification.md §11.2). The
+/// that replica's failure and acknowledges the write, so it fails its test (test/Durable.Storage/docs/spec/verification.md §11.2). The
 /// replica double defines <c>DEBUG</c>, so this runs in every configuration.
 /// </summary>
 public sealed class LedgerQuorumDebugAssertionTests : IDisposable

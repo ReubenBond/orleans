@@ -85,7 +85,7 @@ public sealed class LinearizabilityPropertyTests
     }
 
     /// <summary>
-    /// Etcd-shaped histories like Porcupine's Jepsen vectors, which are not copied (tests/shared-vectors/linearizability):
+    /// Etcd-shaped histories like Porcupine's Jepsen vectors, which are not copied (test/Durable.Storage/shared-vectors/linearizability):
     /// reads which time out, and writes and compare-and-sets with indeterminate outcomes.
     /// </summary>
     [Fact]

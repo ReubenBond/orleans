@@ -15,7 +15,7 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
-/// The drain simulation's traces for validation against <c>specs/archive-logs/ArchiveLogs.qnt</c> (docs/spec/verification.md
+/// The drain simulation's traces for validation against <c>test/Durable.Storage/specs/archive-logs/ArchiveLogs.qnt</c> (test/Durable.Storage/docs/spec/verification.md
 /// §5.1; archive-logs.md §10). Each seed runs one key's history, <c>k</c>, beside another key's, <c>o</c>, over a closed
 /// ledger and its successor, which a writer extends while two drainers race to drain both, crash by cancellation, meet
 /// requests which fail before they land, and restart from the markers, and a sweeper sweeps; the successor then closes,
@@ -23,7 +23,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// and completes, each crash, sweep, drop, decision, and close is recorded as the model's action, and the run's decided
 /// ledgers give the model's constants. With <c>CLOG_ARCHIVE_LOG_TRACES</c> set, each seed writes the trace as a Quint
 /// module whose <c>traceReplay</c> run applies every action in order and checks the model's invariants after each, and
-/// the model's position against the store's after each request, which <c>eng/archive-log-traces.ps1</c> runs with
+/// the model's position against the store's after each request, which <c>test/Durable.Storage/eng/archive-log-traces.ps1</c> runs with
 /// <c>quint test</c>: an action the model disables, a state which breaks an invariant, or a position the store does not
 /// reach fails the trace. The second ledger's decisions are taken from its writer as each proposal is decided, and its
 /// close from the replace which closes it. A drain which blocks is a violation. A run of the <c>marks-unheld</c> mutant,

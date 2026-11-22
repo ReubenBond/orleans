@@ -46,7 +46,7 @@ public sealed class LedgerStoreNodeTests
 
     /// <summary>
     /// Each media damage the node does, to a page it chooses or to one its caller names, reaches its damage observers as
-    /// it happens, so a ledger trace logs every damage (docs/spec/verification.md §5.1); damage which finds no page to
+    /// it happens, so a ledger trace logs every damage (test/Durable.Storage/docs/spec/verification.md §5.1); damage which finds no page to
     /// damage reaches none.
     /// </summary>
     [Fact]

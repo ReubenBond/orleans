@@ -16,7 +16,7 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
-/// The LSM simulation's traces for validation against <c>specs/archive/Archive.qnt</c> (docs/spec/verification.md §5.1;
+/// The LSM simulation's traces for validation against <c>test/Durable.Storage/specs/archive/Archive.qnt</c> (test/Durable.Storage/docs/spec/verification.md §5.1;
 /// archive-lsm.md §10). Each seed runs one key's history, <c>k</c>, beside another key's, <c>o</c>, over a closed ledger
 /// and its successor, which a writer extends while two drainers race to drain both, crash by cancellation, and restart;
 /// two compactors race to push or merge the overfull partition; two committers replace the manifest; a sweeper, restarted
@@ -27,7 +27,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// action, and the run's decided ledgers give the model's constants. With <c>CLOG_ARCHIVE_TRACES</c> set, each seed
 /// writes the trace as a Quint module whose <c>traceReplay</c> run applies every action in order and checks the model's
 /// invariants after each, the manifest's watermarks and references after each commit, each upload's rows, and each read's
-/// answer against the fold of the decided history at its cut, which <c>eng/archive-traces.ps1</c> runs with
+/// answer against the fold of the decided history at its cut, which <c>test/Durable.Storage/eng/archive-traces.ps1</c> runs with
 /// <c>quint test</c>, with trace mutants of its steps, which the model must refuse at the steps they change.
 /// </summary>
 /// <remarks>

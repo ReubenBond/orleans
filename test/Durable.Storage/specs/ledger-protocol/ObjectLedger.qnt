@@ -1,6 +1,6 @@
 // -*- mode: Bluespec; -*-
 /**
- * Object-store ledger model (docs/spec/components/object-ledgers.md §5, §7,
+ * Object-store ledger model (test/Durable.Storage/docs/spec/components/object-ledgers.md §5, §7,
  * §8, §10), refining AtomicLedger.qnt.
  *
  * Models one ledger stored in a strongly consistent object store under either

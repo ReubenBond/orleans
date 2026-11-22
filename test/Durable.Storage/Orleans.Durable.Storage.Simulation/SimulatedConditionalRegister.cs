@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Simulation;
 /// A simulated MetaStore register which injects the faults its contract allows: outages, failed reads, writes whose
 /// outcome is unknown, which apply before the caller hears, never, or later, and writes which apply and answer
 /// <see cref="RegisterWriteOutcome.Mismatch"/>, as a backend-SDK retry of an attempt which applied does (metastore.md
-/// §2.2, §6; docs/spec/verification.md §7.2).
+/// §2.2, §6; test/Durable.Storage/docs/spec/verification.md §7.2).
 /// </summary>
 /// <remarks>
 /// <para>

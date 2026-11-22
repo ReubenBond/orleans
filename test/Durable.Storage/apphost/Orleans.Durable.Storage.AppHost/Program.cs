@@ -2,7 +2,7 @@ using Orleans.Durable.Storage.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Each image is pinned by its digest in EmulatorImages, which docs/spec/build-packaging.md §2 records, so a run is
+// Each image is pinned by its digest in EmulatorImages, which test/Durable.Storage/docs/spec/build-packaging.md §2 records, so a run is
 // reproducible.
 
 builder.AddEmulator("localstack", EmulatorImages.LocalStack)

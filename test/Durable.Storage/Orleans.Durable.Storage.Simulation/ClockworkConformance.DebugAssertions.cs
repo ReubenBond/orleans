@@ -11,7 +11,7 @@ public static partial class ClockworkConformance
     /// <summary>
     /// Fails a debug assertion on the scheduler lane after an <c>await</c> and catches its exception, as code under test
     /// which counts a failure toward an outcome does, then waits on virtual time and continues. The trace records
-    /// <c>asserting</c>, <c>caught</c>, and <c>continued</c> as the probe reaches each (docs/spec/verification.md §11.2).
+    /// <c>asserting</c>, <c>caught</c>, and <c>continued</c> as the probe reaches each (test/Durable.Storage/docs/spec/verification.md §11.2).
     /// </summary>
     /// <param name="environment">The run's environment, whose trace records the probe's progress.</param>
     /// <param name="message">The assertion's message.</param>

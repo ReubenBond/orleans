@@ -8,7 +8,7 @@ namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
 /// Reaches the ledger replicas on simulated LedgerStore nodes from one client node across Clockwork's network: the
-/// replica transport behind <see cref="ILedgerReplicaTransport"/> (docs/spec/verification.md §7.2).
+/// replica transport behind <see cref="ILedgerReplicaTransport"/> (test/Durable.Storage/docs/spec/verification.md §7.2).
 /// </summary>
 /// <remarks>
 /// <para>

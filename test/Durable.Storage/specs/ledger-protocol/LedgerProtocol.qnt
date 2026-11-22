@@ -1,7 +1,7 @@
 // -*- mode: Bluespec; -*-
 /**
  * BookKeeper's quorum ledger protocol for one Clog ledger
- * (docs/spec/components/ledger-protocol.md §6–§8).
+ * (test/Durable.Storage/docs/spec/components/ledger-protocol.md §6–§8).
  *
  * Adapted from Jack Vanlightly's BookKeeperProtocol.tla
  * (https://github.com/Vanlightly/bookkeeper-tlaplus, commit

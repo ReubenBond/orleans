@@ -29,7 +29,7 @@ public sealed class LedgerProposalSimulationTests
     private const int FirstSeed = 1;
 
     // Every change runs three seeds and exploration runs more through CLOG_SIM_SEEDS
-    // (docs/spec/verification.md §7.4, §12); the replay check reuses one of them.
+    // (test/Durable.Storage/docs/spec/verification.md §7.4, §12); the replay check reuses one of them.
     private const int SeedCount = 3;
 
     // The trace entry which counts, for a run, the proposals whose write met a seal, each decided from the map's
@@ -97,7 +97,7 @@ public sealed class LedgerProposalSimulationTests
 
     private static async Task SimulateAsync(SimulationEnvironment environment)
     {
-        // The scenario owns the token, so no thread outside the simulation cancels it (docs/spec/verification.md §7.1).
+        // The scenario owns the token, so no thread outside the simulation cancels it (test/Durable.Storage/docs/spec/verification.md §7.1).
         using var cancellation = new CancellationTokenSource();
         var cancellationToken = cancellation.Token;
         var network = environment.Network;

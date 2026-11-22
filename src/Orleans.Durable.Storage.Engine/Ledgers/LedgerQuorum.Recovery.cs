@@ -25,7 +25,7 @@ internal sealed partial class LedgerQuorum
     /// Seals the ledger's replicas and recovers its candidate end, BookKeeper's ledger recovery (LP-I6, LP-I7,
     /// ledger-protocol.md §8.3), calling the quorum's recovery observer, when it has one, with each replica answer it
     /// handles, in the order it handles them, before it acts on the answer; deterministic simulation logs them for trace
-    /// validation (docs/spec/verification.md §5.1).
+    /// validation (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     /// <param name="contiguousTail">The ledger's known contiguous tail (LP-I11).</param>
     /// <param name="cancellationToken">Stops the recovery; the seals and recovery writes it sent may still land.</param>

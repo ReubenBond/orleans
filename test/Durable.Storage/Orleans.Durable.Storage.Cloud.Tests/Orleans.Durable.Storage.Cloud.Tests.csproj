@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    The cloud providers against the emulators of apphost/Orleans.Durable.Storage.AppHost, which the tests start through Aspire's testing
-    host when CLOG_EMULATORS is 1 (just emulators), at milestones (docs/spec/verification.md §10); otherwise those tests
+    The cloud providers against the emulators of test/Durable.Storage/apphost/Orleans.Durable.Storage.AppHost, which the tests start through Aspire's testing
+    host when CLOG_EMULATORS is 1 (just emulators), at milestones (test/Durable.Storage/docs/spec/verification.md §10); otherwise those tests
     skip, and the provider tests which need no emulator run. The Debug leg runs them in Debug, where Orleans.Durable.Storage.Engine.Buffers poisons
     each page as it returns to its pool, so an upload which read its content after its lease ended would send the poison.
   -->

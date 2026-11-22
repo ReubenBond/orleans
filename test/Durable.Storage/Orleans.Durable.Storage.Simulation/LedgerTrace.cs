@@ -8,7 +8,7 @@ using Orleans.Durable.Storage.Testing;
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// The operation a ledger event names (docs/spec/verification.md §5.1).
+/// The operation a ledger event names (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 public enum LedgerOperation
 {
@@ -39,7 +39,7 @@ public enum LedgerOperation
 }
 
 /// <summary>
-/// The kind of a ledger event (docs/spec/verification.md §5.1).
+/// The kind of a ledger event (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 public enum LedgerEventKind
 {
@@ -285,7 +285,7 @@ public sealed record RecoveredReplica(bool Held, bool Sealed, IReadOnlyList<long
 
 /// <summary>
 /// Logs a simulated ledger's protocol, as the ledger model names its steps, and checks the run against the
-/// guarantees the log shows after every step (docs/spec/verification.md §5.1, §7).
+/// guarantees the log shows after every step (test/Durable.Storage/docs/spec/verification.md §5.1, §7).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -920,7 +920,7 @@ public sealed class LedgerTrace
 
     /// <summary>
     /// Logs that media damage reached <paramref name="node"/>'s WAL, as it happens: the trace allows a slot of the node to
-    /// turn faulty only after this (docs/spec/verification.md §5.1).
+    /// turn faulty only after this (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     internal void Damaged(LedgerStoreNode node) =>
         _ = Record(new LedgerEvent(0, LedgerEventKind.Damaged, node.Address, default) { Node = node.Address, Incarnation = node.Incarnation });
@@ -936,13 +936,13 @@ public sealed class LedgerTrace
     /// <summary>
     /// Gets the observer every traced quorum is built with: it forwards each step to the observer of the recovery the
     /// current flow runs through <see cref="RecoverAsync(Ledger, string, LedgerId, CancellationToken)"/>, so concurrent
-    /// recoveries through one <see cref="Ledger"/> each log their own steps (docs/spec/verification.md §5.1).
+    /// recoveries through one <see cref="Ledger"/> each log their own steps (test/Durable.Storage/docs/spec/verification.md §5.1).
     /// </summary>
     internal static Action<RecoveryStep> RecoveryObserver { get; } = static step => CurrentRecovery.Value?.Invoke(step);
 
     /// <summary>
     /// Gets or sets a value indicating whether a node's restart logs what its recovery established for each ledger a
-    /// client has sent requests for, which trace validation checks (docs/spec/verification.md §5.1). Reading it reads each
+    /// client has sent requests for, which trace validation checks (test/Durable.Storage/docs/spec/verification.md §5.1). Reading it reads each
     /// unloaded slot-table leaf it covers into a scratch copy before the node serves, so the node loads the leaves an
     /// untraced run's would, but the reads can change the schedule; only a run whose trace is exported sets it.
     /// </summary>

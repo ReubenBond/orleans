@@ -8,7 +8,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// A scripted run in which a reader repairs its preferred replica (ledger-protocol.md §8.3, LP-I10): the ledger is written
 /// and closed while the first node is partitioned, so that node holds none of it, and a reader on that node, which
 /// learned the recorded <c>T</c>, reads a slot below it, finds it on another replica, and copies it to the first node with
-/// a recovery write (docs/spec/verification.md §5.1). Its ledger trace maps the repair to the model's fetcher, which reads
+/// a recovery write (test/Durable.Storage/docs/spec/verification.md §5.1). Its ledger trace maps the repair to the model's fetcher, which reads
 /// below its tail and sends the repair in one step (<c>ReadBelowTail</c>), so trace validation checks a repair against
 /// the model.
 /// </summary>

@@ -9,7 +9,7 @@ namespace Orleans.Durable.Storage.Testing;
 /// </summary>
 /// <remarks>
 /// Without <see cref="Variable"/> each live case skips with <see cref="SkipReason"/>, which the emulator run, in which any
-/// other skip fails, allows verbatim while the variable is unset (eng/validate.ps1). The cases authenticate through
+/// other skip fails, allows verbatim while the variable is unset (test/Durable.Storage/eng/validate.ps1). The cases authenticate through
 /// <see cref="DefaultAzureCredential"/>, which takes the Azure CLI's sign-in on a workstation and a workload identity in
 /// CI; the identity holds Storage Blob Data Owner, the built-in role which may write blob index tags.
 /// </remarks>
@@ -21,7 +21,7 @@ internal static class AzureLiveAccount
     /// </summary>
     public const string Variable = "CLOG_AZURE_LIVE";
 
-    /// <summary>The reason a live case skips without <see cref="Variable"/>, which eng/validate.ps1 allows verbatim.</summary>
+    /// <summary>The reason a live case skips without <see cref="Variable"/>, which test/Durable.Storage/eng/validate.ps1 allows verbatim.</summary>
     public const string SkipReason =
         $"The live-account fidelity run waits on {Variable}: set it to a storage account's blob service endpoint, on which the identity DefaultAzureCredential signs in with holds Storage Blob Data Owner.";
 

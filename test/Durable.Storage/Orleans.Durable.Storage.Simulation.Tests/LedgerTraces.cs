@@ -5,7 +5,7 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
 /// Writes a simulation's ledger trace as the Quint module which the ledger model's trace specification validates, when
-/// <see cref="Variable"/> names a directory (docs/spec/verification.md §5.1).
+/// <see cref="Variable"/> names a directory (test/Durable.Storage/docs/spec/verification.md §5.1).
 /// </summary>
 internal static class LedgerTraces
 {

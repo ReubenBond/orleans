@@ -95,7 +95,7 @@ public sealed class WalLifecycleTests : IDisposable
 
     /// <summary>
     /// Disposing the log closes its directory and every file it opened, including the next file it was preparing
-    /// (docs/spec/verification.md §11.1).
+    /// (test/Durable.Storage/docs/spec/verification.md §11.1).
     /// </summary>
     [Fact]
     public async Task DisposalClosesTheDirectoryAndEveryFile()

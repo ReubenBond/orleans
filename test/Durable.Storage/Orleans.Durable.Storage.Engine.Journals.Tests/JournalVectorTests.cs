@@ -10,7 +10,7 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Engine.Journals.Tests;
 
 /// <summary>
-/// Checks the shared Journals vectors under <c>tests/shared-vectors/journals</c> (journals.md §4.1, §4.2, §7): each entry
+/// Checks the shared Journals vectors under <c>test/Durable.Storage/shared-vectors/journals</c> (journals.md §4.1, §4.2, §7): each entry
 /// record's fields encode, for its row key, to its bytes, and its bytes decode under that key to its fields, contiguous
 /// and one byte per segment, each written as its row: its row kind, its version before, and its native body; each rejection is rejected for its reason, the cases which break two rules for the earlier,
 /// and together they cover journals.md §7's reasons in order; each version's text form in both directions, and each
@@ -216,7 +216,7 @@ public sealed partial class JournalVectorTests : IDisposable
     /// <summary>The reasons journals.md §7's decoding rules name for the entry record, distinct, in their order.</summary>
     private static string[] SpecReasons()
     {
-        var lines = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "spec", "components", "journals.md"));
+        var lines = File.ReadAllLines(Path.Combine(StorageRoot(), "docs", "spec", "components", "journals.md"));
         var start = Array.FindIndex(lines, static line => line.StartsWith("Decoding takes the row key and the record", StringComparison.Ordinal));
         Assert.True(start >= 0, "journals.md §7 has no decoding rules.");
         var rules = lines.Skip(start + 1).SkipWhile(static line => !line.StartsWith("1. ", StringComparison.Ordinal)).TakeWhile(static line => line.Length > 0);

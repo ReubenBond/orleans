@@ -12,7 +12,7 @@ namespace Orleans.Durable.Storage.Testing;
 
 /// <summary>
 /// Records every failed <c>Debug.Assert</c>, <c>Debug.Fail</c>, and <c>Trace.Assert</c> in a test host, so that the
-/// seeded simulation, test, or test assembly which raised it fails (docs/spec/verification.md §11.2; the design's
+/// seeded simulation, test, or test assembly which raised it fails (test/Durable.Storage/docs/spec/verification.md §11.2; the design's
 /// rationale is in §14).
 /// </summary>
 /// <remarks>
@@ -261,7 +261,7 @@ internal static class DebugAssertions
 
 /// <summary>
 /// A failed <c>Debug.Assert</c>, <c>Debug.Fail</c>, or <c>Trace.Assert</c> in a test host, thrown at its site
-/// (docs/spec/verification.md §11.2).
+/// (test/Durable.Storage/docs/spec/verification.md §11.2).
 /// </summary>
 public sealed class DebugAssertionException : Exception
 {
@@ -330,7 +330,7 @@ public sealed class DebugAssertionException : Exception
 
 /// <summary>
 /// Fails a test with the debug assertions recorded in it, whether or not they propagated, so that one which also failed
-/// the test directly reads as a repeat (docs/spec/verification.md §11.2).
+/// the test directly reads as a repeat (test/Durable.Storage/docs/spec/verification.md §11.2).
 /// </summary>
 public sealed class RecordedDebugAssertionsException : AggregateException
 {

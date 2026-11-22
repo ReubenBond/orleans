@@ -2,8 +2,8 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.FileSystem.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests.csproj",
-      "../../tests/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj"
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests.csproj",
+      "../../test/Durable.Storage/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs"

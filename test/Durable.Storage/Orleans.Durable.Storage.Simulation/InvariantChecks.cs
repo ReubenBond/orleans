@@ -4,7 +4,7 @@ using Orleans.Testing.Simulation.Runtime.Shims;
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// The invariants a simulation checks after every step (docs/spec/verification.md §3.2, §7).
+/// The invariants a simulation checks after every step (test/Durable.Storage/docs/spec/verification.md §3.2, §7).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,7 +21,7 @@ namespace Orleans.Durable.Storage.Simulation;
 /// throws cannot vouch for its invariant, so its exception is its violation. A check which drives the cluster, as the
 /// driver's quiescence check runs the work due at its instant, can meet a
 /// <see cref="SimulationThreadAffinityException"/> which work outside the scheduler raised. That exception belongs to
-/// the run: it propagates, so Clockwork aborts the run (docs/spec/verification.md §7.4).
+/// the run: it propagates, so Clockwork aborts the run (test/Durable.Storage/docs/spec/verification.md §7.4).
 /// </para>
 /// </remarks>
 public sealed class InvariantChecks

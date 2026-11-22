@@ -2,8 +2,8 @@
   "stryker-config": {
     "project": "Orleans.Durable.Storage.GoogleCloud.csproj",
     "test-projects": [
-      "../../tests/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj",
-      "../../tests/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj"
+      "../../../test/Durable.Storage/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj",
+      "../../../test/Durable.Storage/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs"

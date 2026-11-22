@@ -11,7 +11,7 @@ namespace Orleans.Durable.Storage.Fuzz.Archive;
 /// </summary>
 public sealed class StoreRecordTarget : FuzzTarget
 {
-    /// <summary>The reasons of <c>tests/shared-vectors/archive/store-record-rejections.json</c>.</summary>
+    /// <summary>The reasons of <c>test/Durable.Storage/shared-vectors/archive/store-record-rejections.json</c>.</summary>
     private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("archive", "store-record-rejections.json"));
 
     public override string Name => "archive-store-record";

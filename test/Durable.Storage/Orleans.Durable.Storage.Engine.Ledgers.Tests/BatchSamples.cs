@@ -287,7 +287,7 @@ internal static class BatchSamples
     /// <param name="format">The start of the paragraph which introduces the table, such as <c>**Batch rules.**</c>.</param>
     public static string[] SpecReasons(string format = "**Batch rules.**")
     {
-        var lines = File.ReadAllLines(Path.Combine(SharedVectors.RepositoryRoot(), "docs", "spec", "components", "ledgers.md"));
+        var lines = File.ReadAllLines(Path.Combine(SharedVectors.StorageRoot(), "docs", "spec", "components", "ledgers.md"));
         var start = Array.FindIndex(lines, line => line.StartsWith(format, StringComparison.Ordinal));
         Assert.True(start >= 0, $"ledgers.md §7 has no paragraph {format}.");
         var header = Array.IndexOf(lines, "| Reason | Rule |", start);

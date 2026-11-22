@@ -4,7 +4,7 @@
  * LR-I3, LP-I5, LR-I7, LR-I8, LP-I7, and LS-I2).
  *
  * One address in the final window of ledger X, replicated on N nodes with
- * quorum Q, as in specs/ledger-protocol/LedgerProtocol.qnt. A node holds no state for X
+ * quorum Q, as in test/Durable.Storage/specs/ledger-protocol/LedgerProtocol.qnt. A node holds no state for X
  * until a write, a recovery write, or a seal creates its replica, which it does
  * unless it holds X's tombstone. The former primary's writer write is
  * outstanding: copies reach nodes at any time, including after X is dropped, and
