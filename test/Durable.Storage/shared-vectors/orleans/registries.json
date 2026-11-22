@@ -1,0 +1,363 @@
+{
+  "description": "Node registry values, CLNR version 1 (orleans.md \u00a77.3): decoding hex yields the value, and encoding the value yields hex.",
+  "cases": [
+    {
+      "name": "A first registration: one node, no ordinal or failure domain, on the LSM.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000048000000d9bb98d10a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118012210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "Three nodes in node byte order, on archive logs: an ordinal succession retired node 2 at revision 5, ordinal 0 is written, and an IPv6 endpoint is bracketed.",
+      "revision": "5",
+      "archiveStore": {
+        "kind": "logs",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 3,
+          "ordinal": 0,
+          "retiredRevision": "0",
+          "failureDomain": "zone-a",
+          "diskless": false
+        },
+        {
+          "node": "01234567-89ab-4def-8000-000000000002",
+          "siloEndpoint": "10.0.0.2:11111",
+          "generation": 1,
+          "ordinal": 1,
+          "retiredRevision": "5",
+          "failureDomain": "zone-b",
+          "diskless": false
+        },
+        {
+          "node": "01234567-89ab-4def-8000-000000000003",
+          "siloEndpoint": "[2001:db8::3]:11111",
+          "generation": 2147483647,
+          "ordinal": 1,
+          "retiredRevision": "0",
+          "failureDomain": "zone-b",
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e5201000000bd0000004a73cc390a2e0a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311803200032067a6f6e652d610a300a100123456789ab4def8000000000000002120e31302e302e302e323a313131313118012001280532067a6f6e652d620a370a100123456789ab4def800000000000000312135b323030313a6462383a3a335d3a313131313118ffffffff07200132067a6f6e652d62100518022210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "No node and no archive store: a value revision 1 holds before any registration recorded a store.",
+      "revision": "1",
+      "archiveStore": null,
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [],
+      "hex": "434c4e520100000002000000e93be01e1001"
+    },
+    {
+      "name": "The largest port, and a failure domain outside ASCII.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:65535",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": "zone-\u00e9",
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000051000000ffb391c60a2d0a100123456789ab4def8000000000000001120e31302e302e302e313a3635353335180132077a6f6e652dc3a9100118012210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "A failure domain of 64 bytes, the most an entry holds.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00e9",
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e52010000008a0000003313487d0a660a100123456789ab4def8000000000000001120e31302e302e302e313a3131313131180132407a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7ac3a9100118012210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "A first registration on the memory store, which only tests and simulations record.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "memory",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000048000000c37ad6200a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118032210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "An archive store ID whose upper 64 bits are zero: the smallest ID.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "00000000000000000000000000000001"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e52010000004800000007a1846f0a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118012210000000000000000000000000000000012a0a6162636465666768696a"
+    },
+    {
+      "name": "An archive store ID whose lower 64 bits are zero, and whose top bit is set.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "logs",
+        "prefix": "abcdefghij",
+        "id": "80000000000000000000000000000000"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000048000000a571a0f90a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118022210800000000000000000000000000000002a0a6162636465666768696a"
+    },
+    {
+      "name": "A store prefix of one character.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "a",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e52010000003f0000003cc11e3a0a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118012210fedcba9876544321a00000000000000a2a0161"
+    },
+    {
+      "name": "A store prefix of 16 characters, the most, with every kind of character it may hold.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "logs",
+        "prefix": "z09_-azaz09_-azz",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e52010000004e0000002415d4670a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100118022210fedcba9876544321a00000000000000a2a107a30395f2d617a617a30395f2d617a7a"
+    },
+    {
+      "name": "A mixed cluster with an object-ledger store ID and a diskless node.",
+      "revision": "2",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": "112233445566477899aabbccddeeff01",
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": 0,
+          "retiredRevision": "0",
+          "failureDomain": "zone-a",
+          "diskless": false
+        },
+        {
+          "node": "01234567-89ab-4def-8000-000000000002",
+          "siloEndpoint": "10.0.0.2:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": "zone-b",
+          "diskless": true
+        }
+      ],
+      "hex": "434c4e520100000094000000470284640a2e0a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801200032067a6f6e652d610a2e0a100123456789ab4def8000000000000002120e31302e302e302e323a3131313131180132067a6f6e652d623801100218012210fedcba9876544321a00000000000000a2a0a6162636465666768696a3210112233445566477899aabbccddeeff01"
+    },
+    {
+      "name": "A cluster actively draining all node-backed ledgers at revision 3, with an object-ledger store ID.",
+      "revision": "3",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": "112233445566477899aabbccddeeff01",
+      "drainAllRevision": "3",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": 0,
+          "retiredRevision": "0",
+          "failureDomain": "zone-a",
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000066000000472afefa0a2e0a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801200032067a6f6e652d61100318012210fedcba9876544321a00000000000000a2a0a6162636465666768696a3210112233445566477899aabbccddeeff013803"
+    },
+    {
+      "name": "Seed archive-logs-store: a registry at revision 2 on archive logs.",
+      "revision": "2",
+      "archiveStore": {
+        "kind": "logs",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e5201000000480000003f673ab60a240a100123456789ab4def8000000000000001120e31302e302e302e313a31313131311801100218022210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "Seed ipv6-loopback-endpoint: the IPv6 loopback endpoint.",
+      "revision": "1",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "[::1]:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "0",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e520100000045000000f6908a160a210a100123456789ab4def8000000000000001120b5b3a3a315d3a31313131311801100118012210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    },
+    {
+      "name": "Seed largest-revision: the largest revision, and a node retired at it.",
+      "revision": "18446744073709551615",
+      "archiveStore": {
+        "kind": "lsm",
+        "prefix": "abcdefghij",
+        "id": "fedcba9876544321a00000000000000a"
+      },
+      "objectLedgerStoreId": null,
+      "drainAllRevision": "0",
+      "nodes": [
+        {
+          "node": "01234567-89ab-4def-8000-000000000001",
+          "siloEndpoint": "10.0.0.1:11111",
+          "generation": 1,
+          "ordinal": null,
+          "retiredRevision": "18446744073709551615",
+          "failureDomain": null,
+          "diskless": false
+        }
+      ],
+      "hex": "434c4e52010000005c000000508d06af0a2f0a100123456789ab4def8000000000000001120e31302e302e302e313a3131313131180128ffffffffffffffffff0110ffffffffffffffffff0118012210fedcba9876544321a00000000000000a2a0a6162636465666768696a"
+    }
+  ]
+}

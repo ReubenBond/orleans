@@ -1,0 +1,20 @@
+# Banned APIs for Clog
+# Use TimeProvider so production code and tests share a controllable clock.
+P:System.DateTime.Now;Use TimeProvider.GetLocalNow().
+P:System.DateTime.UtcNow;Use TimeProvider.GetUtcNow().
+P:System.DateTime.Today;Use TimeProvider.GetLocalNow().
+P:System.DateTimeOffset.Now;Use TimeProvider.GetLocalNow().
+P:System.DateTimeOffset.UtcNow;Use TimeProvider.GetUtcNow().
+M:System.Threading.Thread.Sleep(System.Int32);Use TimeProvider and asynchronous delays.
+M:System.Threading.Tasks.Task.Delay(System.Int32);Use Task.Delay with a TimeProvider.
+M:System.Threading.Tasks.Task.Delay(System.Int32,System.Threading.CancellationToken);Use Task.Delay with a TimeProvider.
+M:System.Threading.Tasks.Task.Delay(System.TimeSpan);Use Task.Delay with a TimeProvider.
+M:System.Threading.Tasks.Task.Delay(System.TimeSpan,System.Threading.CancellationToken);Use Task.Delay with a TimeProvider.
+M:System.Threading.PeriodicTimer.#ctor(System.TimeSpan);Use the PeriodicTimer constructor which accepts a TimeProvider.
+# RocksDB scans bound themselves in managed code (journals.md, issue #68): under load, iterate_upper_bound scans with
+# an implicit snapshot while the memtable holds range tombstones returned rows past their bound and missed rows within
+# it. Keeping iterate_upper_bound banned lets whole-ledger DeleteRange remain safe while scans check prefixes in managed code.
+M:RocksDbSharp.ReadOptions.SetIterateUpperBound(System.Byte*,System.UInt64);Compare each key with the bound in managed code.
+M:RocksDbSharp.ReadOptions.SetIterateUpperBound(System.Byte[],System.UInt64);Compare each key with the bound in managed code.
+M:RocksDbSharp.ReadOptions.SetIterateUpperBound(System.Byte[]);Compare each key with the bound in managed code.
+M:RocksDbSharp.ReadOptions.SetIterateUpperBound(System.String,System.Text.Encoding);Compare each key with the bound in managed code.

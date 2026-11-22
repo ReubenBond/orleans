@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Debug leg runs the manifest committer's debug assertions here (docs/spec/verification.md §12). -->
+  <PropertyGroup>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Verify.XunitV3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\Archive\*.cs" LinkBase="Archive" />
+    <Compile Include="..\shared\Archive\Objects\*.cs" LinkBase="Archive\Objects" />
+    <Compile Include="..\shared\LedgerProposals.cs" Link="LedgerProposals.cs" />
+    <Compile Include="..\shared\Archive\Lsm\*.cs" LinkBase="Archive" />
+    <Compile Include="..\shared\CrashStates\*.cs" LinkBase="CrashStates" />
+    <Compile Include="..\shared\Conformance\*.cs" LinkBase="Conformance\Kit" />
+    <Compile Include="..\shared\Conformance\Archive\Lsm\*.cs" LinkBase="Conformance\Kit\Archive" />
+    <Compile Include="..\shared\LeakChecks\*.cs" Exclude="..\shared\LeakChecks\SimulationLeakCheck.cs" LinkBase="LeakChecks" />
+    <Compile Include="..\shared\SharedVectors.cs" Link="SharedVectors.cs" />
+    <Compile Include="..\shared\SnapshotSettings.cs" Link="SnapshotSettings.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.Archive\Orleans.Durable.Storage.Fuzz.Archive.csproj" />
+    <Compile Include="..\shared\CorpusReplay.cs" Link="CorpusReplay.cs" />
+  </ItemGroup>
+</Project>

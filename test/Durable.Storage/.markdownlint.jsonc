@@ -1,0 +1,8 @@
+// Markdown style shared by every Markdown file; eng/check-docs.ps1 and editors' markdownlint read it.
+{
+  "default": true,
+  // Prose wraps at 120 columns; tables and code keep their lines whole.
+  "MD013": { "line_length": 120, "tables": false, "code_blocks": false },
+  // Exponents use <sup>.
+  "MD033": { "allowed_elements": ["sup"] }
+}

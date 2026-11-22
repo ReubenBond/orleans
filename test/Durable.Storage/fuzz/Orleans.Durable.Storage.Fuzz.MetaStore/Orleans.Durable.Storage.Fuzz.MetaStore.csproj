@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The fuzz targets of the MetaStore's formats (docs/spec/verification.md §6.1). They reference the provider package
+    whose format they decode, the file-system package, alone; the MetaStore's tests replay their corpora.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Abstractions\Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
+  </ItemGroup>
+</Project>

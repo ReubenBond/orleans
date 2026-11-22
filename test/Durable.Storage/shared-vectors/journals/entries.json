@@ -1,0 +1,224 @@
+{
+  "description": "Entry records (journals.md §7), each with the row key it was written for, its fields, and the row it is written as (journals.md §4.2): its row kind, its version before, and its native body; decoding hex under rowKey yields the fields, and encoding them for rowKey yields hex.",
+  "cases": [
+    {
+      "name": "The first Append of five bytes, at Origin.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "0"
+      },
+      "payload": "68656c6c6f",
+      "hex": "03220f8100000068656c6c6f",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "0"
+      },
+      "rowBody": "68656c6c6f"
+    },
+    {
+      "name": "An Append of five bytes for the journal \"a\".",
+      "rowKey": "550d745661",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "1"
+      },
+      "payload": "68656c6c6f",
+      "hex": "7ac8110600000168656c6c6f",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "1"
+      },
+      "rowBody": "68656c6c6f"
+    },
+    {
+      "name": "An Append for a journal whose key is not ASCII.",
+      "rowKey": "8893a6e8e697a5e69cace8aa9ee381aee382ade383bc",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "3"
+      },
+      "payload": "0001",
+      "hex": "251a78c50000030001",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "3"
+      },
+      "rowBody": "0001"
+    },
+    {
+      "name": "An Append at count 127, the longest one-byte varint.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "127"
+      },
+      "payload": "7f",
+      "hex": "492efdf800007f7f",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "127"
+      },
+      "rowBody": "7f"
+    },
+    {
+      "name": "An Append at count 128, the shortest two-byte varint.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "128"
+      },
+      "payload": "80",
+      "hex": "d23e3d330000800180",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "128"
+      },
+      "rowBody": "80"
+    },
+    {
+      "name": "An empty Replace, after which the journal exists.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Replace",
+      "expectedVersion": {
+        "base": "",
+        "count": "5"
+      },
+      "payload": "",
+      "hex": "1ce7905b010005",
+      "rowKind": "Replace",
+      "versionBefore": {
+        "base": "",
+        "count": "5"
+      },
+      "rowBody": ""
+    },
+    {
+      "name": "A Replace whose snapshot is bytes 0 to 31, at a rebased version of a 20-byte base.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Replace",
+      "expectedVersion": {
+        "base": "0000000000000003000000000000002900000002",
+        "count": "0"
+      },
+      "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "hex": "d06be8420114000000000000000300000000000000290000000200000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "rowKind": "Replace",
+      "versionBefore": {
+        "base": "0000000000000003000000000000002900000002",
+        "count": "0"
+      },
+      "rowBody": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    },
+    {
+      "name": "An Append at a 32-byte base and the greatest count.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "count": "18446744073709551615"
+      },
+      "payload": "ff",
+      "hex": "18ff98bd0020e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffffffffffffffffffff01ff",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "count": "18446744073709551615"
+      },
+      "rowBody": "ff"
+    },
+    {
+      "name": "A Delete stamped 2026-11-13T00:00:00Z.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Delete",
+      "expectedVersion": {
+        "base": "",
+        "count": "8"
+      },
+      "deletedAt": "639301248000000000",
+      "hex": "0d94196b0200080000810f1941df08",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "",
+        "count": "8"
+      },
+      "rowBody": "0000810f1941df08"
+    },
+    {
+      "name": "A Delete at Origin, stamped at tick 0.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Delete",
+      "expectedVersion": {
+        "base": "",
+        "count": "0"
+      },
+      "deletedAt": "0",
+      "hex": "0a4ab3bb0200000000000000000000",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "",
+        "count": "0"
+      },
+      "rowBody": "0000000000000000"
+    },
+    {
+      "name": "A Delete at a 32-byte base and the greatest count, stamped at the last tick of 9999.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Delete",
+      "expectedVersion": {
+        "base": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "count": "18446744073709551615"
+      },
+      "deletedAt": "3155378975999999999",
+      "hex": "a782867c0220e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffffffffffffffffffff01ff3f37f47528ca2b",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "count": "18446744073709551615"
+      },
+      "rowBody": "ff3f37f47528ca2b"
+    },
+    {
+      "name": "An Expired of the deleted state at a 20-byte base and count 3.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Expired",
+      "expectedVersion": {
+        "base": "0000000000000003000000000000002900000002",
+        "count": "3"
+      },
+      "hex": "4a44580b0314000000000000000300000000000000290000000203",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "0000000000000003000000000000002900000002",
+        "count": "3"
+      },
+      "rowBody": ""
+    },
+    {
+      "name": "An Expired at Origin.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Expired",
+      "expectedVersion": {
+        "base": "",
+        "count": "0"
+      },
+      "hex": "0da10e21030000",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "",
+        "count": "0"
+      },
+      "rowBody": ""
+    }
+  ]
+}

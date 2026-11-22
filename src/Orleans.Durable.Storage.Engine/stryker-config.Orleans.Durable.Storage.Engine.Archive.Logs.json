@@ -1,0 +1,28 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj"
+    ],
+    "mutate": [
+      "Archive/Logs/**/*.cs",
+      "!Archive/Logs/ArchiveLogExceptions.cs",
+      "!Archive/Logs/ArchiveLogLayout.cs",
+      "!Archive/Logs/ArchiveLogName.cs",
+      "!Archive/Logs/ArchiveLogOpener.cs",
+      "!Archive/Logs/ArchiveLogPosition.cs",
+      "!Archive/Logs/ArchiveLogRead.cs",
+      "!Archive/Logs/IArchiveLogContainer.cs",
+      "!Archive/Logs/IArchiveLogStore.cs"
+    ],
+    "test-runner": "mtp",
+    "coverage-analysis": "perTestInIsolation",
+    "additional-timeout": 60000,
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

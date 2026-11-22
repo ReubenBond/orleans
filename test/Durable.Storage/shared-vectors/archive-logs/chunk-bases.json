@@ -1,0 +1,169 @@
+{
+  "cases": [
+    {
+      "name": "a key's first append run's empty base of generation 1",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "none",
+      "rows": "0",
+      "tombstone": null,
+      "content": "",
+      "hex": "434c414201000000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427ec9148cd8"
+    },
+    {
+      "name": "a Replace of one row",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Replace",
+      "rows": "1",
+      "tombstone": null,
+      "content": "7374617465",
+      "hex": "434c414201010000f288e0cbda5705d80100000000000000000000000000000005000000000000009ed39e2ea931586b6a985a6942ef573e43d52e787374617465"
+    },
+    {
+      "name": "a Replace which folds three rows",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Replace",
+      "rows": "3",
+      "tombstone": null,
+      "content": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+      "hex": "434c414201010000f288e0cbda5705d803000000000000000000000000000000280000000000000030dd5e4cae35ba892cc66d77367239803e0650d2000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627"
+    },
+    {
+      "name": "a Delete with no tombstone and no appends",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Delete",
+      "rows": "1",
+      "tombstone": null,
+      "content": "",
+      "hex": "434c414201020000f288e0cbda5705d8010000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427eee741c77"
+    },
+    {
+      "name": "a Delete whose base folds appends after it",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Delete",
+      "rows": "2",
+      "tombstone": null,
+      "content": "6166746572",
+      "hex": "434c414201020000f288e0cbda5705d8020000000000000000000000000000000500000000000000632a2406bbcbcd553eec45ac14b40a0ab62356666166746572"
+    },
+    {
+      "name": "a Delete with a tombstone",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Delete",
+      "rows": "1",
+      "tombstone": "0102030405060708",
+      "content": "",
+      "hex": "434c414201020100f288e0cbda5705d8010000000000000008070605040302010000000000000000d41d8cd98f00b204e9800998ecf8427e99681d5f"
+    },
+    {
+      "name": "the largest base rows",
+      "keyHash": "d80557dacbe088f2",
+      "opener": "Replace",
+      "rows": "34359738367",
+      "tombstone": null,
+      "content": "78",
+      "hex": "434c414201010000f288e0cbda5705d8ffffffff07000000000000000000000001000000000000009dd4e461268c8034f5c8564e155c67a6ffbd116978"
+    }
+  ],
+  "rejections": [
+    {
+      "name": "an empty object",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "a header one byte short",
+      "reason": "truncated",
+      "hex": "434c414201010000f288e0cbda5705d80100000000000000000000000000000005000000000000009ed39e2ea931586b6a985a6942ef573e43d52e"
+    },
+    {
+      "name": "another magic",
+      "reason": "bad-magic",
+      "hex": "434c415801000000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e767370b3"
+    },
+    {
+      "name": "another magic and version: the magic first",
+      "reason": "bad-magic",
+      "hex": "434c415802000000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e79182f5a"
+    },
+    {
+      "name": "version 0",
+      "reason": "bad-version",
+      "hex": "434c414200000000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e63e0e27c"
+    },
+    {
+      "name": "version 2",
+      "reason": "bad-version",
+      "hex": "434c414202000000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427ec67fd331"
+    },
+    {
+      "name": "a flipped header bit",
+      "reason": "bad-crc",
+      "hex": "434c414201010000f288e0cbda5705d80100000001000000000000000000000005000000000000009ed39e2ea931586b6a985a6942ef573e43d52e787374617465"
+    },
+    {
+      "name": "a flipped header bit and a bad kind: the checksum first",
+      "reason": "bad-crc",
+      "hex": "434c414201030000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e00000000"
+    },
+    {
+      "name": "kind 3",
+      "reason": "bad-kind",
+      "hex": "434c414201030000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e435bf493"
+    },
+    {
+      "name": "a flag past the tombstone's",
+      "reason": "bad-flags",
+      "hex": "434c414201020200f288e0cbda5705d8010000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e8dee09b1"
+    },
+    {
+      "name": "a reserved byte set",
+      "reason": "bad-flags",
+      "hex": "434c414201000001f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427ecbaa0a1f"
+    },
+    {
+      "name": "a Replace with a tombstone",
+      "reason": "tomb-mismatch",
+      "hex": "434c414201010100f288e0cbda5705d8010000000000000008070605040302010000000000000000d41d8cd98f00b204e9800998ecf8427e13276514"
+    },
+    {
+      "name": "a tombstone value with no flag",
+      "reason": "tomb-mismatch",
+      "hex": "434c414201020000f288e0cbda5705d8010000000000000008070605040302010000000000000000d41d8cd98f00b204e9800998ecf8427ed09ee1be"
+    },
+    {
+      "name": "base rows on a first run's base",
+      "reason": "bad-rows",
+      "hex": "434c414201000000f288e0cbda5705d8010000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427ee2014c05"
+    },
+    {
+      "name": "a Replace of no rows",
+      "reason": "bad-rows",
+      "hex": "434c414201010000f288e0cbda5705d8000000000000000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427e4f2ea4e1"
+    },
+    {
+      "name": "a Delete of 2^35 rows",
+      "reason": "bad-rows",
+      "hex": "434c414201020000f288e0cbda5705d8000000000800000000000000000000000000000000000000d41d8cd98f00b204e9800998ecf8427ed4ca5531"
+    },
+    {
+      "name": "a first run's base with content",
+      "reason": "none-with-content",
+      "hex": "434c414201000000f288e0cbda5705d80000000000000000000000000000000001000000000000009dd4e461268c8034f5c8564e155c67a66fedfe6d78"
+    },
+    {
+      "name": "a length past the content",
+      "reason": "bad-length",
+      "hex": "434c414201010000f288e0cbda5705d80100000000000000000000000000000006000000000000009ed39e2ea931586b6a985a6942ef573e20e412b37374617465"
+    },
+    {
+      "name": "content past the length",
+      "reason": "bad-length",
+      "hex": "434c414201010000f288e0cbda5705d80100000000000000000000000000000004000000000000009ed39e2ea931586b6a985a6942ef573ecd1761c27374617465"
+    },
+    {
+      "name": "content which does not hash to its MD5",
+      "reason": "bad-md5",
+      "hex": "434c414201010000f288e0cbda5705d80100000000000000000000000000000005000000000000009ed39e2ea931586b6a985a6942ef573e43d52e787374616c65"
+    }
+  ]
+}

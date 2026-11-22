@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Orleans composition (orleans.md): each silo's node, the journal storage, routing, placement, the replica
+    transport, and the control grains, with the controllers' decisions (orleans.md §5.6, §5.7) over the ledger map's
+    transitions, the LSM's workers and committers, and archive logs' drain worker. The decisions name no Orleans type, so
+    the grains which host them are their only tie to Orleans, and deterministic simulation runs them without it.
+  -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage</RootNamespace>
+
+    <!--
+      An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), which the journaling adapter implements,
+      until Orleans.Journaling ships stable (build-packaging.md §2).
+    -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+
+    <!--
+      Binds the silo's options from configuration with generated code rather than reflection, so the binding stays within
+      the trim and AOT analyzers (orleans.md §6).
+    -->
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Runtime" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Polly.Core" />
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+
+  <!--
+    Orleans' own buffer, which the replica calls' grain messages carry (orleans.md §5.12), has one name here, so a bare
+    ArcBuffer always means Clog's.
+  -->
+  <ItemGroup>
+    <Using Include="Orleans.Serialization.Buffers.ArcBuffer" Alias="OrleansBuffer" />
+    <Using Include="Orleans.Serialization.Buffers.ArcBufferWriter" Alias="OrleansBufferWriter" />
+  </ItemGroup>
+</Project>

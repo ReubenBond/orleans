@@ -1,0 +1,60 @@
+No bytes.
+  truncated: The batch's 0 bytes do not hold its 9 fixed header bytes and 4-byte CRC-32C.
+The fixed header and three bytes, one short of the CRC-32C.
+  truncated: The batch's 12 bytes do not hold its 9 fixed header bytes and 4-byte CRC-32C.
+Magic XLLB.
+  bad-magic: The batch's magic is not CLLB.
+Version 2.
+  bad-version: The batch has version 2; only version 1 is supported.
+A CRC-32C which does not match the bytes.
+  crc-mismatch: The batch's CRC-32C does not match its bytes.
+Flags 0x81: the start flag and bit 7.
+  bad-flags: The batch's flags are 0x81; only bit 0 may be set.
+A segment offset of 0 in two bytes, 0x80 0x00, longer than its shortest form.
+  bad-varint: The batch's segment offset is not a varint which ends before the CRC-32C within 10 bytes, fits a u64, and is in its shortest form.
+A segment offset of 11 bytes, whose 10th byte carries past the u64.
+  bad-varint: The batch's segment offset is not a varint which ends before the CRC-32C within 10 bytes, fits a u64, and is in its shortest form.
+A row count which reaches the CRC-32C unterminated: a header varint is bad-varint there.
+  bad-varint: The batch's row count is not a varint which ends before the CRC-32C within 10 bytes, fits a u64, and is in its shortest form.
+The start flag with segment offset 1.
+  bad-segment-offset: The batch begins a segment, and its segment offset is 1, not 0.
+No start flag, with segment offset 0.
+  bad-segment-offset: The batch does not begin a segment, and its segment offset is 0.
+The start flag with ordinal base 1.
+  bad-ordinal-base: The batch begins a segment, and its ordinal base is 1, not 0.
+No start flag and no rows: only a marker holds none.
+  no-rows: The batch holds no rows, and only a marker, which begins a segment, holds none.
+One counted row and no row bytes.
+  row-truncated: Row 0's flags runs past the batch's CRC-32C.
+A defining row whose key runs one byte past the CRC-32C.
+  row-truncated: Row 0's key runs past the batch's CRC-32C.
+A referencing row whose ordinal reaches the CRC-32C unterminated: a row's varint is row-truncated there.
+  row-truncated: Row 0's ordinal runs past the batch's CRC-32C.
+A body whose length runs one byte past the CRC-32C.
+  row-truncated: Row 0's body runs past the batch's CRC-32C.
+A row of kind 3.
+  bad-row-flags: Row 0 has flags 0x07: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
+A row with bit 3 set.
+  bad-row-flags: Row 0 has flags 0x0c: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
+A body length of 0 in two bytes, longer than its shortest form.
+  bad-varint: Row 0's body length is not a varint which ends within 10 bytes, fits a u64, and is in its shortest form.
+A defining row with an empty key.
+  empty-key: Row 0 defines an empty key.
+A defining row whose key length is 65,536.
+  key-too-long: Row 0 defines a key of 65536 bytes, longer than 65535.
+A version base of 33 bytes.
+  base-too-long: Row 0's version base is 33 bytes, longer than 32.
+A token of 33 bytes.
+  token-too-long: Row 0's token is 33 bytes, longer than 32.
+A batch which starts a segment and references ordinal 0 before defining any key.
+  forward-ordinal: Row 0 references ordinal 0, which its segment has not defined before it: the ordinal base is 0, and the batch defined 0 keys before the row.
+Ordinal base 2 and a reference to ordinal 2, which no row before it defined.
+  forward-ordinal: Row 0 references ordinal 2, which its segment has not defined before it: the ordinal base is 2, and the batch defined 0 keys before the row.
+A byte between the last counted row and the CRC-32C.
+  trailing-bytes: The batch's last counted row ends at byte 19, and its CRC-32C starts at byte 20.
+Flags 0x02, without the start flag, and segment offset 0, which breaks bad-segment-offset too: bad-flags comes first.
+  bad-flags: The batch's flags are 0x02; only bit 0 may be set.
+No rows without the start flag, and trailing bytes: no-rows comes first.
+  no-rows: The batch holds no rows, and only a marker, which begins a segment, holds none.
+A row of kind 3 with an empty key: bad-row-flags comes first.
+  bad-row-flags: Row 0 has flags 0x07: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.

@@ -1,0 +1,23 @@
+{
+  "description": "LedgerStore node files, wal/node: the node identity as exactly 32 lowercase hexadecimal ASCII digits, the UUID's \"N\" format, with no terminator; decoding the bytes yields the identity.",
+  "cases": [
+    {
+      "name": "digits",
+      "description": "An identity using every hexadecimal digit.",
+      "identity": "0123456789abcdef0123456789abcdef",
+      "hex": "3031323334353637383961626364656630313233343536373839616263646566"
+    },
+    {
+      "name": "smallest",
+      "description": "The smallest non-empty identity.",
+      "identity": "00000000000000000000000000000001",
+      "hex": "3030303030303030303030303030303030303030303030303030303030303031"
+    },
+    {
+      "name": "largest",
+      "description": "The largest identity.",
+      "identity": "ffffffffffffffffffffffffffffffff",
+      "hex": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ]
+}

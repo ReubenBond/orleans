@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+  </ItemGroup>
+
+  <!-- The emulators' images, pinned by digest once for both AppHosts (build-packaging.md §2). -->
+  <ItemGroup>
+    <Compile Include="..\shared\EmulatorImages.cs" Link="EmulatorImages.cs" />
+  </ItemGroup>
+</Project>

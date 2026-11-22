@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The libFuzzer harness of docs/spec/verification.md §6.1: one executable over every layer's fuzz targets.
+    eng/fuzz.ps1 publishes it, instruments the decoder assemblies with SharpFuzz, and runs it under libfuzzer-dotnet.
+    Each layer's tests replay its own targets' corpora.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpFuzz" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Archive\Orleans.Durable.Storage.Fuzz.Archive.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Archive.Logs\Orleans.Durable.Storage.Fuzz.Archive.Logs.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Journals\Orleans.Durable.Storage.Fuzz.Journals.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Wal\Orleans.Durable.Storage.Fuzz.Wal.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Ledgers\Orleans.Durable.Storage.Fuzz.Ledgers.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.MetaStore\Orleans.Durable.Storage.Fuzz.MetaStore.csproj" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Orleans\Orleans.Durable.Storage.Fuzz.Orleans.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Fuzz.Tests" />
+  </ItemGroup>
+</Project>

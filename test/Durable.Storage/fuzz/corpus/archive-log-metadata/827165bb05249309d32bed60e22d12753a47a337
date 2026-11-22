@@ -1,0 +1,12 @@
+wal
+journals/account-17
+d80557dacbe088f2
+
+format=json
+wal_generation=2
+clog_key=d80557dacbe088f2
+checkpoint=checkpoints/journals/account-17/00000000000000000002
+checkpoint_offset=0
+clog_kind=replace
+clog_base_md5=94d43668918a674ebf8cdf2ae0668367
+clog_base_rows=1

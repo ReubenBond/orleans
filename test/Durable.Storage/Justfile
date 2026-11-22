@@ -1,0 +1,139 @@
+set shell := ["pwsh", "-NoLogo", "-NoProfile", "-Command"]
+set windows-shell := ["pwsh", "-NoLogo", "-NoProfile", "-Command"]
+
+# List the recipes.
+default:
+    @& '{{ just_executable() }}' --list
+
+# Bring this clone or worktree to a buildable state: every submodule at its recorded commit and the pinned .NET SDK.
+sync:
+    @& ./eng/sync.ps1
+
+# Restore the solution using the pinned SDK and audited dependencies.
+restore:
+    @& ./eng/validate.ps1 -Check Restore
+
+# Compile the solution in Release with configured analyzers.
+build: restore
+    @& ./eng/validate.ps1 -Check Build
+
+# Check formatting and analyzer fixes without changing source files.
+format: restore
+    @& ./eng/validate.ps1 -Check Format
+
+# Apply the formatting and analyzer fixes to Clog's source.
+format-fix: restore
+    @& ./eng/validate.ps1 -Check Format -Fix
+
+# Run the default tests.
+test: build
+    @& ./eng/validate.ps1 -Check Test
+
+# Build the Debug leg's test projects in Debug and run them, so their debug assertions run.
+test-debug: restore
+    @& ./eng/validate.ps1 -Check TestDebug
+
+# Exercise the Fast CASPaxos adapter, its shared simulation, and the layer contracts.
+caspaxos:
+    @& ./eng/validate.ps1 -Check CasPaxos
+
+# Run the cloud stores' suites and the Orleans interop tests on the AppHost's emulators (Docker), at milestones.
+emulators: restore
+    @& ./eng/validate.ps1 -Check Emulators
+
+# Run the Orleans composition's multi-silo scenarios, the smoke set and the explicit rest: the milestones' end-to-end tests.
+e2e: restore
+    @& ./eng/validate.ps1 -Check EndToEnd
+
+# Run the Linux LazyFS + SIGKILL multi-process crash and linearizability soak tests (requires Linux, FUSE, and lazyfs).
+lazyfs rounds="2":
+    @& ./eng/lazyfs.ps1 -Rounds {{ rounds }}
+
+# Run the simulation corpora over a range of seeds (CLOG_SIM_SEEDS), for example `just explore 1..500`.
+explore seeds="1..500": restore
+    @& ./eng/validate.ps1 -Check Explore -Seeds '{{ seeds }}'
+
+# Explore the simulated conformance classes' concurrent windows under the deep bound, at milestones and nightly, for example `just explore-schedules '*LedgerReplicaConformanceTests'`.
+explore-schedules classes="*ConformanceTests": restore
+    @& ./eng/validate.ps1 -Check ExploreSchedules -Classes '{{ classes }}'
+
+# Run fuzzing campaigns against decoders, for example `just fuzz ledgerstore-catalog 300` or `just fuzz all 120 -Merge`.
+fuzz target="all" duration="60" *options:
+    @& ./eng/fuzz.ps1 -Target {{ target }} -Duration {{ duration }} {{ options }}
+
+# Run the benchmarks a filter selects, for example `just bench '*Wal*' --job Dry`.
+bench filter *options: restore
+    @& ./eng/bench.ps1 '{{ filter }}' {{ options }}
+
+# Run the sample Orleans app over Clog: three silos over Azurite, with the Aspire dashboard (Docker; samples/README.md).
+sample: restore
+    @& ./eng/sample.ps1
+
+# Exhaust the ledger protocol Quint models' default set and verify their expected counterexamples.
+models:
+    @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger
+
+# Exhaust the ledger protocol Quint models' quick tier: small positive cases, every mutant, and every witness.
+models-quick:
+    @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger -Tier Quick
+
+# Run the ledger protocol models' quick tier when specs/ledger-protocol or eng/model-check-quint.ps1 changed since a commit.
+models-changed ref="main":
+    @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger -Tier Quick -Since {{ ref }}
+
+# Exhaust the ledger protocol Quint models' extended bounds.
+models-extended:
+    @& ./eng/model-check-quint.ps1 -Model QuorumCoverageSealing,AtomicLedger,LedgerProtocol,ObjectLedger -Tier Extended
+
+# Generate the simulation's ledger traces and validate each against the ledger protocol model, for example `just ledger-traces 1..50`.
+ledger-traces seeds="": restore
+    @& ./eng/ledger-traces.ps1 -Seeds '{{ seeds }}'
+
+# Generate the archive-log drain simulation's traces and replay each against the archive-log model, for example `just archive-log-traces 1..50`.
+archive-log-traces seeds="": restore
+    @& ./eng/archive-log-traces.ps1 -Seeds '{{ seeds }}'
+
+# Generate the ledger map committer and transition simulations' traces, replay each against the ledger map model, and
+# check that every trace mutant is rejected at the step it changes, for example `just ledger-map-traces 1..50`.
+ledger-map-traces seeds="": restore
+    @& ./eng/ledger-map-traces.ps1 -Seeds '{{ seeds }}'
+
+# Generate the LSM simulation's traces, replay each against the LSM model, and check that every trace mutant is rejected
+# at the step it changes, for example `just archive-traces 1..50`.
+archive-traces seeds="": restore
+    @& ./eng/archive-traces.ps1 -Seeds '{{ seeds }}'
+
+# Exhaust the Quint models of the ledger protocol, Ledgers, the Archive, and archive logs, and verify their expected counterexamples, for example `just quint-models -Model LedgerMap`.
+quint-models *options:
+    @& ./eng/model-check-quint.ps1 {{ options }}
+
+# Exhaust the Quint models' extended bounds.
+quint-models-extended *options:
+    @& ./eng/model-check-quint.ps1 -Extended {{ options }}
+
+# Check Markdown style, relative links and heading anchors, and that every Mermaid diagram parses.
+docs:
+    @& ./eng/check-docs.ps1
+
+# Collect the existing coverage and CRAP reports after building.
+coverage: build
+    @& ./eng/validate.ps1 -Check Coverage
+
+# Mutation-test the named units, each a component, with Stryker.NET, for example `just mutation Orleans.Durable.Storage.Engine.Ledgers.Store`.
+mutation +projects:
+    @& ./eng/mutation.ps1 -Project {{ replace(projects, " ", ",") }}
+
+# Mutation-test the core units in full against their break thresholds in eng/mutation-baseline.json.
+mutation-core:
+    @& ./eng/mutation.ps1
+
+# Mutation-test the core units' changes since a commit, for example `just mutation-since main`.
+mutation-since ref="main":
+    @& ./eng/mutation.ps1 -Since {{ ref }}
+
+# Default pre-merge gate: build, formatting, default tests, the Debug leg, documentation, the ledger protocol models' quick tier when
+# the model changed, and trace validation, which ties code changes to the models.
+check: build format test test-debug docs models-changed ledger-traces archive-log-traces ledger-map-traces archive-traces
+
+# Full local qualification, including the Debug leg, every Quint model's extended bounds, and trace validation.
+check-full: build format test test-debug docs ledger-traces archive-log-traces ledger-map-traces archive-traces quint-models-extended

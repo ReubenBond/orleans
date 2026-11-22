@@ -1,0 +1,151 @@
+{
+  "description": "MetaStore register keys (metastore.md section 7): each register (cluster, name) maps to the register key {cluster:N}/{name} and to one key per backend, configured as backends shows. Azure Table row keys and Firestore document identifiers write each '/' of the register key as ':'. invalidNames are rejected register names; the empty cluster is rejected. firestoreVersions pin the Firestore version token: Base64 of the update time, seconds (int64 big-endian) then nanoseconds (int32 big-endian); malformedFirestoreVersions are tokens Firestore never issues, so a write naming one is a mismatch.",
+  "emptyCluster": "00000000000000000000000000000000",
+  "backends": {
+    "azure-blob": {
+      "prefix": "registers/"
+    },
+    "azure-table": {
+      "partitionKey": "durable-storage",
+      "rowKeyPrefix": "vlog-"
+    },
+    "aws-dynamodb": {
+      "partitionKeyPrefix": "vlog#"
+    },
+    "google-firestore": {
+      "collection": "durableStorageRegisters"
+    }
+  },
+  "registers": [
+    {
+      "cluster": "0123456789abcdef0123456789abcdef",
+      "name": "l/orders",
+      "registerKey": "0123456789abcdef0123456789abcdef/l/orders",
+      "backendKeys": {
+        "caspaxos": "0123456789abcdef0123456789abcdef/l/orders",
+        "azure-blob": "registers/0123456789abcdef0123456789abcdef/l/orders",
+        "azure-table": "vlog-0123456789abcdef0123456789abcdef:l:orders",
+        "aws-dynamodb": "vlog#0123456789abcdef0123456789abcdef/l/orders",
+        "google-firestore": "durableStorageRegisters/0123456789abcdef0123456789abcdef:l:orders"
+      }
+    },
+    {
+      "cluster": "0123456789abcdef0123456789abcdef",
+      "name": "l/a.b_c-9",
+      "registerKey": "0123456789abcdef0123456789abcdef/l/a.b_c-9",
+      "backendKeys": {
+        "caspaxos": "0123456789abcdef0123456789abcdef/l/a.b_c-9",
+        "azure-blob": "registers/0123456789abcdef0123456789abcdef/l/a.b_c-9",
+        "azure-table": "vlog-0123456789abcdef0123456789abcdef:l:a.b_c-9",
+        "aws-dynamodb": "vlog#0123456789abcdef0123456789abcdef/l/a.b_c-9",
+        "google-firestore": "durableStorageRegisters/0123456789abcdef0123456789abcdef:l:a.b_c-9"
+      }
+    },
+    {
+      "cluster": "0123456789abcdef0123456789abcdef",
+      "name": "bucket-map",
+      "registerKey": "0123456789abcdef0123456789abcdef/bucket-map",
+      "backendKeys": {
+        "caspaxos": "0123456789abcdef0123456789abcdef/bucket-map",
+        "azure-blob": "registers/0123456789abcdef0123456789abcdef/bucket-map",
+        "azure-table": "vlog-0123456789abcdef0123456789abcdef:bucket-map",
+        "aws-dynamodb": "vlog#0123456789abcdef0123456789abcdef/bucket-map",
+        "google-firestore": "durableStorageRegisters/0123456789abcdef0123456789abcdef:bucket-map"
+      }
+    },
+    {
+      "cluster": "0123456789abcdef0123456789abcdef",
+      "name": "node-registry",
+      "registerKey": "0123456789abcdef0123456789abcdef/node-registry",
+      "backendKeys": {
+        "caspaxos": "0123456789abcdef0123456789abcdef/node-registry",
+        "azure-blob": "registers/0123456789abcdef0123456789abcdef/node-registry",
+        "azure-table": "vlog-0123456789abcdef0123456789abcdef:node-registry",
+        "aws-dynamodb": "vlog#0123456789abcdef0123456789abcdef/node-registry",
+        "google-firestore": "durableStorageRegisters/0123456789abcdef0123456789abcdef:node-registry"
+      }
+    },
+    {
+      "cluster": "0123456789abcdef0123456789abcdef",
+      "name": "l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "registerKey": "0123456789abcdef0123456789abcdef/l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "backendKeys": {
+        "caspaxos": "0123456789abcdef0123456789abcdef/l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "azure-blob": "registers/0123456789abcdef0123456789abcdef/l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "azure-table": "vlog-0123456789abcdef0123456789abcdef:l:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "aws-dynamodb": "vlog#0123456789abcdef0123456789abcdef/l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "google-firestore": "durableStorageRegisters/0123456789abcdef0123456789abcdef:l:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "cluster": "fedcba9876543210fedcba9876543210",
+      "name": "l/orders",
+      "registerKey": "fedcba9876543210fedcba9876543210/l/orders",
+      "backendKeys": {
+        "caspaxos": "fedcba9876543210fedcba9876543210/l/orders",
+        "azure-blob": "registers/fedcba9876543210fedcba9876543210/l/orders",
+        "azure-table": "vlog-fedcba9876543210fedcba9876543210:l:orders",
+        "aws-dynamodb": "vlog#fedcba9876543210fedcba9876543210/l/orders",
+        "google-firestore": "durableStorageRegisters/fedcba9876543210fedcba9876543210:l:orders"
+      }
+    },
+    {
+      "cluster": "fedcba9876543210fedcba9876543210",
+      "name": "bucket-map",
+      "registerKey": "fedcba9876543210fedcba9876543210/bucket-map",
+      "backendKeys": {
+        "caspaxos": "fedcba9876543210fedcba9876543210/bucket-map",
+        "azure-blob": "registers/fedcba9876543210fedcba9876543210/bucket-map",
+        "azure-table": "vlog-fedcba9876543210fedcba9876543210:bucket-map",
+        "aws-dynamodb": "vlog#fedcba9876543210fedcba9876543210/bucket-map",
+        "google-firestore": "durableStorageRegisters/fedcba9876543210fedcba9876543210:bucket-map"
+      }
+    }
+  ],
+  "invalidNames": [
+    "",
+    "/",
+    "l/",
+    "/l",
+    "l//orders",
+    "L/orders",
+    "l/Orders",
+    "l/a b",
+    "l:orders",
+    "l/caf\u00e9",
+    "l/a\u0000b",
+    "l/a%2Fb",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "l/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ],
+  "firestoreVersions": [
+    {
+      "seconds": "1234567890",
+      "nanos": 123456789,
+      "version": "AAAAAEmWAtIHW80V"
+    },
+    {
+      "seconds": "0",
+      "nanos": 0,
+      "version": "AAAAAAAAAAAAAAAA"
+    },
+    {
+      "seconds": "-62135596800",
+      "nanos": 0,
+      "version": "////8YhuCQAAAAAA"
+    },
+    {
+      "seconds": "253402300799",
+      "nanos": 999999999,
+      "version": "AAAAOv/0QX87msn/"
+    }
+  ],
+  "malformedFirestoreVersions": [
+    "not-base64",
+    "AA==",
+    "AAAAAAAAAAAAAAAAAAAAAA==",
+    " AAAAAAAAAAAAAAAA",
+    "\"etag\"",
+    "1"
+  ]
+}

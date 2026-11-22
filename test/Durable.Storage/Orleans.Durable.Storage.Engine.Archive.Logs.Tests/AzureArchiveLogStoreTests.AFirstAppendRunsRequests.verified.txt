@@ -1,0 +1,23 @@
+﻿CreateAppendBlob wal/journals/account-17 → 201
+    if-none-match: *
+    x-ms-blob-type: AppendBlob
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-format: json
+    x-ms-meta-wal_generation: 1
+    x-ms-tags: durable-gen=00000000000000000001
+    x-ms-version: 2026-10-06
+AppendBlock wal/journals/account-17 → 201
+    content-md5: present
+    x-ms-blob-condition-appendpos: 0
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-version: 2026-10-06
+AppendBlock wal/journals/account-17 → 201
+    content-md5: present
+    x-ms-blob-condition-appendpos: 3
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-version: 2026-10-06
+wal/journals/account-17: 5 bytes
+    metadata durable_key: d80557dacbe088f2
+    metadata format: json
+    metadata wal_generation: 1
+    tag durable-gen: 00000000000000000001

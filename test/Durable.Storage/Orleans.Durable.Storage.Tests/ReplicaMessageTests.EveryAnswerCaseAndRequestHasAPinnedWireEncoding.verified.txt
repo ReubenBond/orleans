@@ -1,0 +1,166 @@
+﻿{
+  Writes: [
+    {
+      Case: Written,
+      Outcome: Written { LeaseGrant = 00:00:00 },
+      Wire: 2000030101c101c1010101e0
+    },
+    {
+      Case: Written,
+      Outcome: Written { LeaseGrant = 00:00:03 },
+      Wire: 2000030101c101c1016180c3c901e0
+    },
+    {
+      Case: Sealed,
+      Outcome: Sealed { },
+      Wire: 2000050101c101c1010101e0
+    },
+    {
+      Case: Dropped,
+      Outcome: Dropped { },
+      Wire: 2000070101c101c1010101e0
+    },
+    {
+      Case: Backpressure,
+      Outcome: Backpressure { },
+      Wire: 2000090101c101c1010101e0
+    },
+    {
+      Case: NotThisNode,
+      Outcome: NotThisNode { },
+      Wire: 20000b0101c101c1010101e0
+    },
+    {
+      Case: ReplicaCallRefused,
+      Outcome: ReplicaCallRefused { Kind = Argument, Message = An empty batch. },
+      Wire: 20000d0103411f416e20656d7074792062617463682ec1010101e0
+    },
+    {
+      Case: ReplicaCallRefused,
+      Outcome: ReplicaCallRefused { Kind = Stopping, Message = Stopping. },
+      Wire: 20000d0109411353746f7070696e672ec1010101e0
+    },
+    {
+      Case: ReplicaCorrupt,
+      Outcome: ReplicaCorrupt { Slot = , Message = A damaged value. },
+      Wire: 20000f01014121412064616d616765642076616c75652ec1010101e0
+    }
+  ],
+  Reads: [
+    {
+      Case: Data,
+      Wire: 200003410701020301010101c101c101e0
+    },
+    {
+      Case: Data,
+      Wire: 200003410101010101c101c101e0
+    },
+    {
+      Case: TooLarge,
+      Wire: 200011410161000010000101c101c101e0
+    },
+    {
+      Case: OutsideBatch,
+      Wire: 200013410101150101c101c101e0
+    },
+    {
+      Case: Missing,
+      Wire: 200005410101010101c101c101e0
+    },
+    {
+      Case: Dropped,
+      Wire: 200007410101010101c101c101e0
+    },
+    {
+      Case: Backpressure,
+      Wire: 200009410101010101c101c101e0
+    },
+    {
+      Case: NotThisNode,
+      Wire: 20000b410101010101c101c101e0
+    },
+    {
+      Case: ReplicaCallRefused,
+      Wire: 20000d410101010105413354686520736c6f74206973206f7574206f662072616e67652ec101e0
+    },
+    {
+      Case: ReplicaCorrupt,
+      Wire: 20000f4101010101014121412064616d616765642076616c75652e0111e0
+    }
+  ],
+  Tails: [
+    {
+      Case: Tail,
+      Read: Tail { ContiguousTail = 7, IsSealed = True, LeaseRemainingTicks = 0 },
+      Wire: Guid_1
+    },
+    {
+      Case: Tail,
+      Read: Tail { ContiguousTail = 7, IsSealed = True, LeaseRemainingTicks = 20000000 },
+      Wire: 200003011d01030101c101c10161002d3101e0
+    },
+    {
+      Case: Tail,
+      Read: Tail { ContiguousTail = 0, IsSealed = False, LeaseRemainingTicks = 0 },
+      Wire: Guid_2
+    },
+    {
+      Case: Dropped,
+      Read: Dropped { },
+      Wire: Guid_3
+    },
+    {
+      Case: Backpressure,
+      Read: Backpressure { },
+      Wire: Guid_4
+    },
+    {
+      Case: NotThisNode,
+      Read: NotThisNode { },
+      Wire: Guid_5
+    },
+    {
+      Case: ReplicaCallRefused,
+      Read: ReplicaCallRefused { Kind = UnsupportedVersion, Message = Version 2. },
+      Wire: 20000d010101010107411556657273696f6e20322ec1010101e0
+    },
+    {
+      Case: ReplicaCorrupt,
+      Read: ReplicaCorrupt { Slot = , Message = A damaged value. },
+      Wire: 20000f0101010101014121412064616d616765642076616c75652ec1010101e0
+    }
+  ],
+  Heartbeats: [
+    {
+      Case: Reply,
+      Read: Reply(LeaseGrantTicks = 30000000, Outcomes = [4]),
+      Wire: 2000036180c3c9014109000102030101c101e0
+    },
+    {
+      Case: Reply,
+      Read: Reply(LeaseGrantTicks = 0, Outcomes = [0]),
+      Wire: 200003010141010101c101e0
+    },
+    {
+      Case: Backpressure,
+      Read: Backpressure { },
+      Wire: 2000090101c1010101c101e0
+    },
+    {
+      Case: NotThisNode,
+      Read: NotThisNode { },
+      Wire: 20000b0101c1010101c101e0
+    },
+    {
+      Case: ReplicaCallRefused,
+      Read: ReplicaCallRefused { Kind = UnsupportedVersion, Message = Version 2. },
+      Wire: 20000d0101c1010107411556657273696f6e20322ee0
+    }
+  ],
+  Requests: {
+    Write: 20000d01130111010d0109010341050506e0,
+    Read: 20000d01130111010d0109010501050105e0,
+    Tail: 20000d0113011101090103e0,
+    Heartbeat: 20000d21000501130015e0e0
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj"
+    ],
+    "mutate": [
+      "Ledgers/ILedgerReplica.cs",
+      "Ledgers/ILedgerReplicaTransport.cs",
+      "Ledgers/ILedgerStore.cs",
+      "Ledgers/LedgerId.cs",
+      "Ledgers/LedgerReplicaCorruptException.cs",
+      "Ledgers/LedgerReplicaFailures.cs",
+      "Ledgers/LedgerReplicaOperations.cs",
+      "Ledgers/LedgerReplicaOptions.cs",
+      "Ledgers/LedgerReplicaQueueTimeoutException.cs",
+      "Ledgers/LedgerReplicaTail.cs",
+      "Ledgers/LedgerStorageCorruptException.cs",
+      "Ledgers/LedgerStoreClusterMismatchException.cs",
+      "Ledgers/NodeId.cs",
+      "Ledgers/ReplicaHeartbeatRead.cs",
+      "Ledgers/ReplicaHeartbeatReply.cs",
+      "Ledgers/ReplicaHeartbeatStatus.cs",
+      "Ledgers/ReplicaRead.cs",
+      "Ledgers/ReplicaTailRead.cs",
+      "Ledgers/ReplicaWriteOutcome.cs",
+      "Ledgers/Slot.cs"
+    ],
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

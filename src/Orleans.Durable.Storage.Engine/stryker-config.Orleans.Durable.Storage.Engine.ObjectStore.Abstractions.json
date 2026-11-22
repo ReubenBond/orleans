@@ -1,0 +1,38 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests.csproj"
+    ],
+    "mutate": [
+      "ObjectStore/IAppendableObjectStore.cs",
+      "ObjectStore/IObjectStore.cs",
+      "ObjectStore/ListedObject.cs",
+      "ObjectStore/Memory/InMemoryObjectStore.cs",
+      "ObjectStore/ObjectAppendOutcome.cs",
+      "ObjectStore/ObjectContentChangedDefect.cs",
+      "ObjectStore/ObjectContentChangedException.cs",
+      "ObjectStore/ObjectCreateOutcome.cs",
+      "ObjectStore/ObjectName.cs",
+      "ObjectStore/ObjectProperties.cs",
+      "ObjectStore/ObjectReplaceOutcome.cs",
+      "ObjectStore/ObjectSealOutcome.cs",
+      "ObjectStore/ObjectStoreArguments.cs",
+      "ObjectStore/ObjectStoreChecksums.cs",
+      "ObjectStore/ObjectStoreRefusedException.cs",
+      "ObjectStore/ObjectStoreResponses.cs",
+      "ObjectStore/ObjectVersion.cs",
+      "ObjectStore/PacedObjectStore.cs",
+      "ObjectStore/PrefixedAppendableObjectStore.cs",
+      "ObjectStore/PrefixedObjectStore.cs",
+      "ObjectStore/VersionedObject.cs"
+    ],
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+﻿[
+  {
+    Identity: Lsm abcdefghij 0102030405060708090a0b0c0d0e0f10,
+    Surrogate: {
+      Kind: 1,
+      UpperId: 72623859790382856,
+      LowerId: 651345242494996240,
+      Prefix: abcdefghij
+    },
+    Wire: 20000581080706050403020181100f0e0d0c0b0a0941156162636465666768696ae0
+  },
+  {
+    Identity: Logs abcdefghij 0102030405060708090a0b0c0d0e0f10,
+    Surrogate: {
+      Kind: 2,
+      UpperId: 72623859790382856,
+      LowerId: 651345242494996240,
+      Prefix: abcdefghij
+    },
+    Wire: 20000981080706050403020181100f0e0d0c0b0a0941156162636465666768696ae0
+  },
+  {
+    Identity: Memory abcdefghij 0102030405060708090a0b0c0d0e0f10,
+    Surrogate: {
+      Kind: 3,
+      UpperId: 72623859790382856,
+      LowerId: 651345242494996240,
+      Prefix: abcdefghij
+    },
+    Wire: 20000d81080706050403020181100f0e0d0c0b0a0941156162636465666768696ae0
+  },
+  {
+    Identity: default,
+    Wire: 20000101010101c101e0
+  }
+]

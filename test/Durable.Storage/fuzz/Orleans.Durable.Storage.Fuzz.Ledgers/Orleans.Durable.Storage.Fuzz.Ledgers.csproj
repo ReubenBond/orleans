@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The fuzz targets of the Ledgers layer's formats: the batch, and the LedgerStore's formats (docs/spec/verification.md
+    §6.1). They reference the Engine and use the types of the components which decode them alone, whose tests replay
+    their corpora and use the batch target's reading of the format's rules as their oracle.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Abstractions\Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+</Project>

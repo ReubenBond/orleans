@@ -1,0 +1,62 @@
+No bytes.
+  truncated: The manifest holds 0 bytes, fewer than its 16-byte header.
+A header one byte short.
+  truncated: The manifest holds 15 bytes, fewer than its 16-byte header.
+Magic XLAM.
+  bad-magic: The manifest's magic is not CLAM.
+Version 2.
+  bad-version: The manifest's version is 2, not 1.
+A header which gives a body one byte longer than follows it.
+  length-mismatch: The manifest's header gives a 157-byte body, but 156 bytes follow it.
+A header whose CRC-32C is one more than the body's.
+  crc-mismatch: The manifest's body does not match its CRC-32C.
+A body which ends inside the first section, with its length and CRC-32C.
+  body-truncated: The manifest's body ends before section 0's object, at byte 42 of 60.
+Epoch 0, which only the absent manifest has.
+  zero-epoch: The manifest's epoch is 0, which only the absent manifest has.
+Epoch 0 in a body which ends before DrainedBelow: the epoch is checked once read.
+  zero-epoch: The manifest's epoch is 0, which only the absent manifest has.
+DrainedBelow 0.
+  zero-drained-below: The manifest's DrainedBelow is 0, which names no ledger.
+A watermark of ledger 2, below DrainedBelow 3.
+  watermark-below-drained: Watermark 0 is of ledger 2, below DrainedBelow 3.
+Watermarks of ledgers 5, then 4.
+  watermarks-unordered: Watermark 1 is of ledger 4, not above the previous entry's 5.
+A watermark at slot 2^63.
+  slot-out-of-range: Watermark 0 lies at slot 9223372036854775808, past 2^63 - 1.
+A completion flag of 2.
+  bad-complete-flag: Watermark 0's completion flag is 2, neither 0 nor 1.
+A watermark at slot 0 and incomplete.
+  empty-watermark: Watermark 0, of ledger 4, is at slot 0 and incomplete, so it records nothing.
+A complete entry of ledger 3, which is DrainedBelow.
+  complete-at-drained-below: Ledger 3 is complete, so DrainedBelow lies past it.
+A section's object name with an upper-case letter.
+  bad-object-name: Section 0's object, 'D/3/0/0123456789abcdef0123456789abcdef', is not an object name.
+A section's object name with an empty component.
+  bad-object-name: Section 0's object, 'd//1', is not an object name.
+A section of no bytes.
+  bad-section-range: Section 0's bytes, 0 at offset 0, are empty or end past 2^63 - 1.
+A section whose bytes end past 2^63 - 1.
+  bad-section-range: Section 0's bytes, 1 at offset 9223372036854775807, are empty or end past 2^63 - 1.
+A partition 524,281 bits deep, deeper than a key.
+  bad-partition: Section 0's partition is 524281 bits deep, deeper than a key's 524280.
+A partition 3 bits deep which sets a bit past its depth.
+  bad-partition: Section 0's partition sets a bit past its depth, 3.
+A lowest tag of ledger 0.
+  bad-tag: Section 0's lowest tag is of ledger 0, which names no ledger.
+A highest tag at slot 2^63 - 1.
+  bad-tag: Section 0's highest tag lies at slot 9223372036854775807, past 2^63 - 2, the last slot a ledger has.
+A lowest tag with index 2^31.
+  bad-tag: Section 0's lowest tag has index 2147483648, past 2^31 - 1.
+A lowest tag of ledger 0 in a body which ends inside its slot: the ledger is checked once read.
+  bad-tag: Section 0's lowest tag is of ledger 0, which names no ledger.
+A lowest tag above the highest.
+  tags-unordered: Section 0's lowest tag is above its highest.
+A tail of no bytes.
+  bad-tail-range: Section 0's tail, 0 bytes at offset 4096, is empty or ends past 2^63 - 1.
+Sections at offsets 2048, then 0, of one object.
+  sections-unordered: Section 1, at offset 0 of d/3/0/0123456789abcdef0123456789abcdef, is not after the previous section.
+Two sections at one offset of one object.
+  sections-unordered: Section 1, at offset 0 of d/3/0/0123456789abcdef0123456789abcdef, is not after the previous section.
+A byte after the last section.
+  trailing-bytes: The manifest's body runs 1 byte past its last section.

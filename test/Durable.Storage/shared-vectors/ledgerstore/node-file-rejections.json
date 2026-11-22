@@ -1,0 +1,45 @@
+{
+  "description": "LedgerStore node files a decoder rejects, each named by the first rule it breaks in check order (ledgerstore.md §7.1): the file holds exactly 32 lowercase hexadecimal digits (digits), naming a non-empty UUID (empty-uuid); a case breaking both pins their order.",
+  "cases": [
+    {
+      "name": "Uppercase digits.",
+      "reason": "digits",
+      "hex": "3031323334353637383941424344454630313233343536373839414243444546"
+    },
+    {
+      "name": "A character which is not a hexadecimal digit.",
+      "reason": "digits",
+      "hex": "3031323334353637383961626364656730313233343536373839616263646566"
+    },
+    {
+      "name": "31 digits.",
+      "reason": "digits",
+      "hex": "30313233343536373839616263646566303132333435363738396162636465"
+    },
+    {
+      "name": "32 digits and a line feed.",
+      "reason": "digits",
+      "hex": "30313233343536373839616263646566303132333435363738396162636465660a"
+    },
+    {
+      "name": "The UUID's hyphenated format.",
+      "reason": "digits",
+      "hex": "30313233343536372d383961622d636465662d303132332d343536373839616263646566"
+    },
+    {
+      "name": "An empty file.",
+      "reason": "digits",
+      "hex": ""
+    },
+    {
+      "name": "The empty UUID.",
+      "reason": "empty-uuid",
+      "hex": "3030303030303030303030303030303030303030303030303030303030303030"
+    },
+    {
+      "name": "The empty UUID in its hyphenated format: named by digits, which precedes empty-uuid.",
+      "reason": "digits",
+      "hex": "30303030303030302d303030302d303030302d303030302d303030303030303030303030"
+    }
+  ]
+}

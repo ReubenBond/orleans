@@ -1,0 +1,217 @@
+{
+  "description": "Rejected CLOE v1 tombstones and extents (object-ledgers.md \u00a77, formats.md \u00a71), each carrying the reason code of the first rule it breaks.",
+  "tombstones": [
+    {
+      "name": "empty tombstone",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "16-byte tombstone",
+      "reason": "truncated",
+      "hex": "030000000000000000000000004bed2d"
+    },
+    {
+      "name": "18-byte tombstone",
+      "reason": "trailing-bytes",
+      "hex": "030000000000000000000000004bed2ded00"
+    },
+    {
+      "name": "unknown kind in tombstone",
+      "reason": "bad-kind",
+      "hex": "00000000000000000000000000e4a55bbc"
+    },
+    {
+      "name": "data frame as tombstone",
+      "reason": "bad-kind",
+      "hex": "010000000000000000010000003937cc51"
+    },
+    {
+      "name": "roll frame as tombstone",
+      "reason": "bad-kind",
+      "hex": "020000000000000000000000002ed5ffdd"
+    },
+    {
+      "name": "slot past max in tombstone",
+      "reason": "bad-slot",
+      "hex": "03ffffffffffffff7f00000000c03fc724"
+    },
+    {
+      "name": "non-zero length in tombstone",
+      "reason": "bad-length",
+      "hex": "03000000000000000001000000f3476830"
+    },
+    {
+      "name": "bad crc in tombstone",
+      "reason": "crc-mismatch",
+      "hex": "03000000000000000000000000efbeadde"
+    },
+    {
+      "name": "data frame with zero length as tombstone checks length before kind",
+      "reason": "bad-length",
+      "hex": "01000000000000000000000000819d898c"
+    }
+  ],
+  "extents": [
+    {
+      "name": "empty extent",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "shorter than trailer",
+      "reason": "truncated",
+      "hex": "434c4f45"
+    },
+    {
+      "name": "trailer with no frame bytes",
+      "reason": "truncated",
+      "hex": "434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "truncated frame payload",
+      "reason": "truncated",
+      "hex": "01000000000000000005000000a830530801434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "truncated frame header in second append",
+      "reason": "truncated",
+      "hex": "01000000000000000001000000188e16e801434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b170102434c4f45010000000100000000000000010000003a000000000000001200000000000000e2a26bf1"
+    },
+    {
+      "name": "bad trailer magic",
+      "reason": "bad-magic",
+      "hex": "01000000000000000001000000188e16e801434c4c42010000000000000000000000010000000000000000000000000000000000000088da5517"
+    },
+    {
+      "name": "bad trailer version",
+      "reason": "bad-version",
+      "hex": "01000000000000000001000000188e16e801434c4f4502000000000000000000000001000000000000000000000000000000000000009a90e051"
+    },
+    {
+      "name": "bad trailer crc",
+      "reason": "crc-mismatch",
+      "hex": "01000000000000000001000000188e16e801434c4f45010000000000000000000000010000000000000000000000000000000000000078563412"
+    },
+    {
+      "name": "bad frame crc",
+      "reason": "crc-mismatch",
+      "hex": "01000000000000000001000000bebafeca01434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "trailer first slot past max",
+      "reason": "bad-slot",
+      "hex": "01000000000000000001000000188e16e801434c4f4501000000ffffffffffffff7f0100000000000000000000000000000000000000e60a6efd"
+    },
+    {
+      "name": "trailer slot range overflows max",
+      "reason": "bad-slot",
+      "hex": "01000000000000000001000000188e16e801434c4f4501000000feffffffffffff7f02000000000000000000000000000000000000001599bf06"
+    },
+    {
+      "name": "frame slot past max",
+      "reason": "bad-slot",
+      "hex": "01ffffffffffffff7f0100000089f4a0f301434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "trailer count zero",
+      "reason": "no-frames",
+      "hex": "01000000000000000001000000188e16e801434c4f4501000000000000000000000000000000000000000000000000000000000000007a164820"
+    },
+    {
+      "name": "first append with non-zero previous trailer offset",
+      "reason": "bad-offset",
+      "hex": "01000000000000000001000000188e16e801434c4f45010000000000000000000000010000000000000000000000280000000000000084803058"
+    },
+    {
+      "name": "start offset below minimum append length",
+      "reason": "bad-offset",
+      "hex": "01000000000000000001000000188e16e801434c4f4501000000000000000000000001000000280000000000000000000000000000009e9fa2b2"
+    },
+    {
+      "name": "previous trailer offset does not chain",
+      "reason": "bad-offset",
+      "hex": "01000000000000000001000000188e16e801434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b1701010000000000000001000000894594cb02434c4f45010000000100000000000000010000003a000000000000000000000000000000185165e7"
+    },
+    {
+      "name": "start offset at or past trailer offset",
+      "reason": "bad-offset",
+      "hex": "01000000000000000001000000188e16e801434c4f450100000000000000000000000100000064000000000000003c0000000000000034548b4f"
+    },
+    {
+      "name": "unknown frame kind",
+      "reason": "bad-kind",
+      "hex": "09000000000000000001000000cac9f44301434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "seal frame inside extent",
+      "reason": "bad-kind",
+      "hex": "030000000000000000000000004bed2ded434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "data frame with zero length",
+      "reason": "bad-length",
+      "hex": "01000000000000000000000000819d898c434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "roll frame with non-zero length",
+      "reason": "bad-length",
+      "hex": "02000000000000000001000000d2711f1401434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "append first slot gap",
+      "reason": "slot-mismatch",
+      "hex": "01000000000000000001000000188e16e801434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b1701020000000000000001000000260de29a02434c4f45010000000200000000000000010000003a0000000000000012000000000000004f49b912"
+    },
+    {
+      "name": "frame slot mismatch",
+      "reason": "slot-mismatch",
+      "hex": "010100000000000000010000007db6c4d801434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "roll frame before data frame in same append",
+      "reason": "roll-not-last",
+      "hex": "020000000000000000000000002ed5ffdd01000000000000000001000000188e16e801434c4f45010000000000000000000000020000000000000000000000000000000000000000f9cf4e"
+    },
+    {
+      "name": "roll frame in non-final append",
+      "reason": "roll-not-last",
+      "hex": "020000000000000000000000002ed5ffdd434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b1701000000000000000001000000188e16e801434c4f4501000000000000000000000001000000390000000000000011000000000000004ccec29b"
+    },
+    {
+      "name": "trailing byte before trailer",
+      "reason": "trailing-bytes",
+      "hex": "01000000000000000001000000188e16e80199434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "bad magic and bad version",
+      "reason": "bad-magic",
+      "hex": "01000000000000000001000000188e16e8015858585863000000000000000000000001000000000000000000000000000000000000001d2ec224"
+    },
+    {
+      "name": "bad version and bad crc",
+      "reason": "bad-version",
+      "hex": "01000000000000000001000000188e16e801434c4f45020000000000000000000000010000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "data frame payload length past max",
+      "reason": "bad-length",
+      "hex": "010000000000000000c7ffff7f91d4e271434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "trailer frame count past int max",
+      "reason": "bad-slot",
+      "hex": "01000000000000000001000000188e16e801434c4f45010000000000000000000000000000800000000000000000000000000000000085104e59"
+    },
+    {
+      "name": "trailer frame count int max",
+      "reason": "truncated",
+      "hex": "01000000000000000001000000188e16e801434c4f45010000000000000000000000ffffff7f0000000000000000000000000000000044b9741a"
+    },
+    {
+      "name": "trailer start offset past max",
+      "reason": "bad-offset",
+      "hex": "01000000000000000001000000188e16e801434c4f4501000000000000000000000001000000c7ffffffffffff7f9fffffffffffff7fe3f1453a"
+    }
+  ]
+}

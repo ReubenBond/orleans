@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The fatal-error handler's tests; the exit probe opens a LedgerStore and a state database, so it references them. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Diagnostics\Orleans.Durable.Storage.Diagnostics.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.RocksDb\Orleans.Durable.Storage.RocksDb.csproj" />
+    <TestingPlatformBuilderHook Include="5E1B6C77-3D2A-4E8F-9B0C-6A4D2F8E1C35">
+      <DisplayName>Clog fatal-error probe</DisplayName>
+      <TypeFullName>Orleans.Durable.Storage.Diagnostics.Tests.FatalErrorProbe</TypeFullName>
+    </TestingPlatformBuilderHook>
+  </ItemGroup>
+</Project>

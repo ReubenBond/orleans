@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The file-system technology package: providers over one host's local file system (the MetaStore's registers and the
+    archive's object store), which publish through the WAL's WalFileSystem, the seam whose directory flushes make names
+    durable and which crash-state enumeration records.
+  -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.FileSystem</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+</Project>

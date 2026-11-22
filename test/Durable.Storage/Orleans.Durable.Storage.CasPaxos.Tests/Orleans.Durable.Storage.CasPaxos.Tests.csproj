@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Debug leg runs these tests in Debug, where Orleans.Durable.Storage.Engine.Buffers poisons each page as it returns to its pool, so an adapter
+    which read a write's value after the write completed would land the poison (docs/spec/verification.md §12).
+  -->
+  <PropertyGroup>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <Import Project="..\..\eng\Orleans.Consensus.CasPaxos.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.CasPaxos\Orleans.Durable.Storage.CasPaxos.csproj" />
+    <ProjectReference Include="$(OrleansConsensusCasPaxosSourceRoot)\csharp\src\Orleans.Consensus.CasPaxos.Testing\Orleans.Consensus.CasPaxos.Testing.csproj" />
+    <ProjectReference Include="$(OrleansConsensusCasPaxosSourceRoot)\csharp\src\Orleans.Consensus.CasPaxos.Sqlite\Orleans.Consensus.CasPaxos.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\ConditionalRegisterContract.cs" Link="ConditionalRegisterContract.cs" />
+    <Compile Include="..\shared\ConditionalRegisterWrites.cs" Link="ConditionalRegisterWrites.cs" />
+    <Compile Include="..\shared\LoopbackRegisterHost.cs" Link="LoopbackRegisterHost.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\LeakChecks\*.cs" Exclude="..\shared\LeakChecks\SimulationLeakCheck.cs" LinkBase="LeakChecks" />
+  </ItemGroup>
+</Project>

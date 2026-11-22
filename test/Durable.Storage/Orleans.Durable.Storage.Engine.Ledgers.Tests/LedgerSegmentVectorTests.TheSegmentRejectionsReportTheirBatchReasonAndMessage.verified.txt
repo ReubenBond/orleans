@@ -1,0 +1,26 @@
+﻿The first batch decoded does not start a segment.
+  batch 0, segment-offset-mismatch: The batch at slot 0, the first decoded, does not begin a segment: its segment offset is 1.
+A batch at slot 2 with segment offset 1, whose segment starts at slot 0.
+  batch 2, segment-offset-mismatch: The batch at slot 2 has segment offset 1, and its segment starts at slot 0.
+A segment offset greater than its slot.
+  batch 1, segment-offset-mismatch: The batch at slot 1 has segment offset 5, and its segment starts at slot 0.
+An ordinal base of 2 after a segment which defined one key.
+  batch 1, ordinal-base-mismatch: The batch at slot 1 has ordinal base 2, and its segment defined 1 keys before it.
+A key defined twice in one batch.
+  batch 0, duplicate-key: Row 1 of the batch at slot 0 defines a key its segment, which starts at slot 0, already defined.
+A key defined again in a later batch of its segment.
+  batch 1, duplicate-key: Row 0 of the batch at slot 1 defines a key its segment, which starts at slot 0, already defined.
+A defining row whose stored count is the u64 maximum.
+  batch 0, count-overflow: Row 0 of the batch at slot 0 would advance its key's count past the u64 maximum, in the segment which starts at slot 0.
+A reference which would advance its key's count past the u64 maximum.
+  batch 1, count-overflow: Row 0 of the batch at slot 1 would advance its key's count past the u64 maximum, in the segment which starts at slot 0.
+A segment rule broken in batch 1 beside a batch rule in batch 2: the earlier batch's segment rule comes first.
+  batch 1, ordinal-base-mismatch: The batch at slot 1 has ordinal base 0, and its segment defined 1 keys before it.
+A batch which breaks a batch rule and a segment rule: the batch rule comes first.
+  batch 1, bad-row-flags: Row 0 has flags 0x07: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
+A duplicate key before a count overflow in one batch: rows are checked in order.
+  batch 0, duplicate-key: Row 1 of the batch at slot 0 defines a key its segment, which starts at slot 0, already defined.
+A batch whose segment offset and ordinal base are both wrong: the offset comes first.
+  batch 1, segment-offset-mismatch: The batch at slot 1 has segment offset 3, and its segment starts at slot 0.
+A row which defines a key again with a count at the u64 maximum: the duplicate comes first.
+  batch 0, duplicate-key: Row 1 of the batch at slot 0 defines a key its segment, which starts at slot 0, already defined.

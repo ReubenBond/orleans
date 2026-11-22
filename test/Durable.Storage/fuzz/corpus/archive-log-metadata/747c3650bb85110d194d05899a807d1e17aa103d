@@ -1,0 +1,7 @@
+wal
+journals/account-17
+d80557dacbe088f2
+00000000000000000001
+wal_generation=1
+format=json
+durable_key=d80557dacbe088f2

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The deterministic simulation kit (docs/spec/verification.md §7): simulated nodes, transport, and doubles at Clog's
+    I/O boundaries. A simulation test project's build rewrites it with the rest of its dependency closure under
+    Clockwork's controlled rule sets (eng/OrleansSimulation.targets), so the kit runs only inside a simulation.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- The simulation kernel, built from Clockwork's source (eng/OrleansSimulation.SourceBuild.targets). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Testing.Simulation" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The kit's self-tests break what its components record, to show that each check fires. -->
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Simulation.Tests" />
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Simulation.Conformance.Tests" />
+  </ItemGroup>
+
+  <!-- A replica which fails a debug assertion on every write, the mutant the debug assertion hook's self-tests run. -->
+  <ItemGroup>
+    <Compile Include="..\shared\AssertingLedgerReplica.cs" Link="AssertingLedgerReplica.cs" />
+    <Compile Include="..\shared\ReplicaAnswers.cs" Link="ReplicaAnswers.cs" />
+  </ItemGroup>
+</Project>

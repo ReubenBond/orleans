@@ -1,0 +1,166 @@
+﻿steps 8128
+schedule 6fa74bbe41daaf9a05fbd3fd579717b7585cb48dbf2b6ceb616803460fd23c7a (5839 decisions)
+outcome Completed
+ledger call events 344
+ledger served events 336
+ledger answer events 344
+ledger handled events 47
+0 start replica-0: incarnation 1 lists []
+0 start replica-1: incarnation 1 lists []
+0 start replica-2: incarnation 1 lists []
+6 ledger writer appends s1 0
+6 ledger writer appends s1 1
+6 ledger writer appends s1 2
+6 ledger writer appends s1 3
+7 pause replica-1 for 94.386 ms
+8 isolate replica-0
+11 reconnect replica-0
+15 ledger writer appended s1 2 -> Written
+18 ledger checker seal check #13 of s1 begins with tail 0
+18 rpc client -> replica-2: request duplicated
+18 ledger writer appended s1 1 -> Written
+25 ledger checker seal check #13 of s1 -> tail 0 sealed False
+50 ledger checker seal check #17 of s1 begins with tail 0
+57 ledger checker seal check #17 of s1 -> tail 0 sealed False
+58 ledger checker seal check #21 of s1 begins with tail 0
+65 ledger checker seal check #21 of s1 -> tail 0 sealed False
+74 ledger checker seal check #25 of s1 begins with tail 0
+79 ledger checker seal check #25 of s1 -> tail 0 sealed False
+91 ledger checker seal check #29 of s1 begins with tail 0
+99 ledger checker seal check #29 of s1 -> tail 0 sealed False
+138 ledger checker seal check #33 of s1 begins with tail 0
+178 ledger checker seal check #33 of s1 fails: AggregateException
+198 ledger writer appended s1 0 -> Written
+198 ledger writer completed s1 0
+198 ledger writer completed s1 2
+198 ledger writer completed s1 1
+198 ledger writer appends s1 4
+198 ledger writer appends s1 5
+198 rpc client -> replica-0: request duplicated
+198 ledger writer appends s1 6
+205 ledger checker seal check #52 of s1 begins with tail 0
+205 ledger writer appended s1 4 -> Written
+206 ledger writer appended s1 5 -> Written
+208 ledger writer appended s1 3 -> Written
+208 ledger writer completed s1 3
+208 ledger writer completed s1 4
+208 ledger writer completed s1 5
+208 ledger writer appends s1 7
+208 ledger writer appends s1 8
+208 ledger writer appended s1 6 -> Written
+208 ledger writer completed s1 6
+208 ledger writer appends s1 9
+208 ledger writer appends s1 10
+212 ledger checker seal check #52 of s1 -> tail 3 sealed False
+215 ledger writer appended s1 8 -> Written
+217 ledger writer appended s1 7 -> Written
+217 ledger writer completed s1 7
+217 ledger writer appends s1 11
+217 ledger writer completed s1 8
+217 ledger writer appends s1 12
+218 ledger writer appended s1 10 -> Written
+219 ledger writer appended s1 9 -> Written
+219 ledger writer completed s1 9
+219 ledger writer completed s1 10
+219 ledger writer appends s1 13
+219 ledger writer appends s1 14
+224 ledger writer appended s1 12 -> Written
+226 ledger writer appended s1 14 -> Written
+227 ledger writer appended s1 11 -> Written
+227 ledger writer completed s1 11
+227 ledger writer completed s1 12
+227 ledger writer appends s1 15
+227 ledger writer appends s1 16
+230 ledger writer appended s1 13 -> Written
+230 ledger writer completed s1 13
+230 ledger writer completed s1 14
+230 ledger writer appends s1 17
+230 ledger writer appends s1 18
+234 ledger writer appended s1 16 -> Written
+237 ledger writer appended s1 15 -> Written
+237 ledger writer completed s1 15
+237 ledger writer completed s1 16
+237 ledger writer appends s1 19
+237 ledger writer appends s1 20
+238 ledger checker seal check #98 of s1 begins with tail 3
+240 ledger writer appended s1 17 -> Written
+240 ledger writer completed s1 17
+240 ledger writer appends s1 21
+241 ledger writer appended s1 18 -> Written
+241 ledger writer completed s1 18
+241 ledger writer appends s1 22
+245 ledger checker seal check #98 of s1 -> tail 17 sealed False
+246 ledger writer appended s1 20 -> Written
+247 ledger writer appended s1 19 -> Written
+247 ledger writer completed s1 19
+247 ledger writer completed s1 20
+247 ledger writer appends s1 23
+247 rpc client -> replica-1: request duplicated
+250 ledger writer appended s1 22 -> Written
+255 ledger writer appended s1 23 -> Written
+256 ledger checker seal check #111 of s1 begins with tail 17
+263 ledger checker seal check #111 of s1 -> tail 21 sealed False
+287 ledger checker seal check #115 of s1 begins with tail 21
+297 ledger checker seal check #115 of s1 -> tail 21 sealed False
+308 ledger recovery-1 recovery #119 of s1 begins with tail 0
+312 crash replica-1 while it serves recovery-1's seal
+312 crash replica-1 (process) with 0 writes in flight
+312 crashed process of replica-1 stopped with CrashedProcessException
+317 rpc client -> replica-0: request duplicated
+317 rpc client -> replica-1: request duplicated
+321 ledger restart replica-1#2 s0 
+321 verify replica-1: 22 acknowledged entries, 0 corrupt, 0 sealed replicas
+321 start replica-1: incarnation 2 lists [1]
+321 restart replica-1 after its crash during recovery-1
+322 crash replica-0 while recovery-1 runs, as it serves its read 24, answered
+322 crash replica-0 (process) with 0 writes in flight
+322 crashed process of replica-0 stopped with CrashedProcessException
+324 rpc client -> replica-0: request duplicated
+324 rpc client -> replica-2: request duplicated
+325 ledger checker seal check #148 of s1 begins with tail 21
+325 ledger restart replica-0#2 s0 
+325 verify replica-0: 23 acknowledged entries, 0 corrupt, 1 sealed replicas
+325 start replica-0: incarnation 2 lists [1]
+325 restart replica-0 after its crash during recovery-1
+331 ledger checker seal check #148 of s1 -> tail 21 sealed True
+332 ledger recovery-1 recovery #119 of s1 ends: c 21, end 24
+359 ledger checker seal check #167 of s1 begins with tail 21
+360 rpc client -> replica-0: request duplicated
+363 ledger checker seal check #167 of s1 -> tail 21 sealed True
+382 rpc client -> replica-0: request duplicated
+387 rpc client -> replica-1: request duplicated
+400 ledger checker seal check #192 of s1 begins with tail 21
+407 ledger checker seal check #192 of s1 -> tail 21 sealed True
+410 ledger checker seal check #202 of s1 begins with tail 21
+415 ledger checker seal check #202 of s1 -> tail 21 sealed True
+421 ledger checker seal check #212 of s1 begins with tail 21
+425 ledger checker seal check #212 of s1 -> tail 21 sealed True
+437 ledger writer appended s1 21 -> Sealed
+437 ledger writer stopped s1: Sealing
+437 ledger writer stopped s1: CompletionFailed
+437 ledger writer stopped s1: CompletionFailed
+440 ledger checker seal check #231 of s1 begins with tail 21
+447 ledger checker seal check #231 of s1 -> tail 21 sealed True
+453 faults healed
+453 ledger checker seal check #241 of s1 begins with tail 21
+460 ledger checker seal check #241 of s1 -> tail 21 sealed True
+471 ledger recovery-2 recovery #251 of s1 begins with tail 0
+489 ledger recovery-2 recovery #251 of s1 ends: c 21, end 24
+489 ledger recovery-2 closes s1 at 24
+489 recovery-2 took 18 ms of its 84 ms bound
+491 ledger checker seal check #277 of s1 begins with tail 21
+499 ledger checker seal check #277 of s1 -> tail 21 sealed True
+531 ledger checker seal check #302 of s1 begins with tail 21
+536 ledger checker seal check #302 of s1 -> tail 21 sealed True
+571 ledger checker seal check #330 of s1 begins with tail 21
+577 ledger checker seal check #330 of s1 -> tail 21 sealed True
+599 ledger checker seal check #349 of s1 begins with tail 21
+605 ledger checker seal check #349 of s1 -> tail 21 sealed True
+633 ledger checker seal check #362 of s1 begins with tail 21
+640 ledger checker seal check #362 of s1 -> tail 21 sealed True
+640 ledger checker seal check #366 of s1 begins with tail 21
+645 ledger checker seal check #366 of s1 -> tail 21 sealed True
+645 writer prefix 21, 21 written; ends [24, 24]
+645 recovery repetitions 0, tracked stragglers 25
+645 ledger writer stopped s1: Requested
+645 teardown

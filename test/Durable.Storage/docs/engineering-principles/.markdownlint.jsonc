@@ -1,0 +1,5 @@
+// The principles keep one line per bullet, as the copies the repository's agents read do.
+{
+  "extends": "../../.markdownlint.jsonc",
+  "MD013": false
+}

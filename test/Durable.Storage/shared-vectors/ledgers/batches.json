@@ -1,0 +1,198 @@
+{
+  "description": "Batches, CLLB version 1, each with its segment state and the rows it holds in order: each row's kind, whether it defines its key, its ordinal (implied on a defining row), a defining row's key, version before (base and count), and token, and its body. Decoding the bytes yields them, and encoding them yields the bytes.",
+  "cases": [
+    {
+      "name": "A marker: the start flag and no rows.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [],
+      "hex": "434c4c42010000000100000056624865"
+    },
+    {
+      "name": "One Append row which defines a one-byte key, with an empty version base and token, count 0, and an empty body.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "Append",
+          "defining": true,
+          "key": "6b",
+          "versionBase": "",
+          "versionCount": "0",
+          "token": "",
+          "body": "",
+          "ordinal": "0"
+        }
+      ],
+      "hex": "434c4c42010000000100000104016b000000003ee0dbf2"
+    },
+    {
+      "name": "A key defined by a Replace and referenced by an Append in one batch, with a version base and a token.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "Replace",
+          "defining": true,
+          "key": "6a6f75726e616c2f31",
+          "versionBase": "0102",
+          "versionCount": "7",
+          "token": "aabbcc",
+          "body": "62617365207374617465",
+          "ordinal": "0"
+        },
+        {
+          "kind": "Append",
+          "defining": false,
+          "ordinal": "0",
+          "body": "64656c7461"
+        }
+      ],
+      "hex": "434c4c42010000000100000205096a6f75726e616c2f310201020703aabbcc0a6261736520737461746500000564656c7461f3c6ea6f"
+    },
+    {
+      "name": "A batch inside a segment, at offset 3 with ordinal base 2: it references ordinals 0 and 1, defines ordinal 2, and references it.",
+      "segmentStart": false,
+      "segmentOffset": "3",
+      "ordinalBase": "2",
+      "rows": [
+        {
+          "kind": "Append",
+          "defining": false,
+          "ordinal": "1",
+          "body": "6f6e65"
+        },
+        {
+          "kind": "Delete",
+          "defining": false,
+          "ordinal": "0",
+          "body": ""
+        },
+        {
+          "kind": "Append",
+          "defining": true,
+          "key": "6a6f75726e616c2f33",
+          "versionBase": "",
+          "versionCount": "1",
+          "token": "",
+          "body": "7468726565",
+          "ordinal": "2"
+        },
+        {
+          "kind": "Replace",
+          "defining": false,
+          "ordinal": "2",
+          "body": "746872656520616761696e"
+        }
+      ],
+      "hex": "434c4c4201000000000302040001036f6e6502000004096a6f75726e616c2f3300010005746872656501020b746872656520616761696ec92165c4"
+    },
+    {
+      "name": "Every kind, each defining a 300-byte key with a 300-byte body, so the key and body lengths take two varint bytes.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "Append",
+          "defining": true,
+          "key": "01203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736",
+          "versionBase": "",
+          "versionCount": "0",
+          "token": "",
+          "body": "0221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837",
+          "ordinal": "0"
+        },
+        {
+          "kind": "Replace",
+          "defining": true,
+          "key": "032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938",
+          "versionBase": "",
+          "versionCount": "0",
+          "token": "",
+          "body": "04234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39",
+          "ordinal": "1"
+        },
+        {
+          "kind": "Delete",
+          "defining": true,
+          "key": "0524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a",
+          "versionBase": "",
+          "versionCount": "0",
+          "token": "",
+          "body": "0625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b",
+          "ordinal": "2"
+        }
+      ],
+      "hex": "434c4c42010000000100000304ac0201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736000000ac020221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf9183705ac02032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938000000ac0204234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a3906ac020524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a000000ac020625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b5a7998b7d6f51433527190afceed0c2b4a6988a7c6e504234261809fbeddfc1b3a597897b6d5f4133251708faecdec0b2a496887a6c5e4032241607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8e70625446382a1c0dffe1d3c5b7a99b8d7f61534537291b0cfee0d2c4b6a89a8c7e60524436281a0bfdefd1c3b87724051"
+    },
+    {
+      "name": "A 32-byte version base and token, the longest, and a count of 2^64 - 2, whose varint takes 10 bytes.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "Append",
+          "defining": true,
+          "key": "6b",
+          "versionBase": "0726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8",
+          "versionCount": "18446744073709551614",
+          "token": "0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabca",
+          "body": "76",
+          "ordinal": "0"
+        }
+      ],
+      "hex": "434c4c42010000000100000104016b200726456483a2c1e0ff1e3d5c7b9ab9d8f71635547392b1d0ef0e2d4c6b8aa9c8feffffffffffffffff01200928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabca01764c25ea63"
+    },
+    {
+      "name": "References to ordinals 127 and 128, whose varints take one and two bytes, at offset 128 and ordinal base 200.",
+      "segmentStart": false,
+      "segmentOffset": "128",
+      "ordinalBase": "200",
+      "rows": [
+        {
+          "kind": "Append",
+          "defining": false,
+          "ordinal": "127",
+          "body": "61"
+        },
+        {
+          "kind": "Append",
+          "defining": false,
+          "ordinal": "128",
+          "body": "62"
+        }
+      ],
+      "hex": "434c4c4201000000008001c80102007f016100800101626e38b7f6"
+    },
+    {
+      "name": "An empty Delete, with an empty body, followed by an Append of the same key, whose count keeps advancing.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "Delete",
+          "defining": true,
+          "key": "6a6f75726e616c2f39",
+          "versionBase": "",
+          "versionCount": "4",
+          "token": "",
+          "body": "",
+          "ordinal": "0"
+        },
+        {
+          "kind": "Append",
+          "defining": false,
+          "ordinal": "0",
+          "body": "6166746572"
+        }
+      ],
+      "hex": "434c4c42010000000100000206096a6f75726e616c2f390004000000000561667465728e08d965"
+    }
+  ]
+}

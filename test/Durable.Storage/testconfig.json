@@ -1,0 +1,9 @@
+{
+  "commandLineOptions": {
+    "crashdump": true,
+    "crashdump-type": "Heap",
+    "hangdump": true,
+    "hangdump-timeout": "10m",
+    "hangdump-type": "Full"
+  }
+}

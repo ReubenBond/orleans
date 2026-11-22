@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Plain Orleans reading the Orleans composition's archive logs (archive-logs.md §10, orleans.md §5.13): Orleans' own
+    Azure journaling provider over the logs Clog writes, on the fake Azure transport on every change, and on Azurite,
+    through the AppHost's emulators when CLOG_EMULATORS is 1 (just emulators), and on a live account under CLOG_AZURE_LIVE,
+    at milestones (docs/spec/verification.md §10). It references the composition, whose names it reads the logs by, and
+    so takes Orleans as the composition's tests do (build-packaging.md §2). The Debug leg runs it in Debug, where
+    Orleans.Durable.Storage.Engine.Buffers poisons each page as it returns to its pool.
+  -->
+  <PropertyGroup>
+    <ClogDebugLeg>true</ClogDebugLeg>
+
+    <!-- An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), as the composition's (build-packaging.md §2). -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\apphost\Orleans.Durable.Storage.AppHost\Orleans.Durable.Storage.AppHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\Archive\Logs\FakeAzureBlobService.cs" Link="Archive\FakeAzureBlobService.cs" />
+    <Compile Include="..\shared\Cloud\*.cs" LinkBase="Cloud" />
+    <Compile Include="..\shared\LeakChecks\*.cs" Exclude="..\shared\LeakChecks\SimulationLeakCheck.cs" LinkBase="LeakChecks" />
+    <Compile Include="..\shared\SharedVectors.cs" Link="SharedVectors.cs" />
+  </ItemGroup>
+
+  <!--
+    Orleans' own buffer has one name here, so a bare ArcBuffer always means Clog's, as in the composition's own tests.
+  -->
+  <ItemGroup>
+    <Using Include="Orleans.Serialization.Buffers.ArcBuffer" Alias="OrleansBuffer" />
+    <Using Include="Orleans.Serialization.Buffers.ArcBufferWriter" Alias="OrleansBufferWriter" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The fuzz target of the Journals layer's entry record (docs/spec/verification.md §6.1). It references the Engine and uses
+    Journals' types alone; Journals' tests replay its corpus and use its reading of the format's rules as their oracle.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Abstractions\Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+</Project>

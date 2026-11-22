@@ -1,0 +1,5 @@
+// Files markdownlint-cli2 skips. Converted papers, vendored sources, and copied license texts keep their upstream form.
+{
+  "ignores": ["**/node_modules/**", "artifacts/**", "research/**", "vendor/**", "**/*-LICENSE.md"],
+  "noProgress": true
+}

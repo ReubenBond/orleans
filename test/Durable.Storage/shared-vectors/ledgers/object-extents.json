@@ -1,0 +1,173 @@
+{
+  "description": "Valid CLOE v1 object-store ledger tombstones and extents (object-ledgers.md \u00a77, formats.md \u00a71). Integers are little-endian, checksums are Castagnoli CRC-32C, and 64-bit values are decimal strings.",
+  "tombstones": [
+    {
+      "name": "slot 0",
+      "slot": "0",
+      "hex": "030000000000000000000000004bed2ded"
+    },
+    {
+      "name": "slot 42",
+      "slot": "42",
+      "hex": "032a00000000000000000000007c22ff33"
+    },
+    {
+      "name": "the greatest slot",
+      "slot": "9223372036854775806",
+      "hex": "03feffffffffffff7f00000000f0ebb615"
+    }
+  ],
+  "extents": [
+    {
+      "name": "one append with one data frame",
+      "firstSlot": "0",
+      "nextSlot": "1",
+      "rollNextSlot": null,
+      "appends": [
+        {
+          "firstSlot": "0",
+          "count": 1,
+          "startOffset": "0",
+          "previousTrailerOffset": "0",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "0",
+              "payloadHex": "010203"
+            }
+          ]
+        }
+      ],
+      "hex": "0100000000000000000300000028b32d99010203434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b17"
+    },
+    {
+      "name": "one append with three coalesced data frames",
+      "firstSlot": "10",
+      "nextSlot": "13",
+      "rollNextSlot": null,
+      "appends": [
+        {
+          "firstSlot": "10",
+          "count": 3,
+          "startOffset": "0",
+          "previousTrailerOffset": "0",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "10",
+              "payloadHex": "aa"
+            },
+            {
+              "kind": "data",
+              "slot": "11",
+              "payloadHex": "bbcc"
+            },
+            {
+              "kind": "data",
+              "slot": "12",
+              "payloadHex": "ddeeff"
+            }
+          ]
+        }
+      ],
+      "hex": "010a000000000000000100000096550d31aa010b0000000000000002000000855b5724bbcc010c0000000000000003000000378f3abcddeeff434c4f45010000000a000000000000000300000000000000000000000000000000000000b19aba3a"
+    },
+    {
+      "name": "two chained appends",
+      "firstSlot": "0",
+      "nextSlot": "3",
+      "rollNextSlot": null,
+      "appends": [
+        {
+          "firstSlot": "0",
+          "count": 1,
+          "startOffset": "0",
+          "previousTrailerOffset": "0",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "0",
+              "payloadHex": "68656c6c6f"
+            }
+          ]
+        },
+        {
+          "firstSlot": "1",
+          "count": 2,
+          "startOffset": "62",
+          "previousTrailerOffset": "22",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "1",
+              "payloadHex": "776f726c64"
+            },
+            {
+              "kind": "data",
+              "slot": "2",
+              "payloadHex": "21"
+            }
+          ]
+        }
+      ],
+      "hex": "010000000000000000050000000d16be3368656c6c6f434c4f450100000000000000000000000100000000000000000000000000000000000000c7e10b170101000000000000000500000050f081c7776f726c64010200000000000000010000000c700fa921434c4f45010000000100000000000000020000003e000000000000001600000000000000a394b64f"
+    },
+    {
+      "name": "a rolled extent",
+      "firstSlot": "5",
+      "nextSlot": "6",
+      "rollNextSlot": "6",
+      "appends": [
+        {
+          "firstSlot": "5",
+          "count": 1,
+          "startOffset": "0",
+          "previousTrailerOffset": "0",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "5",
+              "payloadHex": "1020"
+            }
+          ]
+        },
+        {
+          "firstSlot": "6",
+          "count": 1,
+          "startOffset": "59",
+          "previousTrailerOffset": "19",
+          "frames": [
+            {
+              "kind": "roll",
+              "slot": "6",
+              "payloadHex": ""
+            }
+          ]
+        }
+      ],
+      "hex": "01050000000000000002000000228082f11020434c4f450100000005000000000000000100000000000000000000000000000000000000c1ab9036020600000000000000000000008e2ddb7a434c4f45010000000600000000000000010000003b000000000000001300000000000000a4f8072a"
+    },
+    {
+      "name": "the greatest slot",
+      "firstSlot": "9223372036854775806",
+      "nextSlot": "9223372036854775807",
+      "rollNextSlot": null,
+      "appends": [
+        {
+          "firstSlot": "9223372036854775806",
+          "count": 1,
+          "startOffset": "0",
+          "previousTrailerOffset": "0",
+          "frames": [
+            {
+              "kind": "data",
+              "slot": "9223372036854775806",
+              "payloadHex": "42"
+            }
+          ]
+        }
+      ],
+      "hex": "01feffffffffffff7f01000000a422599142434c4f4501000000feffffffffffff7f0100000000000000000000000000000000000000d2817b5f"
+    }
+  ]
+}

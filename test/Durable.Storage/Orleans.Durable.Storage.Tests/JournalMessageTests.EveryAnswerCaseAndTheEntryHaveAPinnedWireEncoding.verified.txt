@@ -1,0 +1,116 @@
+﻿{
+  Writes: [
+    {
+      Case: Accepted { Version = BAEAAAQA, ReplaceRequested = True },
+      Wire: 200003411142414541414151410103c1010101c101e0
+    },
+    {
+      Case: Accepted { Version = AAA, ReplaceRequested = False },
+      Wire: 20000341074141410101c1010101c101e0
+    },
+    {
+      Case: Rejected { CurrentVersion = BAEAAAQA },
+      Wire: 200005411142414541414151410101c1010101c101e0
+    },
+    {
+      Case: ReplaceRequired { },
+      Wire: 200007c1010101c1010101c101e0
+    },
+    {
+      Case: JournalMoved { Owner = 6a0e1c2d3b4f4a5b8c6d7e8f9a0b1c2d },
+      Wire: 200009c101010141212d1c0e6a4f3b5b4a8c6d7e8f9a0b1c2d0101c101e0
+    },
+    {
+      Case: JournalMoved { Owner =  },
+      Wire: 200009c1010101c1010101c101e0
+    },
+    {
+      Case: Fenced { },
+      Wire: 20000bc1010101c1010101c101e0
+    },
+    {
+      Case: Ambiguous { },
+      Wire: 20000dc1010101c1010101c101e0
+    },
+    {
+      Case: Throttled { },
+      Wire: 20000fc1010101c1010101c101e0
+    },
+    {
+      Case: Unavailable { },
+      Wire: 200015c1010101c1010101c101e0
+    },
+    {
+      Case: NotThisNode { },
+      Wire: 200011c1010101c1010101c101e0
+    },
+    {
+      Case: JournalCallRefused { Kind = Argument, Message = no journal key },
+      Wire: 200013c1010101c1010103411d6e6f206a6f75726e616c206b6579e0
+    },
+    {
+      Case: JournalCallRefused { Kind = Invalid, Message = a record which fails its CRC },
+      Wire: 200013c1010101c1010105413961207265636f7264207768696368206661696c732069747320435243e0
+    }
+  ],
+  Reads: [
+    {
+      Case: Found { Version = BAEAAAQA, Exists = True, ContentLength = 3, ReplaceRequested = False, FirstPage = 3 bytes, Snapshot =  },
+      Wire: 200003411142414541414151410103010d01014107010203c101c1010101c101e0
+    },
+    {
+      Case: Found { Version = BAEAAAQA, Exists = True, ContentLength = 2, ReplaceRequested = True, FirstPage = 2 bytes, Snapshot =  },
+      Wire: 2000034111424145414141514101030109010341050405c101c1010101c101e0
+    },
+    {
+      Case: Found { Version = AAA, Exists = False, ContentLength = 0, ReplaceRequested = False, FirstPage = 0 bytes, Snapshot =  },
+      Wire: 20000341074141410101010101014101c101c1010101c101e0
+    },
+    {
+      Case: JournalMoved { Owner = 6a0e1c2d3b4f4a5b8c6d7e8f9a0b1c2d },
+      Wire: 200005c1010101010101014101c10141212d1c0e6a4f3b5b4a8c6d7e8f9a0b1c2d0101c101e0
+    },
+    {
+      Case: JournalMoved { Owner =  },
+      Wire: 200005c1010101010101014101c101c1010101c101e0
+    },
+    {
+      Case: Busy { },
+      Wire: 200009c1010101010101014101c101c1010101c101e0
+    },
+    {
+      Case: JournalCallRefused { Kind = Argument, Message = no journal key },
+      Wire: 20000bc1010101010101014101c101c1010103411d6e6f206a6f75726e616c206b6579e0
+    },
+    {
+      Case: NotThisNode { },
+      Wire: 200007c1010101010101014101c101c1010101c101e0
+    }
+  ],
+  Pages: [
+    {
+      Case: Page[2 bytes],
+      Wire: 200003410504050101c101e0
+    },
+    {
+      Case: Expired { },
+      Wire: 20000541010101c101e0
+    },
+    {
+      Case: JournalCallRefused { Kind = Argument, Message = an offset outside the snapshot },
+      Wire: 20000941010103413d616e206f6666736574206f7574736964652074686520736e617073686f74e0
+    },
+    {
+      Case: NotThisNode { },
+      Wire: 20000741010101c101e0
+    }
+  ],
+  Entry: 20401b61206a6f75726e616c206b65794107070809e0,
+  Pinned: {
+    Case: Found { Version = BAEAAAQA, Exists = True, ContentLength = 1048577, ReplaceRequested = True, FirstPage = 1048576 bytes, Snapshot = Guid_1 },
+    Before: 2000034111424145414141514101036101001000010341040080,
+    Page: 1048576 bytes of a5,
+    After: 41213e2d1c0b5a4f6c4b9d7e8f9a0b1c2d3ec1010101c101e0,
+    Sha256: 435588179970133157fa604e4294727d537d6d167e6ca7fa40b4cabc61b894ce
+  }
+}

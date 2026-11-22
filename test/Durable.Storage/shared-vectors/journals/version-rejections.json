@@ -1,0 +1,65 @@
+{
+  "description": "Texts which are no version's canonical text form (journals.md §7), each rejected by parsing.",
+  "cases": [
+    {
+      "name": "Empty.",
+      "text": ""
+    },
+    {
+      "name": "Origin with padding.",
+      "text": "AAA="
+    },
+    {
+      "name": "Origin with its unused bits set.",
+      "text": "AAB"
+    },
+    {
+      "name": "One byte, a base length without a count.",
+      "text": "AA"
+    },
+    {
+      "name": "An overlong count: 0 in two bytes.",
+      "text": "AIAA"
+    },
+    {
+      "name": "An unterminated count.",
+      "text": "AIA"
+    },
+    {
+      "name": "A count whose 10th byte passes the u64.",
+      "text": "AP___________wI"
+    },
+    {
+      "name": "A count of 11 bytes.",
+      "text": "AP____________8B"
+    },
+    {
+      "name": "A base of 33 bytes.",
+      "text": "IQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "name": "A base which runs past the text.",
+      "text": "BAEC"
+    },
+    {
+      "name": "A byte after the count.",
+      "text": "AAAA"
+    },
+    {
+      "name": "The standard alphabet's '+'.",
+      "text": "AA+"
+    },
+    {
+      "name": "A space inside.",
+      "text": "AA A"
+    },
+    {
+      "name": "A leading space.",
+      "text": " AAA"
+    },
+    {
+      "name": "59 characters, past the longest text.",
+      "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+Orleans.Durable.Storage.ArchiveLogStoreOptions (sealed class)
+Orleans.Durable.Storage.ArchiveLogStoreOptions..ctor()
+Orleans.Durable.Storage.ArchiveLogStoreOptions.DrainConcurrency: System.Int32 { get; set; }
+Orleans.Durable.Storage.ArchiveLogStoreOptions.DrainMemoryBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions (sealed class)
+Orleans.Durable.Storage.DurableStorageOptions..ctor()
+Orleans.Durable.Storage.DurableStorageOptions.ArchiveLogs: Orleans.Durable.Storage.ArchiveLogStoreOptions { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.ArchiveStore: Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.ArchiveStorePrefix: System.String? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Checkpoints: Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Cluster: System.Guid { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.DiskBudgetBytes: System.Int64? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.FailureDomain: System.String? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Journals: Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Lease: Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.LedgerMapMaxBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Lsm: Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxForwardCallBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxForwardReadCalls: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxForwardedReadBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxNodeCallBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxNodeCalls: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxNodeControlCalls: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxProposalBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxReadReplyBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxReplicaCallBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxReplicaCalls: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxSegmentAge: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxSegmentBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MaxSegmentKeys: System.Int32 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.MinimumFreeDiskBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.NodeToReplace: System.Guid? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.ObjectLedgers: Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.ObjectLedgersStoreServiceKey: const System.String = "Orleans.Durable.Storage.ObjectLedgers"
+Orleans.Durable.Storage.DurableStorageOptions.Ordinal: System.Int32? { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.PreallocateWalFiles: System.Boolean { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Root: System.String { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.WalFileSize: System.Int64 { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.WalRetentionBytes: System.Int64? { get; set; }
+Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind (enum : System.Int32)
+Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind.Logs = 2
+Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind.Lsm = 1
+Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind.Memory = 3
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions>)
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions..ctor()
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.BlockCacheBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.BlockCachePath: System.String? { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.BlockCacheRegionBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.BloomBitsPerKey: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.CompactionBudgetBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.DrainMemoryBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.Equals(Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions? other): System.Boolean
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.GridBits: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.MaxBlockCacheRegionBytes: const System.Int64 = 1073741824
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.MaxGridBits: const System.Int32 = 16
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.MaxSectionsPerPartition: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.MinBlockCacheRegionBytes: const System.Int64 = 4096
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.SectionBlockBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.SectionBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.TailCacheBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.ToString(): System.String
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.ViewAdoptionInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.op_Equality(Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions? left, Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions.op_Inequality(Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions? left, Orleans.Durable.Storage.Engine.Archive.Lsm.ArchiveOptions? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions (sealed class)
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions..ctor()
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ArchiveLogRequestsPerSecond: System.Double { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.BalanceInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ClosedDrainTimeout: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.CompactionTimeout: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ControlInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LedgerPlacement: Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LedgersPerNode: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LoadWindow: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ManifestCommitInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MapRefreshInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MaxConcurrentDrains: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MaxConcurrentHandOffs: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MaxConcurrentRepairs: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MaxConcurrentTransitions: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ObjectLedgerWindow: System.Int32? { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ObjectStoreRequestsPerSecond: System.Double { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.PrepareReleaseTimeout: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ReplicaGrace: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ReplicaSweepInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.Replicas: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SequencerWindow: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SplitBytesPerSecond: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SweepInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.TransitionTimeout: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement (enum : System.Int32)
+Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement.Nodes = 0
+Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement.ObjectStore = 1
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions (sealed class)
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions..ctor()
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.ExpiryInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.LargestBatch(): System.Int64
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBatchBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBatchEntries: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBodyBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxConcurrentHistoryReads: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxQueuedBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.TombstoneRetention: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.WarmStateBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions (sealed class)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.ClockDriftFactor: System.Double { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.Default: static Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.DefaultClockDriftFactor: const System.Double = 1.25
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.DefaultLeaseDuration: static readonly System.TimeSpan
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.DefaultMaxGuardBand: static readonly System.TimeSpan
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.Disabled: static Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.EffectiveGuardBand: System.TimeSpan { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.IsEnabled: System.Boolean { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.LeaseDuration: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.LeaseGuardBand: System.TimeSpan? { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout (enum : System.Int32)
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout.Append = 1
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout.PerSlot = 0
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerRedundancy (enum : System.Int32)
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerRedundancy.SingleZone = 0
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerRedundancy.ZoneRedundant = 1
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions (sealed class)
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.CacheBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.CacheDirectory: System.String? { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.DefaultCacheBytes: const System.Int64 = 1073741824
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.DefaultExtentMaxAppends: const System.Int32 = 40000
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.DefaultExtentTargetBytes: const System.Int64 = 134217728
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.ExtentMaxAppends: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.ExtentTargetBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.Layout: Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.MaxAppendBatchLength: const System.Int32 = 104857543
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.MaxBatchBytes: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.MaxExtentAppends: const System.Int32 = 49999
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.MaxExtentTargetBytes: const System.Int64 = 2147483590
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.Redundancy: Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerRedundancy { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerStoreOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions>)
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.CheckpointInterval: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.CheckpointReplayBytes: System.Int64 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.Equals(Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.MaxCheckpointFiles: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions? left, Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions? left, Orleans.Durable.Storage.Engine.Ledgers.Store.LedgerStoreCheckpointOptions? right): static System.Boolean
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions (static class)
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions.AddDurableJournalIndex(Orleans.Hosting.ISiloBuilder builder, System.Func<System.String, Orleans.Durable.Storage.Engine.Journals.IJournalIndex> createIndex): static Orleans.Hosting.ISiloBuilder
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions.AddDurableJournalStorage(Orleans.Hosting.ISiloBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration): static Orleans.Hosting.ISiloBuilder
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions.AddDurableJournalStorage(Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions>> configure): static Orleans.Hosting.ISiloBuilder
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions.AddDurableJournalStorage(Orleans.Hosting.ISiloBuilder builder, System.String providerName, Microsoft.Extensions.Configuration.IConfiguration configuration): static Orleans.Hosting.ISiloBuilder
+Orleans.Durable.Storage.Hosting.DurableStorageSiloBuilderExtensions.AddDurableJournalStorage(Orleans.Hosting.ISiloBuilder builder, System.String providerName, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions>> configure): static Orleans.Hosting.ISiloBuilder
+Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions (sealed class)
+Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions..ctor()
+Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions.Control: Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions { get; set; }
+Orleans.Durable.Storage.Hosting.DurableStorageSiloOptions.Node: Orleans.Durable.Storage.DurableStorageOptions { get; set; }
+Orleans.Durable.Storage.JournalPlacement (sealed class : Orleans.Runtime.PlacementStrategy)
+Orleans.Durable.Storage.JournalPlacement..ctor()
+Orleans.Durable.Storage.JournalPlacementAttribute (sealed class : Orleans.Placement.PlacementAttribute)
+Orleans.Durable.Storage.JournalPlacementAttribute..ctor()
+Orleans.Durable.Storage.JournalWriteOutcomeUnknownException (sealed class : Orleans.Runtime.OrleansException)
+Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor()
+Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message)
+Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message, System.Exception innerException)
+Orleans.Durable.Storage.JournalWriteOutcomeUnknownException.Journal: System.String? { get; }

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Debug leg runs these tests in Debug, so the group committer's debug assertions run. -->
+  <PropertyGroup>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\LeakChecks\*.cs" Exclude="..\shared\LeakChecks\SimulationLeakCheck.cs" LinkBase="LeakChecks" />
+  </ItemGroup>
+</Project>

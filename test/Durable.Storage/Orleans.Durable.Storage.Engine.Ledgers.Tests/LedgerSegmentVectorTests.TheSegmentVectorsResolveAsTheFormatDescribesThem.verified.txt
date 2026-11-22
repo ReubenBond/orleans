@@ -1,0 +1,25 @@
+One batch which starts a segment, defining two keys.
+  slot 0 row 0: Append, key 61 (length 1), version (01 (length 1), 4), token 10 (length 1), body 6130 (length 2)
+  slot 0 row 1: Replace, key 62 (length 1), version (empty, 1), token 20 (length 1), body 6230 (length 2)
+Three batches of one segment: later rows reference their keys and resolve their versions and tokens.
+  slot 0 row 0: Append, key 61 (length 1), version (01 (length 1), 4), token 10 (length 1), body 6130 (length 2)
+  slot 1 row 0: Append, key 61 (length 1), version (01 (length 1), 5), token 10 (length 1), body 6131 (length 2)
+  slot 1 row 1: Append, key 62 (length 1), version (empty, 1), token 20 (length 1), body 6230 (length 2)
+  slot 2 row 0: Replace, key 62 (length 1), version (empty, 2), token 20 (length 1), body 6231 (length 2)
+  slot 2 row 1: Append, key 61 (length 1), version (01 (length 1), 6), token 10 (length 1), body 6132 (length 2)
+A marker ends a segment; the next segment resets its ordinals and defines its keys again.
+  slot 0 row 0: Append, key 61 (length 1), version (empty, 1), token empty, body 6130 (length 2)
+  slot 1 row 0: Append, key 61 (length 1), version (empty, 2), token empty, body 6131 (length 2)
+  slot 3 row 0: Append, key 62 (length 1), version (empty, 10), token empty, body 6230 (length 2)
+  slot 3 row 1: Append, key 61 (length 1), version (empty, 3), token empty, body 6132 (length 2)
+  slot 4 row 0: Append, key 61 (length 1), version (empty, 4), token empty, body 6133 (length 2)
+A segment which starts at slot 5.
+  slot 5 row 0: Append, key 6b (length 1), version (empty, 1), token empty, body 6b30 (length 2)
+  slot 6 row 0: Delete, key 6b (length 1), version (empty, 2), token empty, body empty
+  slot 7 row 0: Append, key 6b (length 1), version (empty, 3), token empty, body 6b32 (length 2)
+An empty Delete and then an Append: the count keeps advancing.
+  slot 0 row 0: Delete, key 6a6f75726e616c2f31 (length 9), version (empty, 12), token empty, body empty
+  slot 1 row 0: Append, key 6a6f75726e616c2f31 (length 9), version (empty, 13), token empty, body 616761696e (length 5)
+A key's count reaches the u64 maximum on its last row.
+  slot 0 row 0: Append, key 6b (length 1), version (empty, 18446744073709551614), token empty, body 6b30 (length 2)
+  slot 1 row 0: Append, key 6b (length 1), version (empty, 18446744073709551615), token empty, body 6b31 (length 2)

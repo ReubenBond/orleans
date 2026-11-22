@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj"
+    ],
+    "mutate": [
+      "Ledgers/Store/**/*.cs"
+    ],
+    "test-runner": "mtp",
+    "coverage-analysis": "perTestInIsolation",
+    "additional-timeout": 60000,
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

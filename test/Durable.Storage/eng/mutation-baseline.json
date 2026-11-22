@@ -1,0 +1,192 @@
+{
+  "countTolerance": 0.1,
+  "equivalent": [
+    {
+      "mutator": "Boolean mutation",
+      "original": "false",
+      "replacement": "true",
+      "within": "\\.ConfigureAwait\\(false\\)",
+      "reason": "Where a Clog await resumes is unobservable to its callers: they run its operations off any capturing context (orleans §5.12), and Clockwork rewrites the await under simulation (verification §7.1)."
+    },
+    {
+      "mutator": "Remove checked expression",
+      "reason": "Directory.Build.props compiles every project with CheckForOverflowUnderflow, so the arithmetic stays checked."
+    },
+    {
+      "mutator": "String mutation",
+      "within": "new\\s+[\\w.]*Exception\\s*\\((?>[^()]+|\\((?<d>)|\\)(?<-d>))*(?(d)(?!))\\)|\\b\\w*Exception\\??\\s+\\w+\\s*\\([^()]*\\)\\s*=>\\s*new\\s*\\((?>[^()]+|\\((?<d>)|\\)(?<-d>))*(?(d)(?!))\\)|(?<=(?m:^)[^/\\n]*\\bthrow\\s[^;{}]*,\\s*)\\$?\"(?:[^\"\\\\]|\\\\.)*\"(?:\\s*\\+\\s*[\\w.]+)?(?=\\s*\\)\\s*[;:])",
+      "reason": "An exception's message text is diagnostic and outside every contract: the message of an exception construction, explicit or the target-typed one a member returning an exception builds, and the trailing message argument of a thrown helper call, which follows any reason code. Snapshots pin the messages readers rely on (verification §8)."
+    },
+    {
+      "within": "Debug\\.Assert\\((?>[^()]+|\\((?<d>)|\\)(?<-d>))*(?(d)(?!))\\);",
+      "reason": "Mutation runs build Release, from which every Debug.Assert call compiles away."
+    }
+  ],
+  "projects": {
+    "Orleans.Durable.Storage.Engine.Archive.Lsm": {
+      "break": 80,
+      "equivalent": []
+    },
+    "Orleans.Durable.Storage.Engine.GroupCommit": {
+      "break": 80,
+      "provisional": "A new core project (row 4.3): the group committer, which the ledger map's, the manifest's, and the node registry's committers share; its first full run records its counts and score.",
+      "equivalent": []
+    },
+    "Orleans.Durable.Storage.Engine.Ledgers": {
+      "break": 78.5,
+      "provisional": "The floor the combined project measured before row B.8b split it; it stands until this project's first full run records its own counts and score. Row B.8c folded in the code of the project which held the append path and its sequencer, which met its 80% floor as its own project; that code keeps its floor of 80 until the same run records its counts and score, which the run's review checks, since the break applies to the whole project.",
+      "equivalent": [
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Ledger.cs",
+          "mutator": "Equality mutation",
+          "original": "value > current",
+          "replacement": "value >= current",
+          "within": "internal Slot RaiseKnownContiguousTail\\(Slot contiguousTail\\)[\\s\\S]*?\\n    }",
+          "reason": "At value == current the compare-exchange writes the value already held, leaving the tail unchanged; either way the method returns a known tail of at least value."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Sequencer.cs",
+          "mutator": "Conditional (true) mutation",
+          "reason": "Task.WaitAsync with a token which cannot be cancelled returns the task itself."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Memory/InMemoryLedgerReplicaTransport.cs",
+          "mutator": "Statement mutation",
+          "original": "replica.Dispose();",
+          "within": "replica\\.Drop\\(\\);\\s*replica\\.Dispose\\(\\);",
+          "reason": "Drop has released every value and refuses every operation as dropped, which the replica checks before disposal, so disposing it afterwards changes nothing observable."
+        }
+      ]
+    },
+    "Orleans.Durable.Storage.Engine.Ledgers.Store": {
+      "break": 78.5,
+      "provisional": "The floor the combined project measured before row B.8b split it; it stands until this project's first full run records its own counts and score.",
+      "equivalent": [
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Open.cs",
+          "within": "files == 0 \\? LostWal\\(root, \"no node file\"\\) : IdentityLost\\(root, \"slot-index checkpoint directories\"\\)",
+          "reason": "Both branches refuse with LedgerReplicaCorruptException; they differ only in message text."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Open.cs",
+          "mutator": "Boolean mutation",
+          "original": "false",
+          "replacement": "true",
+          "within": "\\? \\(false, new List<uint>\\(\\)\\)",
+          "reason": "Without a valid catalog checkpoint the open holds fewer than two, so it writes one whether or not the replay passed a cut."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Open.cs",
+          "mutator": "Linq method mutation (Append() to Prepend())",
+          "within": "var lowest = LiveReplicas\\(\\)[^;]*;",
+          "reason": "The minimum does not depend on where the cut joins the sequence."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Open.cs",
+          "within": "var from = lowest > retained \\? lowest : retained;",
+          "reason": "LS-I4: a listed replica whose replay start lies below the first retained file is one the replay drops, and the cut lies in a retained file; so a scan from the lower position, whose released files WriteAheadLog reports as a loss ending at the first retained file, faults only replicas the replay drops, and a scan from the first retained file reads only entries below every replay start and the cut, which the replay skips."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/CatalogCheckpoints.cs",
+          "mutator": "Boolean mutation",
+          "original": "false",
+          "replacement": "true",
+          "within": "if \\(_valid\\.Count < Kept\\)\\s*\\{\\s*return false;",
+          "reason": "With fewer than two valid catalog checkpoints the retention bound is the first retained file, so the release which follows releases nothing."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStoreReplica.cs",
+          "mutator": "Statement mutation",
+          "original": "Volatile.Write(ref _live, live);",
+          "replacement": ";",
+          "reason": "The LedgerStoreReplica caches the live replica a lookup returns; without the cache each operation repeats the lookup under the store's lock and finds the same replica, or the ledger's tombstone, which a dropped replica's operations answer too."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStoreReplica.cs",
+          "mutator": "Block removal mutation",
+          "original": "{ return live; }",
+          "within": "private LiveReplica\\? FindForRead\\(\\)[\\s\\S]*?\\n    }",
+          "reason": "Without the cached replica the read repeats the lookup and finds the same replica, or the ledger's tombstone."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStoreReplica.cs",
+          "mutator": "Equality mutation",
+          "original": "live is not null",
+          "replacement": "live is null",
+          "reason": "Caching null, or not caching a found replica, leaves each later operation to repeat the lookup, which finds the same replica."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.cs",
+          "mutator": "Statement mutation",
+          "original": "ThrowIfUnavailableLocked();",
+          "within": "internal async ValueTask<LiveReplica> CreateLiveAsync[\\s\\S]*?\\n    }",
+          "reason": "The creation writer reads the same unavailability under the catalog gate and fails the request with it."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.cs",
+          "mutator": "Statement mutation",
+          "original": "throw Dropped(ledger);",
+          "within": "internal async ValueTask<LiveReplica> CreateLiveAsync[\\s\\S]*?\\n    }",
+          "reason": "The batch decides the same tombstone under the catalog gate and answers LedgerDroppedException; the early refusal spares only the wait."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.cs",
+          "mutator": "Statement mutation",
+          "original": "return;",
+          "within": "if \\(pairs\\.Count == 0\\)\\s*\\{\\s*return;\\s*\\}",
+          "reason": "Without a pair the CreateRecord constructor throws, and the batch's handler completes requests the batch already completed, which ignore it."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/StoreRecord.cs",
+          "mutator": "Bitwise mutation",
+          "original": "key >> SlotBits",
+          "replacement": "key >>> SlotBits",
+          "reason": "The key is a ulong, whose >> is already a logical shift."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/StoreRecord.cs",
+          "mutator": "Bitwise mutation",
+          "original": "key >> LedgerRecords.SlotBits",
+          "replacement": "key >>> LedgerRecords.SlotBits",
+          "reason": "The key is a ulong, whose >> is already a logical shift."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/StoreRecord.cs",
+          "mutator": "Statement mutation",
+          "original": "hash.Add(pair);",
+          "reason": "GetHashCode stays consistent with Equals without the pairs; only its spread changes."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/ReplicaCatalog.cs",
+          "mutator": "Conditional (true) mutation",
+          "within": "_byLedger\\.ContainsKey\\(ledger\\) \\? [^;]*;",
+          "reason": "Filtering a ledger the catalog does not list out of its replicas leaves them unchanged; the branch spares only a copy."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/ReplicaCatalog.cs",
+          "mutator": "Equality mutation",
+          "within": "if \\(_length \\+ length > ChunkLength\\)",
+          "reason": "Flushing earlier appends the same bytes in the same order to the writer and folds the same CRC."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/ReplicaCatalog.cs",
+          "mutator": "Negate expression",
+          "within": "if \\(_length \\+ length > ChunkLength\\)",
+          "reason": "Flushing before every field that fits, which is every field, appends the same bytes in the same order to the writer and folds the same CRC."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Maintenance.cs",
+          "mutator": "Conditional (false) mutation",
+          "within": "replicas\\.Count == 0 \\? null : replicas\\.MinBy[^;]*;",
+          "reason": "MinBy of an empty sequence of references returns null."
+        },
+        {
+          "file": "src/Orleans.Durable.Storage.Engine/Ledgers/Store/LedgerStore.Maintenance.cs",
+          "mutator": "Conditional (false) mutation",
+          "within": "ledgers\\.Length == 0 \\? TimeSpan\\.MaxValue : interval",
+          "reason": "With no replica, a wake after each interval finds no replica checkpoint due."
+        }
+      ]
+    }
+  }
+}

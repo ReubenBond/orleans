@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.Engine.Wal.Tests</RootNamespace>
+    <!-- LibraryImport, for ntdll's RtlAreLongPathsEnabled. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The Debug leg runs WriteAheadLog's debug assertions and those of the buffers it writes (docs/spec/verification.md §12). -->
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Verify.XunitV3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\SharedVectors.cs" Link="SharedVectors.cs" />
+    <Compile Include="..\shared\SnapshotSettings.cs" Link="SnapshotSettings.cs" />
+    <Compile Include="..\shared\CrashStates\*.cs" LinkBase="CrashStates" />
+    <Compile Include="..\shared\UnionLaws\*.cs" LinkBase="UnionLaws" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\LeakChecks\*.cs" Exclude="..\shared\LeakChecks\SimulationLeakCheck.cs" LinkBase="LeakChecks" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.Wal\Orleans.Durable.Storage.Fuzz.Wal.csproj" />
+    <Compile Include="..\shared\CorpusReplay.cs" Link="CorpusReplay.cs" />
+  </ItemGroup>
+</Project>

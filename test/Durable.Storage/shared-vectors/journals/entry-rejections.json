@@ -1,0 +1,149 @@
+{
+  "description": "Entry records a decoder rejects under rowKey, with the reason code each is rejected for (journals.md §7): each breaks one rule, but the cases which name a rule checked first, which break two and are rejected for the earlier rule in §7's order; every record long enough to hold one carries the CRC-32C of its row key and bytes, but the crc-mismatch cases.",
+  "cases": [
+    {
+      "name": "No bytes.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "Five bytes: a CRC-32C and a kind, without the base's length.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "truncated",
+      "hex": "03220f8100"
+    },
+    {
+      "name": "A payload byte flipped after the CRC-32C was computed.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "crc-mismatch",
+      "hex": "03220f8100000068656c6c6e"
+    },
+    {
+      "name": "A valid record of the journal \"orders/42\", verified under the row key of the journal \"orders/43\".",
+      "rowKey": "822f00136f72646572732f3433",
+      "reason": "crc-mismatch",
+      "hex": "03220f8100000068656c6c6f"
+    },
+    {
+      "name": "Kind 4 under the CRC-32C of kind 0: the CRC-32C is checked before the kind.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "crc-mismatch",
+      "hex": "03220f8104000068656c6c6f"
+    },
+    {
+      "name": "Kind 4.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "unknown-kind",
+      "hex": "2ba5350f04000078"
+    },
+    {
+      "name": "Kind 255 with a base length of 40: the kind is checked before the version.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "unknown-kind",
+      "hex": "777689e5ff280000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "A base of 33 bytes.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "base-too-long",
+      "hex": "af199f9600210000000000000000000000000000000000000000000000000000000000000000000078"
+    },
+    {
+      "name": "A base length of 255 with the record ending after it: the length is checked before the base's bytes.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "base-too-long",
+      "hex": "5a47e47900ff"
+    },
+    {
+      "name": "A base of 4 bytes of which the record holds 2.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "field-truncated",
+      "hex": "387e543e01040102"
+    },
+    {
+      "name": "A record which ends after its base, with no count.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "ace078eb01020909"
+    },
+    {
+      "name": "An overlong count: 0 in two bytes.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "5bc8d0a901008000"
+    },
+    {
+      "name": "A count of 11 bytes.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "a112bde10100ffffffffffffffffffff01"
+    },
+    {
+      "name": "A count whose 10th byte passes the u64.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "e66c999c0100ffffffffffffffffff02"
+    },
+    {
+      "name": "An unterminated count.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "20704dd901008081"
+    },
+    {
+      "name": "An Append whose overlong count ends the record: the count is checked before the body.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "94fa376700008100"
+    },
+    {
+      "name": "A Delete whose overlong count precedes a negative deletion time: the count is checked first.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-varint",
+      "hex": "4a5a748702008000ffffffffffffffff"
+    },
+    {
+      "name": "A Delete with 7 bytes of deletion time.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "field-truncated",
+      "hex": "ad66369302000100000000000000"
+    },
+    {
+      "name": "A Delete stamped at tick -1.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-deletion-time",
+      "hex": "0f65c28b020001ffffffffffffffff"
+    },
+    {
+      "name": "A Delete stamped one tick after the last of 9999.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-deletion-time",
+      "hex": "65da9336020001004037f47528ca2b"
+    },
+    {
+      "name": "A Delete stamped at tick -1 with a byte after it: the deletion time is checked before the body.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "bad-deletion-time",
+      "hex": "10ade50c020001ffffffffffffffff00"
+    },
+    {
+      "name": "An Append with an empty body.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "empty-append",
+      "hex": "7e6120cb000000"
+    },
+    {
+      "name": "A Delete with a byte after its deletion time.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "trailing-bytes",
+      "hex": "86b372f2020001000000000000000000"
+    },
+    {
+      "name": "An Expired with a byte after its expected version.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "reason": "trailing-bytes",
+      "hex": "913eef78031400000000000000030000000000000029000000020300"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "description": "LedgerStore WAL records: the 8-byte little-endian key (handle << 40) | slot, then the body. A slot record has a handle below 2^24 - 1 and the slot's DATA, a non-empty value, as its body; nextHandle is the catalog's next handle. A store record has the store handle, 2^24 - 1, and its kind in the slot field (1 create, 2 drop, 3 seal). A create's body is one or more 16-byte pairs, each a ledger ID (u64), the handle (u32) its replica takes, and the window (u32) of the request which creates it; a drop's body is the ledger ID (u64) it drops, whose replica it removes, if the node holds one, and whose tombstone it records; a seal's body is the ledger ID (u64) and handle (u32) of the replica it seals. Slots and ledger IDs are decimal strings.",
+  "cases": [
+    {
+      "name": "data",
+      "description": "DATA at handle 0, slot 0: the key, then the value.",
+      "handle": 0,
+      "slot": "0",
+      "valueHex": "68656c6c6f",
+      "nextHandle": 1,
+      "hex": "000000000000000068656c6c6f"
+    },
+    {
+      "name": "one-zero-byte",
+      "description": "DATA of one zero byte at handle 2, slot 42: any non-empty value is DATA.",
+      "handle": 2,
+      "slot": "42",
+      "valueHex": "00",
+      "nextHandle": 3,
+      "hex": "2a0000000002000000"
+    },
+    {
+      "name": "maximum-key",
+      "description": "DATA at the last replica handle, 2^24 - 2, and the last slot, 2^40 - 1.",
+      "handle": 16777214,
+      "slot": "1099511627775",
+      "valueHex": "ff",
+      "nextHandle": 16777215,
+      "hex": "fffffffffffeffffff"
+    },
+    {
+      "name": "create",
+      "description": "A create of ledger 7 by a request of window 64, which takes handle 0.",
+      "kind": "create",
+      "pairs": [
+        {
+          "ledger": "7",
+          "handle": 0,
+          "window": 64
+        }
+      ],
+      "nextHandle": 0,
+      "hex": "0100000000ffffff07000000000000000000000040000000"
+    },
+    {
+      "name": "create-batch",
+      "description": "A batch of three creations, of ledgers 9, 4, and 12 by requests of windows 4, 64, and 1, taking handles 3, 4, and 5.",
+      "kind": "create",
+      "pairs": [
+        {
+          "ledger": "9",
+          "handle": 3,
+          "window": 4
+        },
+        {
+          "ledger": "4",
+          "handle": 4,
+          "window": 64
+        },
+        {
+          "ledger": "12",
+          "handle": 5,
+          "window": 1
+        }
+      ],
+      "nextHandle": 0,
+      "hex": "0100000000ffffff09000000000000000300000004000000040000000000000004000000400000000c000000000000000500000001000000"
+    },
+    {
+      "name": "drop",
+      "description": "A drop of ledger 7, whose replica the node holds: it removes the replica and records the tombstone.",
+      "kind": "drop",
+      "ledger": "7",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff0700000000000000"
+    },
+    {
+      "name": "drop-unheld",
+      "description": "A drop of ledger 12, which the node never held: it records the tombstone all the same.",
+      "kind": "drop",
+      "ledger": "12",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff0c00000000000000"
+    },
+    {
+      "name": "seal",
+      "description": "A seal of ledger 7's replica at handle 0.",
+      "kind": "seal",
+      "ledger": "7",
+      "handle": 0,
+      "nextHandle": 0,
+      "hex": "0300000000ffffff070000000000000000000000"
+    },
+    {
+      "name": "create-last-handle",
+      "description": "A create of the largest ledger ID by a request of the largest window, 2^31 - 1, taking the last replica handle, 2^24 - 2.",
+      "kind": "create",
+      "pairs": [
+        {
+          "ledger": "18446744073709551615",
+          "handle": 16777214,
+          "window": 2147483647
+        }
+      ],
+      "nextHandle": 0,
+      "hex": "0100000000fffffffffffffffffffffffeffff00ffffff7f"
+    },
+    {
+      "name": "drop-largest-ledger",
+      "description": "A drop of the largest ledger ID.",
+      "kind": "drop",
+      "ledger": "18446744073709551615",
+      "nextHandle": 0,
+      "hex": "0200000000ffffffffffffffffffffff"
+    },
+    {
+      "name": "seal-last-handle",
+      "description": "A seal of the largest ledger ID's replica at the last replica handle, 2^24 - 2.",
+      "kind": "seal",
+      "ledger": "18446744073709551615",
+      "handle": 16777214,
+      "nextHandle": 0,
+      "hex": "0300000000fffffffffffffffffffffffeffff00"
+    }
+  ]
+}

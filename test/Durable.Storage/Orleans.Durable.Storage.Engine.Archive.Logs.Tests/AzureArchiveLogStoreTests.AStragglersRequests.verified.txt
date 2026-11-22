@@ -1,0 +1,89 @@
+﻿CreateAppendBlob wal/journals/account-17 → 201
+    if-none-match: *
+    x-ms-blob-type: AppendBlob
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-format: json
+    x-ms-meta-wal_generation: 1
+    x-ms-tags: durable-gen=00000000000000000001
+    x-ms-version: 2026-10-06
+AppendBlock wal/journals/account-17 → 201
+    content-md5: present
+    x-ms-blob-condition-appendpos: 0
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-version: 2026-10-06
+PutBlockBlob checkpoints/journals/account-17/00000000000000000002 → 201
+    content-md5: present
+    if-none-match: *
+    x-ms-blob-content-md5: present
+    x-ms-blob-type: BlockBlob
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-format: json
+    x-ms-version: 2026-10-06
+CreateAppendBlob wal/journals/account-17 → 201
+    if-match: *
+    x-ms-blob-type: AppendBlob
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-meta-checkpoint: checkpoints/journals/account-17/00000000000000000002
+    x-ms-meta-checkpoint_offset: 0
+    x-ms-meta-durable_base_md5: 55a54008ad1ba589aa210d2629c1df41
+    x-ms-meta-durable_base_rows: 1
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-durable_kind: replace
+    x-ms-meta-format: json
+    x-ms-meta-wal_generation: 2
+    x-ms-tags: durable-gen=00000000000000000002
+    x-ms-version: 2026-10-06
+CreateAppendBlob wal/journals/account-17 → 409
+    if-none-match: *
+    x-ms-blob-type: AppendBlob
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-format: json
+    x-ms-meta-wal_generation: 1
+    x-ms-tags: durable-gen=00000000000000000001
+    x-ms-version: 2026-10-06
+AppendBlock wal/journals/account-17 → 412
+    content-md5: present
+    x-ms-blob-condition-appendpos: 0
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-version: 2026-10-06
+GetProperties wal/journals/account-17 → 200
+    x-ms-version: 2026-10-06
+PutBlockBlob checkpoints/journals/account-17/00000000000000000002 → 409
+    content-md5: present
+    if-none-match: *
+    x-ms-blob-content-md5: present
+    x-ms-blob-type: BlockBlob
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-format: json
+    x-ms-version: 2026-10-06
+GetProperties checkpoints/journals/account-17/00000000000000000002 → 200
+    x-ms-version: 2026-10-06
+CreateAppendBlob wal/journals/account-17 → 412
+    if-match: *
+    x-ms-blob-type: AppendBlob
+    x-ms-if-tags: "durable-gen" = '00000000000000000001'
+    x-ms-meta-checkpoint: checkpoints/journals/account-17/00000000000000000002
+    x-ms-meta-checkpoint_offset: 0
+    x-ms-meta-durable_base_md5: 55a54008ad1ba589aa210d2629c1df41
+    x-ms-meta-durable_base_rows: 1
+    x-ms-meta-durable_key: d80557dacbe088f2
+    x-ms-meta-durable_kind: replace
+    x-ms-meta-format: json
+    x-ms-meta-wal_generation: 2
+    x-ms-tags: durable-gen=00000000000000000002
+    x-ms-version: 2026-10-06
+GetProperties wal/journals/account-17 → 200
+    x-ms-version: 2026-10-06
+wal/journals/account-17: 0 bytes
+    metadata checkpoint: checkpoints/journals/account-17/00000000000000000002
+    metadata checkpoint_offset: 0
+    metadata durable_base_md5: 55a54008ad1ba589aa210d2629c1df41
+    metadata durable_base_rows: 1
+    metadata durable_key: d80557dacbe088f2
+    metadata durable_kind: replace
+    metadata format: json
+    metadata wal_generation: 2
+    tag durable-gen: 00000000000000000002
+checkpoints/journals/account-17/00000000000000000002: 1 bytes
+    metadata durable_key: d80557dacbe088f2
+    metadata format: json

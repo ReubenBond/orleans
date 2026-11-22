@@ -1,0 +1,259 @@
+{
+  "description": "Segments of CLLB batches at consecutive slots from slot, each from a slot at which a segment starts, with the rows they resolve: each row's slot, index, key, kind, version after it (base and count), its key's token, and its body.",
+  "cases": [
+    {
+      "name": "One batch which starts a segment, defining two keys.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000204016101010301100261300501620000012002623010b9c484"
+      ],
+      "rows": [
+        {
+          "slot": "0",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "01",
+          "versionCount": "4",
+          "token": "10",
+          "body": "6130"
+        },
+        {
+          "slot": "0",
+          "index": 1,
+          "key": "62",
+          "kind": "Replace",
+          "versionBase": "",
+          "versionCount": "1",
+          "token": "20",
+          "body": "6230"
+        }
+      ]
+    },
+    {
+      "name": "Three batches of one segment: later rows reference their keys and resolve their versions and tokens.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016101010301100261302be03014",
+        "434c4c42010000000001010200000261310401620000012002623019c22f82",
+        "434c4c420100000000020202010102623100000261324604ce06"
+      ],
+      "rows": [
+        {
+          "slot": "0",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "01",
+          "versionCount": "4",
+          "token": "10",
+          "body": "6130"
+        },
+        {
+          "slot": "1",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "01",
+          "versionCount": "5",
+          "token": "10",
+          "body": "6131"
+        },
+        {
+          "slot": "1",
+          "index": 1,
+          "key": "62",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "1",
+          "token": "20",
+          "body": "6230"
+        },
+        {
+          "slot": "2",
+          "index": 0,
+          "key": "62",
+          "kind": "Replace",
+          "versionBase": "",
+          "versionCount": "2",
+          "token": "20",
+          "body": "6231"
+        },
+        {
+          "slot": "2",
+          "index": 1,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "01",
+          "versionCount": "6",
+          "token": "10",
+          "body": "6132"
+        }
+      ]
+    },
+    {
+      "name": "A marker ends a segment; the next segment resets its ordinals and defines its keys again.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c42010000000001010100000261318cdfeaa8",
+        "434c4c42010000000100000056624865",
+        "434c4c420100000000010002040162000900026230040161000200026132a3fbff9e",
+        "434c4c4201000000000202010001026133f2f7d5f7"
+      ],
+      "rows": [
+        {
+          "slot": "0",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "1",
+          "token": "",
+          "body": "6130"
+        },
+        {
+          "slot": "1",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "2",
+          "token": "",
+          "body": "6131"
+        },
+        {
+          "slot": "3",
+          "index": 0,
+          "key": "62",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "10",
+          "token": "",
+          "body": "6230"
+        },
+        {
+          "slot": "3",
+          "index": 1,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "3",
+          "token": "",
+          "body": "6132"
+        },
+        {
+          "slot": "4",
+          "index": 0,
+          "key": "61",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "4",
+          "token": "",
+          "body": "6133"
+        }
+      ]
+    },
+    {
+      "name": "A segment which starts at slot 5.",
+      "slot": "5",
+      "batches": [
+        "434c4c42010000000100000104016b000000026b3081f827f0",
+        "434c4c42010000000001010102000008286147",
+        "434c4c4201000000000201010000026b324758afda"
+      ],
+      "rows": [
+        {
+          "slot": "5",
+          "index": 0,
+          "key": "6b",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "1",
+          "token": "",
+          "body": "6b30"
+        },
+        {
+          "slot": "6",
+          "index": 0,
+          "key": "6b",
+          "kind": "Delete",
+          "versionBase": "",
+          "versionCount": "2",
+          "token": "",
+          "body": ""
+        },
+        {
+          "slot": "7",
+          "index": 0,
+          "key": "6b",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "3",
+          "token": "",
+          "body": "6b32"
+        }
+      ]
+    },
+    {
+      "name": "An empty Delete and then an Append: the count keeps advancing.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000106096a6f75726e616c2f31000b000010a83b51",
+        "434c4c420100000000010101000005616761696ed7b24c59"
+      ],
+      "rows": [
+        {
+          "slot": "0",
+          "index": 0,
+          "key": "6a6f75726e616c2f31",
+          "kind": "Delete",
+          "versionBase": "",
+          "versionCount": "12",
+          "token": "",
+          "body": ""
+        },
+        {
+          "slot": "1",
+          "index": 0,
+          "key": "6a6f75726e616c2f31",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "13",
+          "token": "",
+          "body": "616761696e"
+        }
+      ]
+    },
+    {
+      "name": "A key's count reaches the u64 maximum on its last row.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016b00fdffffffffffffffff0100026b304a585ab0",
+        "434c4c4201000000000101010000026b31da2cbb12"
+      ],
+      "rows": [
+        {
+          "slot": "0",
+          "index": 0,
+          "key": "6b",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "18446744073709551614",
+          "token": "",
+          "body": "6b30"
+        },
+        {
+          "slot": "1",
+          "index": 0,
+          "key": "6b",
+          "kind": "Append",
+          "versionBase": "",
+          "versionCount": "18446744073709551615",
+          "token": "",
+          "body": "6b31"
+        }
+      ]
+    }
+  ]
+}

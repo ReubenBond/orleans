@@ -1,0 +1,47 @@
+{
+  "description": "Journal versions and their canonical text forms (journals.md §7): base64url without padding of the base's length, the base, and the count as a shortest varint; parsing text yields the version, and formatting the version yields text.",
+  "cases": [
+    {
+      "name": "Origin.",
+      "base": "",
+      "count": "0",
+      "text": "AAA"
+    },
+    {
+      "name": "Origin's next.",
+      "base": "",
+      "count": "1",
+      "text": "AAE"
+    },
+    {
+      "name": "Count 127, the longest one-byte varint.",
+      "base": "",
+      "count": "127",
+      "text": "AH8"
+    },
+    {
+      "name": "Count 128, the shortest two-byte varint.",
+      "base": "",
+      "count": "128",
+      "text": "AIAB"
+    },
+    {
+      "name": "The greatest count at Origin's base.",
+      "base": "",
+      "count": "18446744073709551615",
+      "text": "AP___________wE"
+    },
+    {
+      "name": "A rebased version of a 20-byte base.",
+      "base": "0000000000000003000000000000002900000002",
+      "count": "0",
+      "text": "FAAAAAAAAAADAAAAAAAAACkAAAACAA"
+    },
+    {
+      "name": "A 32-byte base and the greatest count: the longest text.",
+      "base": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "count": "18446744073709551615",
+      "text": "IODh4uPk5ebn6Onq6-zt7u_w8fLz9PX29_j5-vv8_f7_____________AQ"
+    }
+  ]
+}

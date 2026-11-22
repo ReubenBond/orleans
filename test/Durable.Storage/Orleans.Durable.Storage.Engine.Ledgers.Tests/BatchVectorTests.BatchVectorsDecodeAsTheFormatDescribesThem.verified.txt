@@ -1,0 +1,31 @@
+A marker: the start flag and no rows.
+  length 16, start True, offset 0, ordinal base 0, row count 0
+One Append row which defines a one-byte key, with an empty version base and token, count 0, and an empty body.
+  length 23, start True, offset 0, ordinal base 0, row count 1
+  row 0: Append, defines ordinal 0, key 6b (length 1), version before (empty, 0), token empty, body empty
+A key defined by a Replace and referenced by an Append in one batch, with a version base and a token.
+  length 54, start True, offset 0, ordinal base 0, row count 2
+  row 0: Replace, defines ordinal 0, key 6a6f75726e616c2f31 (length 9), version before (0102 (length 2), 7), token aabbcc (length 3), body 62617365207374617465 (length 10)
+  row 1: Append, references ordinal 0, body 64656c7461 (length 5)
+A batch inside a segment, at offset 3 with ordinal base 2: it references ordinals 0 and 1, defines ordinal 2, and references it.
+  length 59, start False, offset 3, ordinal base 2, row count 4
+  row 0: Append, references ordinal 1, body 6f6e65 (length 3)
+  row 1: Delete, references ordinal 0, body empty
+  row 2: Append, defines ordinal 2, key 6a6f75726e616c2f33 (length 9), version before (empty, 1), token empty, body 7468726565 (length 5)
+  row 3: Replace, references ordinal 2, body 746872656520616761696e (length 11)
+Every kind, each defining a 300-byte key with a 300-byte body, so the key and body lengths take two varint bytes.
+  length 1840, start True, offset 0, ordinal base 0, row count 3
+  row 0: Append, defines ordinal 0, key 01203f5e7d9cbbda...5d7c9bbad9f81736 (length 300), version before (empty, 0), token empty, body 0221405f7e9dbcdb...5e7d9cbbdaf91837 (length 300)
+  row 1: Replace, defines ordinal 1, key 032241607f9ebddc...5f7e9dbcdbfa1938 (length 300), version before (empty, 0), token empty, body 04234261809fbedd...607f9ebddcfb1a39 (length 300)
+  row 2: Delete, defines ordinal 2, key 0524436281a0bfde...61809fbeddfc1b3a (length 300), version before (empty, 0), token empty, body 0625446382a1c0df...6281a0bfdefd1c3b (length 300)
+A 32-byte version base and token, the longest, and a count of 2^64 - 2, whose varint takes 10 bytes.
+  length 97, start True, offset 0, ordinal base 0, row count 1
+  row 0: Append, defines ordinal 0, key 6b (length 1), version before (0726456483a2c1e0...ef0e2d4c6b8aa9c8 (length 32), 18446744073709551614), token 0928476685a4c3e2...f1102f4e6d8cabca (length 32), body 76 (length 1)
+References to ordinals 127 and 128, whose varints take one and two bytes, at offset 128 and ordinal base 200.
+  length 27, start False, offset 128, ordinal base 200, row count 2
+  row 0: Append, references ordinal 127, body 61 (length 1)
+  row 1: Append, references ordinal 128, body 62 (length 1)
+An empty Delete, with an empty body, followed by an Append of the same key, whose count keeps advancing.
+  length 39, start True, offset 0, ordinal base 0, row count 2
+  row 0: Delete, defines ordinal 0, key 6a6f75726e616c2f39 (length 9), version before (empty, 4), token empty, body empty
+  row 1: Append, references ordinal 0, body 6166746572 (length 5)

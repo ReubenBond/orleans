@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Google Cloud's providers: Cloud Storage object stores and Firestore conditional registers. -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.GoogleCloud</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Cloud.Firestore" />
+    <PackageReference Include="Google.Cloud.Storage.V1" />
+    <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+</Project>

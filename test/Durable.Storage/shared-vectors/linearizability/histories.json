@@ -1,0 +1,10 @@
+{
+  "histories": [
+    { "name": "c01-ok", "file": "porcupine-kv/c01-ok.txt", "linearizable": true, "unpartitioned": true },
+    { "name": "c01-bad", "file": "porcupine-kv/c01-bad.txt", "linearizable": false, "unpartitioned": true },
+    { "name": "c10-ok", "file": "porcupine-kv/c10-ok.txt", "linearizable": true, "unpartitioned": false },
+    { "name": "c10-bad", "file": "porcupine-kv/c10-bad.txt", "linearizable": false, "unpartitioned": false },
+    { "name": "c50-ok", "file": "porcupine-kv/c50-ok.txt", "linearizable": true, "unpartitioned": false },
+    { "name": "c50-bad", "file": "porcupine-kv/c50-bad.txt", "linearizable": false, "unpartitioned": false }
+  ]
+}

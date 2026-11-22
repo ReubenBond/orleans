@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The MetaStore's conditional registers over Fast CASPaxos (Orleans.Consensus.CasPaxos). -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.CasPaxos</RootNamespace>
+  </PropertyGroup>
+
+  <Import Project="..\..\eng\Orleans.Consensus.CasPaxos.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="$(OrleansConsensusCasPaxosSourceRoot)\csharp\src\Orleans.Consensus.CasPaxos.Grpc\Orleans.Consensus.CasPaxos.Grpc.csproj" />
+  </ItemGroup>
+</Project>

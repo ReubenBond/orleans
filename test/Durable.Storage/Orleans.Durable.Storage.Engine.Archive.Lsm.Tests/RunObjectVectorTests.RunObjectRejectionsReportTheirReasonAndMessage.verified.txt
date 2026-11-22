@@ -1,0 +1,156 @@
+﻿No bytes.
+  truncated: The run object's last 0 bytes are fewer than the 16 of the smallest trailer.
+Fifteen bytes, one short of the smallest trailer.
+  truncated: The run object's last 15 bytes are fewer than the 16 of the smallest trailer.
+Trailer magic XLAR.
+  bad-magic: The trailer's magic is not CLAR.
+Trailer version 2.
+  bad-version: The trailer's version is 2, not 1.
+A trailer length of 15, below the trailer's 16 fixed bytes.
+  length-mismatch: The run object's trailer gives its length as 15, outside 16 to the 276 bytes which end the object, or past 1048576.
+A trailer length one past the object's.
+  length-mismatch: The run object's trailer gives its length as 277, outside 16 to the 276 bytes which end the object, or past 1048576.
+A trailer whose CRC-32C does not match its bytes.
+  crc-mismatch: The trailer's CRC-32C does not match its bytes.
+A trailer of only its fixed bytes, whose body ends before the section count.
+  body-truncated: The trailer ends before the section count, at byte 0 of 0.
+A trailer listing no sections.
+  no-sections: The trailer lists no section.
+A metadata offset past the trailer.
+  bad-section-layout: The metadata offset, 1000000, lies past the trailer at 146.
+A section at offset 1, not 0.
+  sections-not-contiguous: Section 0 starts at 1, not where the previous section's blocks ended, 0.
+A byte between the last section and the metadata.
+  sections-not-contiguous: The last section's blocks end at 103, not at the metadata, 104.
+A section of length 0.
+  bad-section-range: Section 0's 0 bytes of blocks at offset 0 are empty or run past the metadata at 103.
+A section whose blocks run past the metadata.
+  bad-section-range: Section 0's 104 bytes of blocks at offset 0 are empty or run past the metadata at 103.
+A partition deeper than 524,280 bits.
+  bad-partition: The partition of section 0 is 524281 bits deep, deeper than a key's 524280.
+A partition of depth 4 which sets a bit past its depth.
+  bad-partition: The partition of section 0 sets a bit past its depth, 4.
+A section's lowest tag of ledger 0.
+  bad-tag: The trailer's section 0's lowest tag is of ledger 0, which names no ledger.
+A section's highest tag at slot 2^63 - 1.
+  bad-tag: The trailer's section 0's highest tag lies at slot 9223372036854775807, past 2^63 - 2, the last slot a ledger has.
+A section's highest tag at index 2^31.
+  bad-tag: The trailer's section 0's highest tag has index 2147483648, past 2^31 - 1.
+A section's lowest tag above its highest.
+  tags-unordered: Section 0's lowest tag lies above its highest.
+A section of 0 rows.
+  no-rows: Section 0 counts no row.
+A block index which does not start the metadata.
+  bad-section-layout: Section 0's block index at 104 does not lie in order between the blocks and the trailer, with at least 4 bytes for it and each part after it.
+A Bloom filter 3 bytes after the block index.
+  bad-section-layout: Section 0's Bloom filter at 106 does not lie in order between the blocks and the trailer, with at least 4 bytes for it and each part after it.
+A Bloom filter past the trailer.
+  bad-section-layout: Section 0's Bloom filter at 237 does not lie in order between the blocks and the trailer, with at least 4 bytes for it and each part after it.
+A condition of kind 2.
+  bad-condition: The condition's kind is 2, neither 0, a drain, nor 1, a compaction.
+A drain of ledger 0.
+  bad-condition: The drain's ledger is 0, which names no ledger.
+A drain from watermark 2^63.
+  bad-condition: The drain's watermark, 9223372036854775808, lies past 2^63 - 1.
+A compaction of no inputs.
+  bad-condition: The compaction names no input.
+A compaction input at offset 2^63.
+  bad-condition: Input 0's offset, 9223372036854775808, lies past 2^63 - 1.
+A compaction input named D/1.
+  bad-object-name: Input 0's object, 'D/1', is not an object name.
+A compaction input with an empty name.
+  bad-object-name: Input 0's object, '', is not an object name.
+A compaction input with a name of 201 characters.
+  bad-object-name: Input 0's object, 'c/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', is not an object name.
+A compaction listing one input twice.
+  inputs-unordered: Input 1, at offset 5 of d/3/0/a, is not after the previous input.
+A compaction listing d/2/0/a after d/3/0/a.
+  inputs-unordered: Input 1, at offset 9 of d/2/0/a, is not after the previous input.
+A drain of ledger 4 whose rows are of ledger 3.
+  condition-mismatch: Section 0's tags lie outside the drain of ledger 4 from slot 0.
+A drain from slot 1 whose lowest row lies at slot 0.
+  condition-mismatch: Section 0's tags lie outside the drain of ledger 3 from slot 1.
+A drain from slot 2^63 - 1, past the last slot a row has.
+  condition-mismatch: Section 0's tags lie outside the drain of ledger 3 from slot 9223372036854775807.
+A byte after the trailer's condition.
+  trailing-bytes: The trailer runs 1 byte past its last field.
+A trailer whose body ends inside the first section's entry.
+  body-truncated: The trailer ends before section 0's offset, at byte 12 of 14.
+A block index whose CRC-32C does not match its bytes.
+  crc-mismatch: The block index's CRC-32C does not match its bytes.
+A block index of no blocks.
+  no-blocks: The block index lists no block.
+A block of 4 bytes, its CRC-32C alone.
+  blocks-mismatch: Block 0's 4 bytes are fewer than 5 or run past the section's 103 bytes of blocks, after 0.
+A block index which lists two of three blocks.
+  blocks-mismatch: The blocks hold 69 bytes, not the section's 103.
+Block lengths whose sum runs past the section.
+  blocks-mismatch: Block 2's 34 bytes are fewer than 5 or run past the section's 103 bytes of blocks, after 70.
+A continuation flag of 2.
+  bad-continuation: Block 1's continuation flag is 2, which is neither 0 nor 1.
+The first block's continuation flag set.
+  bad-continuation: Block 0's continuation flag is 1, which the first block's is not.
+A block index whose first block's first key is empty.
+  empty-key: The block index's block 0's first key is empty.
+A block index whose third block's first key is below the second's.
+  keys-unordered: Block 2's first key lies below the previous block's.
+A block index whose third block's first key 40 lies outside the section's partition 0011/4.
+  first-key-outside-partition: Block 2's first key lies outside the section's partition, 0011/4.
+A byte after the block index's last first key.
+  trailing-bytes: The block index runs 1 byte past its last field.
+A Bloom filter whose CRC-32C does not match its bytes.
+  crc-mismatch: The Bloom filter's CRC-32C does not match its bytes.
+A Bloom filter of 0 hashes.
+  bad-filter: The Bloom filter records 0 hashes, outside 1 to 64.
+A Bloom filter of 65 hashes.
+  bad-filter: The Bloom filter records 65 hashes, outside 1 to 64.
+A Bloom filter of no bytes.
+  bad-filter: The Bloom filter holds no byte.
+A block whose CRC-32C does not match its bytes.
+  crc-mismatch: Block 1's CRC-32C does not match its bytes.
+A block of 5 bytes, one byte of a row and its CRC-32C.
+  body-truncated: Block 0 ends before row 0's key's length, at byte 0 of 1.
+A block whose row's payload ends past the block.
+  body-truncated: Block 0 ends before row 0's payload, at byte 29 of 29.
+A row whose key is empty.
+  empty-key: Block 2's row 0's key is empty.
+A row whose tag is of ledger 0.
+  bad-tag: Block 1's row 0's tag is of ledger 0, which names no ledger.
+A row whose tag lies at slot 2^63 - 1.
+  bad-tag: Block 1's row 0's tag lies at slot 9223372036854775807, past 2^63 - 2, the last slot a ledger has.
+A row whose tag has index 2^31.
+  bad-tag: Block 1's row 0's tag has index 2147483648, past 2^31 - 1.
+A row of kind 3.
+  unknown-kind: Row 0 of block 2 is of kind 3, not 0, 1, or 2.
+A block whose first row's key is not its first key in the index.
+  index-mismatch: Block 2's first row's key is not the block's first key in the index, or its continuation flag is not whether that key continues the previous block's.
+A block which continues the previous block's key without its continuation flag.
+  index-mismatch: Block 1's first row's key is not the block's first key in the index, or its continuation flag is not whether that key continues the previous block's.
+A block whose continuation flag is set although its key differs from the previous block's.
+  index-mismatch: Block 2's first row's key is not the block's first key in the index, or its continuation flag is not whether that key continues the previous block's.
+A block whose second row precedes its first in tag order.
+  rows-unordered: Row 1 of block 0 does not lie after the previous row, by key and then tag.
+Rows of one key in two blocks, the second block's below the first's in tag order.
+  rows-unordered: Row 0 of block 1 does not lie after the previous row, by key and then tag.
+A row whose key 40, not its block's first, lies outside the section's partition 0011/4.
+  key-outside-partition: Row 2 of block 0 has a key outside the section's partition, 0011/4.
+A row whose tag lies above the section's highest.
+  tag-outside-span: Row 0 of block 2 has a tag outside the section's tags.
+A Bloom filter which admits none of its section's keys.
+  filter-miss: The Bloom filter excludes the key of row 0 of block 0.
+A section counting 4 rows, which holds 3.
+  row-count-mismatch: The section holds 3 rows, not its trailer entry's 4.
+A section whose tags reach slot 5, past its highest row's.
+  tag-span-mismatch: The section's lowest or highest row's tag is not its trailer entry's.
+A compaction output whose second section's Bloom filter fails its CRC-32C.
+  crc-mismatch: The Bloom filter's CRC-32C does not match its bytes.
+Two rules: version 2 and a CRC-32C which does not match; the version is checked first.
+  bad-version: The trailer's version is 2, not 1.
+Two rules: a section at offset 1 whose tags are unordered; the offset is read first.
+  sections-not-contiguous: Section 0 starts at 1, not where the previous section's blocks ended, 0.
+Two rules: a Bloom filter of 0 hashes and a block whose CRC-32C fails; the metadata is read first.
+  bad-filter: The Bloom filter records 0 hashes, outside 1 to 64.
+Two rules: a drain of another ledger and a byte after the condition; the condition is checked first.
+  condition-mismatch: Section 0's tags lie outside the drain of ledger 4 from slot 0.
+Two rules: a row outside the partition in a section counting 4 rows; rows are checked before totals.
+  key-outside-partition: Row 2 of block 0 has a key outside the section's partition, 0011/4.

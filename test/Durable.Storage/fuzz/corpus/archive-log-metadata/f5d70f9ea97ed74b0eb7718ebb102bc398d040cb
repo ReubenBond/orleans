@@ -1,0 +1,8 @@
+wal
+a/b/c
+d80557dacbe088f2
+
+format=json
+wal_generation=1
+clog_key=d80557dacbe088f2
+format=json

@@ -1,0 +1,34 @@
+﻿File 7: a header page and data pages 0 to 6, P = 4096.
+
+Header page at 0x0000: CLFL version 1, page size 4096, write window 256 pages, the first file of its open.
+
+Data page 0 at 0x1000: valid and well-formed.
+  0x1004  Full          0x40000FF8  a whole record of 4088 bytes
+
+Data page 1 at 0x2000: valid and well-formed.
+  0x2004  Full          0x40000FF8  a whole record of 4088 bytes
+
+Data page 2 at 0x3000: valid and well-formed.
+  0x3004  Full          0x40000FF8  a whole record of 4088 bytes
+
+Data page 3 at 0x4000: valid and well-formed.
+  0x4004  Full          0x40000FF8  a whole record of 4088 bytes
+
+Data page 4 at 0x5000: valid and well-formed.
+  0x5004  First         0x80000FF0  record bytes [0, 4080) of 9000
+
+Data page 5 at 0x6000: valid and well-formed.
+  0x6004  Continuation  0xC0000FF8  record bytes [4080, 8168)
+
+Data page 6 at 0x7000: valid and well-formed.
+  0x7004  Continuation  0xC0000340  record bytes [8168, 9000)
+  0x7348  End           0x00000000  zero to 0x8000
+
+A scan returns:
+  a record at (7, 0x1004) on page (7, 0), 4088 bytes
+  a record at (7, 0x2004) on page (7, 1), 4088 bytes
+  a record at (7, 0x3004) on page (7, 2), 4088 bytes
+  a record at (7, 0x4004) on page (7, 3), 4088 bytes
+  a record at (7, 0x5004) on page (7, 4), 9000 bytes
+
+The 9000-byte record's position is (7, 0x5004), and the durable frontier after it (7, 0x7348).

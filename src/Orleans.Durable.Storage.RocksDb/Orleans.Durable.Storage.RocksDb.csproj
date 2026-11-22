@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The state database's RocksDB storage, apart from the engine so that only a host which takes it loads RocksDB. -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.RocksDb</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RocksDB" />
+  </ItemGroup>
+</Project>

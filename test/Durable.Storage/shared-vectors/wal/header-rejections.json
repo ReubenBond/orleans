@@ -1,0 +1,152 @@
+{
+  "description": "WriteAheadLog header pages a reader does not accept, each named by the first rule it breaks in check order (wal.md §7); a case breaking two adjacent rules pins their order. outcome is damage (an invalid header, WAL-I3) or unsupported (a recognized magic with another version, WalUnsupportedFormatException).",
+  "cases": [
+    {
+      "name": "Sixteen bytes: shorter than the header's 24 bytes of fixed fields.",
+      "reason": "truncated",
+      "outcome": "damage",
+      "pageSize": 16,
+      "hex": "00000000434c464c01000000000200"
+    },
+    {
+      "name": "The write window changed after the CRC was computed.",
+      "reason": "crc-mismatch",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "56e75036434c464c01000000000200000300000001"
+    },
+    {
+      "name": "An all-zero page.",
+      "reason": "zero-page",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": ""
+    },
+    {
+      "name": "Magic XLFL.",
+      "reason": "bad-magic",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "c60de2f7584c464c01000000000200000100000001"
+    },
+    {
+      "name": "Version 2 with the CLFL magic.",
+      "reason": "unsupported-version",
+      "outcome": "unsupported",
+      "pageSize": 512,
+      "hex": "b3dc3e54434c464c02000000000200000100000001"
+    },
+    {
+      "name": "A 512-byte page whose header names 1024.",
+      "reason": "page-size-mismatch",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "1fb4eb83434c464c01000000000400000100000001"
+    },
+    {
+      "name": "A 768-byte page: not a power of two.",
+      "reason": "page-size-unsupported",
+      "outcome": "damage",
+      "pageSize": 768,
+      "hex": "87f67804434c464c01000000000300000100000001"
+    },
+    {
+      "name": "A 256-byte page: below 512.",
+      "reason": "page-size-unsupported",
+      "outcome": "damage",
+      "pageSize": 256,
+      "hex": "372d2a72434c464c01000000000100000100000001"
+    },
+    {
+      "name": "A 131072-byte page: above 64 KiB.",
+      "reason": "page-size-unsupported",
+      "outcome": "damage",
+      "pageSize": 131072,
+      "hex": "a67f8176434c464c01000000000002000100000001"
+    },
+    {
+      "name": "Write window 0.",
+      "reason": "window-zero",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "e6176678434c464c01000000000200000000000001"
+    },
+    {
+      "name": "Write window 2^31.",
+      "reason": "window-out-of-range",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "1f9456e1434c464c01000000000200000000008001"
+    },
+    {
+      "name": "Flag bit 1.",
+      "reason": "unknown-flag",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "50054a59434c464c01000000000200000100000003"
+    },
+    {
+      "name": "A non-zero byte at offset 24.",
+      "reason": "nonzero-padding",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "70981f30434c464c0100000000020000010000000100000001"
+    },
+    {
+      "name": "Sixteen zero bytes: truncated and zero, named by truncated, which precedes zero-page.",
+      "reason": "truncated",
+      "outcome": "damage",
+      "pageSize": 16,
+      "hex": ""
+    },
+    {
+      "name": "Magic XLFL with version 2: named by bad-magic, which precedes unsupported-version.",
+      "reason": "bad-magic",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "23368c95584c464c02000000000200000100000001"
+    },
+    {
+      "name": "Version 2 with page size 1000: named by unsupported-version, which precedes page-size-unsupported.",
+      "reason": "unsupported-version",
+      "outcome": "unsupported",
+      "pageSize": 512,
+      "hex": "d522d301434c464c02000000e80300000100000001"
+    },
+    {
+      "name": "Page size 1000 on a 512-byte page: named by page-size-unsupported, which precedes page-size-mismatch.",
+      "reason": "page-size-unsupported",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "3019bd63434c464c01000000e80300000100000001"
+    },
+    {
+      "name": "Page size 1024 on a 512-byte page with a failing CRC: named by page-size-mismatch, which precedes crc-mismatch.",
+      "reason": "page-size-mismatch",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "e04beb83434c464c01000000000400000100000001"
+    },
+    {
+      "name": "Window 0 with a failing CRC: named by crc-mismatch, which precedes window-zero.",
+      "reason": "crc-mismatch",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "19e86678434c464c01000000000200000000000001"
+    },
+    {
+      "name": "Window 2^31 with flag bit 1: named by window-out-of-range, which precedes unknown-flag.",
+      "reason": "window-out-of-range",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "19764c8e434c464c01000000000200000000008003"
+    },
+    {
+      "name": "Flag bit 1 and a non-zero byte at offset 24: named by unknown-flag, which precedes nonzero-padding.",
+      "reason": "unknown-flag",
+      "outcome": "damage",
+      "pageSize": 512,
+      "hex": "767a055f434c464c0100000000020000010000000300000001"
+    }
+  ]
+}

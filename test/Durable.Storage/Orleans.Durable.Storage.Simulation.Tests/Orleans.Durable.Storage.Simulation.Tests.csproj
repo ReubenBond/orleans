@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The build rewrites this project's dependency closure, the simulation kit among it, under Clockwork's deterministic
+    BCL and controlled-task rule sets, and links SeededSimulation's simulation driver (eng/OrleansSimulation.targets).
+  -->
+  <!--
+    Shared test source which runs inside this project's simulations as well as on the thread pool elsewhere takes its
+    simulation branch under CLOG_SIMULATION_TESTS, which this project defines in every configuration (verification.md §7.1).
+  -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);CLOG_SIMULATION_TESTS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OrleansSimulationInstrumentedTestProject>true</OrleansSimulationInstrumentedTestProject>
+    <OrleansSimulationUseBuiltInRules>true</OrleansSimulationUseBuiltInRules>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <!--
+    The seed corpus runs its tests one at a time and slows several-fold on a loaded machine, so its session may run 30
+    minutes; the hang dump and each simulation's step, virtual-time, and livelock budgets end a run which hangs sooner.
+  -->
+  <PropertyGroup>
+    <ClogTestSessionTimeout>30m</ClogTestSessionTimeout>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <OrleansSimulationBuiltInRuleSet Include="clockwork.tasks.controlled" />
+  </ItemGroup>
+
+  <!-- The test application's Microsoft Testing Platform integration: the simulation's test-host hook. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Testing.Simulation.Testing.MTP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- The manifest committer's history oracle judges by the reference reading of the commit rules, apart from the code. -->
+  <ItemGroup>
+    <Compile Include="..\shared\Archive\Lsm\ManifestChanges.cs;..\shared\Archive\Lsm\ManifestReference.cs;..\shared\Archive\Lsm\ManifestWorkload.cs" LinkBase="Archive" />
+  </ItemGroup>
+
+  <!-- The drain simulation writes, closes, and drops live ledgers through one node's process; the chain and version checkers judge the archive's and the Journals simulations. -->
+  <ItemGroup>
+    <Compile Include="..\shared\Archive\LiveLedgers.cs;..\shared\Archive\BackpressureTransport.cs;..\shared\Archive\ArchiveChains.cs;..\shared\Archive\TokenChainChecker.cs;..\shared\Archive\VersionChecker.cs;..\shared\Archive\KeyedRow.cs" LinkBase="Archive" />
+  </ItemGroup>
+
+  <!-- A seed's trace and schedule are pinned as a snapshot, which Verify checks in the test host. -->
+  <ItemGroup>
+    <PackageReference Include="Verify.XunitV3" />
+    <Compile Include="..\shared\SnapshotSettings.cs" Link="SnapshotSettings.cs" />
+    <OrleansSimulationExclude Include="Verify%2A.dll;Argon.dll;DiffEngine.dll;EmptyFiles.dll;SimpleInfoName.dll" />
+  </ItemGroup>
+
+  <!--
+    The fault-injecting object store reports its faults through the conformance kit's events; the kit's simulated cases
+    run in Orleans.Durable.Storage.Simulation.Conformance.Tests. CsCheck and Accordant keep ordinary IL.
+  -->
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" />
+    <OrleansSimulationExclude Include="CsCheck.dll;Accordant%2A.dll" />
+    <Compile Include="..\shared\Conformance\ConformanceKit.cs" Link="Conformance\Kit\ConformanceKit.cs" />
+  </ItemGroup>
+
+  <!-- The archive-log drain simulations' drains and sequence chains; the Azure store's races run in the conformance project. -->
+  <ItemGroup>
+    <Compile Include="..\shared\Archive\Logs\*.cs" Exclude="..\shared\Archive\Logs\FakeAzureBlobService.cs;..\shared\Archive\Logs\ArchiveLogRaces.cs" LinkBase="Archive\Logs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\ConditionalRegisterWrites.cs" Link="ConditionalRegisterWrites.cs" />
+    <Compile Include="..\shared\ScriptedConditionalRegister.cs" Link="ScriptedConditionalRegister.cs" />
+    <Compile Include="..\shared\Archive\Lsm\FaultInjectingObjectStore.cs" Link="Archive\FaultInjectingObjectStore.cs" />
+    <Compile Include="..\shared\CrashStates\*.cs" LinkBase="CrashStates" />
+    <Compile Include="..\shared\Archive\ArchiveOracle.cs" Link="Archive\ArchiveOracle.cs" />
+    <Compile Include="..\shared\LedgerProposals.cs" Link="LedgerProposals.cs" />
+    <Compile Include="..\shared\LedgerAppends.cs" Link="LedgerAppends.cs" />
+    <Compile Include="..\shared\ReplicaChoice.cs" Link="ReplicaChoice.cs" />
+    <Compile Include="..\shared\Conformance\Ledgers\*.cs" LinkBase="Conformance\Ledgers" />
+  </ItemGroup>
+
+  <!-- Client histories are checked with the linearizability checker, which runs in the test host. -->
+  <ItemGroup>
+    <Compile Include="..\shared\Linearizability\*.cs" LinkBase="Linearizability" />
+    <EmbeddedResource Include="..\shared\Linearizability\Visualization\*"
+                      LinkBase="Linearizability\Visualization"
+                      LogicalName="Orleans.Durable.Storage.Testing.Linearizability.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

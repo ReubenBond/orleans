@@ -1,0 +1,51 @@
+# The types of the namespaces which two components share, each under the component which claims it (spec README §2.6).
+# Every other type of a shared namespace belongs to the component whose namespace root contains it: the layer's
+# implementation for an abstractions component. Components.cs reads this file; ComponentDependencyTests checks it
+# against the compiled assemblies.
+
+[Orleans.Durable.Storage.Engine.Archive.Logs.Abstractions]
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogCorruptException
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogGeneration
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogGenerationPage
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogLayout
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogName
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogOpener
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogOpenerKind
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogPacking
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogPosition
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogProperties
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogRead
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogRefusedException
+Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogWriteOutcome
+Orleans.Durable.Storage.Engine.Archive.Logs.IArchiveLogContainer
+Orleans.Durable.Storage.Engine.Archive.Logs.IArchiveLogStore
+
+[Orleans.Durable.Storage.Engine.Ledgers.Abstractions]
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerStore
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaFailures
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStorageCorruptException
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException
+Orleans.Durable.Storage.Engine.Ledgers.NodeId
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome
+Orleans.Durable.Storage.Engine.Ledgers.Slot
+
+[Orleans.Durable.Storage.Engine.MetaStore.Abstractions]
+Orleans.Durable.Storage.Engine.MetaStore.IConditionalRegister
+Orleans.Durable.Storage.Engine.MetaStore.IMetaStore
+Orleans.Durable.Storage.Engine.MetaStore.MetaStoreEntry
+Orleans.Durable.Storage.Engine.MetaStore.MetaStoreRegisterName
+Orleans.Durable.Storage.Engine.MetaStore.MetaStoreVersion
+Orleans.Durable.Storage.Engine.MetaStore.RegisterWriteOutcome

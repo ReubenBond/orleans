@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    An Orleans silo whose journaled grains store their state in Clog: its node's disk under DurableStorage:Node:Root, its MetaStore
+    and LSM object store in Azure Storage, Orleans' membership in Azure Table storage. samples/Orleans.Durable.Storage.Samples.AppHost runs
+    three of them on Azurite.
+  -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.Samples.Journaling</RootNamespace>
+
+    <!-- An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), as the composition's (build-packaging.md §2). -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Runtime" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage\Orleans.Durable.Storage.csproj" />
+  </ItemGroup>
+</Project>

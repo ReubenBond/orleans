@@ -1,0 +1,157 @@
+{
+  "description": "CLSI v1 root slots of slots.root: each root\u0027s fields and the exact slot of slotSize bytes it encodes to; decoding the slot yields the root. hex runs through the slot\u0027s last non-zero byte; the slot continues with zero bytes to slotSize. Generations, files, and offsets are decimal strings; a reference\u0027s crc is 8 hexadecimal digits; corruptionEnd is null when unset; sealed is flag bit 1, set when the replica\u0027s seal record precedes the checkpoint\u0027s cut.",
+  "cases": [
+    {
+      "name": "with-corruption-end",
+      "description": "Generation 7, height 2, replay start (3, 4608), CorruptionEnd (5, 6), and a root node.",
+      "slotSize": 4096,
+      "generation": "7",
+      "height": 2,
+      "replayStart": {
+        "file": "3",
+        "offset": "4608"
+      },
+      "corruptionEnd": {
+        "file": "5",
+        "page": 6
+      },
+      "sealed": false,
+      "root": {
+        "generation": "4",
+        "offset": "8192",
+        "length": 6144,
+        "crc": "deadbeef"
+      },
+      "hex": "7339c0d1434c53490100000002000000070000000000000003000000000000000012000000000000050000000000000006000000010000000400000000000000002000000000000000180000efbeadde"
+    },
+    {
+      "name": "without-corruption-end",
+      "description": "The same root with no corruption bound.",
+      "slotSize": 4096,
+      "generation": "7",
+      "height": 2,
+      "replayStart": {
+        "file": "3",
+        "offset": "4608"
+      },
+      "corruptionEnd": null,
+      "sealed": false,
+      "root": {
+        "generation": "4",
+        "offset": "8192",
+        "length": 6144,
+        "crc": "deadbeef"
+      },
+      "hex": "a44e58bb434c53490100000002000000070000000000000003000000000000000012000000000000000000000000000000000000000000000400000000000000002000000000000000180000efbeadde"
+    },
+    {
+      "name": "sealed",
+      "description": "The root without a corruption bound, of a sealed replica: flags 2.",
+      "slotSize": 4096,
+      "generation": "7",
+      "height": 2,
+      "replayStart": {
+        "file": "3",
+        "offset": "4608"
+      },
+      "corruptionEnd": null,
+      "sealed": true,
+      "root": {
+        "generation": "4",
+        "offset": "8192",
+        "length": 6144,
+        "crc": "deadbeef"
+      },
+      "hex": "9235e6f2434c53490100000002000000070000000000000003000000000000000012000000000000000000000000000000000000020000000400000000000000002000000000000000180000efbeadde"
+    },
+    {
+      "name": "sealed-with-corruption-end",
+      "description": "The root with CorruptionEnd (5, 6), of a sealed replica: flags 3.",
+      "slotSize": 4096,
+      "generation": "7",
+      "height": 2,
+      "replayStart": {
+        "file": "3",
+        "offset": "4608"
+      },
+      "corruptionEnd": {
+        "file": "5",
+        "page": 6
+      },
+      "sealed": true,
+      "root": {
+        "generation": "4",
+        "offset": "8192",
+        "length": 6144,
+        "crc": "deadbeef"
+      },
+      "hex": "45427e98434c53490100000002000000070000000000000003000000000000000012000000000000050000000000000006000000030000000400000000000000002000000000000000180000efbeadde"
+    },
+    {
+      "name": "empty",
+      "description": "An empty table: height 0 and a null root.",
+      "slotSize": 4096,
+      "generation": "1",
+      "height": 0,
+      "replayStart": {
+        "file": "0",
+        "offset": "0"
+      },
+      "corruptionEnd": null,
+      "sealed": false,
+      "root": {
+        "generation": "0",
+        "offset": "0",
+        "length": 0,
+        "crc": "00000000"
+      },
+      "hex": "d24074bd434c5349010000000000000001"
+    },
+    {
+      "name": "maximum",
+      "description": "The largest generation (2^63 - 1), height, positions, and reference fields.",
+      "slotSize": 4096,
+      "generation": "9223372036854775807",
+      "height": 7,
+      "replayStart": {
+        "file": "18446744073709551615",
+        "offset": "18446744073709551615"
+      },
+      "corruptionEnd": {
+        "file": "18446744073709551615",
+        "page": 4294967295
+      },
+      "sealed": false,
+      "root": {
+        "generation": "9223372036854775807",
+        "offset": "18446744073709551615",
+        "length": 4294967295,
+        "crc": "ffffffff"
+      },
+      "hex": "b63751d0434c53490100000007000000ffffffffffffff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffff01000000ffffffffffffff7fffffffffffffffffffffffffffffffff"
+    },
+    {
+      "name": "large-slot",
+      "description": "A root on storage whose minimum page size is 64 KiB: S = 65536.",
+      "slotSize": 65536,
+      "generation": "7",
+      "height": 2,
+      "replayStart": {
+        "file": "3",
+        "offset": "4608"
+      },
+      "corruptionEnd": {
+        "file": "5",
+        "page": 6
+      },
+      "sealed": false,
+      "root": {
+        "generation": "4",
+        "offset": "8192",
+        "length": 6144,
+        "crc": "deadbeef"
+      },
+      "hex": "2e1e5805434c53490100000002000000070000000000000003000000000000000012000000000000050000000000000006000000010000000400000000000000002000000000000000180000efbeadde"
+    }
+  ]
+}

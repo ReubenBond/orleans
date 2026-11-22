@@ -1,0 +1,90 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The conformance kit's simulated cases (verification.md §4.1): each case runs in a simulation of its own
+    (SimulatedConformance.cs), with its concurrent windows' schedules explored within a preemption bound. The build
+    rewrites this project's dependency closure, the simulation kit among it, under Clockwork's deterministic BCL and
+    controlled-task rule sets, and links SeededSimulation's simulation driver (eng/OrleansSimulation.targets). The
+    project runs beside the seed corpus (Orleans.Durable.Storage.Simulation.Tests).
+  -->
+  <!--
+    Shared test source which runs inside this project's simulations as well as on the thread pool elsewhere takes its
+    simulation branch under CLOG_SIMULATION_TESTS, which this project defines in every configuration (verification.md §7.1).
+  -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);CLOG_SIMULATION_TESTS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OrleansSimulationInstrumentedTestProject>true</OrleansSimulationInstrumentedTestProject>
+    <OrleansSimulationUseBuiltInRules>true</OrleansSimulationUseBuiltInRules>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <!--
+    The simulated conformance classes run their tests one at a time and slow several-fold on a loaded machine, so the
+    session may run 30 minutes; the hang dump and each simulation's step, virtual-time, and livelock budgets end a run
+    which hangs sooner.
+  -->
+  <PropertyGroup>
+    <ClogTestSessionTimeout>30m</ClogTestSessionTimeout>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <OrleansSimulationBuiltInRuleSet Include="clockwork.tasks.controlled" />
+  </ItemGroup>
+
+  <!-- The test application's Microsoft Testing Platform integration: the simulation's test-host hook. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Testing.Simulation.Testing.MTP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.AzureStorage\Orleans.Durable.Storage.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.FileSystem\Orleans.Durable.Storage.FileSystem.csproj" />
+  </ItemGroup>
+
+  <!--
+    CsCheck samples and shrinks cases, and Accordant generates them, in the test host, outside every simulation, so both
+    keep ordinary IL. Within a case they only compute: a generator draws from its seed and a spec judges answers.
+  -->
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" />
+    <OrleansSimulationExclude Include="CsCheck.dll;Accordant%2A.dll" />
+    <Compile Include="..\shared\Conformance\ConformanceKit.cs" Link="Conformance\Kit\ConformanceKit.cs" />
+    <Compile Include="..\shared\Conformance\Archive\Lsm\*.cs" LinkBase="Conformance\Kit\Archive" />
+    <Compile Include="..\shared\Conformance\MetaStore\*.cs" LinkBase="Conformance\Kit\MetaStore" />
+    <Compile Include="..\shared\Conformance\LedgerReplica\*.cs" LinkBase="Conformance\Kit\LedgerReplica" />
+    <Compile Include="..\shared\Conformance\LedgerComposition\*.cs" LinkBase="Conformance\Kit\LedgerComposition" />
+    <Compile Include="..\shared\Conformance\Ledger\*.cs" LinkBase="Conformance\Kit\Ledger" />
+    <Compile Include="..\shared\Conformance\Ledgers\*.cs" LinkBase="Conformance\Ledgers" />
+    <Compile Include="..\shared\Conformance\Journals\*.cs" LinkBase="Conformance\Kit\Journals" />
+    <Compile Include="..\shared\Recording\*.cs" LinkBase="Recording" />
+  </ItemGroup>
+
+  <!--
+    The archive-log store's spec runs over the Azure store through the real SDK and the fake transport, which the
+    simulation schedules (archive-logs.md §10), so the SDK runs rewritten with the rest of the closure.
+  -->
+  <ItemGroup>
+    <Compile Include="..\shared\Conformance\Archive\Logs\*.cs" LinkBase="Conformance\Kit\Archive\Logs" />
+    <Compile Include="..\shared\Archive\Logs\*.cs" LinkBase="Archive\Logs" />
+    <Compile Include="..\shared\Archive\BackpressureTransport.cs;..\shared\Archive\KeyedRow.cs" LinkBase="Archive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\ScriptedConditionalRegister.cs" Link="ScriptedConditionalRegister.cs" />
+    <Compile Include="..\shared\Archive\Lsm\FaultInjectingObjectStore.cs;..\shared\Archive\Lsm\ManifestChanges.cs;..\shared\Archive\Lsm\ManifestReference.cs" LinkBase="Archive" />
+    <Compile Include="..\shared\CrashStates\*.cs" LinkBase="CrashStates" />
+    <Compile Include="..\shared\LedgerAppends.cs" Link="LedgerAppends.cs" />
+  </ItemGroup>
+
+  <!-- Client histories are checked with the linearizability checker, which runs in the test host. -->
+  <ItemGroup>
+    <Compile Include="..\shared\Linearizability\*.cs" LinkBase="Linearizability" />
+    <EmbeddedResource Include="..\shared\Linearizability\Visualization\*"
+                      LinkBase="Linearizability\Visualization"
+                      LogicalName="Orleans.Durable.Storage.Testing.Linearizability.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

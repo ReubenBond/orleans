@@ -1,0 +1,45 @@
+{
+  "description": "File-system MetaStore register files (CLFM version 1) a reader rejects, each named by the first rule it breaks in check order (metastore.md §7); a case breaking two adjacent rules pins their order. The reader fails the read or write with the rejection.",
+  "cases": [
+    {
+      "name": "An empty file.",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "A 20-byte file: one byte short of its 21-byte header.",
+      "reason": "truncated",
+      "hex": "434c464d010f1e2d3c4b5a69788796a5b4c3d2e1"
+    },
+    {
+      "name": "Magic CLFX.",
+      "reason": "bad-magic",
+      "hex": "434c4658010f1e2d3c4b5a69788796a5b4c3d2e1f076616c7565"
+    },
+    {
+      "name": "An all-zero header.",
+      "reason": "bad-magic",
+      "hex": "000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "Format version 2 with the CLFM magic.",
+      "reason": "bad-version",
+      "hex": "434c464d020f1e2d3c4b5a69788796a5b4c3d2e1f076616c7565"
+    },
+    {
+      "name": "Format version 0 with the CLFM magic.",
+      "reason": "bad-version",
+      "hex": "434c464d000f1e2d3c4b5a69788796a5b4c3d2e1f0"
+    },
+    {
+      "name": "A 20-byte file with magic CLFX: named by truncated, which precedes bad-magic.",
+      "reason": "truncated",
+      "hex": "434c4658010f1e2d3c4b5a69788796a5b4c3d2e1"
+    },
+    {
+      "name": "Magic CLFX with format version 2: named by bad-magic, which precedes bad-version.",
+      "reason": "bad-magic",
+      "hex": "434c4658020f1e2d3c4b5a69788796a5b4c3d2e1f076616c7565"
+    }
+  ]
+}

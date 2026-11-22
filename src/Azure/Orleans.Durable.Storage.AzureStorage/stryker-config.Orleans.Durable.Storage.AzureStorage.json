@@ -1,0 +1,21 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.AzureStorage.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Cloud.Tests/Orleans.Durable.Storage.Cloud.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Engine.MetaStore.Tests/Orleans.Durable.Storage.Engine.MetaStore.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Simulation.Conformance.Tests/Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj"
+    ],
+    "mutate": [
+      "**/*.cs"
+    ],
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

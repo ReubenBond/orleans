@@ -1,0 +1,166 @@
+﻿[
+  {
+    Row: store outcome: Written,
+    Reported: Written
+  },
+  {
+    Row: store outcome: Sealed,
+    Reported: Sealed
+  },
+  {
+    Row: store outcome: Missing,
+    Reported: Missing
+  },
+  {
+    Row: store outcome: a batch,
+    Reported: a batch of 010203
+  },
+  {
+    Row: store outcome: a byte-range read's range past its batch,
+    Reported: OutsideBatch
+  },
+  {
+    Row: store outcome: Dropped,
+    Reported: Dropped
+  },
+  {
+    Row: store outcome: a contiguous tail and its sealed flag,
+    Reported: LedgerReplicaTail { ContiguousTail = 3, IsSealed = True, LeaseRemaining = 00:00:00 }
+  },
+  {
+    Row: store outcome: a sealing tail read's tail,
+    Reported: LedgerReplicaTail { ContiguousTail = 0, IsSealed = True, LeaseRemaining = 00:00:00 }
+  },
+  {
+    Row: store outcome: a batch longer than the reply reserved, TooLarge, then read again reserving its length,
+    Reported: a batch of the length TooLarge named
+  },
+  {
+    Row: the store's LedgerReplicaCorruptException,
+    Reported: LedgerReplicaCorruptException at slot 4: A damaged value.
+  },
+  {
+    Row: a refusal: ArgumentException, from the host or its store,
+    Reported: ArgumentException
+  },
+  {
+    Row: a refusal: ArgumentOutOfRangeException, from the host or its store,
+    Reported: ArgumentOutOfRangeException
+  },
+  {
+    Row: a refusal: an unknown protocol version,
+    Reported: NotSupportedException
+  },
+  {
+    Row: a refusal: the callee's node stops,
+    Reported: LedgerReplicaUnavailableException
+  },
+  {
+    Row: NotThisNode,
+    Reported: LedgerReplicaUnavailableException
+  },
+  {
+    Row: no registered Active silo: the director refuses,
+    Reported: LedgerReplicaUnavailableException wrapping NodePlacementRefusedException
+  },
+  {
+    Row: Orleans rejects the call as overloaded,
+    Reported: LedgerReplicaUnavailableException wrapping LimitExceededException
+  },
+  {
+    Row: a reply which fails a check: a recovery write answered Sealed,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: empty DATA,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: DATA longer than the reply reserved,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: a byte-range read's DATA of another length,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: TooLarge naming a length the read reserved,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: TooLarge for a byte-range read,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: OutsideBatch for a whole read,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails a check: a contiguous tail below the one sent,
+    Reported: InvalidDataException
+  },
+  {
+    Row: a reply which fails to decode,
+    Reported: InvalidDataException wrapping ReplicaReplyDecodingException
+  },
+  {
+    Row: IOException,
+    Reported: LedgerReplicaUnavailableException wrapping IOException
+  },
+  {
+    Row: UnauthorizedAccessException,
+    Reported: LedgerReplicaUnavailableException wrapping UnauthorizedAccessException
+  },
+  {
+    Row: the callee's ObjectDisposedException while it stops,
+    Reported: LedgerReplicaUnavailableException wrapping ObjectDisposedException
+  },
+  {
+    Row: the callee's OperationCanceledException while it stops,
+    Reported: LedgerReplicaUnavailableException wrapping OperationCanceledException
+  },
+  {
+    Row: an ArgumentException the callee let escape,
+    Reported: LedgerReplicaUnavailableException wrapping ArgumentException
+  },
+  {
+    Row: an InvalidDataException the callee let escape,
+    Reported: LedgerReplicaUnavailableException wrapping InvalidDataException
+  },
+  {
+    Row: Orleans' TimeoutException,
+    Reported: LedgerReplicaUnavailableException wrapping TimeoutException
+  },
+  {
+    Row: SiloUnavailableException,
+    Reported: LedgerReplicaUnavailableException wrapping SiloUnavailableException
+  },
+  {
+    Row: any other callee or Orleans exception,
+    Reported: LedgerReplicaUnavailableException wrapping InvalidOperationException
+  },
+  {
+    Row: Backpressure from the host's limits, its attempts spent,
+    Reported: Backpressure
+  },
+  {
+    Row: a payload above the payload limit, at the caller,
+    Reported: ArgumentException
+  },
+  {
+    Row: the deadline passes in the node's replica queue,
+    Reported: LedgerReplicaQueueTimeoutException
+  },
+  {
+    Row: the caller's cancellation, once sent,
+    Reported: OperationCanceledException carrying the caller's token
+  },
+  {
+    Row: the caller's cancellation, while the call waits in its node's queue,
+    Reported: OperationCanceledException carrying the caller's token
+  },
+  {
+    Row: an operation after the caller's replica is disposed,
+    Reported: ObjectDisposedException
+  }
+]

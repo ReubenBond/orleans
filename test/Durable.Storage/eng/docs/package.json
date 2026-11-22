@@ -1,0 +1,13 @@
+{
+  "name": "clog-docs-tools",
+  "private": true,
+  "description": "Pinned Markdown, link, and Mermaid checkers for eng/check-docs.ps1.",
+  "type": "module",
+  "dependencies": {
+    "jsdom": "30.1.3",
+    "markdownlint-cli2": "0.24.0",
+    "mermaid": "12.2.0",
+    "remark-cli": "12.0.1",
+    "remark-validate-links": "13.1.0"
+  }
+}

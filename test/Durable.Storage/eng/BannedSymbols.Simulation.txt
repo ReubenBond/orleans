@@ -1,0 +1,27 @@
+# Banned APIs for simulation test projects (eng/OrleansSimulation.targets).
+# The test host cancels its token on a thread of its own, which runs there, outside the simulation, the callbacks
+# rewritten code registered on it (docs/spec/verification.md §7.1).
+P:Xunit.ITestContext.CancellationToken;Pass rewritten code a token the scenario owns; only test-host code which runs outside the simulation, such as the driver, observes the test's token.
+# The build rewrites a simulation project's dependency closure, not its test assembly, so a task combinator the test
+# assembly calls is the BCL's: over a task which runs its continuations asynchronously, its promise runs on the real
+# thread pool and posts its waiter's continuation to the simulation from outside it (docs/spec/verification.md §7.1).
+M:System.Threading.Tasks.Task.WhenAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAll(System.ReadOnlySpan{System.Threading.Tasks.Task});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAll(System.Threading.Tasks.Task[]);Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAll``1(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task{``0}});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAll``1(System.ReadOnlySpan{System.Threading.Tasks.Task{``0}});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAll``1(System.Threading.Tasks.Task{``0}[]);Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAll, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny(System.ReadOnlySpan{System.Threading.Tasks.Task});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny(System.Threading.Tasks.Task,System.Threading.Tasks.Task);Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny(System.Threading.Tasks.Task[]);Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny``1(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task{``0}});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny``1(System.ReadOnlySpan{System.Threading.Tasks.Task{``0}});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny``1(System.Threading.Tasks.Task{``0},System.Threading.Tasks.Task{``0});Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenAny``1(System.Threading.Tasks.Task{``0}[]);Use Orleans.Durable.Storage.Simulation.SimulationTasks.WhenAny, which the build rewrites to Clockwork's controlled combinator.
+M:System.Threading.Tasks.Task.WhenEach(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task});Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.
+M:System.Threading.Tasks.Task.WhenEach(System.ReadOnlySpan{System.Threading.Tasks.Task});Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.
+M:System.Threading.Tasks.Task.WhenEach(System.Threading.Tasks.Task[]);Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.
+M:System.Threading.Tasks.Task.WhenEach``1(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task{``0}});Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.
+M:System.Threading.Tasks.Task.WhenEach``1(System.ReadOnlySpan{System.Threading.Tasks.Task{``0}});Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.
+M:System.Threading.Tasks.Task.WhenEach``1(System.Threading.Tasks.Task{``0}[]);Await the tasks through Orleans.Durable.Storage.Simulation.SimulationTasks, which the build rewrites to Clockwork's controlled combinators.

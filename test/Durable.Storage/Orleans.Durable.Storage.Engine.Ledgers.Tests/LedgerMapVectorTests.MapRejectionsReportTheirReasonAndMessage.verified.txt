@@ -1,0 +1,60 @@
+No bytes.
+  truncated: A ledger map value holds its 36-byte header and its CRC-32C, but has 0 bytes.
+A header and three bytes, one short of the CRC-32C.
+  truncated: A ledger map value holds its 36-byte header and its CRC-32C, but has 39 bytes.
+Magic XLLM.
+  bad-magic: A ledger map value begins with the magic CLLM.
+Version 2.
+  bad-version: A ledger map value is version 1, not 2.
+The CRC-32C of other bytes.
+  crc-mismatch: A ledger map value's CRC-32C does not match its bytes.
+Epoch 0.
+  zero-epoch: A stored ledger map value was written, so its epoch is at least 1.
+Epoch 0 and next ledger ID 0: the epoch is checked first.
+  zero-epoch: A stored ledger map value was written, so its epoch is at least 1.
+Next ledger ID 0.
+  zero-next-id: A ledger map value's next ledger ID is at least 1.
+A count of one ledger and no entry.
+  entry-truncated: A ledger's entry runs past the value's CRC-32C.
+A count of 2^32 - 1 ledgers and one entry.
+  entry-truncated: A ledger's entry runs past the value's CRC-32C.
+An entry which ends inside its second replica.
+  entry-truncated: Ledger 1's entry runs past the value's CRC-32C.
+An entry which ends inside its recorded tail.
+  entry-truncated: Ledger 1's entry runs past the value's CRC-32C.
+Ledger ID 0.
+  zero-id: A listed ledger's ID is at least 1.
+Ledger 2 listed twice.
+  ids-not-ascending: A ledger map value lists its ledgers in ascending ID order, but ledger 2 follows ledger 2.
+Ledger 2 listed before ledger 1.
+  ids-not-ascending: A ledger map value lists its ledgers in ascending ID order, but ledger 1 follows ledger 2.
+Ledger 2 at next ledger ID 2.
+  id-at-or-above-next: A listed ledger's ID is below the next ledger ID 2, but is 2.
+A range whose depth needs a prefix byte the entry does not hold.
+  range-truncated: A range runs past the bytes which hold it.
+A range of depth 524,281.
+  range-depth: A range's depth is at most 524280, not 524281.
+A range of depth 1 with a bit set past its depth.
+  range-prefix-bits: A range of depth 1 has a prefix whose bits past its depth are not 0.
+Two replicas.
+  even-replica-count: Ledger 1 has an odd number of replicas, or none in the object store, not 2.
+A replica with the empty node identity.
+  empty-node: Ledger 1 names the empty node identity.
+A replica named twice.
+  duplicate-replica: Ledger 1 names replica 0123456789ab4def8000000000000001 twice.
+Window K = 0.
+  zero-k: Ledger 1's window K is at least 1.
+Window K = 2^31.
+  k-above-int: Ledger 1's window K is at most 2147483647, not 2147483648.
+A primary with the empty node identity.
+  empty-node: Ledger 1 names the empty node identity.
+A primary with the empty sequencer identity.
+  empty-sequencer: Ledger 1's primary claim names the empty sequencer identity.
+Status 2.
+  bad-status: Ledger 1's status is 0 (open) or 1 (closed), not 2.
+A recorded tail of 2^63.
+  tail-out-of-range: Ledger 1's recorded tail is below 2^63, not 9223372036854775808.
+A byte after the last ledger.
+  trailing-bytes: A ledger map value's last ledger ends at its CRC-32C, but 1 bytes follow it.
+A count of no ledgers, and an entry.
+  trailing-bytes: A ledger map value's last ledger ends at its CRC-32C, but 99 bytes follow it.

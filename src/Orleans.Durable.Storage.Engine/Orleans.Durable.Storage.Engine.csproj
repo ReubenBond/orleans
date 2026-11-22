@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Clog's managed storage layers (docs/spec/README.md §2.6), each in the folder of its namespace: buffers, admission and
+    call budgets, group commit, the WAL, the ledgers and the LedgerStore, the MetaStore's contract and memory store, the
+    Archive with the LSM and archive logs, the state database, and Journals. Orleans.Durable.Storage.Architecture.Tests checks the
+    dependencies between the layers over their types (tests/Orleans.Durable.Storage.Architecture.Tests/Components.cs).
+  -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.Engine</RootNamespace>
+
+    <!-- The WAL's direct I/O and io_uring, and the LedgerStore's records, read and write through pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Diagnostics\Orleans.Durable.Storage.Diagnostics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" />
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+</Project>

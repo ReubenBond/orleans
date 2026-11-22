@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "the first tag",
+      "ledger": "1",
+      "slot": "0",
+      "index": "0",
+      "hex": "0100000000000000000000000000000000000000"
+    },
+    {
+      "name": "each field's bytes",
+      "ledger": "72623859790382856",
+      "slot": "1230066625199609624",
+      "index": "555885348",
+      "hex": "0807060504030201181716151413121124232221"
+    },
+    {
+      "name": "the largest tag",
+      "ledger": "18446744073709551615",
+      "slot": "9223372036854775807",
+      "index": "2147483647",
+      "hex": "ffffffffffffffffffffffffffffff7fffffff7f"
+    }
+  ]
+}

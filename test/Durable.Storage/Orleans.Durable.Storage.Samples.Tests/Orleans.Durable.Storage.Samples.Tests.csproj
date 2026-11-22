@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The smoke test of samples/Orleans.Durable.Storage.Samples.Journaling: its silo configuration, over in-memory stores, starts a cluster in
+    which a grain's state survives its silo's death and restart. It sees the composition only through its public surface.
+  -->
+  <PropertyGroup>
+    <!-- An explicit opt-in to Orleans.Journaling's experimental API (ORLEANSEXP005), as the composition's (build-packaging.md §2). -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.TestingHost" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Orleans.Durable.Storage.Samples.Journaling\Orleans.Durable.Storage.Samples.Journaling.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+</Project>

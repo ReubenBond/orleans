@@ -1,0 +1,155 @@
+{
+  "description": "Batches a decoder rejects alone, each breaking one rule of ledgers.md section 7, or two where its name says so, with the reason code of the first rule a decoder checks; every batch long enough to hold one carries the CRC-32C of its bytes, but the crc-mismatch case.",
+  "cases": [
+    {
+      "name": "No bytes.",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "The fixed header and three bytes, one short of the CRC-32C.",
+      "reason": "truncated",
+      "hex": "434c4c420100000001000000"
+    },
+    {
+      "name": "Magic XLLB.",
+      "reason": "bad-magic",
+      "hex": "584c4c42010000000100000104016b00000000006b1e55"
+    },
+    {
+      "name": "Version 2.",
+      "reason": "bad-version",
+      "hex": "434c4c42020000000100000104016b000000003de7485a"
+    },
+    {
+      "name": "A CRC-32C which does not match the bytes.",
+      "reason": "crc-mismatch",
+      "hex": "434c4c42010000000100000104016b000000003fe0dbf2"
+    },
+    {
+      "name": "Flags 0x81: the start flag and bit 7.",
+      "reason": "bad-flags",
+      "hex": "434c4c42010000008100000104016b0000000094e68615"
+    },
+    {
+      "name": "A segment offset of 0 in two bytes, 0x80 0x00, longer than its shortest form.",
+      "reason": "bad-varint",
+      "hex": "434c4c4201000000008000000104016b0000000080fd13d8"
+    },
+    {
+      "name": "A segment offset of 11 bytes, whose 10th byte carries past the u64.",
+      "reason": "bad-varint",
+      "hex": "434c4c420100000000ffffffffffffffffff7f000104016b000000008b168271"
+    },
+    {
+      "name": "A row count which reaches the CRC-32C unterminated: a header varint is bad-varint there.",
+      "reason": "bad-varint",
+      "hex": "434c4c420100000000010080e861ba9f"
+    },
+    {
+      "name": "The start flag with segment offset 1.",
+      "reason": "bad-segment-offset",
+      "hex": "434c4c42010000000101000104016b000000009b9b8d39"
+    },
+    {
+      "name": "No start flag, with segment offset 0.",
+      "reason": "bad-segment-offset",
+      "hex": "434c4c42010000000000000104016b00000000ff17aa65"
+    },
+    {
+      "name": "The start flag with ordinal base 1.",
+      "reason": "bad-ordinal-base",
+      "hex": "434c4c42010000000100010104016b000000007636e506"
+    },
+    {
+      "name": "No start flag and no rows: only a marker holds none.",
+      "reason": "no-rows",
+      "hex": "434c4c420100000000010000905a4c1d"
+    },
+    {
+      "name": "One counted row and no row bytes.",
+      "reason": "row-truncated",
+      "hex": "434c4c42010000000100000155e12397"
+    },
+    {
+      "name": "A defining row whose key runs one byte past the CRC-32C.",
+      "reason": "row-truncated",
+      "hex": "434c4c42010000000100000104026bd5fef8f6"
+    },
+    {
+      "name": "A referencing row whose ordinal reaches the CRC-32C unterminated: a row's varint is row-truncated there.",
+      "reason": "row-truncated",
+      "hex": "434c4c4201000000000101010080b39052f5"
+    },
+    {
+      "name": "A body whose length runs one byte past the CRC-32C.",
+      "reason": "row-truncated",
+      "hex": "434c4c42010000000100000104016b0000000200c94e51e9"
+    },
+    {
+      "name": "A row of kind 3.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c42010000000100000107016b000000006695de4a"
+    },
+    {
+      "name": "A row with bit 3 set.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c4201000000010000010c016b000000006d1df6bc"
+    },
+    {
+      "name": "A body length of 0 in two bytes, longer than its shortest form.",
+      "reason": "bad-varint",
+      "hex": "434c4c42010000000100000104016b0000008000de84d735"
+    },
+    {
+      "name": "A defining row with an empty key.",
+      "reason": "empty-key",
+      "hex": "434c4c4201000000010000010400000000005dea2a36"
+    },
+    {
+      "name": "A defining row whose key length is 65,536.",
+      "reason": "key-too-long",
+      "hex": "434c4c4201000000010000010480800400000000000000009a0623ce"
+    },
+    {
+      "name": "A version base of 33 bytes.",
+      "reason": "base-too-long",
+      "hex": "434c4c42010000000100000104016b21000000000000000000000000000000000000000000000000000000000000000000000000b2c2e929"
+    },
+    {
+      "name": "A token of 33 bytes.",
+      "reason": "token-too-long",
+      "hex": "434c4c42010000000100000104016b000021000000000000000000000000000000000000000000000000000000000000000000009896a65c"
+    },
+    {
+      "name": "A batch which starts a segment and references ordinal 0 before defining any key.",
+      "reason": "forward-ordinal",
+      "hex": "434c4c42010000000100000100000078522cb7"
+    },
+    {
+      "name": "Ordinal base 2 and a reference to ordinal 2, which no row before it defined.",
+      "reason": "forward-ordinal",
+      "hex": "434c4c4201000000000102010002001ffa7867"
+    },
+    {
+      "name": "A byte between the last counted row and the CRC-32C.",
+      "reason": "trailing-bytes",
+      "hex": "434c4c42010000000100000104016b0000000000277e14ce"
+    },
+    {
+      "name": "Flags 0x02, without the start flag, and segment offset 0, which breaks bad-segment-offset too: bad-flags comes first.",
+      "reason": "bad-flags",
+      "hex": "434c4c42010000000200000104016b000000008c8ea54e"
+    },
+    {
+      "name": "No rows without the start flag, and trailing bytes: no-rows comes first.",
+      "reason": "no-rows",
+      "hex": "434c4c420100000000010000001ce3c8c0"
+    },
+    {
+      "name": "A row of kind 3 with an empty key: bad-row-flags comes first.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c42010000000100000107000000000087219602"
+    }
+  ]
+}

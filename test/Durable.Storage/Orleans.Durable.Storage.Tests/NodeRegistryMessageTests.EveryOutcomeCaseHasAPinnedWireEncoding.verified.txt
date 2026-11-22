@@ -1,0 +1,79 @@
+﻿[
+  {
+    Case: Registered,
+    Surrogate: {
+      Case: 1,
+      Revision: 7,
+      HasEntry: false
+    },
+    Wire: 200003010f010121402100000000000000000000000000000000e00101c101e0
+  },
+  {
+    Case: Stale,
+    Surrogate: {
+      Case: 2,
+      HasEntry: false
+    },
+    Wire: 2000050101010121402100000000000000000000000000000000e00101c101e0
+  },
+  {
+    Case: WrongArchiveStore,
+    Surrogate: {
+      Case: 3,
+      HasEntry: false
+    },
+    Wire: 2000070101010121402100000000000000000000000000000000e00101c101e0
+  },
+  {
+    Case: WrongObjectLedgerStore,
+    Surrogate: {
+      Case: 6,
+      HasEntry: false
+    },
+    Wire: 20000d0101010121402100000000000000000000000000000000e00101c101e0
+  },
+  {
+    Case: Refused,
+    Surrogate: {
+      Case: 4,
+      HasEntry: false
+    },
+    Wire: 2000090101010121402100000000000000000000000000000000e00101c101e0
+  },
+  {
+    Case: OrdinalOccupied,
+    Surrogate: {
+      Case: 5,
+      Occupant: {
+        Value: Guid_1
+      },
+      HasEntry: false
+    },
+    Wire: 20000b0101010121402167452301ab89ef4d8000000000000009e00101c101e0
+  },
+  {
+    Case: OrdinalOccupied,
+    Surrogate: {
+      Case: 5,
+      Ordinal: 3,
+      Occupant: {
+        Value: Guid_1
+      },
+      HasEntry: true,
+      EntryOrdinal: 0
+    },
+    Wire: 20000b0101010d21402167452301ab89ef4d8000000000000009e001030101e0
+  },
+  {
+    Case: OrdinalOccupied,
+    Surrogate: {
+      Case: 5,
+      Ordinal: 3,
+      Occupant: {
+        Value: Guid_1
+      },
+      HasEntry: true
+    },
+    Wire: 20000b0101010d21402167452301ab89ef4d8000000000000009e00103c101e0
+  }
+]

@@ -1,0 +1,124 @@
+{
+  "description": "WriteAheadLog data pages a reader does not accept, each named by the first rule it breaks in check order (wal.md §7); a case breaking two adjacent rules pins their order. outcome is invalid (the page CRC fails) or ill-formed (a valid page which breaks the frame rules and is not a hole page).",
+  "cases": [
+    {
+      "name": "A payload byte flipped after the CRC was computed.",
+      "reason": "crc-mismatch",
+      "outcome": "invalid",
+      "pageSize": 512,
+      "hex": "528509a205000040020810171e"
+    },
+    {
+      "name": "An all-zero page.",
+      "reason": "zero-page",
+      "outcome": "invalid",
+      "pageSize": 512,
+      "hex": ""
+    },
+    {
+      "name": "A Full frame of 505 bytes overruns the page.",
+      "reason": "frame-overrun",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "afaef257f901004001080f161d242b323940"
+    },
+    {
+      "name": "A First frame which ends before the page does.",
+      "reason": "first-not-filling",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "0c0e067764000080e80300000000000001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6"
+    },
+    {
+      "name": "An empty First frame filling the page\u0027s last 12 bytes.",
+      "reason": "first-empty",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "339168a4ec01004001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e0000008005"
+    },
+    {
+      "name": "A First frame whose total equals its fragment.",
+      "reason": "first-total-not-above-fragment",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "6c1fd509f0010080f00100000000000001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a"
+    },
+    {
+      "name": "A First frame whose total is 2^31.",
+      "reason": "first-total-out-of-range",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "9755b0fff0010080000000800000000001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a"
+    },
+    {
+      "name": "An empty Continuation.",
+      "reason": "continuation-empty",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "863ab7b5000000c0"
+    },
+    {
+      "name": "A Continuation longer than P - 8.",
+      "reason": "continuation-overlong",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "29b34d39f90100c001080f161d242b323940"
+    },
+    {
+      "name": "A Continuation after a Full frame.",
+      "reason": "continuation-not-leading",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "f0bfe1080400004001080f16040000c002091017"
+    },
+    {
+      "name": "A non-zero byte after the End word.",
+      "reason": "nonzero-after-end",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "7f9db8f30400004001080f16000000000000000001"
+    },
+    {
+      "name": "A word of kind End with a non-zero length below P - 8.",
+      "reason": "end-with-length",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "b8f6fead05"
+    },
+    {
+      "name": "A hole word followed by a non-zero byte.",
+      "reason": "hole-not-zero",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "bf0ab3c8f8010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "name": "An empty Continuation written after the CRC was computed: named by crc-mismatch, which precedes continuation-empty.",
+      "reason": "crc-mismatch",
+      "outcome": "invalid",
+      "pageSize": 512,
+      "hex": "c3a957ec000000c0"
+    },
+    {
+      "name": "An empty Continuation followed by a Full frame of 505 bytes, which overruns the page: named by continuation-empty, which precedes the rules of the frames after it.",
+      "reason": "continuation-empty",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "5e5104c2000000c0f901004001080f161d242b32"
+    },
+    {
+      "name": "An empty First frame at offset P - 8, whose 12-byte header overruns the page: named by first-empty, which precedes frame-overrun.",
+      "reason": "first-empty",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "2edcaf57f001004001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a00000080"
+    },
+    {
+      "name": "A First frame which ends before the page does, whose total equals its fragment: named by first-not-filling, which precedes first-total-not-above-fragment.",
+      "reason": "first-not-filling",
+      "outcome": "ill-formed",
+      "pageSize": 512,
+      "hex": "2598a61264000080640000000000000001080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The oracle framework of docs/spec/verification.md §6.1, shared by the fuzz targets of every layer: each target
+    library references this project and the assembly of its own layer only, and uses its layer's types alone.
+  -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.Fuzz</RootNamespace>
+  </PropertyGroup>
+</Project>

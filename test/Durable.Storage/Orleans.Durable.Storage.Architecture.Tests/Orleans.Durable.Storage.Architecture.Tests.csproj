@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    NamespaceTests reads the metadata of every production assembly, so this project references every project under
+    src. The wildcard keeps a new production project in scope without editing this file. SimulationClosureTests reads
+    what each simulation project's build rewrites, LayeringTests reads each fuzz target assembly's references, and the
+    real-disk check reads the WAL tests' recording file system, so this project references each of those, without its
+    assembly, to build it first.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\*\*.csproj" />
+    <!-- A simulation project builds in its simulation configuration (docs/spec/build-packaging.md §1). -->
+    <ProjectReference Include="..\Orleans.Durable.Storage.Simulation.Conformance.Tests\Orleans.Durable.Storage.Simulation.Conformance.Tests.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      SetConfiguration="Configuration=Simulation$(Configuration)" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Simulation.Tests\Orleans.Durable.Storage.Simulation.Tests.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      SetConfiguration="Configuration=Simulation$(Configuration)" />
+    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz.*\Orleans.Durable.Storage.Fuzz.*.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine.Wal.Tests\Orleans.Durable.Storage.Engine.Wal.Tests.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <!-- LocalStorageFailureTests reads the syntax of the storage projects' sources. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <!-- ValidatorTests runs the SDK's CA1806 over a canary compilation, so it records where the SDK's analyzers lie. -->
+  <Target Name="RecordNetAnalyzers" BeforeTargets="CoreGenerateAssemblyInfo">
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'%(Analyzer.Filename)' == 'Microsoft.CodeAnalysis.NetAnalyzers' or '%(Analyzer.Filename)' == 'Microsoft.CodeAnalysis.CSharp.NetAnalyzers'">
+        <_Parameter1>NetAnalyzer</_Parameter1>
+        <_Parameter2>%(Analyzer.FullPath)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+</Project>

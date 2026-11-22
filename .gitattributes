@@ -28,3 +28,6 @@
 src/Dashboard/Orleans.Dashboard.App/** text=auto eol=lf
 # Generated assets keep their exact bytes, including whitespace in minified code and upstream notices.
 src/Dashboard/Orleans.Dashboard.App/dist/** -text -whitespace linguist-generated=true
+
+# Durable Storage sources keep LF line endings, as in their source repository (test/Durable.Storage/.gitattributes).
+src/**/Orleans.Durable.Storage*/** text eol=lf

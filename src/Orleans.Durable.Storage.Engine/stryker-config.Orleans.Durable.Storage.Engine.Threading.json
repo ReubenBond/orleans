@@ -1,0 +1,18 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Threading.Tests/Orleans.Durable.Storage.Engine.Threading.Tests.csproj"
+    ],
+    "mutate": [
+      "Threading/**/*.cs"
+    ],
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "description": "LedgerStore WAL records which are damage, each named by the first rule it breaks in check order (ledgerstore.md §7.3): a record shorter than its key, a slot record with an empty value, or a slot record of a handle at or above the catalog's next handle, is damage which preserved the page CRC; a store record which breaks a rule of its format is a damaged create, drop, or seal, and a case breaking two adjacent store-record rules pins their order.",
+  "cases": [
+    {
+      "name": "A record of 7 bytes, shorter than its key.",
+      "reason": "record-truncated",
+      "nextHandle": 1,
+      "hex": "00000000000000"
+    },
+    {
+      "name": "Handle 5 when the catalog's next handle is 5.",
+      "reason": "handle-not-allocated",
+      "nextHandle": 5,
+      "hex": "000000000005000001"
+    },
+    {
+      "name": "An empty value at handle 1, slot 7: a slot record holds DATA.",
+      "reason": "empty-slot-record",
+      "nextHandle": 2,
+      "hex": "0700000000010000"
+    },
+    {
+      "name": "A store record of kind 4.",
+      "reason": "store-kind-unknown",
+      "nextHandle": 0,
+      "hex": "0400000000ffffff070000000000000000000000"
+    },
+    {
+      "name": "A create whose body is 17 bytes.",
+      "reason": "create-body-length",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0700000000000000000000000400000000"
+    },
+    {
+      "name": "A create with an empty body.",
+      "reason": "create-body-length",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff"
+    },
+    {
+      "name": "A drop whose body is 12 bytes.",
+      "reason": "drop-body-length",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff070000000000000006000000"
+    },
+    {
+      "name": "A drop with an empty body.",
+      "reason": "drop-body-length",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff"
+    },
+    {
+      "name": "A seal whose body is 8 bytes.",
+      "reason": "seal-body-length",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff0700000000000000"
+    },
+    {
+      "name": "A seal with an empty body.",
+      "reason": "seal-body-length",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff"
+    },
+    {
+      "name": "A create of ledger 0.",
+      "reason": "zero-ledger",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0700000000000000000000000400000000000000000000000100000004000000"
+    },
+    {
+      "name": "A drop of ledger 0.",
+      "reason": "zero-ledger",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff0000000000000000"
+    },
+    {
+      "name": "A seal of ledger 0.",
+      "reason": "zero-ledger",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff000000000000000000000000"
+    },
+    {
+      "name": "A create taking the store handle, 2^24 - 1.",
+      "reason": "handle-out-of-range",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0700000000000000ffffff0004000000"
+    },
+    {
+      "name": "A seal of the store handle, 2^24 - 1.",
+      "reason": "handle-out-of-range",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff0700000000000000ffffff00"
+    },
+    {
+      "name": "A create of window 0.",
+      "reason": "window-out-of-range",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff07000000000000000000000000000000"
+    },
+    {
+      "name": "A create of window 2^31, above 2^31 - 1.",
+      "reason": "window-out-of-range",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff07000000000000000000000000000080"
+    },
+    {
+      "name": "A store record of kind 4 with an empty body, a length no kind takes: named by store-kind-unknown, which precedes the body-length rules.",
+      "reason": "store-kind-unknown",
+      "nextHandle": 0,
+      "hex": "0400000000ffffff"
+    },
+    {
+      "name": "A create whose body is 17 bytes, of ledger 0: named by create-body-length, which precedes zero-ledger.",
+      "reason": "create-body-length",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0000000000000000000000000400000000"
+    },
+    {
+      "name": "A drop whose body is 12 bytes, of ledger 0: named by drop-body-length, which precedes zero-ledger.",
+      "reason": "drop-body-length",
+      "nextHandle": 0,
+      "hex": "0200000000ffffff000000000000000006000000"
+    },
+    {
+      "name": "A seal whose body is 8 bytes, of ledger 0: named by seal-body-length, which precedes zero-ledger.",
+      "reason": "seal-body-length",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff0000000000000000"
+    },
+    {
+      "name": "A create of ledger 0 taking the store handle, 2^24 - 1: named by zero-ledger, which precedes handle-out-of-range.",
+      "reason": "zero-ledger",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0000000000000000ffffff0004000000"
+    },
+    {
+      "name": "A seal of ledger 0 and the store handle, 2^24 - 1: named by zero-ledger, which precedes handle-out-of-range.",
+      "reason": "zero-ledger",
+      "nextHandle": 0,
+      "hex": "0300000000ffffff0000000000000000ffffff00"
+    },
+    {
+      "name": "A create taking the store handle, 2^24 - 1, with window 0: named by handle-out-of-range, which precedes window-out-of-range.",
+      "reason": "handle-out-of-range",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0700000000000000ffffff0000000000"
+    },
+    {
+      "name": "A create whose first pair has window 0 and whose second has ledger 0: named by the first pair's window-out-of-range, which precedes the second pair's zero-ledger.",
+      "reason": "window-out-of-range",
+      "nextHandle": 0,
+      "hex": "0100000000ffffff0700000000000000000000000000000000000000000000000100000004000000"
+    }
+  ]
+}

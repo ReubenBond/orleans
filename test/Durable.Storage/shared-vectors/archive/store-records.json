@@ -1,0 +1,79 @@
+{
+  "cases": [
+    {
+      "name": "layout only",
+      "layout": "lsm",
+      "fields": {},
+      "parameters": {},
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d6c736d",
+      "id": "00000000000000000123456789abcdef"
+    },
+    {
+      "name": "store fields and caller parameters",
+      "layout": "memory-store",
+      "fields": {
+        "max-append-bytes": "16",
+        "max-appends": "4",
+        "replace-request-appends": "3"
+      },
+      "parameters": {
+        "format": "json"
+      },
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d6d656d6f72792d73746f72650a6d61782d617070656e642d62797465733d31360a6d61782d617070656e64733d340a7265706c6163652d726571756573742d617070656e64733d330a63616c6c65722e666f726d61743d6a736f6e",
+      "id": "00000000000000000123456789abcdef"
+    },
+    {
+      "name": "a caller parameter named as a store field",
+      "layout": "memory",
+      "fields": {},
+      "parameters": {
+        "id": "y",
+        "layout": "x"
+      },
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d6d656d6f72790a63616c6c65722e69643d790a63616c6c65722e6c61796f75743d78",
+      "id": "00000000000000000123456789abcdef"
+    },
+    {
+      "name": "an empty value and a non-ASCII one",
+      "layout": "chunks",
+      "fields": {
+        "zone": ""
+      },
+      "parameters": {
+        "region": "são-paulo"
+      },
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d6368756e6b730a7a6f6e653d0a63616c6c65722e726567696f6e3d73c3a36f2d7061756c6f",
+      "id": "00000000000000000123456789abcdef"
+    },
+    {
+      "name": "archive logs on Azure",
+      "layout": "azure-append-blob",
+      "fields": {
+        "max-append-bytes": "104857600",
+        "max-units": "49900",
+        "name-rule": "azure-blob-2",
+        "name-scheme": "hex-1",
+        "replace-request-units": "40000"
+      },
+      "parameters": {
+        "format": "json"
+      },
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d617a7572652d617070656e642d626c6f620a6d61782d617070656e642d62797465733d3130343835373630300a6d61782d756e6974733d34393930300a6e616d652d72756c653d617a7572652d626c6f622d320a6e616d652d736368656d653d6865782d310a7265706c6163652d726571756573742d756e6974733d34303030300a63616c6c65722e666f726d61743d6a736f6e",
+      "id": "00000000000000000123456789abcdef"
+    },
+    {
+      "name": "archive logs' memory store",
+      "layout": "memory",
+      "fields": {
+        "max-append-bytes": "104857600",
+        "max-units": "49900",
+        "name-rule": "any",
+        "name-scheme": "hex-1",
+        "replace-request-units": "40000"
+      },
+      "parameters": {},
+      "hex": "69643d30303030303030303030303030303030303132333435363738396162636465660a6c61796f75743d6d656d6f72790a6d61782d617070656e642d62797465733d3130343835373630300a6d61782d756e6974733d34393930300a6e616d652d72756c653d616e790a6e616d652d736368656d653d6865782d310a7265706c6163652d726571756573742d756e6974733d3430303030",
+      "id": "00000000000000000123456789abcdef"
+    }
+  ]
+}

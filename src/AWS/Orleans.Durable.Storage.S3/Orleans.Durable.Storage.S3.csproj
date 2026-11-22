@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Amazon's providers: S3 object stores and DynamoDB conditional registers. -->
+  <PropertyGroup>
+    <RootNamespace>Orleans.Durable.Storage.S3</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.DynamoDBv2" />
+    <PackageReference Include="AWSSDK.S3" />
+  </ItemGroup>
+</Project>

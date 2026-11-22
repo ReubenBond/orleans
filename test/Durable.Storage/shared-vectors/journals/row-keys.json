@@ -1,0 +1,33 @@
+{
+  "description": "Journal keys and their row keys (journals.md §4.1): xxhash32 of the key's UTF-8, seed 0, as 4 big-endian bytes, then the UTF-8.",
+  "cases": [
+    {
+      "key": "a",
+      "hex": "550d745661"
+    },
+    {
+      "key": "orders/42",
+      "hex": "19f68fb16f72646572732f3432"
+    },
+    {
+      "key": "Grain/user-7f3a",
+      "hex": "ec9f3f37477261696e2f757365722d37663361"
+    },
+    {
+      "key": "naïve café",
+      "hex": "ca2ce9766e61c3af766520636166c3a9"
+    },
+    {
+      "key": "日本語のキー",
+      "hex": "8893a6e8e697a5e69cace8aa9ee381aee382ade383bc"
+    },
+    {
+      "key": "😀 emoji",
+      "hex": "031ccc50f09f988020656d6f6a69"
+    },
+    {
+      "key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hex": "f621610278787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+    }
+  ]
+}

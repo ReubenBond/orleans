@@ -1,0 +1,21 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.GroupCommit.Tests/Orleans.Durable.Storage.Engine.GroupCommit.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Engine.Ledgers.Tests/Orleans.Durable.Storage.Engine.Ledgers.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests/Orleans.Durable.Storage.Engine.Archive.Lsm.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Tests/Orleans.Durable.Storage.Tests.csproj"
+    ],
+    "mutate": [
+      "GroupCommit/**/*.cs"
+    ],
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

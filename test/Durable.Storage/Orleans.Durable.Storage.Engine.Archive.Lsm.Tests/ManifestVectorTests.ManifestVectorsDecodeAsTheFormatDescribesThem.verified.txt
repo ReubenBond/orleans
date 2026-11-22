@@ -1,0 +1,20 @@
+The first manifest a replace writes: epoch 1, DrainedBelow 1, no watermarks and no sections.
+  epoch 1, DrainedBelow 1
+A drain of ledger 3 to slot 812 into one section over the whole keyspace, and ledger 5 complete above it.
+  epoch 7, DrainedBelow 3
+  ledger 3: watermark 812
+  ledger 5: watermark 40, complete
+  section d/3/0/0123456789abcdef0123456789abcdef [0, +4096), partition /0, tags (3, 0, 0) to (3, 811, 2), tail [4096, +128)
+Sections in order of object, then offset: two of one drain output at partitions of depths 1 and 9, and a compaction output at depth 16.
+  epoch 42, DrainedBelow 9
+  ledger 9: watermark 1
+  ledger 10: watermark 300
+  ledger 12: watermark 0, complete
+  section c/1/fedcba9876543210fedcba9876543210 [0, +9000), partition 1010010111000011/16, tags (2, 5, 0) to (9, 0, 4), tail [9000, +256)
+  section d/9/0/0123456789abcdef0123456789abcdef [0, +2048), partition 1/1, tags (9, 0, 0) to (9, 0, 9), tail [6144, +96)
+  section d/9/0/0123456789abcdef0123456789abcdef [2048, +4096), partition 110000011/9, tags (9, 0, 1) to (9, 0, 1), tail [6144, +96)
+The largest values: every u64 field at its bound, slots at 2^63 - 2 in tags and 2^63 - 1 as a watermark, and byte ranges which end at 2^63 - 1.
+  epoch 18446744073709551615, DrainedBelow 18446744073709551614
+  ledger 18446744073709551614: watermark 9223372036854775807
+  ledger 18446744073709551615: watermark 1, complete
+  section d/x [9223372036854775806, +1), partition /0, tags (18446744073709551615, 9223372036854775806, 2147483647) to (18446744073709551615, 9223372036854775806, 2147483647), tail [9223372036854775802, +5)

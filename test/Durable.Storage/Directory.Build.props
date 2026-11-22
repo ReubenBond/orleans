@@ -1,0 +1,57 @@
+<Project>
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <!--
+    eng/validate.ps1 ends a test session which runs past ClogTestSessionTimeout; a project whose tests need longer sets its
+    own. A project which sets ClogDebugLeg to true in its project file joins the Debug leg (just test-debug), which builds it
+    in Debug so that the debug assertions of the code it tests run (docs/spec/verification.md §12).
+  -->
+  <PropertyGroup>
+    <ClogTestSessionTimeout>12m</ClogTestSessionTimeout>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.MTP" />
+    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
+    <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Every test run captures crash, hang, and failure evidence and seeded-simulation histories; see
+    docs/spec/verification.md. testconfig.json enables the crash and hang dump extensions for every
+    run of a test application, however it is launched. Microsoft.Diagnostics.NETCore.Client writes failure dumps; the
+    test output logger implements the Microsoft.Extensions.Logging abstractions, which the shared framework supplies.
+
+    A mutation build (ClogMutationTesting, set by eng/mutation.ps1) leaves testconfig.json out. The dump extensions
+    run the test host beneath a controller process which opens a second server connection, and Stryker.NET's runner
+    serves exactly one connection per test application; under mutation, failing and crashing tests are the expected
+    outcome, which Stryker records as killed mutants.
+  -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)testconfig.json"
+          Condition="'$(ClogMutationTesting)' != 'true'"
+          Link="testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Visible="false" />
+    <Compile Include="$(MSBuildThisFileDirectory)shared\Diagnostics\*.cs" LinkBase="Diagnostics" Visible="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\src\Orleans.Durable.Storage.Diagnostics\Orleans.Durable.Storage.Diagnostics.csproj" />
+    <TestingPlatformBuilderHook Include="25649D24-9BDF-4B33-8887-250631F048E6">
+      <DisplayName>Clog test diagnostics</DisplayName>
+      <TypeFullName>Orleans.Durable.Storage.Testing.TestDiagnosticsBuilderHook</TypeFullName>
+    </TestingPlatformBuilderHook>
+  </ItemGroup>
+</Project>

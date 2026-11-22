@@ -1,0 +1,132 @@
+{
+  "description": "Batches at consecutive slots from slot which a segment decoder rejects: batch is the index of the first batch which breaks a rule, batch rules before segment rules, and reason the rule's reason code.",
+  "cases": [
+    {
+      "name": "The first batch decoded does not start a segment.",
+      "slot": "0",
+      "batches": [
+        "434c4c4201000000000100010401610000000261304143fed5"
+      ],
+      "batch": 0,
+      "reason": "segment-offset-mismatch"
+    },
+    {
+      "name": "A batch at slot 2 with segment offset 1, whose segment starts at slot 0.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c420100000000010101000000057a0e08",
+        "434c4c420100000000010101000000057a0e08"
+      ],
+      "batch": 2,
+      "reason": "segment-offset-mismatch"
+    },
+    {
+      "name": "A segment offset greater than its slot.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c420100000000050101000000724dfbba"
+      ],
+      "batch": 1,
+      "reason": "segment-offset-mismatch"
+    },
+    {
+      "name": "An ordinal base of 2 after a segment which defined one key.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c4201000000000102010401620000000006d21bbe"
+      ],
+      "batch": 1,
+      "reason": "ordinal-base-mismatch"
+    },
+    {
+      "name": "A key defined twice in one batch.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000204016100000002613004016100000005616761696ec7b7941d"
+      ],
+      "batch": 0,
+      "reason": "duplicate-key"
+    },
+    {
+      "name": "A key defined again in a later batch of its segment.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c42010000000001010104016100000005616761696e034bde5f"
+      ],
+      "batch": 1,
+      "reason": "duplicate-key"
+    },
+    {
+      "name": "A defining row whose stored count is the u64 maximum.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016b00ffffffffffffffffff0100004d620dcf"
+      ],
+      "batch": 0,
+      "reason": "count-overflow"
+    },
+    {
+      "name": "A reference which would advance its key's count past the u64 maximum.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016b00feffffffffffffffff0100007db67cfe",
+        "434c4c420100000000010101000000057a0e08"
+      ],
+      "batch": 1,
+      "reason": "count-overflow"
+    },
+    {
+      "name": "A segment rule broken in batch 1 beside a batch rule in batch 2: the earlier batch's segment rule comes first.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c4201000000000100010401620000000067088a53",
+        "434c4c420100000000020101000000dfb1b23d"
+      ],
+      "batch": 1,
+      "reason": "ordinal-base-mismatch"
+    },
+    {
+      "name": "A batch which breaks a batch rule and a segment rule: the batch rule comes first.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c4201000000000705010700006837c2f5"
+      ],
+      "batch": 1,
+      "reason": "bad-row-flags"
+    },
+    {
+      "name": "A duplicate key before a count overflow in one batch: rows are checked in order.",
+      "slot": "0",
+      "batches": [
+        "434c4c4201000000010000030401610000000261300401610000000004016b00ffffffffffffffffff010000f874123f"
+      ],
+      "batch": 0,
+      "reason": "duplicate-key"
+    },
+    {
+      "name": "A batch whose segment offset and ordinal base are both wrong: the offset comes first.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000104016100000002613014af5dd4",
+        "434c4c4201000000000305010000007664c733"
+      ],
+      "batch": 1,
+      "reason": "segment-offset-mismatch"
+    },
+    {
+      "name": "A row which defines a key again with a count at the u64 maximum: the duplicate comes first.",
+      "slot": "0",
+      "batches": [
+        "434c4c42010000000100000204016100000002613004016100ffffffffffffffffff0100008b22f951"
+      ],
+      "batch": 0,
+      "reason": "duplicate-key"
+    }
+  ]
+}

@@ -1,0 +1,1800 @@
+{
+  "cases": [
+    {
+      "name": "a name twice",
+      "reason": "duplicate-name",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "format",
+          "json"
+        ]
+      ]
+    },
+    {
+      "name": "a name in two cases",
+      "reason": "duplicate-name",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "FORMAT",
+          "json"
+        ]
+      ]
+    },
+    {
+      "name": "a name twice and no generation: the duplicate first",
+      "reason": "duplicate-name",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "no format",
+      "reason": "bad-format",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "an empty format",
+      "reason": "bad-format",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          ""
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "no format and no key: the format first",
+      "reason": "bad-format",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "wal_generation",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "an empty checkpoint",
+      "reason": "bad-checkpoint",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          ""
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with no offset",
+      "reason": "bad-checkpoint_offset",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint offset of 1",
+      "reason": "bad-checkpoint_offset",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "1"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "an offset with no checkpoint",
+      "reason": "bad-checkpoint_offset",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "no generation",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "generation 0",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "0"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a generation with a leading zero",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "01"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "Orleans' own generation, a GUID",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "3f2504e04f8941d39a0c0305e82c3301"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a generation past 64 bits",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "18446744073709551616"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a signed generation",
+      "reason": "bad-wal_generation",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "+1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a tag of 19 digits",
+      "reason": "bad-durable-gen",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "0000000000000000001",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a tag of generation 0",
+      "reason": "bad-durable-gen",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "00000000000000000000",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a tag past 64 bits",
+      "reason": "bad-durable-gen",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "99999999999999999999",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "an unknown kind",
+      "reason": "bad-durable_kind",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "append"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a kind in capitals",
+      "reason": "bad-durable_kind",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "Replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a short tombstone",
+      "reason": "bad-durable_tomb",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "3"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000003"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "delete"
+        ],
+        [
+          "durable_tomb",
+          "0102"
+        ],
+        [
+          "durable_base_md5",
+          "f9471cde681cbfdb7c89b3ec3c6bc5fb"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "an upper-case tombstone",
+      "reason": "bad-durable_tomb",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "3"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000003"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "delete"
+        ],
+        [
+          "durable_tomb",
+          "0102030405060A08"
+        ],
+        [
+          "durable_base_md5",
+          "f9471cde681cbfdb7c89b3ec3c6bc5fb"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a short base MD5",
+      "reason": "bad-durable_base_md5",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "0102"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "an upper-case base MD5",
+      "reason": "bad-durable_base_md5",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94D43668918A674EBF8CDF2AE0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a base MD5 in Base64",
+      "reason": "bad-durable_base_md5",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "1B2M2Y8AsgTpgAmY7PhCfg=="
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a bad base MD5 and no key: the MD5 first",
+      "reason": "bad-durable_base_md5",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "0102"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "base rows of 0",
+      "reason": "bad-durable_base_rows",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "base rows with a leading zero",
+      "reason": "bad-durable_base_rows",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "01"
+        ]
+      ]
+    },
+    {
+      "name": "base rows of 2^35",
+      "reason": "bad-durable_base_rows",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "34359738368"
+        ]
+      ]
+    },
+    {
+      "name": "base rows in hexadecimal",
+      "reason": "bad-durable_base_rows",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "a"
+        ]
+      ]
+    },
+    {
+      "name": "bad base rows and no key: the rows first",
+      "reason": "bad-durable_base_rows",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "no key",
+      "reason": "bad-durable_key",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "an upper-case key",
+      "reason": "bad-durable_key",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "D80557DACBE088F2"
+        ]
+      ]
+    },
+    {
+      "name": "a key of 15 digits",
+      "reason": "bad-durable_key",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with no kind",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a kind with no checkpoint",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_kind",
+          "delete"
+        ]
+      ]
+    },
+    {
+      "name": "an opener with no base MD5",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a base MD5 with no opener",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_base_md5",
+          "d67533173f3b06378bb6b07174c18d71"
+        ]
+      ]
+    },
+    {
+      "name": "an opener with no base rows",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ]
+      ]
+    },
+    {
+      "name": "base rows with no opener",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "generation 2 with no opener",
+      "reason": "opener-missing",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "generation 2 with no opener, and a tombstone: the opener first",
+      "reason": "opener-missing",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_tomb",
+          "0000000000000007"
+        ]
+      ]
+    },
+    {
+      "name": "generation 2 with no opener, under the tag of 3: the opener first",
+      "reason": "opener-missing",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "00000000000000000003",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a tombstone on a Replace",
+      "reason": "tomb-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ],
+        [
+          "durable_tomb",
+          "0000000000000007"
+        ]
+      ]
+    },
+    {
+      "name": "a tombstone with no opener",
+      "reason": "tomb-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "durable_tomb",
+          "0000000000000007"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with no kind, and a tombstone: the kind first",
+      "reason": "kind-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ],
+        [
+          "durable_tomb",
+          "0000000000000007"
+        ]
+      ]
+    },
+    {
+      "name": "a tag of another generation",
+      "reason": "generation-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "00000000000000000003",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "another generation and another log: the generation first",
+      "reason": "generation-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": "00000000000000000003",
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-18/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint of another log",
+      "reason": "checkpoint-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-18/00000000000000000002"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint of another generation",
+      "reason": "checkpoint-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000001"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "Orleans' own checkpoint name",
+      "reason": "checkpoint-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/3f2504e04f8941d39a0c0305e82c3301"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint and a key of others: the checkpoint first",
+      "reason": "checkpoint-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "2"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f3"
+        ],
+        [
+          "checkpoint",
+          "checkpoints/journals/account-17/00000000000000000001"
+        ],
+        [
+          "checkpoint_offset",
+          "0"
+        ],
+        [
+          "durable_kind",
+          "replace"
+        ],
+        [
+          "durable_base_md5",
+          "94d43668918a674ebf8cdf2ae0668367"
+        ],
+        [
+          "durable_base_rows",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "another key's hash",
+      "reason": "key-mismatch",
+      "blob": "wal",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "wal_generation",
+          "1"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f3"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint of another key",
+      "reason": "key-mismatch",
+      "blob": "checkpoint",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f3"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with no format",
+      "reason": "bad-format",
+      "blob": "checkpoint",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with no key",
+      "reason": "bad-durable_key",
+      "blob": "checkpoint",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ]
+      ]
+    },
+    {
+      "name": "a checkpoint with a name twice",
+      "reason": "duplicate-name",
+      "blob": "checkpoint",
+      "log": "journals/account-17",
+      "keyHash": "d80557dacbe088f2",
+      "tag": null,
+      "metadata": [
+        [
+          "format",
+          "json"
+        ],
+        [
+          "durable_key",
+          "d80557dacbe088f2"
+        ],
+        [
+          "Durable_Key",
+          "d80557dacbe088f2"
+        ]
+      ]
+    }
+  ]
+}

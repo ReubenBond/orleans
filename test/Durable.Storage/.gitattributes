@@ -1,0 +1,14 @@
+# Durable Storage keeps its source repository's line endings: its tests read its sources, specification, and vectors
+# by line, and its PowerShell scripts use CRLF.
+*.cs text eol=lf
+*.csproj text eol=lf
+*.md text eol=lf
+*.props text eol=lf
+*.proto text eol=lf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+*.slnx text eol=lf
+*.targets text eol=lf
+
+# Decoder corpora keep their exact bytes.
+fuzz/corpus/** binary

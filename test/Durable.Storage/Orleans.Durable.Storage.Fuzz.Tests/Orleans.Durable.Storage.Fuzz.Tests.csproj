@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Corpus replay reaches the slot checkpoints' debug assertions, which the Debug leg runs (docs/spec/verification.md §12). -->
+  <PropertyGroup>
+    <ClogDebugLeg>true</ClogDebugLeg>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\fuzz\Orleans.Durable.Storage.Fuzz\Orleans.Durable.Storage.Fuzz.csproj" />
+  </ItemGroup>
+</Project>

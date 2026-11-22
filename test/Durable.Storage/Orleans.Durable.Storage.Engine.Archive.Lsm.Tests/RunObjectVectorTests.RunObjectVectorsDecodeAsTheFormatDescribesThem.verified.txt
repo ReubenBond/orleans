@@ -1,0 +1,75 @@
+﻿A drain of ledger 3 from slot 0: one section over the whole keyspace with one row, at the default settings.
+  drain of ledger 3 from 0; metadata at 33, trailer at 56, 185 bytes
+  section [0, +33), partition /0, tags (3, 0, 0) to (3, 0, 0), 1 rows, index at 33, filter at 49
+    blocks: [0, +33) from 01
+    filter: 10 hashes, aaaa
+    01 (3, 0, 0) Append, payload aa
+A drain of ledger 3 from slot 812 into partition 0011/4 in 64-byte blocks: a key whose rows span blocks, so the second block continues the first, a row longer than the block size in a block of its own, a Replace and a Delete, and empty payloads.
+  drain of ledger 3 from 812; metadata at 240, trailer at 287, 417 bytes
+  section [0, +240), partition 0011/4, tags (3, 812, 0) to (3, 900, 0), 5 rows, index at 240, filter at 276
+    blocks: [0, +63) from 3101, [63, +63) continuing from 3101, [126, +114) from 3fffff
+    filter: 10 hashes, 288af27ddfa2
+    3101 (3, 812, 0) Append, payload aa
+    3101 (3, 812, 1) Replace, payload 
+    3101 (3, 813, 0) Append, payload bbcc
+    32 (3, 812, 2) Delete, payload 
+    3fffff (3, 900, 0) Append, payload 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f
+A compaction output of two sections, the children 0/1 and 1/1 of the whole keyspace, from inputs of three objects, one with a name of 200 characters and one at offset 2^63 - 1, with one row per block (block size 1) and 1 bit per key; its rows span ledgers 9 and 10.
+  compaction of c/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@7, d/10/0/0123456789abcdef0123456789abcdef@0, d/10/0/0123456789abcdef0123456789abcdef@4096, d/9/0/fedcba9876543210fedcba9876543210@9223372036854775807; metadata at 167, trailer at 238, 793 bytes
+  section [0, +100), partition 0/1, tags (9, 4, 0) to (10, 1, 3), 3 rows, index at 167, filter at 200
+    blocks: [0, +33) from 10, [33, +33) continuing from 10, [66, +34) from 7f00
+    filter: 1 hashes, 60
+    10 (9, 4, 0) Replace, payload 01
+    10 (10, 0, 0) Append, payload 02
+    7f00 (10, 1, 3) Append, payload 03
+  section [100, +67), partition 1/1, tags (9, 4, 1) to (10, 2, 0), 2 rows, index at 206, filter at 232
+    blocks: [100, +32) from 80, [132, +35) from ffffff
+    filter: 1 hashes, 06
+    80 (9, 4, 1) Delete, payload 
+    ffffff (10, 2, 0) Replace, payload 04
+A drain of ledger 7 at 64 bits per key, the most a writer takes: 44 hashes per key.
+  drain of ledger 7 from 1; metadata at 154, trailer at 216, 345 bytes
+  section [0, +154), partition /0, tags (7, 1, 0) to (7, 5, 0), 5 rows, index at 154, filter at 171
+    blocks: [0, +154) from 0101
+    filter: 44 hashes, 0ee389cfe8b8e63ab88eba8cabb30fabd2cac9bc901bb8a98d9eea8aab88f0ceea289cd88a24ed86
+    0101 (7, 1, 0) Append, payload 01
+    0202 (7, 2, 0) Append, payload 02
+    0303 (7, 3, 0) Append, payload 03
+    0404 (7, 4, 0) Append, payload 04
+    0505 (7, 5, 0) Append, payload 05
+Two rows which fill a block of exactly 68 bytes, the block size, in one block.
+  drain of ledger 2 from 0; metadata at 68, trailer at 94, 223 bytes
+  section [0, +68), partition /0, tags (2, 0, 0) to (2, 1, 0), 2 rows, index at 68, filter at 85
+    blocks: [0, +68) from 4101
+    filter: 10 hashes, 399bb339
+    4101 (2, 0, 0) Append, payload 010101
+    4102 (2, 1, 0) Append, payload 020202
+The same two rows under a block size of 67, one byte short of both, in two blocks.
+  drain of ledger 2 from 0; metadata at 72, trailer at 107, 236 bytes
+  section [0, +72), partition /0, tags (2, 0, 0) to (2, 1, 0), 2 rows, index at 72, filter at 98
+    blocks: [0, +36) from 4101, [36, +36) from 4102
+    filter: 10 hashes, 399bb339
+    4101 (2, 0, 0) Append, payload 010101
+    4102 (2, 1, 0) Append, payload 020202
+The largest values: a key of 65,535 bytes in a partition of its full 524,280 bits, the key as its prefix; a tag of ledger 2^64 - 1, slot 2^63 - 2, and index 2^31 - 1; and a drain from that slot.
+  drain of ledger 18446744073709551615 from 9223372036854775806; metadata at 65567, trailer at 131124, 196788 bytes
+  section [0, +65567), partition 65535 bytes from ffffffffffffffff/524280, tags (18446744073709551615, 9223372036854775806, 2147483647) to (18446744073709551615, 9223372036854775806, 2147483647), 1 rows, index at 65567, filter at 131117
+    blocks: [0, +65567) from 65535 bytes from ffffffffffffffff
+    filter: 10 hashes, b36d
+    65535 bytes from ffffffffffffffff (18446744073709551615, 9223372036854775806, 2147483647) Delete, payload 00
+A filter recording 3 hashes at 14 bits per key, where the writer records 10: the decoder takes the recorded count.
+  drain of ledger 6 from 0; metadata at 88, trailer at 115, 244 bytes
+  section [0, +88), partition /0, tags (6, 1, 0) to (6, 3, 0), 3 rows, index at 88, filter at 104
+    blocks: [0, +88) from 01
+    filter: 3 hashes, a0a8000a00a0
+    01 (6, 1, 0) Append, payload 
+    02 (6, 2, 0) Append, payload 
+    03 (6, 3, 0) Append, payload 
+A filter recording 64 hashes, the most the format records, which no writer setting gives.
+  drain of ledger 6 from 0; metadata at 88, trailer at 133, 262 bytes
+  section [0, +88), partition /0, tags (6, 1, 0) to (6, 3, 0), 3 rows, index at 88, filter at 104
+    blocks: [0, +88) from 01
+    filter: 64 hashes, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    01 (6, 1, 0) Append, payload 
+    02 (6, 2, 0) Append, payload 
+    03 (6, 3, 0) Append, payload 

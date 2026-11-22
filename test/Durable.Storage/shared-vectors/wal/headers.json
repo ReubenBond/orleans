@@ -1,0 +1,29 @@
+{
+  "description": "WriteAheadLog header pages, version 1: each page\u0027s fields and its bytes. hex is the page through its last non-zero byte; the page continues with zero bytes to pageSize.",
+  "cases": [
+    {
+      "name": "minimum",
+      "description": "The smallest page and window, not the first file of its open.",
+      "pageSize": 512,
+      "writeWindowPages": 1,
+      "firstOfOpen": false,
+      "hex": "5596dd01434c464c010000000002000001"
+    },
+    {
+      "name": "spec-example",
+      "description": "P = 4096, W = 256, the first file of its open (wal.md \u00A77).",
+      "pageSize": 4096,
+      "writeWindowPages": 256,
+      "firstOfOpen": true,
+      "hex": "615279b5434c464c01000000001000000001000001"
+    },
+    {
+      "name": "maximum",
+      "description": "The largest page and window.",
+      "pageSize": 65536,
+      "writeWindowPages": 2147483647,
+      "firstOfOpen": true,
+      "hex": "154240d4434c464c0100000000000100ffffff7f01"
+    }
+  ]
+}

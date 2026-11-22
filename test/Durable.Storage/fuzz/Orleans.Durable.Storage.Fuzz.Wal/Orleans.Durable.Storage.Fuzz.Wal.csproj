@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The fuzz targets of the WAL's formats (docs/spec/verification.md §6.1). They reference the Engine and use the WAL's types
+    alone, so the WAL's tests replay their corpora at the WAL's layer.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Durable.Storage.Fuzz.Abstractions\Orleans.Durable.Storage.Fuzz.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" />
+  </ItemGroup>
+</Project>

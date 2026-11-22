@@ -1,0 +1,70 @@
+A body missing its last byte, under a header which matches it.
+  truncated: The LedgerStore catalog checkpoint ends inside its header or a field.
+Magic XLSC.
+  bad-magic: The LedgerStore catalog checkpoint has an invalid magic value.
+Version 2.
+  bad-version: The LedgerStore catalog checkpoint has an unsupported version.
+A body length one more than the body.
+  length-mismatch: The LedgerStore catalog checkpoint's body length does not match its header.
+A body byte flipped after the CRC was computed.
+  crc-mismatch: The LedgerStore catalog checkpoint fails its CRC-32C.
+A cut in WAL file 0, which no WAL holds.
+  zero-cut-file: The LedgerStore catalog checkpoint's cut lies in file 0, which no WAL holds.
+A cut other than the one its file name gives.
+  cut-mismatch: The LedgerStore catalog checkpoint's cut differs from the cut its name gives.
+Next handle 2^24, beyond the handle space.
+  next-handle-out-of-range: The LedgerStore catalog checkpoint's next handle exceeds the handle space.
+A replica count larger than the remaining bytes.
+  count-overflow: The LedgerStore catalog checkpoint holds a count above its remaining bytes.
+Handle 1 twice.
+  handle-order: The LedgerStore catalog checkpoint's replicas are not in ascending handle order.
+Handle 5 at next handle 5.
+  handle-not-below-next: The LedgerStore catalog checkpoint holds a handle at or above its next handle.
+A replica of window 0.
+  window-out-of-range: The LedgerStore catalog checkpoint holds a replica whose window is 0 or above 2^31 - 1.
+A replica whose first file is 0.
+  zero-first-file: The LedgerStore catalog checkpoint holds a replica whose first file is 0.
+A replica whose first file, 10, lies above the cut's file, 9.
+  first-file-above-cut: The LedgerStore catalog checkpoint holds a replica whose first file lies above its cut's file.
+A replica of ledger 0.
+  zero-ledger: The LedgerStore catalog checkpoint holds a replica or a tombstone of ledger 0.
+Ledger 2 listed twice.
+  duplicate-ledger: The LedgerStore catalog checkpoint lists a ledger twice.
+Tombstones 11 and 6, out of ascending order.
+  tombstone-order: The LedgerStore catalog checkpoint's tombstones are not in ascending order.
+The tombstone of ledger 9, which a live replica has.
+  tombstone-live: The LedgerStore catalog checkpoint holds a tombstone of a ledger it lists.
+A trailing zero byte.
+  trailing-bytes: The LedgerStore catalog checkpoint has trailing bytes.
+A 15-byte header with magic XLSC: named by truncated, which precedes bad-magic.
+  truncated: The LedgerStore catalog checkpoint ends inside its header or a field.
+Magic XLSC with version 2: named by bad-magic, which precedes bad-version.
+  bad-magic: The LedgerStore catalog checkpoint has an invalid magic value.
+Version 2 with a body length one more than the body: named by bad-version, which precedes length-mismatch.
+  bad-version: The LedgerStore catalog checkpoint has an unsupported version.
+A body length one more than the body, whose last byte is flipped after the CRC was computed: named by length-mismatch, which precedes crc-mismatch.
+  length-mismatch: The LedgerStore catalog checkpoint's body length does not match its header.
+A cut in WAL file 0 under the CRC of a cut in file 9: named by crc-mismatch, which precedes zero-cut-file.
+  crc-mismatch: The LedgerStore catalog checkpoint fails its CRC-32C.
+A cut in WAL file 0 under a name giving file 9: named by zero-cut-file, which precedes cut-mismatch.
+  zero-cut-file: The LedgerStore catalog checkpoint's cut lies in file 0, which no WAL holds.
+Next handle 2^24 under a name giving another cut: named by cut-mismatch, which precedes next-handle-out-of-range.
+  cut-mismatch: The LedgerStore catalog checkpoint's cut differs from the cut its name gives.
+Next handle 2^24 with a replica count larger than the remaining bytes: named by next-handle-out-of-range, which precedes count-overflow.
+  next-handle-out-of-range: The LedgerStore catalog checkpoint's next handle exceeds the handle space.
+A replica count larger than the remaining bytes, over replicas listing handle 1 twice: named by count-overflow, which precedes handle-order.
+  count-overflow: The LedgerStore catalog checkpoint holds a count above its remaining bytes.
+Handle 5 at next handle 5 with window 0: named by handle-not-below-next, which precedes window-out-of-range.
+  handle-not-below-next: The LedgerStore catalog checkpoint holds a handle at or above its next handle.
+A replica of window 0 whose first file is 0: named by window-out-of-range, which precedes zero-first-file.
+  window-out-of-range: The LedgerStore catalog checkpoint holds a replica whose window is 0 or above 2^31 - 1.
+A replica of ledger 0 whose first file, 10, lies above the cut's file, 9: named by first-file-above-cut, which precedes zero-ledger.
+  first-file-above-cut: The LedgerStore catalog checkpoint holds a replica whose first file lies above its cut's file.
+Ledger 2 listed twice, with tombstones 11 and 6: named by duplicate-ledger, which precedes tombstone-order.
+  duplicate-ledger: The LedgerStore catalog checkpoint lists a ledger twice.
+Tombstones 6 and 0: the tombstone of ledger 0, out of ascending order, named by zero-ledger, which precedes tombstone-order.
+  zero-ledger: The LedgerStore catalog checkpoint holds a replica or a tombstone of ledger 0.
+Tombstones 11 and 9: the tombstone of ledger 9, which a live replica has, out of ascending order, named by tombstone-order, which precedes tombstone-live.
+  tombstone-order: The LedgerStore catalog checkpoint's tombstones are not in ascending order.
+The tombstone of ledger 9, which a live replica has, and a trailing zero byte: named by tombstone-live, which precedes trailing-bytes.
+  tombstone-live: The LedgerStore catalog checkpoint holds a tombstone of a ledger it lists.

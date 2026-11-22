@@ -1,0 +1,231 @@
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica (interface : System.IAsyncDisposable)
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.Int32 offset, System.Int32 length, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadTailAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Boolean seal, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.WriteAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, Orleans.Durable.Storage.Engine.Buffers.ArcBuffer payload, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Boolean recovery, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport (interface)
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport.HeartbeatAsync(Orleans.Durable.Storage.Engine.Ledgers.NodeId node, System.ReadOnlyMemory<Orleans.Durable.Storage.Engine.Ledgers.LedgerId> ledgers, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport.Open(Orleans.Durable.Storage.Engine.Ledgers.NodeId node, Orleans.Durable.Storage.Engine.Ledgers.LedgerId ledger, Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions options): Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerStore (interface)
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerStore.DropReplicaAsync(Orleans.Durable.Storage.Engine.Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerStore.ListReplicasAsync(System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Orleans.Durable.Storage.Engine.Ledgers.LedgerId>>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerStore.NodeId: Orleans.Durable.Storage.Engine.Ledgers.NodeId { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId (readonly struct : System.IComparable<Orleans.Durable.Storage.Engine.Ledgers.LedgerId>, System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.LedgerId>)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId..ctor(System.UInt64 value)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.CompareTo(Orleans.Durable.Storage.Engine.Ledgers.LedgerId other): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.Equals(Orleans.Durable.Storage.Engine.Ledgers.LedgerId other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.Equals(System.Object obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.Value: System.UInt64 { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_GreaterThan(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_GreaterThanOrEqual(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_LessThan(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerId.op_LessThanOrEqual(Orleans.Durable.Storage.Engine.Ledgers.LedgerId left, Orleans.Durable.Storage.Engine.Ledgers.LedgerId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException (sealed class : System.Exception)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException..ctor(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.String message)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException..ctor(System.String message)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException..ctor(System.String message, System.Exception innerException)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaCorruptException.Slot: Orleans.Durable.Storage.Engine.Ledgers.Slot? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaFailures (static class)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaFailures.IsTransient(System.Exception exception, System.Threading.CancellationToken stop): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations (static class)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.RangeOf(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer value, System.Int32 offset, System.Int32 length): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ReadRangeOfValueAsync(Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica replica, Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.Int32 offset, System.Int32 length, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken): static System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateBatch(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer payload): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateReplicaWindow(System.Int32 replicaWindow, System.Int32 windowSize): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateSlot(Orleans.Durable.Storage.Engine.Ledgers.Slot slot): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateWindowSize(System.Int32 windowSize): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions>)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.Equals(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.WindowSize: required System.Int32 { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions? left, Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions? left, Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOptions? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException (sealed class : System.Exception)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException..ctor(Orleans.Durable.Storage.Engine.Ledgers.NodeId node, System.TimeSpan deadline)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException..ctor(System.String message)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException..ctor(System.String message, System.Exception innerException)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaQueueTimeoutException.Node: Orleans.Durable.Storage.Engine.Ledgers.NodeId? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail>)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail..ctor(Orleans.Durable.Storage.Engine.Ledgers.Slot ContiguousTail, System.Boolean IsSealed, System.TimeSpan LeaseRemaining = default)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.ContiguousTail: Orleans.Durable.Storage.Engine.Ledgers.Slot { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.Deconstruct(out Orleans.Durable.Storage.Engine.Ledgers.Slot ContiguousTail, out System.Boolean IsSealed, out System.TimeSpan LeaseRemaining): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.Equals(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.Equals(System.Object obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.IsSealed: System.Boolean { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.LeaseRemaining: System.TimeSpan { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail left, Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail left, Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStorageCorruptException (sealed class : System.Exception)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStorageCorruptException..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStorageCorruptException..ctor(System.String message)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStorageCorruptException..ctor(System.String message, System.Exception innerException)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException (sealed class : System.Exception)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException..ctor()
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException..ctor(System.String claim, System.Guid cluster, System.String claimedCluster)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException..ctor(System.String message)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException..ctor(System.String message, System.Exception innerException)
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException.Claim: System.String? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException.ClaimedCluster: System.String? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LedgerStoreClusterMismatchException.Cluster: System.Guid? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.NodeId (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.NodeId>)
+Orleans.Durable.Storage.Engine.Ledgers.NodeId..ctor(System.Guid value)
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.Equals(Orleans.Durable.Storage.Engine.Ledgers.NodeId other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.Equals(System.Object obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.New(): static Orleans.Durable.Storage.Engine.Ledgers.NodeId
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.Value: System.Guid { get; }
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.NodeId left, Orleans.Durable.Storage.Engine.Ledgers.NodeId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.NodeId.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.NodeId left, Orleans.Durable.Storage.Engine.Ledgers.NodeId right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead>, System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.HasValue: System.Boolean { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply..ctor(System.TimeSpan LeaseGrant, System.ReadOnlyMemory<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus> Outcomes)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.Deconstruct(out System.TimeSpan LeaseGrant, out System.ReadOnlyMemory<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus> Outcomes): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.Equals(System.Object obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.LeaseGrant: System.TimeSpan { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.Outcomes: System.ReadOnlyMemory<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus> { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus (enum : System.Byte)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Absent = 3
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Dropped = 2
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Granted = 0
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Sealed = 1
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead (readonly struct : System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.Instance: static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch..ctor(System.Int32 Length)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.Deconstruct(out System.Int32 Length): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.Length: System.Int32 { get; init; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead..ctor(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.HasValue: System.Boolean { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.TryGetValue(out Orleans.Durable.Storage.Engine.Buffers.ArcBuffer value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+OutsideBatch? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead>, System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.HasValue: System.Boolean { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaTail value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome (readonly struct : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome>, System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.Instance: static Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.Instance: static Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.Instance: static Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written>)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written..ctor(System.TimeSpan leaseGrant)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.FromGrant(System.TimeSpan leaseGrant): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.Instance: static Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.LeaseGrant: System.TimeSpan { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written? left, Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Sealed value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Written value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.Slot (readonly struct : System.IComparable<Orleans.Durable.Storage.Engine.Ledgers.Slot>, System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.Slot>)
+Orleans.Durable.Storage.Engine.Ledgers.Slot..ctor(System.Int64 value)
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Add(System.Int64 offset): Orleans.Durable.Storage.Engine.Ledgers.Slot
+Orleans.Durable.Storage.Engine.Ledgers.Slot.CompareTo(Orleans.Durable.Storage.Engine.Ledgers.Slot other): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Equals(Orleans.Durable.Storage.Engine.Ledgers.Slot other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Subtract(Orleans.Durable.Storage.Engine.Ledgers.Slot other): System.Int64
+Orleans.Durable.Storage.Engine.Ledgers.Slot.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Value: System.Int64 { get; }
+Orleans.Durable.Storage.Engine.Ledgers.Slot.Zero: static Orleans.Durable.Storage.Engine.Ledgers.Slot { get; }
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_Addition(Orleans.Durable.Storage.Engine.Ledgers.Slot position, System.Int64 offset): static Orleans.Durable.Storage.Engine.Ledgers.Slot
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_GreaterThan(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_GreaterThanOrEqual(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_LessThan(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_LessThanOrEqual(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_Subtraction(Orleans.Durable.Storage.Engine.Ledgers.Slot left, Orleans.Durable.Storage.Engine.Ledgers.Slot right): static System.Int64
+Orleans.Durable.Storage.Engine.Ledgers.Slot.op_Subtraction(Orleans.Durable.Storage.Engine.Ledgers.Slot position, System.Int64 offset): static Orleans.Durable.Storage.Engine.Ledgers.Slot

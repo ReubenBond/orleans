@@ -1,0 +1,96 @@
+{
+  "description": "Object-store ledger names (object-ledgers.md §7), relative to the cluster's store prefix. A slot's reverse key is (2^63 - 2) - slot as exactly 20 decimal digits; a ledger ID is 20 decimal digits. 64-bit values are decimal strings.",
+  "reverseKeys": [
+    {
+      "slot": "0",
+      "key": "09223372036854775806"
+    },
+    {
+      "slot": "1",
+      "key": "09223372036854775805"
+    },
+    {
+      "slot": "42",
+      "key": "09223372036854775764"
+    },
+    {
+      "slot": "4096",
+      "key": "09223372036854771710"
+    },
+    {
+      "slot": "9223372036854775806",
+      "key": "00000000000000000000"
+    }
+  ],
+  "invalidReverseKeys": [
+    "0922337203685477580",
+    "009223372036854775806",
+    "0922337203685477580a",
+    "-9223372036854775806",
+    "09223372036854775807",
+    "99999999999999999999"
+  ],
+  "listingOrder": {
+    "slots": [
+      "0",
+      "1",
+      "2",
+      "9",
+      "10",
+      "11"
+    ],
+    "listed": [
+      "11",
+      "10",
+      "9",
+      "2",
+      "1",
+      "0"
+    ]
+  },
+  "names": [
+    {
+      "ledger": "7",
+      "object": "sealed",
+      "name": "ledgers/l/00000000000000000007/sealed"
+    },
+    {
+      "ledger": "7",
+      "object": "dropped",
+      "name": "ledgers/l/00000000000000000007/dropped"
+    },
+    {
+      "ledger": "7",
+      "slot": "0",
+      "name": "ledgers/l/00000000000000000007/s/09223372036854775806"
+    },
+    {
+      "ledger": "7",
+      "slot": "42",
+      "name": "ledgers/l/00000000000000000007/s/09223372036854775764"
+    },
+    {
+      "ledger": "18446744073709551615",
+      "slot": "9223372036854775806",
+      "name": "ledgers/l/18446744073709551615/s/00000000000000000000"
+    }
+  ],
+  "extentNames": [
+    {
+      "ledger": "7",
+      "firstSlot": "0",
+      "name": "ledgers/l/00000000000000000007/x/09223372036854775806"
+    },
+    {
+      "ledger": "7",
+      "firstSlot": "42",
+      "name": "ledgers/l/00000000000000000007/x/09223372036854775764"
+    },
+    {
+      "ledger": "18446744073709551615",
+      "firstSlot": "9223372036854775806",
+      "name": "ledgers/l/18446744073709551615/x/00000000000000000000"
+    }
+  ],
+  "store": "ledgers/store"
+}

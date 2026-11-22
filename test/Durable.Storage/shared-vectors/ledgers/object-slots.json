@@ -1,0 +1,121 @@
+{
+  "description": "The per-slot layout's rules (object-ledgers.md §8.1, OL-I2) over an object's properties: its length and the CRC-32C its create recorded, or null. Classification reads a slot's object, its properties and its whole content: Batch, Seal, or Corrupt. Settlement reads the properties of a slot after the writer's create met an occupant or lost its answer; observed null means absent: Repeat, Written, Sealed, or Corrupt.",
+  "classification": [
+    {
+      "name": "empty, no CRC",
+      "properties": {
+        "length": "0",
+        "crc32c": null
+      },
+      "contentHex": "",
+      "result": "Seal"
+    },
+    {
+      "name": "empty, with a CRC",
+      "properties": {
+        "length": "0",
+        "crc32c": "00000000"
+      },
+      "contentHex": "",
+      "result": "Seal"
+    },
+    {
+      "name": "matching CRC",
+      "properties": {
+        "length": "5",
+        "crc32c": "9a71bb4c"
+      },
+      "contentHex": "68656c6c6f",
+      "result": "Batch"
+    },
+    {
+      "name": "no CRC",
+      "properties": {
+        "length": "5",
+        "crc32c": null
+      },
+      "contentHex": "68656c6c6f",
+      "result": "Corrupt"
+    },
+    {
+      "name": "mismatched CRC",
+      "properties": {
+        "length": "5",
+        "crc32c": "00000000"
+      },
+      "contentHex": "68656c6c6f",
+      "result": "Corrupt"
+    },
+    {
+      "name": "content shorter than the length",
+      "properties": {
+        "length": "6",
+        "crc32c": "9a71bb4c"
+      },
+      "contentHex": "68656c6c6f",
+      "result": "Corrupt"
+    },
+    {
+      "name": "content longer than the length",
+      "properties": {
+        "length": "4",
+        "crc32c": "9a71bb4c"
+      },
+      "contentHex": "68656c6c6f",
+      "result": "Corrupt"
+    }
+  ],
+  "settlement": [
+    {
+      "name": "absent",
+      "payloadHex": "68656c6c6f",
+      "observed": null,
+      "result": "Repeat"
+    },
+    {
+      "name": "a SEAL",
+      "payloadHex": "68656c6c6f",
+      "observed": {
+        "length": "0",
+        "crc32c": null
+      },
+      "result": "Sealed"
+    },
+    {
+      "name": "the writer's batch",
+      "payloadHex": "68656c6c6f",
+      "observed": {
+        "length": "5",
+        "crc32c": "9a71bb4c"
+      },
+      "result": "Written"
+    },
+    {
+      "name": "another CRC",
+      "payloadHex": "68656c6c6f",
+      "observed": {
+        "length": "5",
+        "crc32c": "00000000"
+      },
+      "result": "Corrupt"
+    },
+    {
+      "name": "no CRC",
+      "payloadHex": "68656c6c6f",
+      "observed": {
+        "length": "5",
+        "crc32c": null
+      },
+      "result": "Corrupt"
+    },
+    {
+      "name": "another length",
+      "payloadHex": "68656c6c6f",
+      "observed": {
+        "length": "6",
+        "crc32c": "9a71bb4c"
+      },
+      "result": "Corrupt"
+    }
+  ]
+}

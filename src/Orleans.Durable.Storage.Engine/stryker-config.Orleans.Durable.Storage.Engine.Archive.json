@@ -1,0 +1,23 @@
+{
+  "stryker-config": {
+    "project": "Orleans.Durable.Storage.Engine.csproj",
+    "test-projects": [
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Tests/Orleans.Durable.Storage.Engine.Archive.Tests.csproj",
+      "../../tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests/Orleans.Durable.Storage.Engine.Archive.Logs.Tests.csproj"
+    ],
+    "mutate": [
+      "Archive/**/*.cs",
+      "!Archive/Logs/**/*.cs",
+      "!Archive/Lsm/**/*.cs"
+    ],
+    "test-runner": "mtp",
+    "coverage-analysis": "perTestInIsolation",
+    "additional-timeout": 60000,
+    "configuration": "Release",
+    "reporters": [
+      "json",
+      "html",
+      "progress"
+    ]
+  }
+}

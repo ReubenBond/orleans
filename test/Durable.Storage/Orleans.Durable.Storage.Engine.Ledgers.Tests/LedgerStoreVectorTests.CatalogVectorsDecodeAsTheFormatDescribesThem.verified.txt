@@ -1,0 +1,47 @@
+empty: 44 bytes
+  header: CLSC version 1, a 28-byte body, CRC-32C 0xe73faeb6
+  cut: file 1, offset 4096, named 00000000000000000001-00000000000000004096.clsc
+  next handle 0
+  no live replica
+  no tombstone
+
+one-replica: 68 bytes
+  header: CLSC version 1, a 52-byte body, CRC-32C 0xc45e3a46
+  cut: file 1, offset 8192, named 00000000000000000001-00000000000000008192.clsc
+  next handle 1
+  live replicas, in handle order:
+    handle 0: ledger 1; window 64; first file 1
+  no tombstone
+
+replicas-and-tombstones: 132 bytes
+  header: CLSC version 1, a 116-byte body, CRC-32C 0x67ea6592
+  cut: file 9, offset 12288, named 00000000000000000009-00000000000000012288.clsc
+  next handle 5
+  live replicas, in handle order:
+    handle 1: ledger 2; window 4; first file 3
+    handle 3: ledger 9; window 4; first file 4
+    handle 4: ledger 5; window 4; first file 9
+  tombstones, ascending: 6, 11
+
+dropped-only: 68 bytes
+  header: CLSC version 1, a 52-byte body, CRC-32C 0xc940c26a
+  cut: file 4, offset 4096, named 00000000000000000004-00000000000000004096.clsc
+  next handle 3
+  no live replica
+  tombstones, ascending: 1, 2, 3
+
+tombstones-of-unheld-ledgers: 60 bytes
+  header: CLSC version 1, a 44-byte body, CRC-32C 0x5580bdbb
+  cut: file 2, offset 4096, named 00000000000000000002-00000000000000004096.clsc
+  next handle 0
+  no live replica
+  tombstones, ascending: 4, 8
+
+maximum-handle-and-ledger: 100 bytes
+  header: CLSC version 1, a 84-byte body, CRC-32C 0xe89e7e9e
+  cut: file 18446744073709551615, offset 18446744073709551615, named 18446744073709551615-18446744073709551615.clsc
+  next handle 16777215
+  live replicas, in handle order:
+    handle 0: ledger 1; window 1; first file 1
+    handle 16777214: ledger 18446744073709551615; window 2147483647; first file 18446744073709551615
+  tombstones, ascending: 18446744073709551614
