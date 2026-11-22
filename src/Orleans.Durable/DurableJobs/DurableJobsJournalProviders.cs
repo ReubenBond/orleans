@@ -67,6 +67,30 @@ internal sealed class DurableJobsJournalProviders
 
     private static DurableJobsJournalProvider Resolve(IServiceProvider services, string name)
     {
+        // Durable Jobs discovers shards through the provider's catalog and claims them through conditional metadata
+        // updates. Registrations bind a catalog only for providers which implement one, so its absence identifies a
+        // provider which cannot hold shards, without constructing that provider.
+        if (services.GetService<IServiceProviderIsKeyedService>() is { } registrations)
+        {
+            if (!registrations.IsKeyedService(typeof(IJournalStorageProvider), name))
+            {
+                throw new OrleansConfigurationException(
+                    $"Durable Jobs journal provider '{name}' is not registered. Register a journal storage provider which supports " +
+                    $"catalog listing and journal metadata under this name, for example AddAzureBlobJournalStorage(\"{name}\", ...), " +
+                    $"or select a registered provider with {nameof(DurableJobsOptions)}.{nameof(DurableJobsOptions.ActiveProviderName)}.");
+            }
+
+            if (!registrations.IsKeyedService(typeof(IJournalStorageCatalog), name))
+            {
+                throw new OrleansConfigurationException(
+                    $"Durable Jobs journal provider '{name}' does not implement {nameof(IJournalStorageCatalog)}. Durable Jobs discovers " +
+                    "shards by listing the provider's journal catalog and claims them through conditional journal metadata updates, " +
+                    "so its provider must support catalog listing and journal metadata. Register such a provider under another name, " +
+                    "for example AddAzureBlobJournalStorage(\"jobs\", ...), and select it with " +
+                    $"{nameof(DurableJobsOptions)}.{nameof(DurableJobsOptions.ActiveProviderName)} = \"jobs\".");
+            }
+        }
+
         try
         {
             return new(

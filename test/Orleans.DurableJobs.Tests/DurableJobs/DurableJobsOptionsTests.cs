@@ -96,10 +96,10 @@ public class DurableJobsOptionsTests
     }
 
     [Theory]
-    [InlineData("storage")]
-    [InlineData("catalog")]
-    [InlineData("factory")]
-    public void UseJournaledDurableJobs_MissingSelectedCollaboratorNamesProviderInConfigurationFailure(string missing)
+    [InlineData("storage", "is not registered")]
+    [InlineData("catalog", "does not implement IJournalStorageCatalog")]
+    [InlineData("factory", "storage, catalog, and state-manager factory")]
+    public void UseJournaledDurableJobs_MissingSelectedCollaboratorNamesProviderInConfigurationFailure(string missing, string expectedMessage)
     {
         var builder = CreateSelectionBuilder();
         builder.AddVolatileJournalStorage("current").AddVolatileJournalStorage("old")
@@ -123,7 +123,28 @@ public class DurableJobsOptionsTests
             new DurableJobsJournalingConfigurationValidator(services).ValidateConfiguration);
 
         Assert.Contains("'old'", exception.Message);
-        Assert.Contains("storage, catalog, and state-manager factory", exception.Message);
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public void UseJournaledDurableJobs_ProviderWithoutCatalogFailsNamingTheCapabilityWithoutConstructingIt()
+    {
+        var builder = CreateSelectionBuilder();
+        var constructed = false;
+        builder.AddJournalStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, _ =>
+        {
+            constructed = true;
+            return new CatalogLessJournalStorageProvider();
+        }).UseJournaledDurableJobs();
+        using var services = builder.Services.BuildServiceProvider();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            new DurableJobsJournalingConfigurationValidator(services).ValidateConfiguration);
+
+        Assert.Contains($"'{ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME}' does not implement IJournalStorageCatalog", exception.Message);
+        Assert.Contains("catalog listing and journal metadata", exception.Message);
+        Assert.Contains(nameof(DurableJobsOptions.ActiveProviderName), exception.Message);
+        Assert.False(constructed);
     }
 
     [Fact]
@@ -161,6 +182,11 @@ public class DurableJobsOptionsTests
     {
         public IServiceCollection Services { get; } = new ServiceCollection();
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
+    }
+
+    private sealed class CatalogLessJournalStorageProvider : IJournalStorageProvider
+    {
+        public IJournalStorage CreateStorage(JournalId journalId) => throw new NotSupportedException();
     }
 
     [Fact]
