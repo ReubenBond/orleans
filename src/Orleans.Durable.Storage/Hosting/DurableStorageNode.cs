@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine;
 using Orleans.Durable.Storage.Engine.Archive;
@@ -13,7 +14,6 @@ using Orleans.Durable.Storage.Engine.Ledgers.Store;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.Wal;
-using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Polly;
 using Polly.Retry;

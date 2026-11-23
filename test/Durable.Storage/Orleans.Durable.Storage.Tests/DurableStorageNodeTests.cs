@@ -1,13 +1,13 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine.Archive;
 using Orleans.Durable.Storage.Engine.Cluster.Control;
 using Orleans.Durable.Storage.Engine.ObjectStore.Memory;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Tests;

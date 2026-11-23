@@ -6,13 +6,13 @@ using Azure;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using CsCheck;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.AzureStorage.Archive;
 using Orleans.Durable.Storage.Engine.Archive.Logs;
 using Orleans.Durable.Storage.Engine.Archive.Logs.Control;
 using Orleans.Durable.Storage.Engine.Journals;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Durable.Journaling;
 
 [assembly: AssemblyFixture(typeof(CloudEmulators))]
 [assembly: CloudEmulatorsUse(Emulator.Azurite)]

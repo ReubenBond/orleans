@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Durable.Journaling.Json;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Hosting;
-using Orleans.Durable.Journaling.Json;
 
 namespace Orleans.Durable.Storage.Samples.Journaling;
 

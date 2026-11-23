@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine.Archive.Memory;
 using Orleans.Durable.Storage.Engine.Journals;
@@ -6,7 +7,6 @@ using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Control;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using static Orleans.Durable.Storage.Tests.NodeRegistrySamples;

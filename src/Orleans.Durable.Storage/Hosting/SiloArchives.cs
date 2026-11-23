@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine.Archive;
 using Orleans.Durable.Storage.Engine.Archive.Logs;
@@ -9,7 +10,6 @@ using Orleans.Durable.Storage.Engine.Archive.Lsm;
 using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers.Objects;
 using Orleans.Durable.Storage.Engine.ObjectStore;
-using Orleans.Durable.Journaling;
 
 namespace Orleans.Durable.Storage.Hosting;
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.AzureStorage.Archive;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine.Archive;
@@ -21,7 +22,6 @@ using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.ObjectStore.Memory;
 using Orleans.Durable.Storage.Hosting;
 using Orleans.Durable.Storage.Testing;
-using Orleans.Durable.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 

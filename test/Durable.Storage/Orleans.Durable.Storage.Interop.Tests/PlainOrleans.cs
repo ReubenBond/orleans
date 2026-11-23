@@ -3,9 +3,9 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
 using Orleans.Durable.Journaling;
 using Orleans.Durable.Journaling.Json;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Interop.Tests;
