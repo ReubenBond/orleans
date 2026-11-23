@@ -54,6 +54,7 @@ public sealed partial class RetiredNamesTests
         new(@"\bLogDrive(?=\s+paper|, Delos)", "The LogDrive paper keeps its name."),
         new(@"\bClog\.LogDrivePerf\b", "wal.md cites the benchmark which took its measurement by the name it ran under."),
         new(@"\bresearch/papers/[\w./-]+", "The papers' paths."),
+        new(@"\[GrainType\(""journalstore""\)\]", "Orleans derives the journal store grain's type, which OrleansContracts.txt records, from JournalStoreGrain."),
     ];
 
     /// <summary>The code names which keep a drive, with the reason each stays.</summary>
