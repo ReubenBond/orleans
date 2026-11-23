@@ -360,14 +360,20 @@ namespace Orleans.Consensus.CasPaxos.Messages
 namespace Orleans.Consensus.CasPaxos.Model
 {
     public delegate (OperationStatus Status, TValue Result) Apply<TInput, TValue>(TValue existing, TInput input);
-    public readonly partial struct Ballot : System.IComparable<Ballot>
+    public readonly partial struct Ballot : System.IComparable<Ballot>, System.IEquatable<Ballot>
     {
         private readonly int _dummyPrimitive;
         public Ballot(int round, int id) { }
 
+        public Ballot(long configuration, int round, int id) { }
+
+        public long Configuration { get { throw null; } }
+
         public bool IsClassicRoundBallot { get { throw null; } }
 
         public bool IsFastRoundBallot { get { throw null; } }
+
+        public bool IsFloorBallot { get { throw null; } }
 
         public bool IsZero { get { throw null; } }
 
@@ -383,9 +389,13 @@ namespace Orleans.Consensus.CasPaxos.Model
 
         public override readonly bool Equals(object? obj) { throw null; }
 
+        public static Ballot Floor(long configuration) { throw null; }
+
         public override readonly int GetHashCode() { throw null; }
 
         public static Ballot InitialClassic(int proposer) { throw null; }
+
+        public static Ballot InitialClassic(long configuration, int proposer) { throw null; }
 
         public static Ballot InitialFast() { throw null; }
 
@@ -501,6 +511,8 @@ namespace Orleans.Consensus.CasPaxos.Protocol
         public static AcceptorAcceptResult Learn<TValue>(ref AcceptorState<TValue> state, Messages.AcceptRequest<TValue> request) { throw null; }
 
         public static AcceptorPrepareResult<TValue> Prepare<TValue>(ref AcceptorState<TValue> state, Messages.PrepareRequest request) { throw null; }
+
+        public static Model.Ballot SetFloor<TValue>(ref AcceptorState<TValue> state, Model.Ballot targetFloor) { throw null; }
     }
 
     public static partial class AcceptorPrepareResult
@@ -548,7 +560,7 @@ namespace Orleans.Consensus.CasPaxos.Protocol
 
     public static partial class AcceptorState
     {
-        public static AcceptorState<TValue> CreateInitial<TValue>(TValue acceptedValue) { throw null; }
+        public static AcceptorState<TValue> CreateInitial<TValue>(TValue acceptedValue, long configuration = 1) { throw null; }
     }
 
     public partial struct AcceptorState<TValue>
@@ -558,6 +570,10 @@ namespace Orleans.Consensus.CasPaxos.Protocol
         public Model.Ballot AcceptedBallot { get { throw null; } set { } }
 
         public TValue AcceptedValue { get { throw null; } set { } }
+
+        public Model.Ballot EffectivePromisedBallot { get { throw null; } }
+
+        public Model.Ballot FloorBallot { get { throw null; } set { } }
 
         public bool IsCommitted { get { throw null; } set { } }
 
@@ -785,9 +801,13 @@ namespace Orleans.Consensus.CasPaxos.Protocol
 
     public abstract partial class ProposerEngine<TValue, TRoute>
     {
-        public ProposerEngine(ProposerRuntime runtime, TValue initialValue, System.Collections.Immutable.ImmutableArray<TRoute> acceptors, ProposerModePolicy modePolicy) { }
+        public ProposerEngine(ProposerRuntime runtime, TValue initialValue, System.Collections.Immutable.ImmutableArray<TRoute> acceptors, ProposerModePolicy modePolicy, long configuration = 1, System.Collections.Immutable.ImmutableArray<TRoute> previousAcceptors = default) { }
+
+        public System.Collections.Immutable.ImmutableArray<TRoute> Acceptors { get { throw null; } }
 
         public Model.Ballot Ballot { get { throw null; } }
+
+        public long Configuration { get { throw null; } }
 
         public int ConflictDebt { get { throw null; } }
 
@@ -799,11 +819,17 @@ namespace Orleans.Consensus.CasPaxos.Protocol
 
         public bool HasPendingProposal { get { throw null; } }
 
+        public bool IsHandOff { get { throw null; } }
+
         public int? LeaderHintProposerId { get { throw null; } }
 
         public int LeaderMisses { get { throw null; } }
 
         public ProposerModePolicy ModePolicy { get { throw null; } }
+
+        public Model.Ballot? ObservedHigherConfigurationBallot { get { throw null; } }
+
+        public System.Collections.Immutable.ImmutableArray<TRoute> PrepareAcceptors { get { throw null; } }
 
         public Model.Ballot? PreparedBallot { get { throw null; } }
 
@@ -832,6 +858,8 @@ namespace Orleans.Consensus.CasPaxos.Protocol
         public void LearnCommittedValue(Model.Ballot acceptedBallot, TValue value, Model.Ballot preparedBallot = default) { }
 
         protected virtual void OnCachedValueChanged(TValue value) { }
+
+        protected virtual void OnHigherConfigurationObserved(Model.Ballot observedBallot) { }
 
         protected virtual void OnPendingAcceptValueCleared(TValue value) { }
 
@@ -1000,7 +1028,7 @@ namespace Orleans.Consensus.CasPaxos.Protocol
 
     public abstract partial class ValueTrackingProposerEngine<TValue, TRoute> : ProposerEngine<TValue, TRoute>
     {
-        protected ValueTrackingProposerEngine(ProposerRuntime runtime, TValue initialValue, System.Collections.Immutable.ImmutableArray<TRoute> acceptors, ProposerModePolicy modePolicy) : base(default!, default!, default, default!) { }
+        protected ValueTrackingProposerEngine(ProposerRuntime runtime, TValue initialValue, System.Collections.Immutable.ImmutableArray<TRoute> acceptors, ProposerModePolicy modePolicy) : base(default!, default!, default, default!, default, default) { }
 
         public TValue CachedValue { get { throw null; } }
 

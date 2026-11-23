@@ -19,7 +19,7 @@ public sealed class SqliteVoterRegistryTests
         Guid incarnation;
         await using (var server = await database.OpenAsync())
         {
-            var registry = await SqliteVoterRegistry.OpenAsync(server, "a", TestContext.Current.CancellationToken);
+            var registry = await SqliteVoterRegistry.OpenAsync(server, "a", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal("a", registry.VoterId);
             Assert.False(registry.IsAdmitted);
             incarnation = registry.Incarnation;
@@ -28,7 +28,7 @@ public sealed class SqliteVoterRegistryTests
         }
 
         await using var reopened = await database.OpenAsync();
-        var restored = await SqliteVoterRegistry.OpenAsync(reopened, "a", TestContext.Current.CancellationToken);
+        var restored = await SqliteVoterRegistry.OpenAsync(reopened, "a", cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(incarnation, restored.Incarnation);
         Assert.True(restored.IsAdmitted);
     }
@@ -38,9 +38,9 @@ public sealed class SqliteVoterRegistryTests
     {
         using var database = new TestDatabase();
         await using var server = await database.OpenAsync();
-        _ = await SqliteVoterRegistry.OpenAsync(server, "a", TestContext.Current.CancellationToken);
+        _ = await SqliteVoterRegistry.OpenAsync(server, "a", cancellationToken: TestContext.Current.CancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => SqliteVoterRegistry.OpenAsync(server, "b", TestContext.Current.CancellationToken));
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => SqliteVoterRegistry.OpenAsync(server, "b", cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("bound to voter 'a'", failure.Message, StringComparison.Ordinal);
 
         // The refusal is an answer, not a storage failure: the acceptor still serves.
@@ -54,7 +54,7 @@ public sealed class SqliteVoterRegistryTests
         await using var server = await database.OpenAsync();
         _ = await server.PrepareAsync("key", new PrepareRequest(new Ballot(1, 1)), TestContext.Current.CancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => SqliteVoterRegistry.OpenAsync(server, "a", TestContext.Current.CancellationToken));
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => SqliteVoterRegistry.OpenAsync(server, "a", cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("without a voter binding", failure.Message, StringComparison.Ordinal);
     }
 
@@ -66,16 +66,16 @@ public sealed class SqliteVoterRegistryTests
         var first = Guid.NewGuid();
         await using (var server = await database.OpenAsync())
         {
-            var registry = await SqliteVoterRegistry.OpenAsync(server, "a", TestContext.Current.CancellationToken);
-            Assert.Equal(first, await registry.AdmitAsync("b", first, TestContext.Current.CancellationToken));
-            Assert.Equal(first, await registry.AdmitAsync("b", first, TestContext.Current.CancellationToken));
-            Assert.Equal(first, await registry.AdmitAsync("b", Guid.NewGuid(), TestContext.Current.CancellationToken));
-            Assert.Throws<ArgumentException>(() => registry.AdmitAsync("a", Guid.NewGuid(), TestContext.Current.CancellationToken));
+            var registry = await SqliteVoterRegistry.OpenAsync(server, "a", cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal(first, await registry.AdmitAsync("b", first, cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(first, await registry.AdmitAsync("b", first, cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(first, await registry.AdmitAsync("b", Guid.NewGuid(), cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Throws<ArgumentException>(() => registry.AdmitAsync("a", Guid.NewGuid(), cancellationToken: TestContext.Current.CancellationToken));
         }
 
         await using var reopened = await database.OpenAsync();
-        var restored = await SqliteVoterRegistry.OpenAsync(reopened, "a", TestContext.Current.CancellationToken);
-        Assert.Equal(first, await restored.AdmitAsync("b", Guid.NewGuid(), TestContext.Current.CancellationToken));
+        var restored = await SqliteVoterRegistry.OpenAsync(reopened, "a", cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(first, await restored.AdmitAsync("b", Guid.NewGuid(), cancellationToken: TestContext.Current.CancellationToken));
     }
 
     /// <summary>Admissions run in the acceptor's own transactions, beside its protocol requests, under load.</summary>
@@ -84,12 +84,12 @@ public sealed class SqliteVoterRegistryTests
     {
         using var database = new TestDatabase();
         await using var server = await database.OpenAsync();
-        var registry = await SqliteVoterRegistry.OpenAsync(server, "a", TestContext.Current.CancellationToken);
+        var registry = await SqliteVoterRegistry.OpenAsync(server, "a", cancellationToken: TestContext.Current.CancellationToken);
         var incarnations = Enumerable.Range(0, 32).Select(static _ => Guid.NewGuid()).ToArray();
         var prepares = Enumerable.Range(0, 256).Select(index => server.PrepareAsync(
             index.ToString(System.Globalization.CultureInfo.InvariantCulture), new PrepareRequest(new Ballot(1, 1)), TestContext.Current.CancellationToken).AsTask());
         var admissions = incarnations.Select((incarnation, index) => registry.AdmitAsync(
-            "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), incarnation, TestContext.Current.CancellationToken).AsTask());
+            "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), incarnation, cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         await Task.WhenAll(prepares);
         Assert.Equal(incarnations, await Task.WhenAll(admissions));

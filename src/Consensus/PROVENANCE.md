@@ -10,8 +10,8 @@ simulation, scenarios, simulation runner, and shared register test fixture, with
 | Item | Value |
 | --- | --- |
 | Repository | [ReubenBond/fast-caspaxos](https://github.com/ReubenBond/fast-caspaxos) |
-| Revision | [`4dad617353f6251e3c2030872e5bb5f4a5560df9`](https://github.com/ReubenBond/fast-caspaxos/commit/4dad617353f6251e3c2030872e5bb5f4a5560df9) (18 November 2026) |
-| Import form | Snapshot of that revision's tree (`git archive`), committed as one change |
+| Revision | [`436cc0fbcecb81d9252a5e6119741f86ead359df`](https://github.com/ReubenBond/fast-caspaxos/commit/436cc0fbcecb81d9252a5e6119741f86ead359df) (22 November 2026) |
+| Import form | Initial snapshot at [`4dad617353`](https://github.com/ReubenBond/fast-caspaxos/commit/4dad617353f6251e3c2030872e5bb5f4a5560df9), with subsequent commits [`ddcca54667`](https://github.com/ReubenBond/fast-caspaxos/commit/ddcca54667cba652a16ee94f31164125762b3b97) (reconverged from Orleans `49ec166dd6`) and [`67d6a14f34`](https://github.com/ReubenBond/fast-caspaxos/commit/67d6a14f347485ebdd9fae2a1342a49d1a8ebfc8) (voter reconfiguration) ported; [`436cc0fbce`](https://github.com/ReubenBond/fast-caspaxos/commit/436cc0fbcecb81d9252a5e6119741f86ead359df) is Quint-only, which remains upstream |
 | License | MIT; [LICENSE](LICENSE) is the upstream notice |
 
 ReubenBond/fast-caspaxos remains the authoritative repository for this family until the integration is accepted into

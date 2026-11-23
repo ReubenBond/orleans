@@ -42,33 +42,43 @@ namespace Orleans.Consensus.CasPaxos.Sqlite
         public System.Threading.Tasks.ValueTask<Server.AcceptorReadResult> ReadAsync(string key, Server.AcceptedDigest? known = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<Server.ByteString?> ResolveCommittedValueAsync(string key, Server.AcceptedDigest digest, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<Model.Ballot> SetFloorAsync(Model.Ballot targetFloor, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public sealed partial class SqliteProposerBallotSource : Server.IProposerBallotSource, System.IDisposable
     {
         public SqliteProposerBallotSource(string databasePath, int proposerId, Server.IFatalErrorHandler fatalErrors) { }
 
+        public long HighestReservedConfiguration { get { throw null; } }
+
         public int ProposerId { get { throw null; } }
 
         public void Dispose() { }
 
         public Model.Ballot Reserve(int minimumRound) { throw null; }
+
+        public Model.Ballot Reserve(long configuration, int minimumRound) { throw null; }
     }
 
     public sealed partial class SqliteVoterRegistry
     {
         internal SqliteVoterRegistry() { }
 
+        public Server.ByteString? BootstrapDigest { get { throw null; } }
+
         public System.Guid Incarnation { get { throw null; } }
 
         public bool IsAdmitted { get { throw null; } }
 
+        public long JoinConfiguration { get { throw null; } }
+
         public string VoterId { get { throw null; } }
 
-        public System.Threading.Tasks.ValueTask<System.Guid> AdmitAsync(string voterId, System.Guid incarnation, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask<System.Guid> AdmitAsync(string voterId, System.Guid incarnation, Server.ByteString? bootstrapDigest = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask MarkAdmittedAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<SqliteVoterRegistry> OpenAsync(SqliteAcceptorServer acceptor, string voterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<SqliteVoterRegistry> OpenAsync(SqliteAcceptorServer acceptor, string voterId, long joinConfiguration = 1, Server.ByteString? bootstrapDigest = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }

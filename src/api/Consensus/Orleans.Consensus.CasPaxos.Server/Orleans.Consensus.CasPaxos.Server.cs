@@ -19,7 +19,7 @@ namespace Orleans.Consensus.CasPaxos.Server
     {
     }
 
-    public sealed partial record AcceptorMissing()
+    public sealed partial record AcceptorMissing(Model.Ballot PromisedBallot = default)
     {
     }
 
@@ -135,6 +135,7 @@ namespace Orleans.Consensus.CasPaxos.Server
         System.Threading.Tasks.ValueTask<KeyPage> ListKeysAsync(string prefix = "", string? afterKey = null, int limit = 100, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<Protocol.AcceptorPrepareResult<ByteString?>> PrepareAsync(string key, Messages.PrepareRequest request, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<AcceptorReadResult> ReadAsync(string key, AcceptedDigest? known = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<Model.Ballot> SetFloorAsync(Model.Ballot targetFloor, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface ILocalAcceptorInspection
@@ -146,9 +147,12 @@ namespace Orleans.Consensus.CasPaxos.Server
 
     public partial interface IProposerBallotSource
     {
+        long HighestReservedConfiguration { get; }
+
         int ProposerId { get; }
 
         Model.Ballot Reserve(int minimumRound);
+        Model.Ballot Reserve(long configuration, int minimumRound);
     }
 
     public partial interface IRegisterDigestLearner
@@ -198,6 +202,13 @@ namespace Orleans.Consensus.CasPaxos.Server
     {
     }
 
+    public sealed partial class ReconfigurationConflictException : System.InvalidOperationException
+    {
+        public ReconfigurationConflictException(VoterConfiguration winningConfiguration) { }
+
+        public VoterConfiguration WinningConfiguration { get { throw null; } }
+    }
+
     public sealed partial class RegisterBusyException : System.Exception
     {
     }
@@ -226,9 +237,13 @@ namespace Orleans.Consensus.CasPaxos.Server
 
         public int Capacity { get { throw null; } init { } }
 
+        public long InitialConfiguration { get { throw null; } init { } }
+
         public Protocol.ProposerModePolicy Mode { get { throw null; } init { } }
 
         public System.TimeSpan OperationTimeout { get { throw null; } init { } }
+
+        public System.Func<VoterDescriptor, IKeyedAcceptor>? PeerResolver { get { throw null; } init { } }
 
         public System.TimeSpan RetryBackoff { get { throw null; } init { } }
 
@@ -262,6 +277,10 @@ namespace Orleans.Consensus.CasPaxos.Server
     {
         public ReplicatedRegisterService(System.Collections.Immutable.ImmutableArray<AcceptorPeer> peers, IProposerBallotSource ballots, RegisterServiceOptions? options = null, ILocalAcceptorInspection? localAcceptor = null, Diagnostics.NodeEventJournal? diagnostics = null, BoundedReadExecutor? localReads = null) { }
 
+        public long ActiveConfiguration { get { throw null; } }
+
+        public System.Collections.Immutable.ImmutableArray<AcceptorPeer> ActivePeers { get { throw null; } }
+
         public System.Exception? LastInspectionFailure { get { throw null; } }
 
         public RegisterNotificationFailure? LastNotificationFailure { get { throw null; } }
@@ -277,6 +296,49 @@ namespace Orleans.Consensus.CasPaxos.Server
         public System.Threading.Tasks.ValueTask<RegisterKeyPage> ListKeysAsync(string prefix = "", string? afterKey = null, int limit = 100, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<RegisterValue> ReadAsync(string key, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public sealed partial record VoterConfiguration(long Number, System.Collections.Immutable.ImmutableArray<VoterDescriptor> Voters, VoterConfigurationState State)
+    {
+        public const string RegisterKey = "__caspaxos/config";
+        public System.Collections.Immutable.ImmutableArray<VoterDescriptor> CanonicalVoters { get { throw null; } }
+
+        public static ByteString ComputeBootstrapDigest(System.Collections.Generic.IEnumerable<string> voterIds) { throw null; }
+
+        public bool HasSameVoters(System.Collections.Immutable.ImmutableArray<VoterDescriptor> other) { throw null; }
+
+        public void Validate() { }
+    }
+
+    public static partial class VoterConfigurationEncoding
+    {
+        public static VoterConfiguration Decode(ByteString payload) { throw null; }
+
+        public static ByteString Encode(VoterConfiguration configuration) { throw null; }
+    }
+
+    public enum VoterConfigurationState : byte
+    {
+        Pending = 0,
+        Active = 1
+    }
+
+    public sealed partial record VoterDescriptor(string Id, string Endpoint = "")
+    {
+        public void Validate() { }
+    }
+
+    public sealed partial class VoterReconfigurationDriver
+    {
+        public VoterReconfigurationDriver(IProposerBallotSource ballots, System.Func<VoterDescriptor, IKeyedAcceptor> peerResolver, RegisterServiceOptions? options = null) { }
+
+        public System.Threading.Tasks.Task<VoterConfiguration> DiscoverConfigurationAsync(System.Collections.Immutable.ImmutableArray<VoterDescriptor> seedVoters, long seedConfiguration, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<VoterConfiguration> ReconfigureAsync(System.Collections.Immutable.ImmutableArray<VoterDescriptor> currentVoters, long currentConfiguration, System.Collections.Immutable.ImmutableArray<VoterDescriptor> nextVoters, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<VoterConfiguration> ResumeAsync(System.Collections.Immutable.ImmutableArray<VoterDescriptor> seedVoters, long seedConfiguration, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<RegisterValue> TransferKeyHandOffAsync(string key, long nextConfiguration, System.Collections.Immutable.ImmutableArray<AcceptorPeer> previousPeers, System.Collections.Immutable.ImmutableArray<AcceptorPeer> nextPeers, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
@@ -353,6 +415,8 @@ namespace Orleans.Consensus.CasPaxos.Server.Diagnostics
         public System.Threading.Tasks.ValueTask<Protocol.AcceptorPrepareResult<ByteString?>> PrepareAsync(string key, Messages.PrepareRequest request, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<AcceptorReadResult> ReadAsync(string key, AcceptedDigest? known = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<Model.Ballot> SetFloorAsync(Model.Ballot targetFloor, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public sealed partial class ObservedRegisterService : IRegisterService
