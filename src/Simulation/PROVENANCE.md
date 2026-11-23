@@ -11,6 +11,7 @@ support, and the `dotnet-orleans-simulation` tool. Their test suites are under `
 | Repository | [ReubenBond/Clockwork](https://github.com/ReubenBond/Clockwork) |
 | Revision | [`d1e492649ed028991763bd9764d969206e27866d`](https://github.com/ReubenBond/Clockwork/commit/d1e492649ed028991763bd9764d969206e27866d) (merge of ReubenBond/Clockwork#75, 18 November 2026) |
 | Import form | Snapshot of that revision's tree (`git archive`), committed as one change |
+| Ported commits | [`f2dbc6c30037e17e339d0b045a6a762c396af380`](https://github.com/ReubenBond/Clockwork/commit/f2dbc6c30037e17e339d0b045a6a762c396af380) (ReubenBond/Clockwork#80, fixing ReubenBond/Clockwork#79): the `ConfigureAwait(ConfigureAwaitOptions)` awaitables keep the BCL's validation frame |
 | License | MIT; [LICENSE](LICENSE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) are the upstream notices |
 
 ReubenBond/Clockwork remains the authoritative repository for this family until the integration is accepted into
@@ -58,10 +59,8 @@ The import keeps the upstream code, identities, and test oracles. These changes 
   (xUnit1069). `dotnet format whitespace` normalizes indentation and final newlines.
 - Tests locate the repository by `Orleans.slnx` and use the Orleans paths above. Each suite carries Orleans' CI traits
   (`Area=Simulation`, `Provider=None`, and `Suite=BVT`, or `SlowBVT` for the instrumentation and conformance suites),
-  and runs with collection-level parallelism, as upstream's do, through `test/Simulation/testconfig.json` in place of
-  Orleans' sequential configuration; `RethrownExceptionStackTraceMatchesTheBclAwaiter` fails under sequential order
-  upstream as well (ReubenBond/Clockwork#79). The `Simulation packaging and lowering` CI job runs the package smoke tests
-  and the Debug and untiered conformance lanes of upstream's CI.
+  and runs under Orleans' sequential test configuration. The `Simulation packaging and lowering` CI job runs the package
+  smoke tests and the Debug, untiered, and sequential awaiter conformance lanes of upstream's CI.
 
 ## Instrumented test projects
 

@@ -841,6 +841,14 @@ jobs:
         DOTNET_TieredCompilation: '0'
         DOTNET_ReadyToRun: '0'
       run: dotnet run --project test/Simulation/Clockwork.Conformance.Tests/Clockwork.Conformance.Tests.csproj --configuration Debug --no-build -- --timeout 600s --filter-class Orleans.Testing.Simulation.Conformance.Tests.ChannelConformanceTests
+    - name: Awaiter conformance sequentially without tiered compilation
+      # Fully optimized Release runtime code is what a long sequential run reaches through tiering: the controlled
+      # ConfigureAwait(options) awaitables must keep the BCL's validation frame instead of inlining it into a hidden
+      # frame (ReubenBond/Clockwork#79).
+      env:
+        DOTNET_TieredCompilation: '0'
+        DOTNET_ReadyToRun: '0'
+      run: dotnet run --project test/Simulation/Clockwork.Conformance.Tests/Clockwork.Conformance.Tests.csproj --configuration Release -- --timeout 600s --parallel none --filter-class Orleans.Testing.Simulation.Conformance.Tests.ControlledAwaiterConformanceTests
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       if: failure()
       with:

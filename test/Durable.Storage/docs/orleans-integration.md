@@ -94,6 +94,8 @@ and Docker 29.9.3:
 | `validate.ps1 -Check Emulators`: the cloud and interop suites, Release and Debug, on the AppHost's emulators through Aspire and Docker | All passed but `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` on fake-gcs-server ([ReubenBond/clog#468][clog-468]); the live-account cases skipped for their unset variables. With #468's fix ported, the cloud suite passes in Release and Debug: 275 passed, 54 live-account cases skipped |
 | `validate.ps1 -Check Format` | Passed, after ordering twenty files' imports |
 | `Clockwork.Instrumentation.Tests`' package smoke tests (`ORLEANS_SIMULATION_SMOKE_TESTS=1`), as CI's simulation job runs them | All 47 passed |
+| `Clockwork.Conformance.Tests`, Release, with [ReubenBond/Clockwork#79][clockwork-79]'s fix ported: the suite with collection parallelism and with `--parallel none`, and `ControlledAwaiterConformanceTests` with `--parallel none` under `DOTNET_TieredCompilation=0`, with and without `DOTNET_ReadyToRun=0` | 1,507 passed in each mode; 49 passed in each awaiter run, and 4 fail there without the fix |
+| The other simulation suites, Debug, with collection parallelism and with `--parallel none` | All passed in both modes; the simulation family now runs under Orleans' sequential test configuration |
 | Orleans suites using Verify and CsCheck after the central version changes: `Orleans.CodeGenerator.Tests`, `Orleans.Journaling.Tests`, `Orleans.Journaling.Json.Tests`, `Orleans.Serialization.UnitTests`, `Orleans.Core.Tests` | All passed, with one snapshot's trailing newline corrected for Verify 32 |
 | `test/Durable.Storage/eng/check-docs.ps1` | Passed |
 | Packing and closure checks of every new package | As section 3 records |
@@ -103,7 +105,6 @@ and Docker 29.9.3:
 
 | Limitation | Status |
 | --- | --- |
-| [ReubenBond/Clockwork#79][clockwork-79]: `RethrownExceptionStackTraceMatchesTheBclAwaiter` depends on test execution order | Passes under the collection-level parallelism the simulation suites run with |
 | A single-voter CASPaxos deployment admits its own voter, so it cannot detect a voter restarted on a lost database | Deploy three or five voters; [operations](operations/caspaxos.md#failures-operators-observe) records it |
 | Replacing a lost voter, and changing the voter set | [Deferred work](spec/deferred.md) |
 | The Engine's public surface holds its layers' contracts and implementations (387 public types in 26 namespaces) | Review before the first release, with Diagnostics' public `FatalErrorHandler.Interceptor` test seam |

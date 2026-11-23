@@ -15,8 +15,13 @@ public sealed class ControlledAwaiterConformanceTests : IDisposable
 {
     private static readonly DateTimeOffset Start = new(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
+    // An optimizing JIT may inline the BCL's ConfigureAwait into its caller, removing that frame from the BCL's
+    // trace depending on the caller's tier. The probe disables JIT optimization so the BCL trace has the frames
+    // of a non-inlined call in every run, as the controlled awaitable produces.
     private const string Source = """
+        using System.Diagnostics;
         using System.Threading.Tasks;
+        [assembly: Debuggable(DebuggableAttribute.DebuggingModes.Default | DebuggableAttribute.DebuggingModes.DisableOptimizations)]
         namespace Conf { public static class AwaiterProbe {
             public static async Task<int> Fail()
             {

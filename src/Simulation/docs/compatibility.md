@@ -592,7 +592,8 @@ through which an async `Main` returns (`task.GetAwaiter().GetResult()`), waits t
 `Task.ConfigureAwait(ConfigureAwaitOptions)` and `Task<T>.ConfigureAwait(ConfigureAwaitOptions)` build
 the same controlled awaitables: `SuppressThrowing` completes the await normally for a faulted or
 canceled `Task`, `ForceYielding` always yields through the coordinator, and invalid options (including
-`SuppressThrowing` on `Task<T>`) throw the BCL's `ArgumentOutOfRangeException`. As in the BCL,
+`SuppressThrowing` on `Task<T>`) throw the BCL's `ArgumentOutOfRangeException` from the BCL's
+`ConfigureAwait` frame, as a call the JIT does not inline does. As in the BCL,
 `GetAwaiter()` or `ConfigureAwait` on a null task throws `NullReferenceException` and the controlled
 awaiters keep their frames out of a rethrown exception's stack trace. A synchronous
 `GetAwaiter().GetResult()` on an incomplete task or value task pumps the coordinator until it completes

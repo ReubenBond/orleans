@@ -39,12 +39,14 @@ public readonly struct ControlledConfiguredTaskAwaitable
     /// </param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="options"/> is invalid for <see cref="Task"/>.</exception>
     [StackTraceHidden]
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public ControlledConfiguredTaskAwaitable(Task task, ConfigureAwaitOptions options)
     {
         SimulationRuntimeDispatch.RequireActiveSimulation(ApiName);
 
         // The BCL call dereferences the task and validates the options, so a null task and invalid options
-        // throw the BCL's own exceptions.
+        // throw the BCL's own exceptions. This frame is hidden, so the JIT must not inline the BCL call into
+        // it: invalid options are thrown from the BCL's ConfigureAwait frame, as from a non-inlined call.
         _ = task.ConfigureAwait(options);
         _task = task;
         _options = options;
@@ -146,12 +148,14 @@ public readonly struct ControlledConfiguredTaskAwaitable<TResult>
     /// <paramref name="options"/> is invalid for <see cref="Task{TResult}"/>, including <see cref="ConfigureAwaitOptions.SuppressThrowing"/>.
     /// </exception>
     [StackTraceHidden]
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     public ControlledConfiguredTaskAwaitable(Task<TResult> task, ConfigureAwaitOptions options)
     {
         SimulationRuntimeDispatch.RequireActiveSimulation(ApiName);
 
         // The BCL call dereferences the task and validates the options, so a null task and invalid options
-        // throw the BCL's own exceptions.
+        // throw the BCL's own exceptions. This frame is hidden, so the JIT must not inline the BCL call into
+        // it: invalid options are thrown from the BCL's ConfigureAwait frame, as from a non-inlined call.
         _ = task.ConfigureAwait(options);
         _task = task;
         _options = options;
