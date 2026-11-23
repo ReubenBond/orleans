@@ -88,7 +88,7 @@ and Docker 29.9.3:
 | --- | --- |
 | `dotnet build Orleans.slnx` (Debug), after the central version changes and again at the branch head | Succeeded, no warnings |
 | `test/Durable.Storage/eng/validate.ps1 -Check Build` (Release) | Succeeded, no warnings |
-| Every Storage test project, Release (simulation projects in `SimulationRelease`) | All passed; ReubenBond/clog#465's test excluded and then skipped. The Orleans composition took 16 minutes, the simulated conformance classes 8, the ledgers 4, the seed corpus 2, the WAL 1.5 |
+| Every Storage test project, Release (simulation projects in `SimulationRelease`) | All passed; ReubenBond/clog#465's test, then failing, excluded The Orleans composition took 16 minutes, the simulated conformance classes 8, the ledgers 4, the seed corpus 2, the WAL 1.5 |
 | Every Storage test project, Debug (simulation projects in `SimulationDebug`), as CI runs them | All passed |
 | `MixedProviderApplicationTests` and `MixedProviderDurableJobsTests` on Azurite 3.35.0 (the CI image) | All passed, over the in-memory and the native CASPaxos MetaStore |
 | `validate.ps1 -Check Emulators`: the cloud and interop suites, Release and Debug, on the AppHost's emulators through Aspire and Docker | All passed but `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` on fake-gcs-server ([ReubenBond/clog#468][clog-468], which fails the same way at I3's head); the live-account cases skipped for their unset variables |
@@ -97,12 +97,12 @@ and Docker 29.9.3:
 | Orleans suites using Verify and CsCheck after the central version changes: `Orleans.CodeGenerator.Tests`, `Orleans.Journaling.Tests`, `Orleans.Journaling.Json.Tests`, `Orleans.Serialization.UnitTests`, `Orleans.Core.Tests` | All passed, with one snapshot's trailing newline corrected for Verify 32 |
 | `test/Durable.Storage/eng/check-docs.ps1` | Passed |
 | Packing and closure checks of every new package | As section 3 records |
+| `Orleans.Durable.Storage.Engine.Archive.Tests`, Release and Debug, with [ReubenBond/clog#465][clog-465]'s fix ported | 175 passed, 4 skipped, none failed |
 
 ## 5. Qualified limitations
 
 | Limitation | Status |
 | --- | --- |
-| [ReubenBond/clog#465][clog-465]: `IndexedReadPropagatesNonCallerOperationCanceledExceptionFromSlotRead`'s slot read reaches the object-ledger batch cache instead of its canceling object store | Skipped with the issue's reason until the fix lands upstream |
 | [ReubenBond/clog#468][clog-468]: `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` fails on fake-gcs-server with a resumable-upload 404 | Open; the emulator suites run outside CI |
 | [ReubenBond/Clockwork#79][clockwork-79]: `RethrownExceptionStackTraceMatchesTheBclAwaiter` depends on test execution order | Passes under the collection-level parallelism the simulation suites run with |
 | A single-voter CASPaxos deployment admits its own voter, so it cannot detect a voter restarted on a lost database | Deploy three or five voters; [operations](operations/caspaxos.md#failures-operators-observe) records it |

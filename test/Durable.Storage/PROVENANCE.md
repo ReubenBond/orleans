@@ -6,6 +6,14 @@ as a snapshot. Clog's history remains in its repository. Clog's author, Reuben B
 this repository's license. Clog remains authoritative for this code until the integration is accepted into
 `dotnet/orleans`; changes landing in Clog after the snapshot are ported onto the integration branch.
 
+## Ported changes
+
+Clog changes which landed after the snapshot, ported onto the integration branch:
+
+| Clog commit | Change |
+| --- | --- |
+| [`673755c40962ddad9ae6afbfa84583a68169090d`](https://github.com/ReubenBond/clog/commit/673755c40962ddad9ae6afbfa84583a68169090d) | `IndexedReadPropagatesNonCallerOperationCanceledExceptionFromSlotRead` reaches its canceling object store (ReubenBond/clog#465) |
+
 ## Layout
 
 | Clog path | Orleans path |

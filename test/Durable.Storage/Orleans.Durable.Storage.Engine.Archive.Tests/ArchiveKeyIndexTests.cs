@@ -253,7 +253,7 @@ public sealed class ArchiveKeyIndexTests : IDisposable
     /// A non-caller <see cref="OperationCanceledException"/> (such as an internal object-store timeout) thrown by a slot
     /// point read during an indexed fetch is propagated rather than swallowed as a truncated <c>Reached</c> scan.
     /// </summary>
-    [Fact(Timeout = 30_000, Skip = "ReubenBond/clog#465: the slot read hits ObjectLedgerStorage's batch cache instead of the canceling object store.")]
+    [Fact(Timeout = 30_000)]
     public async Task IndexedReadPropagatesNonCallerOperationCanceledExceptionFromSlotRead()
     {
         var token = TestContext.Current.CancellationToken;
@@ -261,12 +261,24 @@ public sealed class ArchiveKeyIndexTests : IDisposable
         var closedId = new LedgerId(1);
         var openId = new LedgerId(2);
         var cancelSlot1 = false;
+        var canceledReads = 0;
         var slot1Suffix = ObjectLedgerNames.Slot(closedId, new Slot(1)).Value;
         var objects = new CancelingObjectStore(
             memoryObjects,
-            name => cancelSlot1 && name.Value.EndsWith(slot1Suffix, StringComparison.Ordinal));
+            name =>
+            {
+                if (!cancelSlot1 || !name.Value.EndsWith(slot1Suffix, StringComparison.Ordinal))
+                {
+                    return false;
+                }
 
-        var objectStore = ObjectLedgerStore.Over(objects, new ObjectLedgerStoreOptions(), TimeProvider.System);
+                _ = Interlocked.Increment(ref canceledReads);
+                return true;
+            });
+
+        // The local batch cache (OL-I11) would serve slot 1 from its append without reading the object store, so the
+        // store runs without one and every point read reaches CancelingObjectStore.
+        var objectStore = ObjectLedgerStore.Over(objects, new ObjectLedgerStoreOptions { CacheBytes = 0 }, TimeProvider.System);
         var claim = new PrimaryClaim(ArchiveCluster.Node, SequencerInstanceId.New());
         var openClosed = new LedgerMetadata(closedId, KeyRange.Root, LedgerLocation.ObjectStore.Instance, ArchiveCluster.Window, claim, LedgerStatus.Open.Instance);
 
@@ -292,7 +304,7 @@ public sealed class ArchiveKeyIndexTests : IDisposable
 
         using var store = new InMemoryArchiveStore();
         Tag tA0;
-        Tag tA1;
+        Tag tB1;
         using (var lease = ledgerReader.LeaseLedger(openClosed))
         {
             await using var writer = lease.Ledger.CreateWriter(TimeProvider.System);
@@ -305,12 +317,12 @@ public sealed class ArchiveKeyIndexTests : IDisposable
             tA0 = new Tag(closedId, d0.Slot, 0);
 
             var s1 = Assert.NotNull(await writer.AcquireAsync(token));
-            using var b1 = ArcBuffer.Wrap(Encoding.UTF8.GetBytes("a1"));
-            using var r1 = new Row([1], RowKind.Append, b1);
+            using var b1 = ArcBuffer.Wrap(Encoding.UTF8.GetBytes("b1"));
+            using var r1 = new Row([2], RowKind.Append, b1);
             using var batch1 = BatchView.Encode([r1]);
             var o1 = await writer.AppendAsync(s1, batch1, token);
             Assert.True(o1.TryGetValue(out AppendOutcome.Appended d1));
-            tA1 = new Tag(closedId, d1.Slot, 0);
+            tB1 = new Tag(closedId, d1.Slot, 0);
         }
 
         var closed = new LedgerMetadata(closedId, KeyRange.Root, LedgerLocation.ObjectStore.Instance, ArchiveCluster.Window, claim, new LedgerStatus.Closed(new Slot(2)));
@@ -333,10 +345,11 @@ public sealed class ArchiveKeyIndexTests : IDisposable
         {
             if (ledger.Id == closedId && key.Span.SequenceEqual([(byte)1]))
             {
+                // Key 2's defining row stands in for a hash collision in key 1's index, so the read fetches slot 1.
                 return ValueTask.FromResult<KeyIndexRead>(new KeyIndexRead.Indexed(
                 [
                     new(tA0, tA0.Slot, 0),
-                    new(tA1, tA0.Slot, 0),
+                    new(tB1, tB1.Slot, 0),
                 ]));
             }
 
@@ -349,6 +362,7 @@ public sealed class ArchiveKeyIndexTests : IDisposable
             using var _ = await reader.ReadAsync(new byte[] { 1 }, token);
         });
         Assert.Equal("Simulated object-store timeout.", thrown.Message);
+        Assert.True(Volatile.Read(ref canceledReads) > 0);
     }
 
     /// <summary>
