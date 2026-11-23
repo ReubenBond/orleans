@@ -397,6 +397,7 @@ public sealed class AzureAppendableObjectFidelityTests(CloudEmulators emulators)
             account.Store,
             account.Transport,
             ObjectLedgerNames.Slot(PerSlotLedger, new Slot(13)),
+            assertUnknownOutcome: null,
             Token);
     }
 

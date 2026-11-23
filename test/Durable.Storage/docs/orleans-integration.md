@@ -91,7 +91,7 @@ and Docker 29.9.3:
 | Every Storage test project, Release (simulation projects in `SimulationRelease`) | All passed; ReubenBond/clog#465's test, then failing, excluded The Orleans composition took 16 minutes, the simulated conformance classes 8, the ledgers 4, the seed corpus 2, the WAL 1.5 |
 | Every Storage test project, Debug (simulation projects in `SimulationDebug`), as CI runs them | All passed |
 | `MixedProviderApplicationTests` and `MixedProviderDurableJobsTests` on Azurite 3.35.0 (the CI image) | All passed, over the in-memory and the native CASPaxos MetaStore |
-| `validate.ps1 -Check Emulators`: the cloud and interop suites, Release and Debug, on the AppHost's emulators through Aspire and Docker | All passed but `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` on fake-gcs-server ([ReubenBond/clog#468][clog-468], which fails the same way at I3's head); the live-account cases skipped for their unset variables |
+| `validate.ps1 -Check Emulators`: the cloud and interop suites, Release and Debug, on the AppHost's emulators through Aspire and Docker | All passed but `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` on fake-gcs-server ([ReubenBond/clog#468][clog-468]); the live-account cases skipped for their unset variables. With #468's fix ported, the cloud suite passes in Release and Debug: 275 passed, 54 live-account cases skipped |
 | `validate.ps1 -Check Format` | Passed, after ordering twenty files' imports |
 | `Clockwork.Instrumentation.Tests`' package smoke tests (`ORLEANS_SIMULATION_SMOKE_TESTS=1`), as CI's simulation job runs them | All 47 passed |
 | Orleans suites using Verify and CsCheck after the central version changes: `Orleans.CodeGenerator.Tests`, `Orleans.Journaling.Tests`, `Orleans.Journaling.Json.Tests`, `Orleans.Serialization.UnitTests`, `Orleans.Core.Tests` | All passed, with one snapshot's trailing newline corrected for Verify 32 |
@@ -103,7 +103,6 @@ and Docker 29.9.3:
 
 | Limitation | Status |
 | --- | --- |
-| [ReubenBond/clog#468][clog-468]: `GcsObjectLedgerFidelityTests.LostAnswerCreateSettlesThroughProperties` fails on fake-gcs-server with a resumable-upload 404 | Open; the emulator suites run outside CI |
 | [ReubenBond/Clockwork#79][clockwork-79]: `RethrownExceptionStackTraceMatchesTheBclAwaiter` depends on test execution order | Passes under the collection-level parallelism the simulation suites run with |
 | A single-voter CASPaxos deployment admits its own voter, so it cannot detect a voter restarted on a lost database | Deploy three or five voters; [operations](operations/caspaxos.md#failures-operators-observe) records it |
 | Replacing a lost voter, and changing the voter set | [Deferred work](spec/deferred.md) |

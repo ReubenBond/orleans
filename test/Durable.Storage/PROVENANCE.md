@@ -13,6 +13,7 @@ Clog changes which landed after the snapshot, ported onto the integration branch
 | Clog commit | Change |
 | --- | --- |
 | [`673755c40962ddad9ae6afbfa84583a68169090d`](https://github.com/ReubenBond/clog/commit/673755c40962ddad9ae6afbfa84583a68169090d) | `IndexedReadPropagatesNonCallerOperationCanceledExceptionFromSlotRead` reaches its canceling object store (ReubenBond/clog#465) |
+| [`73e5b2d21`](https://github.com/ReubenBond/clog/commit/73e5b2d21) | `LostAnswerCreateSettlesThroughProperties` asserts fake-gcs-server's unknown outcome and its repetition's `Exists` (ReubenBond/clog#468) |
 
 ## Layout
 

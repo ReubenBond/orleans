@@ -177,10 +177,22 @@ internal static class ObjectLedgerPreconditionChecks
     /// settles deterministically via <see cref="IObjectStore.GetPropertiesAsync"/> and holds the exact bytes and
     /// CRC-32C.
     /// </summary>
+    /// <param name="store">The store under test.</param>
+    /// <param name="transport">The transport beneath the store's client.</param>
+    /// <param name="slotName">The slot object to create.</param>
+    /// <param name="assertUnknownOutcome">
+    /// <see langword="null"/> where the client recovers the lost answer, so the create answers
+    /// <see cref="ObjectCreateOutcome.Created"/> or <see cref="ObjectCreateOutcome.Exists"/>; otherwise the backend leaves
+    /// the create's outcome unknown, the create throws, this asserts the exception, and the repeated create, as the
+    /// object-ledger writer repeats it (object-ledgers.md §8.1), meets its own landing and answers
+    /// <see cref="ObjectCreateOutcome.Exists"/>.
+    /// </param>
+    /// <param name="cancellationToken">The test's cancellation.</param>
     public static async Task VerifyLostAnswerCreateSettlesAsync(
         IObjectStore store,
         TransportDouble transport,
         ObjectName slotName,
+        Action<Exception>? assertUnknownOutcome,
         CancellationToken cancellationToken)
     {
         var payload = MakePayload(77, 192);
@@ -188,10 +200,19 @@ internal static class ObjectLedgerPreconditionChecks
         var expectedCrc = ObjectStoreChecksums.Crc32C(content);
 
         transport.FailNext(TransportFault.LoseAnswer, TransportDouble.IsUpload);
-        var outcome = await store.CreateAsync(slotName, content, expectedCrc, cancellationToken);
-        Assert.True(
-            outcome.Value is ObjectCreateOutcome.Created or ObjectCreateOutcome.Exists,
-            $"Expected Created or Exists after lost answer, got {outcome}.");
+        if (assertUnknownOutcome is null)
+        {
+            var outcome = await store.CreateAsync(slotName, content, expectedCrc, cancellationToken);
+            Assert.True(
+                outcome.Value is ObjectCreateOutcome.Created or ObjectCreateOutcome.Exists,
+                $"Expected Created or Exists after lost answer, got {outcome}.");
+        }
+        else
+        {
+            assertUnknownOutcome(await Assert.ThrowsAnyAsync<Exception>(async () => await store.CreateAsync(slotName, content, expectedCrc, cancellationToken)));
+            Assert.IsType<ObjectCreateOutcome.Exists>((await store.CreateAsync(slotName, content, expectedCrc, cancellationToken)).Value);
+        }
+
         Assert.Equal(1, transport.Injected);
 
         var properties = await store.GetPropertiesAsync(slotName, cancellationToken);

@@ -170,6 +170,7 @@ public sealed class S3ObjectLedgerFidelityTests(CloudEmulators emulators) : IDis
             target.Store,
             target.Transport,
             ObjectLedgerNames.Slot(Ledger, new Slot(13)),
+            assertUnknownOutcome: null,
             Token);
     }
 

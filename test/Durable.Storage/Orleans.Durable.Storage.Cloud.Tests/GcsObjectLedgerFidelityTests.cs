@@ -205,7 +205,11 @@ public sealed class GcsObjectLedgerFidelityTests(CloudEmulators emulators) : IDi
 
     /// <summary>
     /// A conditional create whose response is lost after landing settles deterministically via
-    /// <see cref="IObjectStore.GetPropertiesAsync"/> with the exact length, CRC-32C, and bytes.
+    /// <see cref="IObjectStore.GetPropertiesAsync"/> with the exact length, CRC-32C, and bytes. On the service and the
+    /// testbench the client asks the resumable session for its state, which reports the finalized object, so the create
+    /// answers. <c>fake-gcs-server</c> forgets a session once it finalizes the object and answers that status query 404,
+    /// so there the create throws with its outcome unknown, and its repetition meets its own landing
+    /// (verification.md §10).
     /// </summary>
     [Theory]
     [MemberData(nameof(Backends))]
@@ -216,6 +220,9 @@ public sealed class GcsObjectLedgerFidelityTests(CloudEmulators emulators) : IDi
             target.Store,
             target.Transport,
             ObjectLedgerNames.Slot(Ledger, new Slot(13)),
+            backend == GcsBackend.FakeGcsServer
+                ? static failure => Assert.Equal(HttpStatusCode.NotFound, Assert.IsType<GoogleApiException>(failure).HttpStatusCode)
+                : null,
             Token);
     }
 
