@@ -30,7 +30,7 @@ the snapshot are ported onto the stack.
 | Family | Source revision | Orleans paths | Provenance |
 | --- | --- | --- | --- |
 | Durable Storage | [Clog `6ffb29aa96d2e4d48fc9c34f80790493e548af96`][clog] | `src/Orleans.Durable.Storage*`, `src/{Azure,AWS,Google}/Orleans.Durable.Storage.*`, `test/Durable.Storage`, `playground/DurableStorage` | [PROVENANCE.md](../PROVENANCE.md) |
-| Consensus | [Fast CASPaxos `4dad617353f6251e3c2030872e5bb5f4a5560df9`][caspaxos] | `src/Consensus`, `test/Consensus` | `src/Consensus/PROVENANCE.md` |
+| Consensus | [Fast CASPaxos `699daab90b411a260418870a76fc08f62f2284c8`][caspaxos] (snapshot from `4dad617353`, ported through `ddcca54667`, `67d6a14f34`, `f93a13dbc2`, `30e79ac3ec`, and `699daab90b`) | `src/Consensus`, `test/Consensus` | `src/Consensus/PROVENANCE.md` |
 | Simulation | [Clockwork `d1e492649ed028991763bd9764d969206e27866d`][clockwork] | `src/Simulation`, `test/Simulation` | `src/Simulation/PROVENANCE.md` |
 
 ## 3. Packages and artifacts
@@ -106,7 +106,7 @@ and Docker 29.9.3:
 | Limitation | Status |
 | --- | --- |
 | A single-voter CASPaxos deployment admits its own voter, so it cannot detect a voter restarted on a lost database | Deploy three or five voters; [operations](operations/caspaxos.md#failures-operators-observe) records it |
-| Replacing a lost voter, and changing the voter set | [Deferred work](spec/deferred.md) |
+| Restoring CASPaxos voters from backups and zero-pause membership changes | Operator-driven voter replacement, addition, and removal are implemented via `CasPaxosReconfigurationService` ([operations](operations/caspaxos.md#voter-reconfiguration)); backup restore and zero-pause changes remain [deferred work](spec/deferred.md#fast-caspaxos-backup-restore-and-zero-pause-membership-change) |
 | The Engine's public surface holds its layers' contracts and implementations (387 public types in 26 namespaces) | Review before the first release, with Diagnostics' public `FatalErrorHandler.Interceptor` test seam |
 | The specification's prose names the engine Clog | Build and test settings, shipped source, project descriptions, and the sample use the Durable Storage name |
 | The cloud and interop suites' emulator cases have no CI lane | Run locally with `just emulators` |
@@ -131,15 +131,15 @@ builder.UseOrleans(silo => silo
 | Procedure | Steps |
 | --- | --- |
 | Startup | Configure membership independently of the MetaStore. With native CASPaxos, give every silo the same `Voters`, start the voter silos together on their first start, and keep each voter's database on a persistent volume ([CASPaxos lifecycle](operations/caspaxos.md#lifecycle)). Each node registers once the MetaStore serves; Durable Jobs starts on its named provider, which must implement the journal catalog and metadata, and a provider which cannot hold shards fails the silo's start. |
-| Voter loss | A minority of voters down leaves writes available; restore each voter silo at its endpoint with its original databases. A voter restarted on an empty disk is refused; restore its databases or keep the silo out of the cluster ([CASPaxos failures](operations/caspaxos.md#failures-operators-observe)). |
-| Disk replacement | Retire the old node by identity, or name it in the new silo's `NodeToReplace` ([Orleans composition §8](spec/compositions/orleans.md#8-operation)). A voter's acceptor database is not replaceable. |
+| Voter loss | A minority of voters down leaves writes available; restore each voter silo at its endpoint with its original databases, or permanently retire the lost identity and replace it with a fresh voter identity using `CasPaxosReconfigurationService.ReplaceVoterAsync` ([voter reconfiguration](operations/caspaxos.md#voter-reconfiguration)). A lost voter restarted on an empty disk under its old identity is refused ([CASPaxos failures](operations/caspaxos.md#failures-operators-observe)). |
+| Disk replacement | Retire the old node by identity, or name it in the new silo's `NodeToReplace` ([Orleans composition §8](spec/compositions/orleans.md#8-operation)). Replace a lost voter's database by provisioning a fresh voter identity with `JoiningVoter` and running `CasPaxosReconfigurationService.ReplaceVoterAsync` ([voter reconfiguration](operations/caspaxos.md#voter-reconfiguration)). |
 | Archive configuration | Choose the LSM over an object store or archive logs in a dedicated Azure container, and keep the cluster's archive store and prefix fixed for its life ([Orleans composition §8](spec/compositions/orleans.md#8-operation)). |
 | Recovery | A lost silo's ledgers move to a live node, and its grains recover their journals on survivors. Durable Jobs survivors adopt the lost silo's shards in the Azure provider, and their wakeups reactivate grains with scheduled messages or durable delays, as `MixedProviderApplicationTests` qualifies. A whole-cluster restart follows [Orleans composition §5.10](spec/compositions/orleans.md#510-cluster-restart). |
 
 [plan]: https://github.com/ReubenBond/clog/blob/rb-orleans-integration-plan/docs/orleans-integration-plan.md
 [orleans-base]: https://github.com/dotnet/orleans/commit/6a0e937f544c35ffcf11b37e4c2b7de5a1580a03
 [clog]: https://github.com/ReubenBond/clog/commit/6ffb29aa96d2e4d48fc9c34f80790493e548af96
-[caspaxos]: https://github.com/ReubenBond/fast-caspaxos/commit/4dad617353f6251e3c2030872e5bb5f4a5560df9
+[caspaxos]: https://github.com/ReubenBond/fast-caspaxos/commit/699daab90b411a260418870a76fc08f62f2284c8
 [clockwork]: https://github.com/ReubenBond/Clockwork/commit/d1e492649ed028991763bd9764d969206e27866d
 [clog-465]: https://github.com/ReubenBond/clog/issues/465
 [clog-468]: https://github.com/ReubenBond/clog/issues/468

@@ -807,16 +807,17 @@ make faulting whole ranges costly.
 
 ## 5. Metadata
 
-### Fast CASPaxos membership change
+### Fast CASPaxos backup restore and zero-pause membership change
 
-**What.** Changing the Fast CASPaxos voting membership, replacing a member identity after disk loss, and
-restoring a member or the whole cluster from an older snapshot, each by a procedure which preserves every
-acknowledged promise and allocation ([metastore](components/metastore.md#8-mechanism-and-policy)). Until then a voter
-restarted on a fresh database under its old identity is refused by the other voters' admission records and its silo
-does not start ([metastore §8.1](components/metastore.md#81-fast-caspaxos-semantics)).
+**What.** Restoring a Fast CASPaxos voter or whole cluster from an older snapshot, detecting disk loss in a single-voter
+deployment, detecting a rolled-back proposer allocator, and zero-pause online membership changes (such as stepwise
+quorum widening without the Fence-to-Activate metadata pause) ([metastore
+§8.1](components/metastore.md#81-fast-caspaxos-semantics)). Operator-driven voter replacement, addition, removal, and
+migration are implemented through `CasPaxosReconfigurationService` and `VoterReconfigurationDriver` (Choose → Fence →
+Install → Activate).
 
-**Revisit when** a deployment must replace a member, change membership without stopping the MetaStore, or
-restore from a backup.
+**Revisit when** a deployment must restore consensus state from backups, run zero-pause membership changes, or detect
+single-voter disk loss or allocator rollback automatically.
 
 ## 6. Compositions
 
