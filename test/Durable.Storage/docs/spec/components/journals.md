@@ -308,11 +308,15 @@ Outcome taxonomy: [outcomes](../outcomes.md).
 
 ### 2.2 Writes
 
-The writing process encodes each entry once, through `JournalStore.EncodeAppend(key, expectedVersion, payload)`,
-`EncodeReplace(key, expectedVersion, snapshot)`, or `EncodeDelete(key, expectedVersion)`, each over the journal's
-`JournalRowKey` and returning a `JournalEntryRecord` its caller owns, and writes it with `WriteAsync(record)`, which
-returns a `JournalWriteOutcome`. `WriteAsync` also takes a record forwarded to the primary, which the composition
-verified where its bytes entered the process (§7, JS-I5).
+The writing process encodes each entry once, through `JournalStore.EncodeAppend(key, expectedVersion, payload)` (or
+its overload taking `ReadOnlySpan<LocalAppendRecord> localAppends`),
+`EncodeReplace(key, expectedVersion, snapshot)` (with optional `localAppends`), or
+`EncodeDelete(key, expectedVersion)` (with optional `localAppends`), each over the journal's `JournalRowKey` and
+returning a `JournalEntryRecord` its caller owns, and writes it with `WriteAsync(record)`, which returns a
+`JournalWriteOutcome`. `WriteAsync` also takes a record forwarded to the primary, which the composition verified where
+its bytes entered the process (§7, JS-I5). Attached `LocalAppendRecord` entries ride in the same `JournalEntryRecord`
+CRC-32C envelope and commit atomically in the same `LedgerBatch` slot as the journal row, or commit none (JS-I11);
+`Expired` entries carry no local appends. *Local-append encoding and admission are not yet in code* (J1).
 
 Preconditions, each refused with `ArgumentException` by the writing process as it encodes the entry, and again by
 `WriteAsync` and by admission as the entry arrives (§8.1), through one check of the record (`CheckRecord`): the key's
@@ -446,6 +450,9 @@ content, `DeletedAt` its `Tombstone`, and its `Content`.
 | `JournalReadOutcome` | A `JournalReadResult` or `JournalMoved(Owner?)`. |
 | `JournalMoved` | `Moved` of a write, a read, and a load: `Owner`, the primary the map names, or none (§8.5). |
 | `JournalStoreLimitException` | An `ArgumentException` from `JournalStore`'s constructor naming the startup bound which fails (`JournalStoreLimit`: the payload limit, `MaxAppendBytes`, `MaxQueuedBytes`, or `MaxProposalBytes`, §8.4). |
+| `LocalAppendRecord` | Readonly struct `(Stream: LocalStreamName, Payload: ReadOnlyMemory<byte>)` carrying one validated passthrough ledger-local append attached to an `Append`, `Replace`, or `Delete` write; `MaxPayloadLength = 65_536`; construction rejects a null `Stream` or payload above `MaxPayloadLength`, and `JournalEntryRecord` encoders reject `default(LocalAppendRecord)` (§7, JS-I11). *Not yet in code* (J1). |
+| `ILocalStreamHandler` | Registered once per `LocalStreamName` on `JournalStore`: exposes `Stream`, pure pre-admission `InvalidDataException? Validate(ReadOnlySpan<byte> payload)` (zero I/O, checked via CA1806), and `ILocalStreamSession OpenLedger(LedgerId ledger)` opening isolated per-ledger primary state for a fresh primary writer lifetime starting at slot 0 (LP-I1, LG-I2). *Not yet in code* (J1). |
+| `ILocalStreamSession` | `IDisposable` owning per-ledger runtime state for one local stream on its primary: `OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records)` runs in strict slot order outside `LedgerAdmission`'s lock after `ProposalOutcome.Durable`, before warm-state `Apply` and before callers receive `Accepted`, always with non-empty `records` and performing no blocking I/O; `Dispose()` runs once strictly after the last possible `OnBatchDurable` (JS-I12). *Not yet in code* (J1). |
 
 ### 4.3 Versions
 
@@ -467,6 +474,8 @@ content, `DeletedAt` its `Tombstone`, and its `Content`.
 | JS-I8 | Retired: entries carry no blobs. The number is not reused. |
 | JS-I9 | An answer (an absence, a read, or a load for admission) counts a node's key index of a live ledger only once the index has caught up to the ledger's decided end, and counts the archive only through `ArchiveReader`'s reads ([archive §2](archive.md#2-contract-upward)). For the primary's own open ledger, a read counts its index through the tail its open check confirmed, the ledger's decided end; an admission counts it through the primary's applied position, with the key's in-flight entries decided apart (§8.1). |
 | JS-I10 | Admission stores, in each defining row, the key's token for that segment and its version before the row. The token is `Origin` for a key's first segment, `prefix.Token` after a rebase, and otherwise `Plan` of the key's write in its previous segment (in any ledger of its lineage), which starts from that segment's token. The version continues the fold of the rows its primary loaded (its warm version), which may since have dropped, or is `(prefix.VersionBase, 0)` after a rebase, which happens only when no ledger the map value read before the archive lists holds a row of the key. A key's versions are unique for its lifetime; a key the LSM has forgotten entirely starts a new lifetime at `(Origin, 0)` (§8.3). Each version names one state, the fold's version or, once every row of the key has dropped, the rebased version, which a primary holding the key warm from earlier rows holds beside it. |
+| JS-I11 | **Atomic journal and local-append commit.** A journal write with attached `LocalAppend` records commits its journal row and all its `LocalAppend` rows in one `LedgerBatch` slot, or commits none; `Rejected`, `ReplaceRequired`, `Moved`, and `Fenced` leave zero `LocalAppend` rows in any ledger. *Not yet in code* (J1). |
+| JS-I12 | **Local-stream session ordering and disposal.** `ILocalStreamSession.OnBatchDurable` runs strictly in slot order, outside `LedgerAdmission`'s lock, only after `ProposalOutcome.Durable`, before warm-state `Apply` and before callers receive `Accepted`, with non-empty `records` per stream. `ILocalStreamSession.Dispose()` runs once, strictly after the last possible `OnBatchDurable`. *Not yet in code* (J1). |
 
 ## 6. Faults, concurrency, and cancellation
 
@@ -508,29 +517,44 @@ little-endian, and the varint is unsigned LEB128 in its shortest form, at most 1
 | Field | Bytes |
 | --- | --- |
 | CRC-32C of the row key, then every byte of the record after this field (`u32`) | 4 |
-| Kind (`u8`): 0 `Append`, 1 `Replace`, 2 `Delete`, 3 `Expired` | 1 |
+| Kind and flags (`u8`): bits 0..6 are the kind (`0` `Append`, `1` `Replace`, `2` `Delete`, `3` `Expired`); bit 7 (`0x80`) is `HasLocalAppendsFlag` (*Not yet in code*, J1) | 1 |
 | Expected version: the base's length (`u8`, at most 32), the base's bytes, then the count (varint) | 2 to 43 |
 | Deletion time, a `Delete`'s only: UTC ticks (`i64`), 0 to 3,155,378,975,999,999,999 (`DateTime.MaxValue`) | 8 |
+| Local appends *(present iff `HasLocalAppendsFlag` is set)*: `localCount` (`u8`, 1..255), followed by `localCount` entries of `(streamLen: u8 [1..64], streamBytes [a-z0-9._-], payloadLen: varint [0..65_536], payloadBytes)` | Variable |
 | Body: an `Append`'s payload, non-empty, or a `Replace`'s snapshot, possibly empty; a `Delete`'s and an `Expired`'s is empty | The rest |
 
 Each value has one encoding. The CRC leads the record, so a writer which holds the payload in pages computes it over the
-row key, the head's fields, and then the payload, and the record is its head followed by the payload's pages, which the
-primary copies once, into its batch ([conventions §1](../conventions.md#1-buffers-and-ownership)). A body's bound,
-`MaxBodyBytes`, is a precondition the writer and admission check (§8.4), not a decoding rule.
+row key, the head's fields, any local-append wire bytes (streamed directly through `JournalCrc` without materializing a
+large stack buffer, keeping the `FixedMaxHeadLength = 56` `stackalloc` fast path untouched when `HasLocalAppendsFlag`
+is 0), and then the payload; the record is its head followed by the payload's pages, which the primary copies once, into
+its batch ([conventions §1](../conventions.md#1-buffers-and-ownership)). On decode, local-append entries are parsed
+through `SequenceReader<byte>` and their small payloads are copied into one contiguous `byte[]` sliced into
+`ImmutableArray<LocalAppendRecord> LocalAppends` (detached from pooled `ArcBuffer` pages), preserving zero-copy
+`bytes.Slice(entry.HeadLength)` for `Payload`; `WithoutPayload()` drops `Payload` while preserving `LocalAppends` until
+`OnBatchDurable` finishes. Admission bounds (`MaxBodyBytes`, `MaxLocalAppendsPerWrite`, `MaxLocalAppendBytesPerWrite`)
+are preconditions the writer and admission check (§8.4), while `LocalAppendRecord.MaxPayloadLength` (`65_536`) is
+enforced on the wire.
 
 Decoding takes the row key and the record, and accepts only this layout. It checks these rules in this order, and a
 rejection names the first rule the record breaks by its reason, which the primary reports as
 `JournalStoreCorruptException` ([conventions §15](../conventions.md#15-outcomes-unions-and-errors)):
 
-1. `truncated`: the record holds its CRC, its kind, and its base's length, 6 bytes.
+1. `truncated`: the record holds its CRC, its kind/flags byte, and its base's length, 6 bytes.
 2. `crc-mismatch`: the CRC-32C matches the row key and the record's bytes after the CRC.
-3. `unknown-kind`: the kind is 0 to 3.
-4. The expected version, in layout order: `base-too-long`, a base length above 32; `field-truncated`, a base which runs
+3. `unknown-kind`: the kind (`byte & 0x7F`) is 0 to 3.
+4. `expired-local-appends`: `HasLocalAppendsFlag` (`0x80`) is 0 when the kind is `Expired` (`3`).
+5. The expected version, in layout order: `base-too-long`, a base length above 32; `field-truncated`, a base which runs
    past the record's end; `bad-varint`, a count which is overlong, longer than 10 bytes, above 2<sup>64</sup> − 1, or
    unterminated.
-5. A `Delete`'s deletion time: `field-truncated`, fewer than 8 bytes left; `bad-deletion-time`, a value outside 0 to
+6. A `Delete`'s deletion time: `field-truncated`, fewer than 8 bytes left; `bad-deletion-time`, a value outside 0 to
    `DateTime.MaxValue`'s ticks.
-6. The body: `empty-append`, an `Append` with an empty body; `trailing-bytes`, a `Delete` or `Expired` with bytes after
+7. Local appends *(when `HasLocalAppendsFlag` is set)*: `truncated` (`localCount` byte missing),
+   `empty-local-appends` (`localCount == 0`), then for each of the `localCount` entries in order: `truncated`
+   (`streamLen` byte missing), `empty-local-stream` (`streamLen == 0`), `local-stream-too-long` (`streamLen > 64`),
+   `truncated` (`streamBytes` short), `bad-local-stream` (any byte outside ASCII `[a-z0-9._-]`), `truncated`
+   (`payloadLen` missing), `bad-varint` (malformed `payloadLen`), `local-payload-too-long` (`payloadLen > 65_536`),
+   `truncated` (`payloadBytes` short).
+8. The body: `empty-append`, an `Append` with an empty body; `trailing-bytes`, a `Delete` or `Expired` with bytes after
    its last field.
 
 **Row bodies.** An `Append`'s and a `Replace`'s row body is the entry's payload. A `Delete` row's is the tombstone, the
@@ -559,9 +583,14 @@ break two rules for the earlier; the `journals-entry` fuzz target, whose input f
 On the primary of the key's open ledger, per key, serialized:
 
 1. Check the entry, which needs no state, so admission checks it first, as the write arrives: its key lies in the
-   ledger's range (else `Moved` without an owner); the archive store admits its key (`AdmitsKey`) and its body is at
-   most `MaxBodyBytes` (else `ArgumentException`); and its CRC-32C was verified where the record entered the primary
-   (JS-I5). An `Append`'s body is non-empty in every record: the writing process's encoding refuses an empty one with
+   ledger's range (else `Moved` without an owner); the archive store admits its key (`AdmitsKey`), its body is at most
+   `MaxBodyBytes`, every attached `LocalAppendRecord` names a registered `ILocalStreamHandler`, `localAppends.Length <=
+   MaxLocalAppendsPerWrite`, `sum(payload.Length) <= MaxLocalAppendBytesPerWrite`, every `handler.Validate(payload)`
+   returns `null`, and `LedgerBatch.MaxHeaderLength(1 + localAppends.Length) + rowLength + sum(localRowLengths) <=
+   min(MaxBatchLength, MaxQueuedBytes, MaxProposalBytes)` (else `ArgumentException` with zero effect; forwarded writes
+   catch `ArgumentException` in `JournalNodeHost.WriteCoreAsync` and answer `JournalCallRefused(JournalRefusal.Argument,
+   ex.Message)` rather than `Ambiguous`); and its CRC-32C was verified where the record entered the primary (JS-I5). An
+   `Append`'s body is non-empty in every record: the writing process's encoding refuses an empty one with
    `ArgumentException`, and §7's decoding rejects one as `empty-append`.
 2. Ensure the key's warm state (§8.3). An `Expired` never loads its key: one whose key holds no loaded warm state is
    `Rejected` at once, with no effect and no history read, reporting its own expected version, a hint which names no
@@ -607,10 +636,24 @@ On the primary of the key's open ledger, per key, serialized:
    through `BeginRow(key, kind, versionBefore, token, bodyLength, bodyHead)` and `WriteBody`
    ([ledgers §4](ledgers.md#4-data-types)), adds the entry's command to the written fold (`Add`), and adopts the
    version `BeginRow` returns, which a debug assertion checks equals its own expectation. A `BeginRow` which throws
-   leaves the writer's dictionary unchanged. Each row reserves a token of 32 bytes until its batch plans it. Batches go
-   to `ProposeAsync` in order; a batch which took no slot names no segment, plans no token, and is `Fenced`.
-6. On `Durable`, admission, warm state's one applier, applies the batch, removes its entries from the in-flight set,
-   and completes them `Accepted` with their versions.
+   leaves the writer's dictionary unchanged. For each attached `LocalAppendRecord`, admission writes a
+   `RowKind.LocalAppend` row to the same `LedgerBatch` under `localKey = LedgerLocalKey.Encode(ledger.Id,
+   ledger.Range, record.Stream)` via `BeginRow(localKey, RowKind.LocalAppend, batch.HeldVersion(localKey), default,
+   record.Payload.Length, record.Payload.Span)` (JS-I11). `TakeBatch` counts journal entries against `MaxBatchEntries`,
+   computes `totalRows = sum(1 + pending.LocalAppends.Length)`, sizes headers with
+   `LedgerBatch.MaxHeaderLength(totalRows)`, stops before `totalRows > MaxSegmentKeys` / `MaxBatchBytes` /
+   `MaxBatchLength` (always admitting the first entry), and charges local-append bytes to `_queuedBytes`. Each row
+   reserves a token of 32 bytes until its batch plans it. Batches go to `ProposeAsync` in order; a batch which took no
+   slot names no segment, plans no token, and is `Fenced`.
+6. On `Durable`, when a batch carries no local appends and no local-append callback is pending (`!entries.HasLocalAppends
+   && _localCallbacksPending == 0`), admission preserves its synchronous fast-apply shortcut under `_lock`. Otherwise,
+   single-reader `CompleteProposalsAsync` invokes each stream's `ILocalStreamSession.OnBatchDurable(slot, streamRecords)`
+   in strict slot order outside `_lock` (skipped for streams with 0 records in the batch; an unexpected exception calls
+   `FatalErrorHandler.StopOnDefect`, then under `_lock` fails the batch's entries, fences admission, and abandons the
+   writer without touching warm state), then acquires `_lock` to run warm-state `Apply`, `EndBatch`, and `Run`, and
+   completes callers `Accepted` with their versions (JS-I12). `DisposeSessionsOnce()` runs inside
+   `CompleteProposalsAsync` at the first non-`Durable` outcome or fault and in its `finally` block (strictly after the
+   last possible `OnBatchDurable`); cooperative `PrepareReleaseAsync` followed by `CancelDrain` keeps sessions alive.
 
 `LedgerAdmission` admits the entries of one open ledger for one primary claim, and holds the warm state of the keys it
 admitted. Its mechanism:
@@ -729,8 +772,12 @@ Each node keeps, in its state database:
   - **Wiring.** `JournalStateDatabase.Applier` implements `LedgerApplier`, `JournalStateDatabase.KeyIndex` implements
     `ArchiveKeyIndex` (wired into `ArchiveReader` when `JournalStore` is constructed with a `JournalStateDatabase`), and
     `Attach(LedgerApplyLoop)` lets catch-up waits wake a replicated ledger's delivery (`LedgerApplyLoop.Wake`) and observe
-    loop completion or faults. A background map-watcher drops indexes for non-replicated predecessors once the map drops
-    them.
+    loop completion or faults. `JournalStateDatabase.TryHasKeyEntryAsync(ledger, key, tail, ct)` (*Not yet in code*, J2)
+    exposes a non-blocking O(1) presence check over caught-up `IJournalIndex.HasKeyEntryAsync` (`Absent` only when the
+    ledger is on this node, its index is not corrupt, its watermark is at least `tail`, and `HasKeyEntryAsync` returns
+    false; otherwise `Present` or `Unindexed`, never triggering `PredecessorScan`) so closed-ledger local-stream drains
+    skip disk reads when a ledger wrote zero local appends. A background map-watcher drops indexes for non-replicated
+    predecessors once the map drops them.
 - **Warm state**: on a primary, `JournalWarmState` holds `JournalState` and `JournalPlanning` per touched key, owned
   exclusively by `LedgerAdmission` for one primary claim and discarded when the claim ends or the process restarts
   (JS-I6).
@@ -838,23 +885,28 @@ Every body is inline, in its record and its row: no entry travels as a blob. `Ma
 policy, a cluster parameter which the composition records among the caller parameters of the store's record
 (`max-body-bytes`, [archive §2.4](archive.md#24-selecting-the-store)), 16 MiB by default and configurable up to the
 replica's payload limit less a maximal row's overhead, a 65,535-byte key, a 32-byte version base and token, and headers,
-about 64 KiB; `JournalStore.StoreParameters` gives the composition the parameter from the store's own copy of its
-options, which it enforces. An `Append`'s or a `Replace`'s body above it is refused with `ArgumentException` by the
-writing process before it forwards the entry, and again by the owner (§2.2, §8.1). Ledgers bounds a body only by its
-batch's length.
+about 64 KiB; `JournalStore.StoreParameters` (`StoreParametersOf(options, registeredHandlers)`) gives the composition
+the cluster parameters from the store's own copy of its options and its registered `ILocalStreamHandler`s:
+`max-body-bytes`, `local-streams` (comma-separated ordinal-sorted registered stream names, `""` when empty),
+`max-local-appends`, and `max-local-append-bytes` (*local-stream parameters not yet in code*, J1). An `Append`'s or a
+`Replace`'s body above `MaxBodyBytes` is refused with `ArgumentException` by the writing process before it forwards the
+entry, and again by the owner (§2.2, §8.1). Ledgers bounds a body only by its batch's length.
 
 Memory in flight is bounded by bytes, not by counts of entries or slots: on a primary, per ledger, admission holds at
 most `MaxQueuedBytes` of entries not yet in a batch, and its `LedgerWriter` at most `MaxProposalBytes` of batches
 created and not yet decided ([ledgers §2.4](ledgers.md#24-primary-ledgerwriter)), 128 MiB together by default; a
 forwarded write waits on the composition's per-node forwarding byte budget
 ([Orleans §5.5](../compositions/orleans.md#55-forwarding-and-journal-outcomes)). `JournalStore`'s constructor, the
-process's start check, copies its options and runs three checks on the copy, after each setting's range, and throws
+process's start check, copies its options and runs startup checks on the copy, after each setting's range, and throws
 `JournalStoreLimitException` naming the bound (`JournalStoreLimit`) which fails, so the process refuses to start:
 
 - the largest batch admission builds (`LedgerAdmission.LargestBatch`), the larger of a batch of `MaxBatchEntries`
-  rows within `MaxBatchBytes` and a batch of one row with a 65,535-byte key and a `MaxBodyBytes` body, or a tombstone,
-  with the batch's and the row's headers, a 32-byte version base and token among them, is within the replica's payload
-  limit ([ledgers §7](ledgers.md#7-formats));
+  rows within `MaxBatchBytes` and a batch of one journal row with a 65,535-byte key and a `MaxBodyBytes` body (or a
+  tombstone), plus — when local-stream handlers are registered — `MaxLocalAppendsPerWrite` defining `LocalAppend` rows
+  (`LedgerLocalKey.MaxEncodedLength = 105` bytes each, total payload `MaxLocalAppendBytesPerWrite`), with the batch's
+  and rows' headers, a 32-byte version base and token among them, is within the replica's payload limit
+  ([ledgers §7](ledgers.md#7-formats));
+- when local-stream handlers are registered, `1 + MaxLocalAppendsPerWrite <= MaxSegmentKeys`;
 - `MaxBodyBytes` is at most the archive store's `MaxAppendBytes`, so the archive never refuses an `Append` for its size;
 - `MaxQueuedBytes` and the writer's `MaxProposalBytes` are each at least that largest batch, so a maximal entry always
   fits.
@@ -943,6 +995,7 @@ snapshot arrives as an ordinary `Replace`.
 | Setting | Default |
 | --- | --- |
 | `MaxBodyBytes`: an entry's body, recorded per cluster in the store's record, at most the payload limit less a maximal row's overhead (about 64 KiB) | 16 MiB |
+| `MaxLocalAppendsPerWrite`, `MaxLocalAppendBytesPerWrite`: maximum attached `LocalAppendRecord` count and total payload bytes per journal write, recorded per cluster as `max-local-appends` and `max-local-append-bytes` alongside `local-streams` (*Not yet in code*, J1) | 8, 64 KiB |
 | Batch: entries, bytes, linger (`MaxBatchEntries`, `MaxBatchBytes`) | 256, 1 MiB, 0 (batch what is queued) |
 | Rows accepted and not yet proposed, per ledger's admission (`MaxQueuedBytes`); at least the largest batch | 64 MiB |
 | Warm state, per ledger's admission (`WarmStateBytes`), counting each key's state and its planning state, whose folds `ArchivePlan.MaxStateBytes` bounds | 64 MiB; least recently used keys with nothing waiting or in flight are evicted |
@@ -1230,3 +1283,14 @@ before its registry (§8.1); a call which meets the disposed store fails with `O
   version checker and the history read, `JournalColdPrimaryTests` the cold-primary property, `VersionCheckerTests` the
   checker's own cases, and `JournalModelTests` the model's. The simulation's cost is in
   [verification §12](../verification.md#12-gates-and-measurements).
+- **Ledger-local appends (planned, J1–J2).** `JournalStoreSpec` and `JournalModel` extend to atomic journal +
+  `LocalAppend` writes (`JS-I11` indivisible `Expect.OneOf` on `Ambiguous`, zero `LocalAppend` rows on `Rejected` /
+  `ReplaceRequired` / `Moved` / `Fenced`), paired with a white-box `LocalSessionOracle` verifying `JS-I12` (strict slot
+  order, non-empty `records`, `OnBatchDurable` before `Apply` and `Accepted`, `Dispose()` once after the last possible
+  `OnBatchDurable`, cooperative `PrepareReleaseAsync` + `CancelDrain`, multi-stream batching, `OnBatchDurable` defect
+  → `FatalErrors`, and 1-preemption race mutants `OnDurableBeforeQuorumMutant`,
+  `CompleteCallerBeforeOnDurableMutant`, and `DisposeBeforeLastOnDurableMutant`). `EntryRules`, `journals/entries.json`,
+  `journals/entry-rejections.json`, and `journals-entry` cover `HasLocalAppendsFlag` (`0x80`) contiguous and
+  multi-segment decoding, allocation bounds, and page leak checks. `JournalStateDatabaseTests` and
+  `RocksDbJournalIndexTests` verify `TryHasKeyEntryAsync` over real `RocksDbJournalIndex` (`LedgerApplyLoop`,
+  `PredecessorScan`, `FlushAsync` + reopen, `DropLedgerAsync`, and zero `tombstones` entries for `LocalAppend`).

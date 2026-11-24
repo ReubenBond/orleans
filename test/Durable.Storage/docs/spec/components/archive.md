@@ -30,9 +30,12 @@ segments, versions, the ledger map, and drops, and stores each defining row's to
 [Journals](journals.md) owns the meaning of rows, writes them, chooses each defining row's token with `Plan`, and reads
 journals through this layer.
 
-Code: `Orleans.Durable.Storage.Engine.Archive`, data plane only, namespace `Orleans.Durable.Storage.Engine.Archive`:
-`ArchiveReader` and its types, and `IArchiveStore`, the layer's one interface, since two stores implement it; the memory
-store, `InMemoryArchiveStore`, for tests and simulation, in `Orleans.Durable.Storage.Engine.Archive.Memory` (§9).
+Code: `Orleans.Durable.Storage.Engine.Archive`, data plane in `Orleans.Durable.Storage.Engine.Archive`
+(`ArchiveReader` and its types, and `IArchiveStore`, the layer's data-plane interface implemented by both stores),
+control plane in `Orleans.Durable.Storage.Engine.Archive.Control` (`DrainScan`, `ByteBudget`, and
+`ILedgerLocalDrainBarrier` / `LocalDrainBarrierOutcome` for closed-ledger local-stream draining, *barrier not yet in
+code*, J2); the memory store, `InMemoryArchiveStore`, for tests and simulation, in
+`Orleans.Durable.Storage.Engine.Archive.Memory` (§9).
 
 ### Design rationale
 
@@ -246,9 +249,13 @@ never changes under a key.
 
 ### 2.1 History of a key
 
-A key's commands are its decided rows ([ledgers §2.2](ledgers.md#22-rows-batches-and-tags)): `Append`, which applies on
-top of the earlier commands; `Replace`, which supersedes them and becomes the base; and `Delete`, which supersedes them
-and leaves its tombstone, its body, when it has one.
+A key's commands are its decided archive rows ([ledgers §2.2](ledgers.md#22-rows-batches-and-tags),
+`RowKinds.IsArchiveKind`): `Append`, which applies on top of the earlier commands; `Replace`, which supersedes them and
+becomes the base; and `Delete`, which supersedes them and leaves its tombstone, its body, when it has one.
+`RowKind.LocalAppend` rows are ledger-local stream records excluded from `History(k)`, `ArchiveRow.Live`, and all three
+`ArchiveReader` scan and point-read paths (`Collect`, `FetchSingleSlotIndexedAsync`, and `ProcessSlot`), where each
+skipped `LocalAppend` key is validated against `ILedgerLocalDrainBarrier.ValidateLocalAppendKey` when a barrier is
+configured (or rejected with `ArchiveCorruptException` if malformed or unregistered; [LG-I15](ledgers.md#5-invariants)).
 
 A key's **write** for a segment is the value a drain writes for the key, a pure function of the key's rows in that
 segment. It holds commands, not their bytes:
@@ -291,12 +298,15 @@ A read uses cached maps and restarts when a cache proves stale (§8.1); a caller
 ### 2.3 Coverage and drops
 
 A closed ledger `S` leaves the ledger map by the change `Drop(S)` ([ledgers §2.6](ledgers.md#26-transitions)) only once
-the archive store holds every decided row of `S` below its recovered tail `T` (HI-I2). Each store states the evidence
-its drop submitter holds: for the LSM, `ManifestValue.IsComplete(S)` in a manifest value read or applied ([archive LSM
-§2.6](archive-lsm.md#26-dropping-ledgers)); for archive logs, every segment of `S` complete, each key's write held, as a
-write the drain saw land or a properties read shows ([archive logs](archive-logs.md#2-contract-upward)). Drops follow
-each key's lineage ([LG-I10](ledgers.md#5-invariants)), and each replica node drops its replica once its view revokes
-it.
+the archive store holds every decided row of `S` below its recovered tail `T` (HI-I2) and, on a cluster with an
+`ILedgerLocalDrainBarrier`, once `EnsureLocalStreamsDrainedAsync(S, T)` has returned
+`LocalDrainBarrierOutcome.Drained` for `T > 0` ([LG-I16](ledgers.md#5-invariants)). Each store states the evidence its
+drop submitter holds: for the LSM, `ManifestValue.IsComplete(S)` in a manifest value read or applied ([archive LSM
+§2.6](archive-lsm.md#26-dropping-ledgers)), gated up front by the barrier in `DrainWorker` before committing
+`complete: true`; for archive logs, every segment of `S` complete, each key's write held, as a write the drain saw land
+or a properties read shows ([archive logs](archive-logs.md#2-contract-upward)), gated by the barrier in
+`ArchiveLogDrainWorker` before marking `Complete` and submitting `Drop(S)`. Drops follow each key's lineage
+([LG-I10](ledgers.md#5-invariants)), and each replica node drops its replica once its view revokes it.
 
 ### 2.4 Selecting the store
 
@@ -403,6 +413,8 @@ is empty or 8 bytes; and answers an `Append` `Admits` refuses `ReplaceRequired` 
 | `ArchiveStorePrefix` | A readonly record struct over the short prefix a cluster's store lies under in a bucket or container shared by clusters: 1 to 16 characters of `[a-z0-9_-]`, one object-name component; `Of(seed)` derives 10 lowercase base32 characters, 50 bits, of the SHA-256 of a seed's UTF-8, which the Orleans composition takes from its service ID ([orleans §5.13](../compositions/orleans.md#513-archive-log-store)). |
 | `ArchiveStoreRecord` | The store's record (§2.4, §7): its `ID`, its `Layout`, its `StoreFields`, and the caller's `Parameters`, each group a map; `Decode` answers it or the `InvalidDataException` naming the first rule broken (`bad-utf8`, `bad-line`, `duplicate-field`, `bad-id`, `bad-layout`), and `FirstDifference` names the first field two records differ in, an `ArchiveStoreRecordField(Name, IsParameter)`. Each half has its check, which names its first field which differs with `ArchiveStoreMismatchException`: `CheckStoreFieldsMatch(layout, storeFields)`, the store's, and `CheckParametersMatch(parameters)`, the caller's. |
 | `IArchiveStore` | The archive store contract (§3). |
+| `ILedgerLocalDrainBarrier` | Control plane (`Orleans.Durable.Storage.Engine.Archive.Control`). Named barrier interface invoked by archive drain workers before completing or dropping a closed ledger ([LG-I16](ledgers.md#5-invariants)) and during segment scans to validate skipped `RowKind.LocalAppend` keys fail-closed: `ValidateLocalAppendKey(LedgerMetadata, ReadOnlySpan<byte>)` (throws `ArchiveCorruptException` if invalid or unregistered) and `EnsureLocalStreamsDrainedAsync(LedgerMetadata, Slot, CancellationToken)` returning `ValueTask<LocalDrainBarrierOutcome>` (idempotent across retries and racing drainers). Implemented by `LocalStreamDrainCoordinator` (`Orleans.Durable.Storage.Engine.Cluster.Control`). *Not yet in code* (J2). |
+| `LocalDrainBarrierOutcome` | Control plane union (`Orleans.Durable.Storage.Engine.Archive.Control`): `Drained` (every registered local stream of closed ledger `L` through `T` is durably drained), `Dropped` (`L` left the ledger map), or `Backpressure` (replica backpressure prevented completion; asserts nothing). *Not yet in code* (J2). |
 | `ArchiveCorruptException` | The history contradicts itself: a CRC-32C mismatch, an object or command the store names and does not hold, a store's record which breaks its format (the LSM's manifest or a section, an archive log), a token no provider could have minted, a stored token or version which breaks the chain (HI-I4), or a store which contradicts the ledger map. Both stores raise it. |
 | `ArchiveStoreMismatchException` | The store's record names other store fields or caller parameters than the process's, naming the first which differs, `Field`, whether it is a caller parameter, `IsParameter`, and the record's value of it and the process's, `StoredValue` and `CallerValue`, each null when absent (§2.4); `StoreRecordAsync` throws it on every store for a store field, and `CheckParametersMatch` for a caller parameter. |
 

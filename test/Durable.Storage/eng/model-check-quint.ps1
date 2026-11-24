@@ -34,6 +34,7 @@ $specs = @{
     QuorumCoverageSealing = $ledgerProtocol; AtomicLedger = $ledgerProtocol; LedgerProtocol = $ledgerProtocol
     ObjectLedger = $ledgerProtocol; LedgerDrop = $ledgers; LedgerMap = $ledgers; LedgerLease = $ledgers
     Archive = (Join-Path $root 'specs' 'archive'); ArchiveLogs = (Join-Path $root 'specs' 'archive-logs')
+    LocalDrain = (Join-Path $root 'specs' 'local-drain')
 }
 $Model = @($Model | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 foreach ($m in $Model) {
@@ -1926,6 +1927,90 @@ try {
     Invoke-Simulation 'archive-logs-drainers-3-sampled' 'ArchiveLogs' $logsDrainersAll $logsInvariants -Samples 2000 -Steps 60 -Seed 17
     if ($Nightly) {
         Invoke-Case 'archive-logs-drainers-3-sweeping' 'ArchiveLogs' (With $logsDrainers @{ Sweeping = 'true' }) $logsInvariants
+    }
+
+    # LocalDrain: closed-ledger local-stream drain barrier (LG-I15, LG-I16, JS-I11, JS-I12) on both LSM
+    # (up-front barrier before Drain(..., complete: true), including a == T) and Archive Logs (before-drop barrier
+    # plus eager Waiting drain), with SetWakeup last-write-wins fold, mid-ledger chunked flushes, primary timer vs
+    # closed-ledger drain, concurrent racing drainers, and crashes at every step.
+    $localDrainInvariants = @('TypeOK', 'WakeupPreserved', 'NoDropBeforeLocalDrained', 'ClearedBeforeCloseWritesNothing')
+    $localDrainLiveness = @('EventuallyLocalDrained', 'EventuallyWakeupDelivered')
+
+    $localDrainLsm = [ordered]@{
+        Mode = '"lsm"'
+        Slots = '["S", "C", "S"]'
+        InitialLsmWatermark = 0
+        InitialOlderListed = 'false'
+        OlderCanDrop = 'false'
+        Drainers = 2
+        AllowChunkFlush = 'true'
+        MaxFlushes = 1
+        MaxCrashes = 1
+        Mutation = '"none"'
+    }
+    $localDrainLsmCleared = With $localDrainLsm @{ Slots = '["S", "C"]'; AllowChunkFlush = 'false'; MaxFlushes = 0 }
+    $localDrainLsmAtEnd = With $localDrainLsm @{ Slots = '["K", "S"]'; InitialLsmWatermark = 2; AllowChunkFlush = 'false'; MaxFlushes = 0 }
+    $localDrainLogs = With $localDrainLsm @{ Mode = '"logs"'; InitialOlderListed = 'true'; OlderCanDrop = 'true' }
+    $localDrainLogsWaiting = With $localDrainLsm @{
+        Mode = '"logs"'
+        Slots = '["S"]'
+        InitialOlderListed = 'true'
+        OlderCanDrop = 'false'
+        Drainers = 1
+        AllowChunkFlush = 'false'
+        MaxFlushes = 0
+    }
+    $localDrainLivenessBase = With $localDrainLsm @{
+        Slots = '["S", "C", "S"]'
+        Drainers = 1
+        AllowChunkFlush = 'true'
+        MaxFlushes = 1
+        MaxCrashes = 1
+    }
+
+    # Positive safety cases.
+    Invoke-Case 'local-drain-lsm' 'LocalDrain' $localDrainLsm $localDrainInvariants
+    Invoke-Case 'local-drain-lsm-cleared' 'LocalDrain' $localDrainLsmCleared $localDrainInvariants
+    Invoke-Case 'local-drain-lsm-at-end' 'LocalDrain' $localDrainLsmAtEnd $localDrainInvariants
+    Invoke-Case 'local-drain-logs' 'LocalDrain' $localDrainLogs $localDrainInvariants
+    Invoke-Case 'local-drain-logs-waiting' 'LocalDrain' $localDrainLogsWaiting $localDrainInvariants
+
+    # Weak-fairness liveness cases (LSM, Archive Logs normal, and Archive Logs blocked Waiting on older ledger).
+    Invoke-Case 'local-drain-liveness-lsm' 'LocalDrain' $localDrainLivenessBase -Temporal $localDrainLiveness
+    Invoke-Case 'local-drain-liveness-logs-waiting' 'LocalDrain' $localDrainLogsWaiting -Temporal $localDrainLiveness
+
+    # Non-vacuity witnesses (each must produce a counterexample in the unmutated model).
+    Invoke-Case 'local-drain-witness-NeverSurvivingCrashWakeup' 'LocalDrain' $localDrainLsm -ExpectedInvariant 'NeverSurvivingCrashWakeup'
+    Invoke-Case 'local-drain-witness-NeverClearedBeforeClose' 'LocalDrain' $localDrainLsmCleared -ExpectedInvariant 'NeverClearedBeforeClose'
+    Invoke-Case 'local-drain-witness-NeverLsmAlreadyDrainedPath' 'LocalDrain' $localDrainLsmAtEnd -ExpectedInvariant 'NeverLsmAlreadyDrainedPath'
+    Invoke-Case 'local-drain-witness-NeverRacingDrainers' 'LocalDrain' $localDrainLsm -ExpectedInvariant 'NeverRacingDrainers'
+    Invoke-Case 'local-drain-witness-NeverChunkedFlush' 'LocalDrain' $localDrainLsm -ExpectedInvariant 'NeverChunkedFlush'
+
+    # Guard-disabling safety mutants (one per invariant + volatile-answer mutants).
+    foreach ($case in @(
+        @('lsm-complete-before-barrier', $localDrainLsm, 'NoDropBeforeLocalDrained'),
+        @('lsm-skip-barrier-at-end', $localDrainLsmAtEnd, 'NoDropBeforeLocalDrained'),
+        @('logs-drop-before-barrier', $localDrainLogs, 'NoDropBeforeLocalDrained'),
+        @('skip-wakeup-commit', $localDrainLsm, 'WakeupPreserved'),
+        @('schedule-volatile', $localDrainLsm, 'WakeupPreserved'),
+        @('barrier-complete-on-backpressure', $localDrainLsm, 'NoDropBeforeLocalDrained'),
+        @('barrier-complete-on-backpressure', $localDrainLsm, 'WakeupPreserved'),
+        @('flush-cleared-entry', $localDrainLsmCleared, 'ClearedBeforeCloseWritesNothing'))) {
+        Invoke-Case "local-drain-mutant-$($case[0])-$($case[2])" 'LocalDrain' (Mutant $case[1] $case[0]) `
+            -ExpectedInvariant $case[2]
+    }
+
+    # Liveness mutant: disabling eager Waiting drain on Archive Logs violates EventuallyLocalDrained and EventuallyWakeupDelivered.
+    Invoke-Case 'local-drain-mutant-no-eager-waiting-drain-EventuallyLocalDrained' 'LocalDrain' `
+        (Mutant $localDrainLogsWaiting 'no-eager-waiting-drain') -ExpectedProperty 'EventuallyLocalDrained'
+    Invoke-Case 'local-drain-mutant-no-eager-waiting-drain-EventuallyWakeupDelivered' 'LocalDrain' `
+        (Mutant $localDrainLogsWaiting 'no-eager-waiting-drain') -ExpectedProperty 'EventuallyWakeupDelivered'
+
+    if ($Extended) {
+        Invoke-Case 'local-drain-lsm-crashes-2' 'LocalDrain' (With $localDrainLsm @{ MaxCrashes = 2 }) $localDrainInvariants
+        Invoke-Case 'local-drain-logs-crashes-2' 'LocalDrain' (With $localDrainLogs @{ MaxCrashes = 2 }) $localDrainInvariants
+        Invoke-Case 'local-drain-liveness-logs-racing' 'LocalDrain' (With $localDrainLogs @{ Slots = '["S", "C", "S"]'; AllowChunkFlush = 'false'; MaxFlushes = 0 }) `
+            -Temporal $localDrainLiveness
     }
 }
 finally {

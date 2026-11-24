@@ -174,6 +174,8 @@ Owner: [archive §2, §3](components/archive.md#2-contract-upward), and each sto
 | `ArchiveReader.ReadStoreAsync(key)` | `ArchiveStoreAnswer(Map, Prefix?)`: the store's prefix, or null for its `Absent`, with the map value read before the store, which holds while that value's open ledger for the key is unsealed ([archive §2.2](components/archive.md#22-history-reads)); on the LSM, `Absent` only when no committed section holds a row of the key, judged with a manifest which shows complete every ledger `Map` no longer lists. |
 | `IArchiveStore.ReadAsync(key, map)` | `ArchiveStoreRead`: `Absent`; `Stale`, when the store's own snapshot proved out of date, after which the caller reads the map and the store again; or `Read(ArchivePrefix)`, which its caller owns: the key's token, version base, whether a `Replace` opened its base (`HasBase`), tombstone when the key is deleted now, and content ([archive §3](components/archive.md#3-requirements-downward)). |
 | `Plan`, `Admits`, `Holds`, `IsReplaceRequested`, `AdmitsKey` | Pure values: a token from `Plan`, and a Boolean from each of the others. `Plan` throws `ArchiveCorruptException` for a token its provider could not have minted ([HI-I3](components/archive.md#5-invariants)). |
+| `ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, tail)` (*Not yet in code*, J2) | `LocalDrainBarrierOutcome`: `Drained` (every registered local stream of closed ledger `ledger` through `tail` is durably drained, [LG-I16](components/ledgers.md#5-invariants)), `Dropped` (`ledger` left the ledger map), or `Backpressure` (replica backpressure prevented completion; asserts nothing). `ArchiveCorruptException` when a `RowKind.LocalAppend` key or payload fails validation. |
+| `ILocalKeyPresenceLookup.TryHasKeyEntryAsync(ledger, localKey, tail)` (*Not yet in code*, J2) | `LocalKeyPresenceRead`: `Absent` (the local node's caught-up key index proves zero rows for `localKey` below `tail`), `Present` (at least one indexed row exists), or `Unindexed` (fallback to sequential scan). |
 
 History reads restart internally when a cached map or manifest proves stale. A caller sees only the outcome or
 `ArchiveCorruptException`: a store which contradicts the map or itself, a CRC-32C mismatch in an LSM section or trailer,
@@ -238,11 +240,12 @@ Every write resolves to exactly one outcome ([JS-I4](components/journals.md#5-in
 resend `Moved` and `Fenced` entries; a resend of an accepted entry is `Rejected` with the advanced `CurrentVersion`.
 Versions are opaque and compared only for equality, so nothing infers from them whether an `Ambiguous` entry applied;
 [journals §2.2](components/journals.md#22-writes) states how its writer continues. A write whose key the archive store
-does not admit, whose body is above `MaxBodyBytes`, or which is an empty `Append` throws `ArgumentException` before
-admission. A write whose key's state loads while the key's ledger cannot reach its quorum throws
-`JournalStoreUnavailableException` without effect: it waited for the load, and was never proposed. The Orleans
-composition also answers `Throttled`, which has no effect, before a write reaches the Journals while the key's ledger is
-throttled ([orleans §5.9](compositions/orleans.md#59-resource-governance)).
+does not admit, whose body is above `MaxBodyBytes`, which is an empty `Append`, or whose attached `LocalAppendRecord`
+fails pre-admission validation throws `ArgumentException` before admission (and forwarded writes return
+`JournalCallRefused(JournalRefusal.Argument, message)` rather than `Ambiguous`). A write whose key's state loads while
+the key's ledger cannot reach its quorum throws `JournalStoreUnavailableException` without effect: it waited for the
+load, and was never proposed. The Orleans composition also answers `Throttled`, which has no effect, before a write
+reaches the Journals while the key's ledger is throttled ([orleans §5.9](compositions/orleans.md#59-resource-governance)).
 
 | Read outcome | Meaning |
 | --- | --- |

@@ -434,6 +434,21 @@ limit bounds it; Ledgers interprets no body.
 | `Append` | Applies on top of the earlier rows. |
 | `Replace` | Supersedes every earlier row; the row itself is the new state's base. |
 | `Delete` | Supersedes every earlier row and leaves its body, when it has one, as the key's tombstone; an empty body leaves nothing. |
+| `LocalAppend` | Unchecked append to a ledger-local stream addressed by `LedgerLocalKey`; shares the segment's key dictionary, commits atomically in the batch slot, and is excluded from `Archive.Lsm`, `Archive.Logs`, and `ArchiveReader` journal folds (LG-I15). *Not yet in code* (J1). |
+
+`RowKinds.IsDefined(RowKind)` admits all four ledger kinds (`Append`, `Replace`, `Delete`, `LocalAppend`);
+`RowKinds.IsArchiveKind(RowKind)` admits only keyed archive kinds (`Append`, `Replace`, `Delete`), guarding
+`ArchiveRow.Live` and every archive and journal fold.
+
+**Ledger-local streams and keys.** A **ledger-local stream** is identified by a validated `LocalStreamName` (1 to 64
+ASCII bytes from `[a-z0-9._-]`). Within ledger `L` over `L.Range`, every `RowKind.LocalAppend` row for `stream` uses
+the key `LedgerLocalKey.Encode(L.Id, L.Range, stream)` (`MaxRangeDepth = 256`, `MaxEncodedLength = 105` bytes). The
+encoded key starts with `max(4, ceil(L.Range.Depth / 8))` prefix bytes (unused low bits 0), followed by `0xFF`,
+`L.Id.Value` (8 bytes big-endian), and `stream` (1 to 64 ASCII bytes). The key always satisfies `L.Range.Contains(key)`,
+is disjoint from every valid UTF-8 `JournalRowKey` (`0xFF` at index ≥ 4), and is unique per `(LedgerId,
+LocalStreamName)`. Because it is an ordinary ledger key in `L.Range`, `LedgerSegmentDictionary` defines it once per
+segment (1-byte ordinal per subsequent write in that segment) and `RocksDbJournalIndex`'s `key_index` indexes and drops
+it automatically with no schema change. *Not yet in code* (J1).
 
 **Versions and tokens.** Each key carries two opaque values its writer's caller supplies, which Ledgers stores and
 lends back without interpreting either; their meaning belongs to the caller:
@@ -867,7 +882,9 @@ the same address ([OR-I14](../compositions/orleans.md#51-invariants)).
 | --- | --- |
 | `LedgerId` | A `ulong` which the map write installing the ledger assigns from `NextLedgerId`; 0 is never assigned. Unique within a cluster for its life (LG-I3). Its code type is in `Orleans.Durable.Storage.Engine.Ledgers.Abstractions`, since the ledger replica addresses replicas by it ([identity §3](../identity.md#3-ledger-identity)). |
 | `KeyRange` | `(Prefix, Depth)`, `0 ≤ Depth ≤ 524,280`: `Depth` bits, stored in `⌈Depth / 8⌉` bytes with the unused low bits 0, which construction requires; the default is the whole keyspace and equals the constructed `(0, 0)`. `Containing(key, depth)`, the range at `depth` which contains `key`; `Contains(key)`, `Contains(range)`, `Overlaps(range)`, `Children`, `Parent`, `Sibling`; `IsPartition(ranges)`, whether a list of ranges partitions the keyspace (§2.1). Equality is by value, and `GetContainingHashCode(key, depth)` is the hash code of `Containing(key, depth)`, computed without constructing it, so a lookup by range finds a key's range at a depth without allocating; the hash covers the depth and the prefix's first 8 bytes, which spread well over keys led by a hash, as journal keys are ([Journals](journals.md#41-keys)). `IsPartition` and `GetContainingHashCode` are internal to the layer, whose map and committer call them. Its text form is the prefix's bits, `/`, and the depth: `10/2`, and `/0` for the whole keyspace. Construction throws `ArgumentOutOfRangeException` for a depth outside 0 to 524,280 and `ArgumentException` for a prefix of the wrong length or with a bit set past the depth; `Containing`, `Contains(key)`, and `GetContainingHashCode` throw `ArgumentException` for a key of 0 or more than 65,535 bytes; `Children` throws `InvalidOperationException` at depth 524,280, and `Parent` and `Sibling` on the whole keyspace. |
-| `RowKind` | `Append = 0`, `Replace = 1`, `Delete = 2` (§2.2). |
+| `RowKind` | `Append = 0`, `Replace = 1`, `Delete = 2`, `LocalAppend = 3` (§2.2). `RowKinds.IsDefined` accepts all four kinds (`0..3`); `RowKinds.IsArchiveKind` accepts keyed archive kinds (`0..2`). |
+| `LocalStreamName` | Validated immutable ASCII `[a-z0-9._-]` stream identifier (`MaxLength = 64`, 1 to 64 bytes), implementing `IEquatable<LocalStreamName>` (§2.2). *Not yet in code* (J1). |
+| `LedgerLocalKey` | Ledger-local row key codec (`MaxRangeDepth = 256`, `MaxEncodedLength = 105`): `Encode(LedgerId, KeyRange, LocalStreamName)` builds `prefixBytes (max(4, ceil(depth / 8)), unused low bits 0) \|\| 0xFF \|\| ledger.Value (8B BE) \|\| stream`, rejecting `range.Depth > MaxRangeDepth`; `TryDecode(ReadOnlySpan<byte>, KeyRange, LedgerId, out ReadOnlySpan<byte> streamName)` validates prefix, zeroed low bits, `0xFF`, `ledger.Value`, and `[a-z0-9._-]` stream bytes (1..64) (§2.2, §7). *Not yet in code* (J1). |
 | `RowToken` | A readonly struct of at most 32 opaque bytes, held inline without allocation: a key's token for a segment, or a version's base (§2.2). Equality is by bytes, and the default is the empty token. Construction throws `ArgumentException` for more than 32 bytes. Ledgers stores and lends it verbatim and never interprets it. |
 | `RowVersion` | `(Base: RowToken, Count: ulong)`, a readonly record struct: a key's version (§2.2), equal by base and count. `Next()` keeps the base and adds one to the count, and throws `OverflowException` at the `u64` maximum ([conventions §8](../conventions.md#8-checked-arithmetic)). |
 | `Row` | `(Key: ReadOnlyMemory<byte>, Kind, Body: ArcBuffer)`, which owns a copy of its key and its own lease on its body, possibly empty, which its disposal releases; construction retains that lease, and the caller keeps and disposes its own. Construction throws `ArgumentException` for a key of 0 or more than 65,535 bytes or an undefined kind, and `InvalidOperationException` for a released body. A row's version, token, and ordinal are not part of a `Row`: they live on `BatchRow` and `ResolvedRow`. |
@@ -914,6 +931,8 @@ the same address ([OR-I14](../compositions/orleans.md#51-invariants)).
 | LG-I12 | Batches are created one at a time and take slots in creation order. Each created batch is decided in slot order, or no later batch is decided. A segment lies within one ledger, closes by a later flagged batch or by `T`, defines each key at most once with ordinals 0, 1, …, and every reference names a key defined earlier in its segment. |
 | LG-I13 | A row's version is its defining row's stored version `(base, count)` with the count advanced by one per row of the key in the segment (§2.2). Ledgers stores each defining row's version base and token verbatim. |
 | LG-I14 | **Lease-respecting transitions.** Before `TransitionExecutor` submits `LedgerMapChange.Install` closing one or more open ledgers (`Replace`, `Split`, `Merge`), it waits on its monotonic clock for the maximum `LeaseRemaining` reported across all closed ledgers' recoveries ([LP-I18](ledger-protocol.md#5-invariants)), so no successor ledger can commit in `LedgerMap` while an outgoing primary holds an unexpired local read lease. Exception: on `Transition.Replace` with `PredecessorReleaseHint.Cooperative`, the outgoing primary permanently surrendered its read lease in `PrepareReleaseAsync` before returning `Released` ([OR-I24](../compositions/orleans.md#51-invariants)), so the executor skips the lease wait (0 ms planned handoff). |
+| LG-I15 | **Ledger-local append isolation.** Every `RowKind.LocalAppend` row is protected by its batch's CRC-32C, decided atomically with its batch's slot and keyed rows, addressed by `LedgerLocalKey`, and excluded from `Archive.Lsm`, `Archive.Logs`, and all `ArchiveReader` journal folds. *Not yet in code* (J1). |
+| LG-I16 | **Closed-ledger local drain barrier.** On a cluster with an `ILedgerLocalDrainBarrier`, a closed ledger `L` with `T > 0` is neither marked complete in the LSM manifest (`ManifestChange.Drain(..., complete: true)`) nor submitted for `LedgerMapChange.Drop(L)` on Archive Logs until `ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync(L, T)` has returned `LocalDrainBarrierOutcome.Drained`. Modeled by [`LocalDrain.qnt`](../../../specs/local-drain/LocalDrain.qnt); *Not yet in code* (J2). |
 
 LG-I1 and LG-I2 make each key's ownership a chain; LG-I3 orders it; LG-I4 and LG-I5 make every closed ledger's
 contribution final; LG-I6 follows from them. A successor ledger's ID exceeds every parent's: LG-I2 closes the parents in
@@ -1062,8 +1081,8 @@ wrote. A batch, in order:
 | Rows | The rows, in order, below |
 | CRC | CRC-32C of every byte before it (`u32`) |
 
-Each row begins with a flags byte (`u8`): its kind in bits 0 and 1 (`Append` 0, `Replace` 1, `Delete` 2), *defining* in
-bit 2, and the other bits 0. The fields which follow it:
+Each row begins with a flags byte (`u8`): its kind in bits 0 and 1 (`Append` 0, `Replace` 1, `Delete` 2,
+`LocalAppend` 3), *defining* in bit 2, and the other bits 0. The fields which follow it:
 
 | Field | Defining row | Referencing row |
 | --- | --- | --- |
@@ -1109,7 +1128,7 @@ rules:
 | `bad-ordinal-base` | The ordinal base is 0 when the start flag is set |
 | `no-rows` | The row count is at least 1 without the start flag |
 | `row-truncated` | Each field of the counted rows ends at or before the CRC |
-| `bad-row-flags` | A row's kind is 0, 1, or 2, and its bits other than the kind and *defining* are 0 |
+| `bad-row-flags` | A row's kind is 0, 1, 2, or 3, and its bits other than the kind and *defining* (`0x07`) are 0 |
 | `empty-key` | A defining row's key length is at least 1 |
 | `key-too-long` | A defining row's key length is at most 65,535 |
 | `base-too-long` | A version base's length is at most 32 |
@@ -1133,6 +1152,21 @@ The batch rules and `ordinal-base-mismatch` make every reference resolve, so the
 unknown ordinal. A point read through a key index, which names a key's defining slot and ordinal, meets one: a
 defining batch which defines no such ordinal answers `unknown-ordinal` (`BatchView.FindDefining`, §2.5), which the
 point-read path reports as corruption.
+
+**Ledger-local key (`LedgerLocalKey`).** Encoded row key for `RowKind.LocalAppend` rows (*Not yet in code*, J1).
+`MaxRangeDepth = 256` (32 prefix bytes), giving `MaxEncodedLength = 105` bytes (`32 + 1 + 8 + 64`). Layout in byte
+order:
+
+| Field | Bytes | Rule |
+| --- | --- | --- |
+| Range prefix | `max(4, ceil(range.Depth / 8))` | `range`'s prefix bytes right-padded with 0 bytes to at least 4 bytes; unused low bits past `range.Depth` are 0 |
+| Disjointness sentinel | 1 | `0xFF`, impossible in valid UTF-8 so never collides with any `JournalRowKey` |
+| Ledger ID | 8 | `ledger.Value`, big-endian (`u64`) |
+| Stream name | 1 to 64 | ASCII bytes from `[a-z0-9._-]` (`LocalStreamName`) |
+
+`LedgerLocalKey.TryDecode` verifies the prefix length and bits (including zeroed unused low bits), the `0xFF` sentinel,
+exact `ledger.Value`, and a valid `LocalStreamName` (`1..64` bytes in `[a-z0-9._-]`). Golden vectors:
+`test/Durable.Storage/shared-vectors/ledgers/local-keys.json` and `local-key-rejections.json`.
 
 ## 8. Mechanism and policy
 
@@ -1421,6 +1455,18 @@ parameterize the group committer ([conventions §6](../conventions.md#6-retries-
 
 ## 10. Verification
 
+- **Model.** [`LocalDrain.qnt`](../../../specs/local-drain/LocalDrain.qnt) checks closed-ledger local-stream draining
+  with `ILedgerLocalDrainBarrier` on both LSM (up-front barrier before `ManifestChange.Drain(..., complete: true)`,
+  including the `a == T` path) and Archive Logs (before-drop barrier plus eager `Waiting` drain behind an older
+  overlapping ledger), covering `LG-I15`, `LG-I16`, `JS-I11`, and `JS-I12` (`WakeupPreserved`,
+  `NoDropBeforeLocalDrained`, `ClearedBeforeCloseWritesNothing`, weak-fairness liveness `EventuallyLocalDrained` and
+  `EventuallyWakeupDelivered`, five witnesses, and safety, volatile-answer, and liveness mutants; [local-drain
+  model](../../../specs/local-drain/README.md)).
+- **Ledger-local keys and `RowKind.LocalAppend`.** Golden vectors (`ledgers/local-keys.json`,
+  `local-key-rejections.json`, updated `batches.json` and `batch-rejections.json`) and CsCheck properties check
+  `range.Contains(key)` across depths `0..256`, disjointness from every valid UTF-8 `JournalRowKey`, canonical
+  round-trip, rejection of `range.Depth > MaxRangeDepth`, non-zero unused low bits, wrong ledger ID, and malformed
+  stream names, and re-merged `ledgers-batch` / `ledgers-segment` fuzz corpora (*Not yet in code*, J1).
 - **Model.** [`LedgerLease.qnt`](../../../specs/ledgers/LedgerLease.qnt) checks the L2 ledger-replica quorum read
   lease protocol ([LR-I10](ledger-replicas.md#5-invariants), [LP-I18](ledger-protocol.md#5-invariants), LG-I14):
   bounded monotonic clock rates `v_min .. v_max` with `F ≥ v_max / v_min`, primary grant tracking

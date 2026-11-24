@@ -99,7 +99,7 @@ ledger-map-traces seeds="": restore
 archive-traces seeds="": restore
     @& ./eng/archive-traces.ps1 -Seeds '{{ seeds }}'
 
-# Exhaust the Quint models of the ledger protocol, Ledgers, the Archive, and archive logs, and verify their expected counterexamples, for example `just quint-models -Model LedgerMap`.
+# Exhaust the Quint models of the ledger protocol, Ledgers, the Archive, archive logs, and local-stream drain, and verify their expected counterexamples, for example `just quint-models -Model LocalDrain`.
 quint-models *options:
     @& ./eng/model-check-quint.ps1 {{ options }}
 
