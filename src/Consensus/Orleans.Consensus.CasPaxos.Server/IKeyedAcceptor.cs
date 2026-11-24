@@ -54,4 +54,7 @@ public sealed record AcceptorUnchanged;
 public union AcceptorReadResult(AcceptorMissing, AcceptorUnchanged, KeyedAcceptorState);
 
 /// <summary>A local inventory page. A null continuation means the page exhausted its snapshot.</summary>
-public sealed record KeyPage(ImmutableArray<KeyedAcceptorState> Entries, string? ContinuationKey);
+public sealed record KeyPage(
+    ImmutableArray<KeyedAcceptorState> Entries,
+    string? ContinuationKey,
+    Ballot FloorBallot = default);

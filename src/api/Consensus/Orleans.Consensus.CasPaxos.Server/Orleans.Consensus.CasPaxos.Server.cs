@@ -185,7 +185,7 @@ namespace Orleans.Consensus.CasPaxos.Server
     {
     }
 
-    public sealed partial record KeyPage(System.Collections.Immutable.ImmutableArray<KeyedAcceptorState> Entries, string? ContinuationKey)
+    public sealed partial record KeyPage(System.Collections.Immutable.ImmutableArray<KeyedAcceptorState> Entries, string? ContinuationKey, Model.Ballot FloorBallot = default)
     {
     }
 
@@ -298,9 +298,11 @@ namespace Orleans.Consensus.CasPaxos.Server
         public System.Threading.Tasks.ValueTask<RegisterValue> ReadAsync(string key, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public sealed partial record VoterConfiguration(long Number, System.Collections.Immutable.ImmutableArray<VoterDescriptor> Voters, VoterConfigurationState State)
+    public sealed partial record VoterConfiguration(long Number, System.Collections.Immutable.ImmutableArray<VoterDescriptor> Voters, VoterConfigurationState State, System.Collections.Immutable.ImmutableArray<VoterDescriptor> PreviousVoters = default)
     {
         public const string RegisterKey = "__caspaxos/config";
+        public System.Collections.Immutable.ImmutableArray<VoterDescriptor> CanonicalPreviousVoters { get { throw null; } }
+
         public System.Collections.Immutable.ImmutableArray<VoterDescriptor> CanonicalVoters { get { throw null; } }
 
         public static ByteString ComputeBootstrapDigest(System.Collections.Generic.IEnumerable<string> voterIds) { throw null; }
