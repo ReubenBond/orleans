@@ -128,7 +128,7 @@ public sealed class NativeConsensusTests : IDisposable
         }
 
         var failure = await Assert.ThrowsAsync<InvalidDataException>(() => LocalVoter.OpenAsync(
-            "b", NativeVoterCluster.DatabaseOf(_directory.FullName, 0), NativeVoterCluster.Ids, 16, 4, new Consensus.CasPaxos.Testing.RecordingFatalErrorHandler(), TestContext.Current.CancellationToken));
+            "b", NativeVoterCluster.DatabaseOf(_directory.FullName, 0), 16, 4, new Consensus.CasPaxos.Testing.RecordingFatalErrorHandler(), cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("bound to voter 'a'", failure.Message, StringComparison.Ordinal);
     }
 

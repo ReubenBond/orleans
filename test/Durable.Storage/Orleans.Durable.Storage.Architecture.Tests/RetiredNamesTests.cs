@@ -61,6 +61,7 @@ public sealed partial class RetiredNamesTests
     private static readonly Exemption[] DriveExemptions =
     [
         new(@"\bDrive(?:Info|Type|Format)\b", "The platform's names for a disk."),
+        new(@"\bVoterReconfigurationDriver\b", "The upstream Fast CASPaxos consensus library's reconfiguration type name."),
     ];
 
     /// <summary>

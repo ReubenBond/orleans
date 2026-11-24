@@ -35,10 +35,14 @@ internal sealed class CasPaxosVoterSystemTarget : SystemTarget, ICasPaxosVoter
         _service.AcceptAsync(voter, key, ballot, value, nextBallotToPrepare, cancellationToken);
 
     /// <inheritdoc/>
+    public ValueTask<VoterSetFloorReply> SetFloorAsync(string voter, Ballot targetFloor, CancellationToken cancellationToken) =>
+        _service.SetFloorAsync(voter, targetFloor, cancellationToken);
+
+    /// <inheritdoc/>
     public ValueTask<VoterKeyPageReply> ListKeysAsync(string voter, string prefix, string? afterKey, int limit, CancellationToken cancellationToken) =>
         _service.ListKeysAsync(voter, prefix, afterKey, limit, cancellationToken);
 
     /// <inheritdoc/>
-    public ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, CancellationToken cancellationToken) =>
-        _service.AdmitAsync(voter, candidate, incarnation, cancellationToken);
+    public ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, ByteString? bootstrapDigest, CancellationToken cancellationToken) =>
+        _service.AdmitAsync(voter, candidate, incarnation, bootstrapDigest, cancellationToken);
 }

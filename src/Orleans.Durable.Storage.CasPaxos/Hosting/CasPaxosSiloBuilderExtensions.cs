@@ -57,6 +57,7 @@ public static class CasPaxosSiloBuilderExtensions
         _ = services.AddSingleton<IValidateOptions<CasPaxosMetaStoreOptions>, CasPaxosMetaStoreOptionsValidator>();
         services.TryAddSingleton(TimeProvider.System);
         _ = services.AddSingleton<CasPaxosConsensusHost>();
+        _ = services.AddSingleton(static provider => new CasPaxosReconfigurationService(provider.GetRequiredService<CasPaxosConsensusHost>()));
         _ = services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(static provider => provider.GetRequiredService<CasPaxosConsensusHost>());
         _ = services.AddSingleton<IMetaStore>(static provider => new CasPaxosMetaStoreFactory(provider.GetRequiredService<CasPaxosConsensusHost>()));
         return builder;

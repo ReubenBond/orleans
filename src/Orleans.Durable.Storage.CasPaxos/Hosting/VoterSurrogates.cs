@@ -15,6 +15,10 @@ internal readonly struct BallotSurrogate
     /// <summary>Gets or initializes the ballot's proposer; zero is the shared fast round's.</summary>
     [Id(1)]
     public int Proposer { get; init; }
+
+    /// <summary>Gets or initializes the ballot's 1-based configuration number; zero exclusively for the zero ballot.</summary>
+    [Id(2)]
+    public long Configuration { get; init; }
 }
 
 /// <summary>Converts a ballot to its surrogate and back.</summary>
@@ -22,10 +26,10 @@ internal readonly struct BallotSurrogate
 internal sealed class BallotConverter : IConverter<Ballot, BallotSurrogate>
 {
     /// <inheritdoc/>
-    public Ballot ConvertFromSurrogate(in BallotSurrogate surrogate) => new(surrogate.Round, surrogate.Proposer);
+    public Ballot ConvertFromSurrogate(in BallotSurrogate surrogate) => new(surrogate.Configuration, surrogate.Round, surrogate.Proposer);
 
     /// <inheritdoc/>
-    public BallotSurrogate ConvertToSurrogate(in Ballot value) => new() { Round = value.Round, Proposer = value.Proposer };
+    public BallotSurrogate ConvertToSurrogate(in Ballot value) => new() { Configuration = value.Configuration, Round = value.Round, Proposer = value.Proposer };
 }
 
 /// <summary>

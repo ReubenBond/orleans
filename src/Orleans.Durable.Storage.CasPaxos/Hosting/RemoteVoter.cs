@@ -1,4 +1,5 @@
 using Orleans.Consensus.CasPaxos.Messages;
+using Orleans.Consensus.CasPaxos.Model;
 using Orleans.Consensus.CasPaxos.Protocol;
 using Orleans.Consensus.CasPaxos.Server;
 
@@ -28,7 +29,7 @@ internal sealed class RemoteVoter(string id, Func<ICasPaxosVoter> target) : IKey
         Validate(reply.Voter);
         return reply.Kind switch
         {
-            VoterReadKind.Missing => new AcceptorMissing(),
+            VoterReadKind.Missing => new AcceptorMissing(reply.PromisedBallot),
             VoterReadKind.Unchanged => new AcceptorUnchanged(),
             VoterReadKind.Accepted when reply.Record is { } record => record.ToState(),
             _ => throw new InvalidDataException($"Voter '{Id}' answered a read with an invalid outcome."),
@@ -52,22 +53,30 @@ internal sealed class RemoteVoter(string id, Func<ICasPaxosVoter> target) : IKey
     }
 
     /// <inheritdoc/>
+    public async ValueTask<Ballot> SetFloorAsync(Ballot targetFloor, CancellationToken cancellationToken = default)
+    {
+        var reply = await target().SetFloorAsync(Id, targetFloor, cancellationToken).ConfigureAwait(false);
+        Validate(reply.Voter);
+        return reply.Floor;
+    }
+
+    /// <inheritdoc/>
     public async ValueTask<KeyPage> ListKeysAsync(string prefix = "", string? afterKey = null, int limit = 100, CancellationToken cancellationToken = default)
     {
         var reply = await target().ListKeysAsync(Id, prefix, afterKey, limit, cancellationToken).ConfigureAwait(false);
         Validate(reply.Voter);
-        return new([.. reply.Entries.Select(static record => record.ToState())], reply.ContinuationKey);
+        return new([.. reply.Entries.Select(static record => record.ToState())], reply.ContinuationKey, reply.FloorBallot);
     }
 
     /// <summary>
-    /// Asks the voter to admit <paramref name="incarnation"/> of <paramref name="candidate"/>, returning the incarnation
-    /// it admits.
+    /// Asks the voter to admit <paramref name="incarnation"/> of <paramref name="candidate"/>, validating
+    /// <paramref name="bootstrapDigest"/> when supplied and returning the voter's reply.
     /// </summary>
-    public async ValueTask<Guid> AdmitAsync(string candidate, Guid incarnation, CancellationToken cancellationToken)
+    public async ValueTask<VoterAdmitReply> AdmitAsync(string candidate, Guid incarnation, ByteString? bootstrapDigest, CancellationToken cancellationToken)
     {
-        var reply = await target().AdmitAsync(Id, candidate, incarnation, cancellationToken).ConfigureAwait(false);
+        var reply = await target().AdmitAsync(Id, candidate, incarnation, bootstrapDigest, cancellationToken).ConfigureAwait(false);
         Validate(reply.Voter);
-        return reply.Admitted;
+        return reply;
     }
 
     private void Validate(string answered)

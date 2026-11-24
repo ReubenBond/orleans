@@ -42,18 +42,25 @@ internal static partial class VoterAdmission
             var answers = await Task.WhenAll(others
                 .Where(remote => !admitted.Contains(remote.Id))
                 .Select(remote => AskAsync(remote, voter, attemptTimeout, timeProvider, logger, cancellationToken))).ConfigureAwait(false);
-            foreach (var (remote, incarnation) in answers)
+            foreach (var (remote, reply) in answers)
             {
-                if (incarnation is not { } answer)
+                if (reply is null)
                 {
                     continue;
                 }
 
-                if (answer != voter.Incarnation)
+                if (reply.Status == VoterAdmitStatus.BootstrapDigestMismatch)
                 {
                     throw new InvalidOperationException(
-                        $"Voter '{remote}' admitted incarnation {answer} of voter '{voter.Id}', not this database's {voter.Incarnation}: this voter's state was lost or replaced, "
-                        + "and a fresh database cannot keep the promises the lost one gave. Replacing a lost voter is unsupported; restore the voter's database, or keep this silo out of the cluster.");
+                        $"Voter '{remote}' rejected admission of voter '{voter.Id}' because their bootstrap voter configurations disagree. "
+                        + "Every bootstrap silo must configure the identical V(1) voter set.");
+                }
+
+                if (reply.Admitted != voter.Incarnation)
+                {
+                    throw new InvalidOperationException(
+                        $"Voter '{remote}' admitted incarnation {reply.Admitted} of voter '{voter.Id}', not this database's {voter.Incarnation}: this voter's state was lost or replaced, "
+                        + "and a fresh database cannot keep the promises the lost one gave. Restore the voter's database, or replace the lost voter with a new identity through CasPaxosReconfigurationService.");
                 }
 
                 _ = admitted.Add(remote);
@@ -71,7 +78,7 @@ internal static partial class VoterAdmission
         LogAdmitted(logger, voter.Id, voter.Incarnation, needed);
     }
 
-    private static async Task<(string Remote, Guid? Incarnation)> AskAsync(
+    private static async Task<(string Remote, VoterAdmitReply? Reply)> AskAsync(
         RemoteVoter remote, LocalVoter voter, TimeSpan attemptTimeout, TimeProvider timeProvider, ILogger logger, CancellationToken cancellationToken)
     {
         using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -79,7 +86,7 @@ internal static partial class VoterAdmission
         using var registration = deadline.Token.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), attempt);
         try
         {
-            return (remote.Id, await remote.AdmitAsync(voter.Id, voter.Incarnation, attempt.Token).ConfigureAwait(false));
+            return (remote.Id, await remote.AdmitAsync(voter.Id, voter.Incarnation, voter.BootstrapDigest, attempt.Token).ConfigureAwait(false));
         }
         catch (Exception failure) when (!cancellationToken.IsCancellationRequested)
         {

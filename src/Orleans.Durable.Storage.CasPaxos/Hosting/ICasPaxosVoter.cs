@@ -27,16 +27,21 @@ internal interface ICasPaxosVoter : ISystemTarget
     [Alias("Accept")]
     ValueTask<VoterAcceptReply> AcceptAsync(string voter, string key, Ballot ballot, ByteString value, Ballot nextBallotToPrepare, CancellationToken cancellationToken);
 
+    /// <summary>Raises the voter's durable acceptor-wide floor ballot to at least <paramref name="targetFloor"/>, as <see cref="IKeyedAcceptor.SetFloorAsync"/> does.</summary>
+    [Alias("SetFloor")]
+    ValueTask<VoterSetFloorReply> SetFloorAsync(string voter, Ballot targetFloor, CancellationToken cancellationToken);
+
     /// <summary>Lists the voter's accepted records, as <see cref="IKeyedAcceptor.ListKeysAsync"/> does.</summary>
     [Alias("ListKeys")]
     ValueTask<VoterKeyPageReply> ListKeysAsync(string voter, string prefix, string? afterKey, int limit, CancellationToken cancellationToken);
 
     /// <summary>
     /// Asks <paramref name="voter"/> to admit <paramref name="incarnation"/> of the voter <paramref name="candidate"/>
-    /// (<see cref="Consensus.CasPaxos.Sqlite.SqliteVoterRegistry.AdmitAsync"/>), answering with the incarnation it admits.
+    /// (<see cref="Consensus.CasPaxos.Sqlite.SqliteVoterRegistry.AdmitAsync"/>), validating <paramref name="bootstrapDigest"/>
+    /// when supplied and answering with the incarnation it admits.
     /// </summary>
     [Alias("Admit")]
-    ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, CancellationToken cancellationToken);
+    ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, ByteString? bootstrapDigest, CancellationToken cancellationToken);
 }
 
 /// <summary>The kinds of a voter's read answer (<see cref="AcceptorReadResult"/>).</summary>
@@ -50,6 +55,16 @@ internal enum VoterReadKind : byte
 
     /// <summary>The voter's accepted state (<see cref="KeyedAcceptorState"/>).</summary>
     Accepted,
+}
+
+/// <summary>The outcome status of an admission request.</summary>
+internal enum VoterAdmitStatus : byte
+{
+    /// <summary>The voter processed the admission and answered with the incarnation it admits.</summary>
+    Admitted = 0,
+
+    /// <summary>The candidate's bootstrap configuration digest disagreed with this voter's bootstrap digest.</summary>
+    BootstrapDigestMismatch = 1,
 }
 
 /// <summary>A voter's accepted record of a key, as <see cref="KeyedAcceptorState"/> holds it.</summary>
@@ -66,10 +81,17 @@ internal sealed record VoterAcceptedRecord(
     public KeyedAcceptorState ToState() => new(Key, PromisedBallot, AcceptedBallot, AcceptedValue);
 }
 
-/// <summary>A voter's read answer; <see cref="Record"/> is present for <see cref="VoterReadKind.Accepted"/> alone.</summary>
+/// <summary>
+/// A voter's read answer; <see cref="Record"/> is present for <see cref="VoterReadKind.Accepted"/> alone, and
+/// <see cref="PromisedBallot"/> carries the acceptor's effective floor on <see cref="VoterReadKind.Missing"/>.
+/// </summary>
 [GenerateSerializer]
 [Immutable]
-internal sealed record VoterReadReply([property: Id(0)] string Voter, [property: Id(1)] VoterReadKind Kind, [property: Id(2)] VoterAcceptedRecord? Record);
+internal sealed record VoterReadReply(
+    [property: Id(0)] string Voter,
+    [property: Id(1)] VoterReadKind Kind,
+    [property: Id(2)] VoterAcceptedRecord? Record,
+    [property: Id(3)] Ballot PromisedBallot = default);
 
 /// <summary>A voter's prepare answer, as <c>AcceptorPrepareResult&lt;ByteString?&gt;</c> holds it.</summary>
 [GenerateSerializer]
@@ -85,15 +107,24 @@ internal sealed record VoterPrepareReply(
 [Immutable]
 internal sealed record VoterAcceptReply([property: Id(0)] string Voter, [property: Id(1)] bool IsAccepted, [property: Id(2)] Ballot Ballot);
 
+/// <summary>A voter's floor-raising answer: its resulting durable floor ballot.</summary>
+[GenerateSerializer]
+[Immutable]
+internal sealed record VoterSetFloorReply([property: Id(0)] string Voter, [property: Id(1)] Ballot Floor);
+
 /// <summary>A voter's inventory page, as <see cref="KeyPage"/> holds it.</summary>
 [GenerateSerializer]
 [Immutable]
 internal sealed record VoterKeyPageReply(
     [property: Id(0)] string Voter,
     [property: Id(1)] IReadOnlyList<VoterAcceptedRecord> Entries,
-    [property: Id(2)] string? ContinuationKey);
+    [property: Id(2)] string? ContinuationKey,
+    [property: Id(3)] Ballot FloorBallot = default);
 
-/// <summary>A voter's admission answer: the incarnation of the candidate it admits.</summary>
+/// <summary>A voter's admission answer: the incarnation of the candidate it admits, or a bootstrap digest mismatch.</summary>
 [GenerateSerializer]
 [Immutable]
-internal sealed record VoterAdmitReply([property: Id(0)] string Voter, [property: Id(1)] Guid Admitted);
+internal sealed record VoterAdmitReply(
+    [property: Id(0)] string Voter,
+    [property: Id(1)] Guid Admitted,
+    [property: Id(2)] VoterAdmitStatus Status = VoterAdmitStatus.Admitted);

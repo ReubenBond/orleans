@@ -25,8 +25,9 @@ internal sealed class CasPaxosVoterService(LocalVoter local) : ICasPaxosVoter
         var result = await local.ReadAsync(key, known, cancellationToken);
         return result switch
         {
-            KeyedAcceptorState state => new(local.Id, VoterReadKind.Accepted, VoterAcceptedRecord.From(state)),
+            KeyedAcceptorState state => new(local.Id, VoterReadKind.Accepted, VoterAcceptedRecord.From(state), state.PromisedBallot),
             AcceptorUnchanged => new(local.Id, VoterReadKind.Unchanged, null),
+            AcceptorMissing missing => new(local.Id, VoterReadKind.Missing, null, missing.PromisedBallot),
             _ => new(local.Id, VoterReadKind.Missing, null),
         };
     }
@@ -48,18 +49,33 @@ internal sealed class CasPaxosVoterService(LocalVoter local) : ICasPaxosVoter
     }
 
     /// <inheritdoc/>
+    public async ValueTask<VoterSetFloorReply> SetFloorAsync(string voter, Ballot targetFloor, CancellationToken cancellationToken)
+    {
+        ThrowIfNotFor(voter);
+        var floor = await local.SetFloorAsync(targetFloor, cancellationToken);
+        return new(local.Id, floor);
+    }
+
+    /// <inheritdoc/>
     public async ValueTask<VoterKeyPageReply> ListKeysAsync(string voter, string prefix, string? afterKey, int limit, CancellationToken cancellationToken)
     {
         ThrowIfNotFor(voter);
         var page = await local.ListKeysAsync(prefix, afterKey, limit, cancellationToken);
-        return new(local.Id, [.. page.Entries.Select(VoterAcceptedRecord.From)], page.ContinuationKey);
+        return new(local.Id, [.. page.Entries.Select(VoterAcceptedRecord.From)], page.ContinuationKey, page.FloorBallot);
     }
 
     /// <inheritdoc/>
-    public async ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, CancellationToken cancellationToken)
+    public async ValueTask<VoterAdmitReply> AdmitAsync(string voter, string candidate, Guid incarnation, ByteString? bootstrapDigest, CancellationToken cancellationToken)
     {
         ThrowIfNotFor(voter);
-        return new(local.Id, await local.AdmitAsync(candidate, incarnation, cancellationToken));
+        try
+        {
+            return new(local.Id, await local.AdmitAsync(candidate, incarnation, bootstrapDigest, cancellationToken), VoterAdmitStatus.Admitted);
+        }
+        catch (InvalidDataException)
+        {
+            return new(local.Id, Guid.Empty, VoterAdmitStatus.BootstrapDigestMismatch);
+        }
     }
 
     private void ThrowIfNotFor(string addressed)

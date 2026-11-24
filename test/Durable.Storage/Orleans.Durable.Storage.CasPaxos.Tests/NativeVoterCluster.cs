@@ -108,7 +108,8 @@ internal sealed class NativeVoterCluster : IAsyncDisposable
     /// <summary>Opens a voter's database, recovering its state and validating its binding.</summary>
     public async Task OpenVoterAsync(int voter, CancellationToken cancellationToken)
     {
-        var local = await LocalVoter.OpenAsync(Ids[voter], DatabaseOf(Directory, voter), Ids, 256, 64, FatalErrors, cancellationToken);
+        var digest = VoterConfiguration.ComputeBootstrapDigest(Ids);
+        var local = await LocalVoter.OpenAsync(Ids[voter], DatabaseOf(Directory, voter), 256, 64, FatalErrors, joinConfiguration: 1, bootstrapDigest: digest, cancellationToken: cancellationToken);
         Voters[voter] = local;
         Services[voter] = new CasPaxosVoterService(local);
     }
@@ -231,6 +232,14 @@ internal sealed class VoterLink(Func<ICasPaxosVoter> voter) : ICasPaxosVoter
         return ForgedVoter is { } forged ? reply with { Voter = forged } : reply;
     }
 
+    public async ValueTask<VoterSetFloorReply> SetFloorAsync(string addressed, Ballot targetFloor, CancellationToken cancellationToken)
+    {
+        var target = await ReachAsync(cancellationToken);
+        var reply = await target.SetFloorAsync(addressed, targetFloor, cancellationToken);
+        await ReplyAsync();
+        return ForgedVoter is { } forged ? reply with { Voter = forged } : reply;
+    }
+
     public async ValueTask<VoterKeyPageReply> ListKeysAsync(string addressed, string prefix, string? afterKey, int limit, CancellationToken cancellationToken)
     {
         var target = await ReachAsync(cancellationToken);
@@ -239,10 +248,10 @@ internal sealed class VoterLink(Func<ICasPaxosVoter> voter) : ICasPaxosVoter
         return ForgedVoter is { } forged ? reply with { Voter = forged } : reply;
     }
 
-    public async ValueTask<VoterAdmitReply> AdmitAsync(string addressed, string candidate, Guid incarnation, CancellationToken cancellationToken)
+    public async ValueTask<VoterAdmitReply> AdmitAsync(string addressed, string candidate, Guid incarnation, ByteString? bootstrapDigest, CancellationToken cancellationToken)
     {
         var target = await ReachAsync(cancellationToken);
-        var reply = await target.AdmitAsync(addressed, candidate, incarnation, cancellationToken);
+        var reply = await target.AdmitAsync(addressed, candidate, incarnation, bootstrapDigest, cancellationToken);
         await ReplyAsync();
         return ForgedVoter is { } forged ? reply with { Voter = forged } : reply;
     }

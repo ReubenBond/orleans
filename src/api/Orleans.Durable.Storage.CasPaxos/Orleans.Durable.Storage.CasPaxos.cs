@@ -29,6 +29,17 @@ namespace Orleans.Durable.Storage.CasPaxos
 
 namespace Orleans.Durable.Storage.CasPaxos.Hosting
 {
+    public sealed partial class CasPaxosJoiningVoterOptions
+    {
+        public System.Collections.Generic.IList<CasPaxosVoterPeerOptions> AdmissionPeers { get { throw null; } }
+
+        public string Database { get { throw null; } set { } }
+
+        public string Id { get { throw null; } set { } }
+
+        public long JoinConfiguration { get { throw null; } set { } }
+    }
+
     public sealed partial class CasPaxosMetaStoreOptions
     {
         public System.TimeSpan AdmissionRetryDelay { get { throw null; } set { } }
@@ -36,6 +47,10 @@ namespace Orleans.Durable.Storage.CasPaxos.Hosting
         public System.TimeSpan AttemptTimeout { get { throw null; } set { } }
 
         public int Capacity { get { throw null; } set { } }
+
+        public long InitialConfiguration { get { throw null; } set { } }
+
+        public CasPaxosJoiningVoterOptions? JoiningVoter { get { throw null; } set { } }
 
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
 
@@ -52,6 +67,23 @@ namespace Orleans.Durable.Storage.CasPaxos.Hosting
         public System.Collections.Generic.IList<CasPaxosVoterOptions> Voters { get { throw null; } }
     }
 
+    public sealed partial class CasPaxosReconfigurationService
+    {
+        internal CasPaxosReconfigurationService() { }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> AddVoterAsync(Consensus.CasPaxos.Server.VoterDescriptor voter, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> GetCurrentConfigurationAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> ReconfigureAsync(System.Collections.Generic.IReadOnlyList<Consensus.CasPaxos.Server.VoterDescriptor> nextVoters, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> RemoveVoterAsync(string voterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> ReplaceVoterAsync(string lostVoterId, Consensus.CasPaxos.Server.VoterDescriptor replacement, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<Consensus.CasPaxos.Server.VoterConfiguration> ResumeAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
     public static partial class CasPaxosSiloBuilderExtensions
     {
         public static Orleans.Hosting.ISiloBuilder AddCasPaxosMetaStore(this Orleans.Hosting.ISiloBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
@@ -63,6 +95,13 @@ namespace Orleans.Durable.Storage.CasPaxos.Hosting
     {
         public string Database { get { throw null; } set { } }
 
+        public string Endpoint { get { throw null; } set { } }
+
+        public string Id { get { throw null; } set { } }
+    }
+
+    public sealed partial class CasPaxosVoterPeerOptions
+    {
         public string Endpoint { get { throw null; } set { } }
 
         public string Id { get { throw null; } set { } }

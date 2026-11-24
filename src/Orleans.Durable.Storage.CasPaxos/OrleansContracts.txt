@@ -17,7 +17,8 @@ class [GrainType("caspaxosvotersystemtarget")] Orleans.Durable.Storage.CasPaxos.
 # Orleans.Durable.Storage.CasPaxos.Hosting.ICasPaxosVoter
 interface [GrainInterfaceType("Orleans.Durable.Storage.CasPaxos.ICasPaxosVoter")] Orleans.Durable.Storage.CasPaxos.Hosting.ICasPaxosVoter [Version(0)]
   Accept: AcceptAsync(string, string, Orleans.Consensus.CasPaxos.Model.Ballot, Orleans.Consensus.CasPaxos.Server.ByteString, Orleans.Consensus.CasPaxos.Model.Ballot, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterAcceptReply>
-  Admit: AdmitAsync(string, string, System.Guid, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterAdmitReply>
+  Admit: AdmitAsync(string, string, System.Guid, Orleans.Consensus.CasPaxos.Server.ByteString?, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterAdmitReply>
   ListKeys: ListKeysAsync(string, string, string?, int, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterKeyPageReply>
   Prepare: PrepareAsync(string, string, Orleans.Consensus.CasPaxos.Model.Ballot, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterPrepareReply>
   Read: ReadAsync(string, string, Orleans.Consensus.CasPaxos.Model.Ballot?, Orleans.Consensus.CasPaxos.Server.ByteString?, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterReadReply>
+  SetFloor: SetFloorAsync(string, Orleans.Consensus.CasPaxos.Model.Ballot, System.Threading.CancellationToken) -> ValueTask<Orleans.Durable.Storage.CasPaxos.Hosting.VoterSetFloorReply>
