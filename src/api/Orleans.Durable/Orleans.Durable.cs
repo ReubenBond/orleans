@@ -68,6 +68,21 @@ namespace Orleans.Durable.Jobs
         OwnershipLost = 2
     }
 
+    public sealed partial class DurableJobQueueOptions
+    {
+        public int MaxMetadataBytesPerJob { get { throw null; } set { } }
+
+        public int MaxPendingJobs { get { throw null; } set { } }
+
+        public int MaxRetryCount { get { throw null; } set { } }
+
+        public System.TimeSpan RetryInitialInterval { get { throw null; } set { } }
+
+        public System.TimeSpan RetryMaxInterval { get { throw null; } set { } }
+
+        public System.Func<IJobRunContext, System.Exception, System.DateTimeOffset?>? ShouldRetry { get { throw null; } set { } }
+    }
+
     [GenerateSerializer]
     [Alias("Orleans.Durable.Jobs.DurableJobRunResult")]
     public sealed partial class DurableJobRunResult
@@ -138,6 +153,25 @@ namespace Orleans.Durable.Jobs
         public const string DurableJobs = "Orleans.DurableJobs";
     }
 
+    public readonly partial struct GrainJobRequest
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public const int MaxJobIdLength = 128;
+        public const int MaxJobNameLength = 128;
+        public required System.DateTimeOffset DueTime { get { throw null; } init { } }
+
+        public string? JobId { get { throw null; } init { } }
+
+        public required string JobName { get { throw null; } init { } }
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }
+
+        public string? TraceParent { get { throw null; } init { } }
+
+        public string? TraceState { get { throw null; } init { } }
+    }
+
     public partial interface IDurableJobFeatureHandler
     {
         bool CanHandle(string jobName);
@@ -152,6 +186,24 @@ namespace Orleans.Durable.Jobs
     public partial interface IDurableJobHandlerRegistry
     {
         void Register(IDurableJobFeatureHandler handler);
+    }
+
+    public partial interface IDurableJobQueue
+    {
+        int Count { get; }
+
+        System.Collections.Generic.IReadOnlyCollection<PendingGrainJob> PendingJobs { get; }
+
+        bool Cancel(string jobId);
+        IDurableJobQueue RegisterHandler(IDurableJobHandler handler);
+        IDurableJobQueue RegisterHandler(IDurableJobQueueHandler handler);
+        string Schedule(GrainJobRequest request);
+        bool TryGetJob(string jobId, out PendingGrainJob? job);
+    }
+
+    public partial interface IDurableJobQueueHandler
+    {
+        System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
     }
 
     public partial interface IDurableJobsStorageInspector
@@ -252,6 +304,35 @@ namespace Orleans.Durable.Jobs
         public abstract System.Threading.Tasks.Task<System.Collections.Generic.List<IJobShard>> AssignJobShardsAsync(System.DateTimeOffset maxDueTime, int maxNewClaims, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.Task<IJobShard> CreateShardAsync(System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IDictionary<string, string> metadata, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.Task UnregisterShardAsync(IJobShard shard, System.Threading.CancellationToken cancellationToken);
+    }
+
+    [GenerateSerializer]
+    [Alias("Orleans.Durable.Jobs.PendingGrainJob")]
+    public sealed partial class PendingGrainJob
+    {
+        [Id(6)]
+        public int DequeueCount { get { throw null; } init { } }
+
+        [Id(2)]
+        public System.DateTimeOffset DueTime { get { throw null; } init { } }
+
+        [Id(7)]
+        public long ExecutionGeneration { get { throw null; } init { } }
+
+        [Id(0)]
+        public required string Id { get { throw null; } init { } }
+
+        [Id(3)]
+        public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }
+
+        [Id(1)]
+        public required string Name { get { throw null; } init { } }
+
+        [Id(4)]
+        public string? TraceParent { get { throw null; } init { } }
+
+        [Id(5)]
+        public string? TraceState { get { throw null; } init { } }
     }
 
     public readonly partial struct ScheduleJobRequest
@@ -2396,6 +2477,24 @@ namespace OrleansCodeGen.Orleans.Durable.Jobs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_PendingGrainJob : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Durable.Jobs.PendingGrainJob>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_PendingGrainJob(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Durable.Jobs.PendingGrainJob> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Durable.Jobs.PendingGrainJob instance) { }
+
+        public global::Orleans.Durable.Jobs.PendingGrainJob ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Durable.Jobs.PendingGrainJob instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Durable.Jobs.PendingGrainJob value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableJob : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Durable.Jobs.DurableJob>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_DurableJob(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Durable.Jobs.DurableJob> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2411,6 +2510,16 @@ namespace OrleansCodeGen.Orleans.Durable.Jobs
         public Copier_DurableJobRunResult(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Durable.Jobs.DurableJobRunResult> _activator) { }
 
         public global::Orleans.Durable.Jobs.DurableJobRunResult DeepCopy(global::Orleans.Durable.Jobs.DurableJobRunResult original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_PendingGrainJob : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Durable.Jobs.PendingGrainJob>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_PendingGrainJob(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Durable.Jobs.PendingGrainJob> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Durable.Jobs.PendingGrainJob DeepCopy(global::Orleans.Durable.Jobs.PendingGrainJob original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 }
 

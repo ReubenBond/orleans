@@ -42,7 +42,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IStateMachineDirtyProbe, IDurableTaskCompletionSourceCommandHandler<T>
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -178,6 +178,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
     }
+
+    bool IStateMachineDirtyProbe.HasUnwrittenChanges => _status is not DurableTaskCompletionSourceStatus.Pending && !_isCompletionCaptured;
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {

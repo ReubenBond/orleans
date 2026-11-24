@@ -19,7 +19,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IStateMachineDirtyProbe, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -109,6 +109,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
             topic.PublishDurable(_value);
         }
     }
+
+    bool IStateMachineDirtyProbe.HasUnwrittenChanges => _isDirty;
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {

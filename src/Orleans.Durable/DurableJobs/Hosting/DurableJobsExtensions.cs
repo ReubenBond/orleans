@@ -51,6 +51,22 @@ public static class DurableJobsExtensions
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
         services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
         services.TryAddScoped<GrainWakeupCoordinator>();
+        services.AddOptions<DurableJobQueueOptions>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<DurableJobQueueOptions>, DurableJobQueueOptionsValidation>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigurationValidator, DurableJobQueueOptionsValidator>());
+        services.AddOptions<DurableJobsOptions>().PostConfigure<IServiceProvider>(static (options, sp) =>
+        {
+            var shouldRetry = options.ShouldRetry;
+            var clock = sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs) ?? TimeProvider.System;
+            var queueOptions = sp.GetRequiredService<IOptions<DurableJobQueueOptions>>();
+            options.ShouldRetry = (context, exception) => string.Equals(context.Job.Name, DurableJobQueue.WakeupJobName, StringComparison.Ordinal)
+                ? DurableJobQueue.GetWakeupRetryTime(context, clock.GetUtcNow(), queueOptions.Value.RetryInitialInterval)
+                : shouldRetry(context, exception);
+        });
+        services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobQueueJsonContext.Default));
+        services.TryAddSingleton<DurableJobQueueShared>();
+        services.TryAddScoped<DurableJobQueue>();
+        services.Replace(ServiceDescriptor.Scoped<IDurableJobQueue>(static sp => sp.GetRequiredService<DurableJobQueue>()));
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
@@ -147,6 +163,27 @@ public static class DurableJobsExtensions
         ArgumentNullException.ThrowIfNull(services);
         new ServiceCollectionSiloBuilder(services).UseJournaledDurableJobs(configure);
         return services;
+    }
+
+    private sealed class DurableJobQueueOptionsValidation : IValidateOptions<DurableJobQueueOptions>
+    {
+        public ValidateOptionsResult Validate(string? name, DurableJobQueueOptions options)
+        {
+            try
+            {
+                options.Validate();
+                return ValidateOptionsResult.Success;
+            }
+            catch (ArgumentException exception)
+            {
+                return ValidateOptionsResult.Fail(exception.Message);
+            }
+        }
+    }
+
+    private sealed class DurableJobQueueOptionsValidator(IOptions<DurableJobQueueOptions> options) : IConfigurationValidator
+    {
+        public void ValidateConfiguration() => options.Value.Validate();
     }
 
     private sealed class ServiceCollectionSiloBuilder : ISiloBuilder

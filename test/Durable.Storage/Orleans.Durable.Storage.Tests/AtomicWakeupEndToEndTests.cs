@@ -110,7 +110,9 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
                 }
 
                 var current = await ReadMapAsync();
-                return current.Ledgers.Length == 3 && current.Ledgers.All(static l => l.IsOpen);
+                return current.Ledgers.Length == 3
+                    && current.Ledgers.All(static l => l.IsOpen)
+                    && current.Ledgers.Select(static l => l.Primary.Node).Distinct().Count() == 3;
             },
             "all 3 silos' Journals to serve and 3 balanced open ledgers to settle");
 

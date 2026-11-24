@@ -26,7 +26,7 @@ internal sealed partial class WakeupStreamHandler : ILocalStreamHandler
     private static readonly string[] WellKnownJobNames =
     [
         MessagingPump.JobName,
-        "orleans.durable.jobqueue",
+        DurableJobQueue.WakeupJobName,
     ];
 
     private readonly WakeupOptions _options;

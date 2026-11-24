@@ -36,6 +36,40 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private JournalCompanionRecord[] _inFlightCompanions = [];
     private int _inFlightCompanionCount;
 
+    internal bool HasUncommittedChanges
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_journalWriter.CommittedLength > 0 || _journalWriter.HasActiveEntry || _stagedCompanionCount > 0)
+                {
+                    return true;
+                }
+
+                foreach (var state in _states.Values)
+                {
+                    if (state is IStateMachineDirtyProbe probe && probe.HasUnwrittenChanges)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fences the state manager and deactivates the grain when an activation-owned component detects dirty uncommitted
+    /// state after a handler failure, preventing any subsequent write from committing partial state.
+    /// </summary>
+    internal void FenceExternal(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        Fence(exception);
+    }
+
     /// <summary>Gets a value indicating whether the underlying storage supports atomic companion writes.</summary>
     internal bool SupportsCompanionWrites => _storage is ICompanionJournalStorage;
 

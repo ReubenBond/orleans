@@ -7,7 +7,7 @@ using Orleans.Serialization.Serializers;
 namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateMachine, IPersistentStateCommandHandler<T>
+internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateMachine, IStateMachineDirtyProbe, IPersistentStateCommandHandler<T>
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
     private readonly IActivator<T> _activator;
@@ -93,6 +93,8 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
         _hasState = false;
         _clearRequested = false;
     }
+
+    bool IStateMachineDirtyProbe.HasUnwrittenChanges => _clearRequested || _pendingWrite is not PendingWriteKind.None;
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {

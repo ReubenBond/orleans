@@ -1,5 +1,10 @@
 namespace Orleans.Durable.Journaling;
 
+internal interface IStateMachineDirtyProbe
+{
+    bool HasUnwrittenChanges { get; }
+}
+
 /// <summary>
 /// Defines the replay, snapshot, and acknowledgement protocol for a journal-backed state machine.
 /// </summary>

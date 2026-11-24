@@ -2819,11 +2819,13 @@ for grain self-wakeups while preserving crash recovery through the existing `ILo
     1-RTT local-primary writes with zero Azure Blob writes when messages deliver and retire before ledger close.
 - **Outbox-style grain-local durable jobs (`IDurableJobQueue`, `Orleans.Durable.Jobs`, J4).** Layered directly on
   `GrainWakeupCoordinator` as an `IStateMachine` + `IGrainWakeupSource` on `IJournaledStateManager`: synchronous atomic
-  `Schedule(request)`, `Cancel(jobId)`, and `PendingJobs`, bounded by `MaxPendingJobs` and `MaxMetadataBytesPerJob`
-  well below `MaxBodyBytes`, O(1) min-due via `SortedSet` + `Dictionary`, explicit `JobId` equivalence vs conflict
-  (`InvalidOperationException`), post-`await` `(jobId, ExecutionGeneration)` cancel guard, activation fail/deactivate
-  when a handler throws with dirty state, and `[GenerateSerializer]` + source-generated `JsonSerializerContext` for
-  AOT compatibility.
+  `Schedule(GrainJobRequest)`, `Cancel(string)`, `TryGetJob`, and `PendingJobs` (`PendingGrainJob`), bounded by
+  `DurableJobQueueOptions.MaxPendingJobs` and `MaxMetadataBytesPerJob` well below `MaxBodyBytes`, O(1) min-due via
+  `SortedSet` + `Dictionary`, explicit `JobId` equivalence vs conflict (`InvalidOperationException`), post-`await`
+  `(jobId, ExecutionGeneration)` cancel/reschedule guard with monotonic journaled generation, activation fence and
+  deactivation when a handler throws with dirty state, handler dispatch via `IDurableJobQueueHandler` or
+  `IDurableJobHandler`, and `[GenerateSerializer]` + source-generated `DurableJobQueueJsonContext` for AOT
+  compatibility.
 
 ## 6. Configuration
 
