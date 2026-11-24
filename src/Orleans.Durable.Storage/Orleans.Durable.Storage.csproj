@@ -19,9 +19,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The composition reads the Engine's internals under its grant, so it depends on the Engine's exact version. -->
+    <!-- The composition reads the Engine's and Orleans.Durable's internals under its grants, so it depends on their exact versions. -->
     <ProjectReference Include="..\Orleans.Durable.Storage.Engine\Orleans.Durable.Storage.Engine.csproj" PackExactVersion="true" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Durable\Orleans.Durable.csproj" PackExactVersion="true" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
   </ItemGroup>

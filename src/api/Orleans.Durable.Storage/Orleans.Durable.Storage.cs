@@ -78,6 +78,8 @@ namespace Orleans.Durable.Storage
 
         public string Root { get { throw null; } set { } }
 
+        public WakeupOptions Wakeup { get { throw null; } set { } }
+
         public long WalFileSize { get { throw null; } set { } }
 
         public long? WalRetentionBytes { get { throw null; } set { } }
@@ -105,6 +107,21 @@ namespace Orleans.Durable.Storage
         public JournalWriteOutcomeUnknownException(string message) { }
 
         public string? Journal { get { throw null; } }
+    }
+
+    public sealed partial class WakeupOptions
+    {
+        public System.TimeSpan InitialRetryDelay { get { throw null; } set { } }
+
+        public int MaxConcurrentWakeupDispatches { get { throw null; } set { } }
+
+        public int MaxConcurrentWakeupSchedules { get { throw null; } set { } }
+
+        public System.TimeSpan MaxRetryDelay { get { throw null; } set { } }
+
+        public long MaxWakeupBytesPerLedger { get { throw null; } set { } }
+
+        public System.TimeSpan OverdueJitterWindow { get { throw null; } set { } }
     }
 }
 

@@ -35,6 +35,7 @@ Orleans.Durable.Storage.DurableStorageOptions.ObjectLedgersStoreServiceKey: cons
 Orleans.Durable.Storage.DurableStorageOptions.Ordinal: System.Int32? { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.PreallocateWalFiles: System.Boolean { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.Root: System.String { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Wakeup: Orleans.Durable.Storage.WakeupOptions { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.WalFileSize: System.Int64 { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.WalRetentionBytes: System.Int64? { get; set; }
 Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind (enum : System.Int32)
@@ -75,6 +76,7 @@ Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ControlInterval: S
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LedgerPlacement: Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LedgersPerNode: System.Int32 { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LoadWindow: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.LocalDrainMemoryBytes: System.Int64 { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.ManifestCommitInterval: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MapRefreshInterval: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.MaxConcurrentDrains: System.Int32 { get; set; }
@@ -91,9 +93,53 @@ Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SequencerWindow: S
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SplitBytesPerSecond: System.Int64 { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.SweepInterval: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Cluster.Control.ControlOptions.TransitionTimeout: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalKeyPresenceLookup (interface)
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalKeyPresenceLookup.TryHasKeyEntryAsync(Orleans.Durable.Storage.Engine.Ledgers.LedgerMetadata ledger, System.ReadOnlyMemory<System.Byte> localKey, Orleans.Durable.Storage.Engine.Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead>
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold (interface : System.IDisposable)
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold.Add(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.Int32 rowIndex, System.Buffers.ReadOnlySequence<System.Byte> payload): System.Void
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold.Clear(): System.Void
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold.CommitAsync(System.Threading.CancellationToken cancellationToken): System.Threading.Tasks.Task
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold.MemoryBytes: System.Int64 { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor (interface)
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor.BeginClosedLedgerFold(Orleans.Durable.Storage.Engine.Ledgers.LedgerMetadata ledger, Orleans.Durable.Storage.Engine.Ledgers.Slot tail): Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold
+Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor.Stream: Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName { get; }
 Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement (enum : System.Int32)
 Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement.Nodes = 0
 Orleans.Durable.Storage.Engine.Cluster.Control.LedgerPlacement.ObjectStore = 1
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead (readonly struct : System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent>)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.Equals(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent? other): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.Instance: static Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.ToString(): System.String
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.op_Equality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent.op_Inequality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present>)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.Equals(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present? other): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.Instance: static Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.ToString(): System.String
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.op_Equality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present.op_Inequality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed>)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.Equals(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed? other): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.Instance: static Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.ToString(): System.String
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.op_Equality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed.op_Inequality(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed? left, Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead..ctor(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Absent value)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead..ctor(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Present value)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead..ctor(Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead+Unindexed value)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalKeyPresenceRead.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalStreamDrainCoordinator (sealed class : Orleans.Durable.Storage.Engine.Archive.Control.ILedgerLocalDrainBarrier)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalStreamDrainCoordinator..ctor(Orleans.Durable.Storage.Engine.Ledgers.LedgerMapView map, Orleans.Durable.Storage.Engine.Ledgers.LedgerReader reader, System.Collections.Generic.IEnumerable<Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor> processors, System.Int64 memoryBudgetBytes = 33554432, Orleans.Durable.Storage.Engine.Cluster.Control.ILocalKeyPresenceLookup? presenceLookup = null)
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalStreamDrainCoordinator.EnsureLocalStreamsDrainedAsync(Orleans.Durable.Storage.Engine.Ledgers.LedgerMetadata ledger, Orleans.Durable.Storage.Engine.Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome>
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalStreamDrainCoordinator.RegisteredStreams: System.Collections.Immutable.ImmutableArray<Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName> { get; }
+Orleans.Durable.Storage.Engine.Cluster.Control.LocalStreamDrainCoordinator.ValidateLocalAppendKey(Orleans.Durable.Storage.Engine.Ledgers.LedgerMetadata ledger, System.ReadOnlySpan<System.Byte> rowKey): System.Void
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions (sealed class)
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions..ctor()
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.ExpiryInterval: System.TimeSpan { get; set; }
@@ -122,6 +168,25 @@ Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.IsEnabled: System.Bool
 Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.LeaseDuration: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.LeaseGuardBand: System.TimeSpan? { get; set; }
 Orleans.Durable.Storage.Engine.Ledgers.LedgerLeaseOptions.Validate(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName (sealed class : System.IComparable<Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName>, System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName>)
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName..ctor(System.String value)
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Bytes: System.ReadOnlyMemory<System.Byte> { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.CompareTo(Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? other): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Equals(Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? other): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Equals(System.Object? obj): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.GetHashCode(): System.Int32
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.IsValid(System.ReadOnlySpan<System.Byte> bytes): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.IsValid(System.ReadOnlySpan<System.Char> value): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.IsValidByte(System.Byte value): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.MaxLength: const System.Int32 = 64
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Parse(System.String value): static Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Span: System.ReadOnlySpan<System.Byte> { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.ToString(): System.String
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.TryParse(System.ReadOnlySpan<System.Byte> bytes, out Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? name): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.TryParse(System.String? value, out Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? name): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.Value: System.String { get; }
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.op_Equality(Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? left, Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? right): static System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName.op_Inequality(Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? left, Orleans.Durable.Storage.Engine.Ledgers.LocalStreamName? right): static System.Boolean
 Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout (enum : System.Int32)
 Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout.Append = 1
 Orleans.Durable.Storage.Engine.Ledgers.Objects.ObjectLedgerLayout.PerSlot = 0
@@ -175,3 +240,11 @@ Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor()
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message)
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message, System.Exception innerException)
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException.Journal: System.String? { get; }
+Orleans.Durable.Storage.WakeupOptions (sealed class)
+Orleans.Durable.Storage.WakeupOptions..ctor()
+Orleans.Durable.Storage.WakeupOptions.InitialRetryDelay: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.WakeupOptions.MaxConcurrentWakeupDispatches: System.Int32 { get; set; }
+Orleans.Durable.Storage.WakeupOptions.MaxConcurrentWakeupSchedules: System.Int32 { get; set; }
+Orleans.Durable.Storage.WakeupOptions.MaxRetryDelay: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.WakeupOptions.MaxWakeupBytesPerLedger: System.Int64 { get; set; }
+Orleans.Durable.Storage.WakeupOptions.OverdueJitterWindow: System.TimeSpan { get; set; }

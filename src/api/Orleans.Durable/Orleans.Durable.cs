@@ -163,6 +163,8 @@ namespace Orleans.Durable.Jobs
     {
         int DequeueCount { get; }
 
+        bool IsEphemeralWakeup { get; }
+
         DurableJob Job { get; }
 
         string RunId { get; }
@@ -260,6 +262,59 @@ namespace Orleans.Durable.Jobs
         public string? TraceParent { get { throw null; } init { } }
 
         public string? TraceState { get { throw null; } init { } }
+    }
+
+    public static partial class WakeupCompanionCodec
+    {
+        public const byte HasDueTimeFlag = 1;
+        public const int MaxEncodedLength = 1294;
+        public const int MaxGrainIdUtf8Length = 1024;
+        public const int MaxJobNameUtf8Length = 256;
+        public const string StreamName = "orleans.wakeup";
+        public const byte Version = 1;
+        public static System.IO.InvalidDataException? Decode(System.Buffers.ReadOnlySequence<byte> source, out WakeupRecord record) { throw null; }
+
+        public static System.IO.InvalidDataException? Decode(System.ReadOnlySpan<byte> source, out WakeupRecord record) { throw null; }
+
+        public static int Encode(WakeupRecord record, System.Span<byte> destination) { throw null; }
+
+        public static byte[] Encode(WakeupRecord record) { throw null; }
+
+        public static int EncodedLength(WakeupRecord record) { throw null; }
+    }
+
+    public readonly partial struct WakeupRecord : System.IEquatable<WakeupRecord>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public WakeupRecord(Runtime.GrainId Target, string JobName, long? DueTimeUtcTicks) { }
+
+        public long? DueTimeUtcTicks { get { throw null; } init { } }
+
+        public string JobName { get { throw null; } init { } }
+
+        public Runtime.GrainId Target { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out Runtime.GrainId Target, out string JobName, out long? DueTimeUtcTicks) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(WakeupRecord other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(WakeupRecord left, WakeupRecord right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(WakeupRecord left, WakeupRecord right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
     }
 }
 

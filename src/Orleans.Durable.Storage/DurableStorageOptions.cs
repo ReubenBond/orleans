@@ -244,6 +244,11 @@ public sealed class DurableStorageOptions
     public ArchiveOptions Lsm { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the options for ledger-local grain wakeup dispatch and closed-ledger wakeup drain (orleans.md §5.15, §6).
+    /// </summary>
+    public WakeupOptions Wakeup { get; set; } = new();
+
+    /// <summary>
     /// Returns the archive-log drains' options, on a cluster whose archive store is archive logs (archive-logs.md §8.6). A
     /// method, not a property, so a configuration binder sees no key for it.
     /// </summary>
@@ -326,6 +331,8 @@ public sealed class DurableStorageOptions
         Section(nameof(Lease), Lease.Validate);
         ArgumentNullException.ThrowIfNull(Journals, nameof(Journals));
         Section(nameof(Journals), Journals.Validate);
+        ArgumentNullException.ThrowIfNull(Wakeup, nameof(Wakeup));
+        Section(nameof(Wakeup), Wakeup.Validate);
         CheckWriters();
         var largest = Journals.LargestBatch();
         if (Journals.MaxQueuedBytes < largest)

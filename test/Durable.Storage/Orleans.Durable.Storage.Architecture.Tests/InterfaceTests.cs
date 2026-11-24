@@ -90,6 +90,19 @@ public sealed class InterfaceTests
         "Orleans.Durable.Storage.Engine.Journals.ILocalStreamHandler",
         "Orleans.Durable.Storage.Engine.Journals.ILocalStreamSession",
 
+        // Closed-ledger local-stream drain barrier and processor seams: Archive drain workers invoke
+        // ILedgerLocalDrainBarrier without depending on Cluster.Control, and Cluster.Control folds and probes local
+        // streams through named interfaces implemented by higher compositions and Orleans-free simulations
+        // (archive.md §2.3, orleans.md §5.6, LG-I15, LG-I16).
+        "Orleans.Durable.Storage.Engine.Archive.Control.ILedgerLocalDrainBarrier",
+        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor",
+        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold",
+        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalKeyPresenceLookup",
+
+        // Ephemeral wakeup dispatch boundary in the Orleans composition: GrainFactoryWakeupDispatcher calls Orleans'
+        // IDurableJobReceiverExtension while unit tests substitute a fake dispatcher over FakeTimeProvider (orleans.md §5.15).
+        "Orleans.Durable.Storage.IGrainWakeupDispatcher",
+
         // An open file: the operating system's, the reporting wrapper of the WAL's fail-stop seam, and the test doubles
         // which stand in for the file system's I/O.
         "Orleans.Durable.Storage.Engine.Wal.FileSystem.IWalFileSystemFile",

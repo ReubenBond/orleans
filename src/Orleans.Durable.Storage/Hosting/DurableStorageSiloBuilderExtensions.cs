@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Durable.Jobs;
 using Orleans.Durable.Journaling;
 using Orleans.Durable.Storage.Control;
 using Orleans.Durable.Storage.Engine.Archive.Lsm;
@@ -172,6 +173,30 @@ public static class DurableStorageSiloBuilderExtensions
             provider.GetRequiredService<ControlOptions>().ControlInterval,
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<NodePressure>>()));
+        _ = services.AddSingleton(static provider =>
+        {
+            var handlers = provider.GetServices<ILocalStreamHandler>().ToList();
+            var processors = provider.GetServices<ILocalStreamProcessor>().ToList();
+            WakeupStreamHandler? wakeupHandler = handlers.OfType<WakeupStreamHandler>().SingleOrDefault();
+            IDisposable? ownedDisposable = null;
+            if (wakeupHandler is null
+                && !handlers.Any(static h => h.Stream == WakeupStreamHandler.WakeupStream)
+                && !processors.Any(static p => p.Stream == WakeupStreamHandler.WakeupStream)
+                && provider.GetService<ILocalDurableJobManager>() is { } jobManager)
+            {
+                var nodeOptions = provider.GetRequiredService<DurableStorageOptions>();
+                var time = provider.GetRequiredService<TimeProvider>();
+                var loggers = provider.GetRequiredService<ILoggerFactory>();
+                var dispatcher = new GrainFactoryWakeupDispatcher(provider.GetRequiredService<IGrainFactory>());
+                wakeupHandler = new WakeupStreamHandler(nodeOptions.Wakeup, dispatcher, time, loggers.CreateLogger<WakeupStreamHandler>());
+                var wakeupProcessor = new WakeupStreamProcessor(jobManager, nodeOptions.Wakeup, time, loggers.CreateLogger<WakeupStreamProcessor>());
+                handlers.Add(wakeupHandler);
+                processors.Add(wakeupProcessor);
+                ownedDisposable = wakeupProcessor;
+            }
+
+            return new LocalStreamRegistration([.. handlers], [.. processors], wakeupHandler, ownedDisposable);
+        });
         _ = services.AddSingleton<NodeLedgers>();
         _ = services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(static provider => provider.GetRequiredService<NodeLedgers>());
         _ = services.AddSingleton(static provider => new SweepHost(

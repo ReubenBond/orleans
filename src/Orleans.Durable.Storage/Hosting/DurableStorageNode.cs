@@ -51,6 +51,7 @@ internal sealed partial class DurableStorageNode : ILifecycleParticipant<ISiloLi
     private readonly SiloArchive _archive;
     private readonly SiloObjectLedgers _objectLedgers;
     private readonly string _journalFormat;
+    private readonly LocalStreamRegistration _localStreams;
     private readonly WalStorage _storage;
     private readonly ILocalSiloDetails _silo;
     private readonly IGrainFactory _grains;
@@ -75,7 +76,8 @@ internal sealed partial class DurableStorageNode : ILifecycleParticipant<ISiloLi
         IGrainFactory grains,
         IMetaStore metaStore,
         TimeProvider timeProvider,
-        ILogger<DurableStorageNode> logger)
+        ILogger<DurableStorageNode> logger,
+        LocalStreamRegistration? localStreams = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(control);
@@ -91,6 +93,7 @@ internal sealed partial class DurableStorageNode : ILifecycleParticipant<ISiloLi
         _archive = archive;
         _objectLedgers = objectLedgers;
         _journalFormat = journaling.Value.JournalFormatKey;
+        _localStreams = localStreams ?? LocalStreamRegistration.Empty;
         _storage = storage;
         _silo = silo;
         _grains = grains;
@@ -284,7 +287,7 @@ internal sealed partial class DurableStorageNode : ILifecycleParticipant<ISiloLi
     {
         var register = await _metaStore.GetRegisterAsync(_options.Cluster, NodeRegistryValue.RegisterName, cancellationToken).ConfigureAwait(false);
         var (registry, _) = await NodeRegistryCodec.ReadAsync(register, cancellationToken).ConfigureAwait(false);
-        var archiveStore = registry.ArchiveStore ?? await _archive.FirstRecordAsync(NodeRuntime.RecordParametersOf(_options.Journals, _journalFormat), cancellationToken).ConfigureAwait(false);
+        var archiveStore = registry.ArchiveStore ?? await _archive.FirstRecordAsync(NodeRuntime.RecordParametersOf(_options.Journals, _journalFormat, _localStreams.Handlers), cancellationToken).ConfigureAwait(false);
         ObjectLedgerStoreId? objectLedgerStore;
         if (registry.ObjectLedgerStore is { } recorded)
         {

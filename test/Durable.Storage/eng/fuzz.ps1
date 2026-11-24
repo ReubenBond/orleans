@@ -171,6 +171,7 @@ try {
         'Orleans.Durable.Storage.FileSystem.dll' = @()
         'Orleans.Durable.Storage.AzureStorage.dll' = @()
         'Orleans.Durable.Storage.dll' = @()
+        'Orleans.Durable.dll' = @('Orleans.Durable.Jobs')
     }
     foreach ($assembly in $instrumented.Keys) {
         $path = Join-Path $publish $assembly

@@ -48,6 +48,7 @@ public sealed class DrainWorker
     private readonly ManifestView _manifest;
     private readonly LedgerReader _reader;
     private readonly BlockCache? _blocks;
+    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
     private readonly TimeProvider _time;
     private readonly RunSectionSettings _settings;
     private readonly int _gridBits;
@@ -65,8 +66,16 @@ public sealed class DrainWorker
     /// <param name="options">The sections' settings and size, the grid step, and the drain memory.</param>
     /// <param name="timeProvider">The clock of the scans' backoff after backpressure.</param>
     /// <param name="blocks">The process's volatile-disk block cache, through which drain outputs are written, or <see langword="null"/> when none is configured.</param>
+    /// <param name="localDrainBarrier">Optional barrier validating skipped <see cref="RowKind.LocalAppend"/> keys and draining ledger-local streams before completing a closed ledger (LG-I15, LG-I16).</param>
     /// <exception cref="ArgumentOutOfRangeException">The options are invalid.</exception>
-    public DrainWorker(IObjectStore store, ManifestView manifest, LedgerReader reader, ArchiveOptions options, TimeProvider timeProvider, BlockCache? blocks = null)
+    public DrainWorker(
+        IObjectStore store,
+        ManifestView manifest,
+        LedgerReader reader,
+        ArchiveOptions options,
+        TimeProvider timeProvider,
+        BlockCache? blocks = null,
+        ILedgerLocalDrainBarrier? localDrainBarrier = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(manifest);
@@ -79,6 +88,7 @@ public sealed class DrainWorker
         _manifest = manifest;
         _reader = reader;
         _blocks = blocks;
+        _localDrainBarrier = localDrainBarrier;
         _time = timeProvider;
         _settings = options.SectionSettings;
         _gridBits = options.GridBits;
@@ -91,6 +101,12 @@ public sealed class DrainWorker
     /// inside a segment, as the rejected drain to the contiguous tail did, and starts from a watermark wherever it lies.
     /// </summary>
     internal bool DrainsInsideSegmentsMutant { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the worker skips <see cref="ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync"/>
+    /// before completing a closed ledger (LG-I16 mutant for tests).
+    /// </summary>
+    internal bool DropBeforeLocalDrainedMutant { get; init; }
 
     /// <summary>Gets how many times a scan resumes after backpressure before the drain answers it; at least 1.</summary>
     internal int BackpressureRetries { get; init; } = 8;
@@ -173,6 +189,26 @@ public sealed class DrainWorker
                 return DrainOutcome.Covered.Instance;
             }
 
+            // LG-I16: run the local-stream drain barrier up front for a closed ledger with T > 0
+            // before holding any segment memory or committing complete: true (covers both a < T and a == T).
+            if (t is { } closedEnd && closedEnd > Slot.Zero && _localDrainBarrier is not null && !DropBeforeLocalDrainedMutant)
+            {
+                var barrier = await _localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, closedEnd, cancellationToken).ConfigureAwait(false);
+                switch (barrier.Value)
+                {
+                    case LocalDrainBarrierOutcome.Drained:
+                        break;
+                    case LocalDrainBarrierOutcome.Dropped:
+                        Forget(ledger.Id);
+                        return ReplicaWriteOutcome.Dropped.Instance;
+                    case LocalDrainBarrierOutcome.Backpressure:
+                        return ReplicaWriteOutcome.Backpressure.Instance;
+                    case null:
+                    default:
+                        throw new UnreachableException("conventions.md §15: a barrier answers a union which holds a case.");
+                }
+            }
+
             if (a == below)
             {
                 // A drain of no slots only completes its ledger, uploading nothing.
@@ -237,7 +273,7 @@ public sealed class DrainWorker
     /// <exception cref="DrainMemoryExceededException">The segment's rows pass the drain memory alone.</exception>
     private async Task<Scanned> ScanAsync(LedgerMetadata ledger, Start start, Slot below, bool boundIsEnd, CancellationToken cancellationToken)
     {
-        Segment? segment = new(new LedgerSegmentId(ledger.Id, start.Slot), _settings.BloomBitsPerKey);
+        Segment? segment = new(new LedgerSegmentId(ledger.Id, start.Slot), ledger, _settings.BloomBitsPerKey, _localDrainBarrier);
         try
         {
             var scanned = await Scan.ScanAsync(
@@ -528,7 +564,7 @@ public sealed class DrainWorker
     /// A segment's rows, held in pooled arrays over one retained <see cref="ArcBuffer"/> per batch with non-empty bodies
     /// and a pooled key-byte arena, releasing each batch once all of its rows have been written.
     /// </summary>
-    private sealed class Segment(LedgerSegmentId id, int bloomBitsPerKey) : DrainRows(id)
+    private sealed class Segment(LedgerSegmentId id, LedgerMetadata ledger, int bloomBitsPerKey, ILedgerLocalDrainBarrier? localDrainBarrier) : DrainRows(id)
     {
         private DrainedRow[] _rows = [];
         private ArcBuffer[] _batches = [];
@@ -586,9 +622,14 @@ public sealed class DrainWorker
             {
                 if (row.Kind == RowKind.LocalAppend)
                 {
-                    // LG-I15: fail closed when no ILedgerLocalDrainBarrier is configured (wired in J2).
-                    throw new ArchiveCorruptException(
-                        string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                    if (localDrainBarrier is null)
+                    {
+                        throw new ArchiveCorruptException(
+                            string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                    }
+
+                    localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key);
+                    continue;
                 }
 
                 Reserve(1);

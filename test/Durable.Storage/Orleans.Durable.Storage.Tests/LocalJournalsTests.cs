@@ -245,7 +245,7 @@ public sealed class LocalJournalsTests : IAsyncLifetime
                 TimeProvider.System,
                 NullLoggerFactory.Instance,
                 index,
-                Token);
+                cancellationToken: Token);
 
             Assert.Equal(withJournalIndex, runtime.StateDatabase is not null);
 

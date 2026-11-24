@@ -199,7 +199,8 @@ internal static partial class Components
             Technologies = ["Polly.Core", "System.IO.Hashing"],
             Grants = Granted(
                 ("Orleans.Durable.Storage.Engine.Archive.Logs", "the drains' shared scan, rows, and memory bound (DrainScan, DrainRows, ByteBudget), and the archive write builder"),
-                ("Orleans.Durable.Storage.Engine.Archive.Lsm", "the drains' shared scan, rows, and memory bound (DrainScan, DrainRows, ByteBudget)")),
+                ("Orleans.Durable.Storage.Engine.Archive.Lsm", "the drains' shared scan, rows, and memory bound (DrainScan, DrainRows, ByteBudget)"),
+                ("Orleans.Durable.Storage.Engine.Cluster.Control", "the local-stream drain coordinator bounds its fold memory through ByteBudget")),
         },
 
         // An archive store: archive logs implement the Archive's contract over the ledgers' rows and an archive-log

@@ -60,6 +60,7 @@ public sealed class ArchiveLogDrainWorker
     private readonly IObjectStore _objects;
     private readonly LedgerMapView _map;
     private readonly LedgerReader _reader;
+    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
     private readonly TimeProvider _time;
     private readonly ArchiveLogNames _names;
     private readonly ByteBudget _memory;
@@ -91,6 +92,7 @@ public sealed class ArchiveLogDrainWorker
     /// <param name="options">The drain concurrency and memory, and the request rate; the logs' names are the gate's.</param>
     /// <param name="timeProvider">The clock of the request rate, the scans' backoff, and the writer's retries.</param>
     /// <param name="writerOptions">The writer's retries; by default <see cref="ArchiveLogWriterOptions"/>'s.</param>
+    /// <param name="localDrainBarrier">Optional barrier validating skipped <see cref="RowKind.LocalAppend"/> keys and draining ledger-local streams before marking a closed ledger complete (LG-I15, LG-I16).</param>
     /// <exception cref="ArgumentOutOfRangeException">The options are invalid.</exception>
     public ArchiveLogDrainWorker(
         ArchiveLogGate gate,
@@ -98,7 +100,8 @@ public sealed class ArchiveLogDrainWorker
         LedgerReader reader,
         ArchiveLogOptions options,
         TimeProvider timeProvider,
-        ArchiveLogWriterOptions? writerOptions = null)
+        ArchiveLogWriterOptions? writerOptions = null,
+        ILedgerLocalDrainBarrier? localDrainBarrier = null)
     {
         ArgumentNullException.ThrowIfNull(gate);
         ArgumentNullException.ThrowIfNull(map);
@@ -111,6 +114,7 @@ public sealed class ArchiveLogDrainWorker
         _objects = gate.Objects;
         _map = map;
         _reader = reader;
+        _localDrainBarrier = localDrainBarrier;
         _time = timeProvider;
         _names = gate.Names;
         _memory = new ByteBudget(options.DrainMemoryBytes);
@@ -187,6 +191,12 @@ public sealed class ArchiveLogDrainWorker
     /// key's write threw, as if it were held; for tests.
     /// </summary>
     internal bool MarksUnheldMutant { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the worker skips <see cref="ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync"/>
+    /// before marking a closed ledger complete (LG-I16 mutant for tests).
+    /// </summary>
+    internal bool DropBeforeLocalDrainedMutant { get; init; }
 
     /// <summary>
     /// Gets the observer of each segment the worker scanned to its end and starts writing, which maps a simulated drain onto
@@ -266,6 +276,33 @@ public sealed class ArchiveLogDrainWorker
             Debug.Assert(t is not { } end || start <= end, "A start past T is a corrupt marker, which the resume refused.");
             if (t is { } closedEnd && start == closedEnd)
             {
+                if (closedEnd > Slot.Zero && _localDrainBarrier is not null && !DropBeforeLocalDrainedMutant)
+                {
+                    LocalDrainBarrierOutcome barrier;
+                    try
+                    {
+                        barrier = await _localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, closedEnd, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (ArchiveCorruptException exception)
+                    {
+                        throw ArchiveLogDrainBlockedException.ForCorruptSegment(new LedgerSegmentId(ledger.Id, Slot.Zero), exception);
+                    }
+
+                    switch (barrier.Value)
+                    {
+                        case LocalDrainBarrierOutcome.Drained:
+                            break;
+                        case LocalDrainBarrierOutcome.Dropped:
+                            Forget(ledger.Id);
+                            return ArchiveLogDrainOutcome.Dropped.Instance;
+                        case LocalDrainBarrierOutcome.Backpressure:
+                            return new ArchiveLogDrainOutcome.Drained(closedEnd);
+                        case null:
+                        default:
+                            throw new UnreachableException("conventions.md §15: a barrier answers a union which holds a case.");
+                    }
+                }
+
                 lock (_sync)
                 {
                     _ = _complete.Add(ledger.Id);
@@ -467,7 +504,7 @@ public sealed class ArchiveLogDrainWorker
     private async Task<DrainStep> DrainSegmentAsync(LedgerMetadata ledger, Slot start, Slot below, bool boundIsEnd, Dictionary<byte[], RowToken>? chain, LedgerSegmentId? marker, CancellationToken cancellationToken)
     {
         var id = new LedgerSegmentId(ledger.Id, start);
-        using var segment = new Segment(id);
+        using var segment = new Segment(id, ledger, _localDrainBarrier);
         DrainScanOutcome scanned;
         try
         {
@@ -859,7 +896,7 @@ public sealed class ArchiveLogDrainWorker
     }
 
     /// <summary>A segment's key writes, in the order their keys first appear.</summary>
-    private sealed class Segment(LedgerSegmentId id) : DrainRows(id)
+    private sealed class Segment(LedgerSegmentId id, LedgerMetadata ledger, ILedgerLocalDrainBarrier? localDrainBarrier) : DrainRows(id)
     {
         private readonly Dictionary<byte[], KeyWrite> _byKey = [with(LedgerSegmentDictionary.KeyComparer.Instance)];
 
@@ -873,9 +910,14 @@ public sealed class ArchiveLogDrainWorker
             {
                 if (row.Kind == RowKind.LocalAppend)
                 {
-                    // LG-I15: fail closed when no ILedgerLocalDrainBarrier is configured (wired in J2).
-                    throw new ArchiveCorruptException(
-                        string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                    if (localDrainBarrier is null)
+                    {
+                        throw new ArchiveCorruptException(
+                            string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                    }
+
+                    localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key);
+                    continue;
                 }
 
                 if (!lookup.TryGetValue(row.Key, out var write))

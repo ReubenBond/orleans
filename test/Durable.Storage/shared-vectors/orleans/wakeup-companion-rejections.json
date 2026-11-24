@@ -1,0 +1,115 @@
+{
+  "description": "Wakeup companion records (orleans.wakeup, version 1; orleans.md §5.15) a decoder rejects in procedural check order.",
+  "cases": [
+    {
+      "name": "Empty input.",
+      "reason": "truncated",
+      "hex": ""
+    },
+    {
+      "name": "Version 2.",
+      "reason": "bad-version",
+      "hex": "020003612f620178"
+    },
+    {
+      "name": "Truncated before flags.",
+      "reason": "truncated",
+      "hex": "01"
+    },
+    {
+      "name": "Reserved flags bit set (0x02).",
+      "reason": "bad-flags",
+      "hex": "010203612f620178"
+    },
+    {
+      "name": "Non-canonical target grain ID length varint (0x83 0x00).",
+      "reason": "bad-varint",
+      "hex": "01008300612f620178"
+    },
+    {
+      "name": "Empty target grain ID (length 0).",
+      "reason": "empty-grain-id",
+      "hex": "0100000178"
+    },
+    {
+      "name": "Target grain ID length 1025 (> 1024).",
+      "reason": "grain-id-too-long",
+      "hex": "01008108"
+    },
+    {
+      "name": "Truncated target grain ID bytes.",
+      "reason": "truncated",
+      "hex": "010005612f62"
+    },
+    {
+      "name": "Invalid UTF-8 in target grain ID.",
+      "reason": "invalid-utf8",
+      "hex": "010003612fff0178"
+    },
+    {
+      "name": "Target grain ID missing slash.",
+      "reason": "bad-grain-id",
+      "hex": "0100036162630178"
+    },
+    {
+      "name": "Target grain ID with empty grain type (/key).",
+      "reason": "bad-grain-id",
+      "hex": "0100042f6b65790178"
+    },
+    {
+      "name": "Non-canonical job name length varint (0x81 0x00).",
+      "reason": "bad-varint",
+      "hex": "010003612f62810078"
+    },
+    {
+      "name": "Empty job name (length 0).",
+      "reason": "empty-job-name",
+      "hex": "010003612f6200"
+    },
+    {
+      "name": "Job name length 257 (> 256).",
+      "reason": "job-name-too-long",
+      "hex": "010003612f628102"
+    },
+    {
+      "name": "Truncated job name bytes.",
+      "reason": "truncated",
+      "hex": "010003612f62047879"
+    },
+    {
+      "name": "Invalid UTF-8 in job name.",
+      "reason": "invalid-utf8",
+      "hex": "010003612f6202c0af"
+    },
+    {
+      "name": "Blank job name (ASCII spaces and tab).",
+      "reason": "blank-job-name",
+      "hex": "010003612f6203200920"
+    },
+    {
+      "name": "Truncated due time ticks (only 4 bytes).",
+      "reason": "truncated",
+      "hex": "010103612f62017800000000"
+    },
+    {
+      "name": "Negative due time ticks (-1).",
+      "reason": "bad-ticks",
+      "hex": "010103612f620178ffffffffffffffff"
+    },
+    {
+      "name": "Due time ticks past DateTimeOffset.MaxValue.UtcTicks.",
+      "reason": "bad-ticks",
+      "hex": "010103612f620178004037f47528ca2b"
+    },
+    {
+      "name": "Trailing byte after clear record.",
+      "reason": "trailing-bytes",
+      "hex": "010003612f620178ff"
+    },
+    {
+      "name": "Trailing byte after scheduled record.",
+      "reason": "trailing-bytes",
+      "hex": "010103612f6201780000000000000000aa"
+    }
+  ]
+}

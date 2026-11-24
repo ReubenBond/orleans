@@ -169,6 +169,9 @@ public sealed class JournalStore : IAsyncDisposable
         }
     }
 
+    /// <summary>The caller parameter key holding the comma-separated ordinal-sorted list of registered local stream names.</summary>
+    public const string LocalStreamsParameter = "local-streams";
+
     /// <summary>
     /// Gets the caller parameters the composition records in the archive store's record (archive.md §2.4), and compares
     /// with the record's, <c>ArchiveStoreRecord.CheckParametersMatch</c>, across the cluster's processes: <c>max-body-bytes</c>, the

@@ -693,10 +693,37 @@ if ($Traces -and $ledgerTraceRoots.Count -eq 0) {
 
     $all = @(Get-ChildItem -LiteralPath $Traces -Filter '*.qnt')
     $modules = @($all | Where-Object { $_.BaseName -like 'ArchiveLogsTrace*' -and $_.BaseName -notlike '*Repeated' -and $_.BaseName -notlike '*Unheld*' })
+    $localDrains = @($all | Where-Object { $_.BaseName -like 'LocalDrainTrace*' -and $_.BaseName -notlike '*Mutant*' })
+    $localDrainMutants = @($all | Where-Object { $_.BaseName -like 'LocalDrainTrace*Mutant*' })
     $ledgerMaps = @($all | Where-Object { $_.BaseName -like 'LedgerMapTrace*' })
     $archives = @($all | Where-Object { $_.BaseName -match '^ArchiveTrace\d+$' })
-    if ($modules.Count + $ledgerMaps.Count + $archives.Count -eq 0) {
+    if ($modules.Count + $localDrains.Count + $localDrainMutants.Count + $ledgerMaps.Count + $archives.Count -eq 0) {
         throw "No trace modules lie in $Traces."
+    }
+
+    # Local-drain trace validation: every conforming LSM and Archive-Logs trace must replay against LocalDrain.qnt,
+    # and every named negative-control mutant trace (drop-before-barrier, complete-on-dropped, skip-unknown-stream) must fail.
+    foreach ($control in $localDrainMutants) {
+        if ((Invoke-Replay $control.FullName $control.BaseName).Passed) {
+            throw "The negative-control local-drain trace $($control.Name) replays: trace validation accepts a forbidden mutant trace."
+        }
+
+        Write-Host "$($control.BaseName): negative-control mutant trace fails, as it must"
+    }
+
+    foreach ($module in $localDrains) {
+        $replay = Invoke-Replay $module.FullName $module.BaseName
+        if (-not $replay.Passed) {
+            throw "The local-drain trace $($module.Name) does not replay against LocalDrain.qnt.`n$($replay.Output)"
+        }
+
+        $text = Get-Content -LiteralPath $module.FullName -Raw
+        $actions = [regex]::Matches($text, '\.then\(').Count
+        Write-Host "$($module.BaseName): replays $actions actions against LocalDrain.qnt"
+    }
+
+    if ($localDrains.Count -gt 0) {
+        Write-Host "Validated $($localDrains.Count) local-drain traces against LocalDrain.qnt; $($localDrainMutants.Count) negative controls fail."
     }
 
     # The negative controls: a marks-unheld drain's trace marks a segment whose write never landed, which must not replay.

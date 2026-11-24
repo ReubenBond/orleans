@@ -32,6 +32,9 @@
     <InternalsVisibleTo Include="Orleans.Durable.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Durable.Redis" />
     <InternalsVisibleTo Include="Orleans.Durable.S3" />
+    <InternalsVisibleTo Include="Orleans.Durable.Storage" />
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Fuzz.Orleans" />
+    <InternalsVisibleTo Include="Orleans.Durable.Storage.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.AzureStorage.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />

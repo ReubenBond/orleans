@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Durable.Storage.Engine.Archive;
 using Orleans.Durable.Storage.Engine.Archive.Logs;
 using Orleans.Durable.Storage.Engine.Archive.Lsm;
+using Orleans.Durable.Storage.Engine.Journals;
 using Orleans.Durable.Storage.Engine.MetaStore;
 using Orleans.Durable.Storage.Engine.ObjectStore;
 using Polly;
@@ -115,9 +116,10 @@ internal abstract class SiloArchive
 
         /// <inheritdoc/>
         /// <remarks>
-        /// Reads the record through the LSM's <c>StoreRecordAsync</c> and passes the gate once its ID and store fields hold,
-        /// so the node may read and write the LSM, whatever its parameters; a parameter's refusal then refuses the Journals
-        /// alone (OR-I8).
+        /// Reads the record through the LSM's <c>StoreRecordAsync</c>, checks the store's ID and <c>local-streams</c>
+        /// parameter before passing the gate (so a silo with a mismatched local-stream set never drains or marks ledgers
+        /// complete; OR-I8, LG-I16), and then checks remaining caller parameters after passing the gate so other
+        /// parameter mismatches refuse the Journals alone.
         /// </remarks>
         private protected override async Task CheckRecordAsync(ArchiveStoreIdentity identity, IReadOnlyDictionary<string, string> parameters, ResiliencePipeline retry, CancellationToken cancellationToken)
         {
@@ -126,6 +128,19 @@ internal abstract class SiloArchive
                 (Objects, parameters),
                 cancellationToken).ConfigureAwait(false);
             identity.Check(Kind, record.Id);
+
+            // OR-I8, LG-I16: verify local-streams agreement before Gate.Pass so a silo with a mismatched
+            // local-stream set never runs LSM drains or marks closed ledgers complete.
+            var storedLocalStreams = record.Parameters.GetValueOrDefault(JournalStore.LocalStreamsParameter);
+            var callerLocalStreams = parameters.TryGetValue(JournalStore.LocalStreamsParameter, out var value) ? value : null;
+            if (!string.Equals(storedLocalStreams, callerLocalStreams, StringComparison.Ordinal))
+            {
+                throw new ArchiveStoreMismatchException(
+                    new ArchiveStoreRecordField(JournalStore.LocalStreamsParameter, IsParameter: true),
+                    storedLocalStreams,
+                    callerLocalStreams);
+            }
+
             Gate.Pass(new ArchiveGateEvidence.Lsm(Objects));
             record.CheckParametersMatch(parameters);
         }
