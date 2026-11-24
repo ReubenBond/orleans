@@ -58,9 +58,9 @@ public readonly struct ArchiveRow : IDisposable
     /// <exception cref="ArgumentException">The kind is undefined, or the segment is not of the row's ledger at or below its slot.</exception>
     public static ArchiveRow Live(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, ArcBuffer body)
     {
-        if (!RowKinds.IsDefined(kind))
+        if (!RowKinds.IsArchiveKind(kind))
         {
-            throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Row kind {(byte)kind} is not defined."), nameof(kind));
+            throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Row kind {(byte)kind} is not an archive row kind (LG-I15)."), nameof(kind));
         }
 
         if (segment.Ledger != tag.Ledger || segment.Start > tag.Slot)
@@ -123,6 +123,7 @@ public readonly struct ArchiveRow : IDisposable
         RowKind.Replace => ArchiveCommand.Replace(BodyLength),
         RowKind.Delete when IsHeld && BodyLength > 0 => throw new InvalidOperationException("A held Delete carries no tombstone."),
         RowKind.Delete => ArchiveCommand.Delete(Body.ToArray()),
+        RowKind.LocalAppend => throw new UnreachableException("RowKind.LocalAppend is excluded from ArchiveRow (LG-I15)."),
         _ => throw new UnreachableException("A row's kind is defined."),
     };
 

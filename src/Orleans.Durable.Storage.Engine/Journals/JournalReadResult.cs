@@ -147,6 +147,8 @@ public sealed class JournalReadResult : IDisposable
                     count = 0;
                     baseLength = 0;
                     break;
+                case RowKind.LocalAppend:
+                    throw new UnreachableException("RowKind.LocalAppend is excluded from journal reads (LG-I15).");
                 case RowKind.Append:
                     if (row.Body.Length > 0)
                     {

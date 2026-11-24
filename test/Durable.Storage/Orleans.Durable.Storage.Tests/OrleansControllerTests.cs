@@ -2002,7 +2002,7 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
         _state.Node = (_, options) => options.Journals.MaxBodyBytes = limit switch
         {
             JournalStoreLimit.PayloadLimit => 32 << 20,
-            JournalStoreLimit.MaxQueuedBytes or JournalStoreLimit.MaxAppendBytes or JournalStoreLimit.MaxProposalBytes => throw new UnreachableException(),
+            JournalStoreLimit.MaxQueuedBytes or JournalStoreLimit.MaxAppendBytes or JournalStoreLimit.MaxProposalBytes or JournalStoreLimit.MaxSegmentKeys => throw new UnreachableException(),
             _ => throw new UnreachableException(),
         };
         var instruments = new ConcurrentDictionary<Instrument, bool>();

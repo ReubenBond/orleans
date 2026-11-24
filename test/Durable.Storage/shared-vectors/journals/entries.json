@@ -219,6 +219,79 @@
         "count": "0"
       },
       "rowBody": ""
+    },
+    {
+      "name": "An Append with one attached local append.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Append",
+      "expectedVersion": {
+        "base": "",
+        "count": "0"
+      },
+      "localAppends": [
+        {
+          "stream": "orleans.wakeup",
+          "payload": "776b3031"
+        }
+      ],
+      "payload": "68656c6c6f",
+      "hex": "1ba2c752800000010e6f726c65616e732e77616b65757004776b303168656c6c6f",
+      "rowKind": "Append",
+      "versionBefore": {
+        "base": "",
+        "count": "0"
+      },
+      "rowBody": "68656c6c6f"
+    },
+    {
+      "name": "An empty Replace with two attached local appends (one empty payload, one non-empty).",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Replace",
+      "expectedVersion": {
+        "base": "",
+        "count": "5"
+      },
+      "localAppends": [
+        {
+          "stream": "a.1",
+          "payload": ""
+        },
+        {
+          "stream": "b_2-z",
+          "payload": "010203"
+        }
+      ],
+      "payload": "",
+      "hex": "60f8c7318100050203612e310005625f322d7a03010203",
+      "rowKind": "Replace",
+      "versionBefore": {
+        "base": "",
+        "count": "5"
+      },
+      "rowBody": ""
+    },
+    {
+      "name": "A Delete with one attached local append.",
+      "rowKey": "19f68fb16f72646572732f3432",
+      "kind": "Delete",
+      "expectedVersion": {
+        "base": "",
+        "count": "8"
+      },
+      "deletedAt": "639301248000000000",
+      "localAppends": [
+        {
+          "stream": "orleans.wakeup",
+          "payload": "776b3031"
+        }
+      ],
+      "hex": "a05b9f0c8200080000810f1941df08010e6f726c65616e732e77616b65757004776b3031",
+      "rowKind": "Delete",
+      "versionBefore": {
+        "base": "",
+        "count": "8"
+      },
+      "rowBody": "0000810f1941df08"
     }
   ]
 }

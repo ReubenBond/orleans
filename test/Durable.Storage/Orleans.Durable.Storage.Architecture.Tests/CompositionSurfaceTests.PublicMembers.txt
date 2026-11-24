@@ -98,10 +98,13 @@ Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions (sealed class)
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions..ctor()
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.ExpiryInterval: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.LargestBatch(): System.Int64
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.LargestBatch(System.Boolean hasLocalStreams): System.Int64
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBatchBytes: System.Int32 { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBatchEntries: System.Int32 { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxBodyBytes: System.Int32 { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxConcurrentHistoryReads: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxLocalAppendBytesPerWrite: System.Int32 { get; set; }
+Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxLocalAppendsPerWrite: System.Int32 { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.MaxQueuedBytes: System.Int64 { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.TombstoneRetention: System.TimeSpan { get; set; }
 Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions.Validate(): System.Void

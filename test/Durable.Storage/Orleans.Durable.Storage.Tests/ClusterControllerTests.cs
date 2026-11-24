@@ -3468,7 +3468,48 @@ public sealed class ClusterControllerTests : IAsyncLifetime
         return Assert.Single(_view.Current.Ledgers);
     }
 
-    /// <summary>Installs the root and splits it into its children's ledgers, with the given replicas, primary first.</summary>
+    /// <summary>
+    /// ledgers.md §3.1, §7.5: when local streams are configured, <see cref="ClusterController"/> refuses to split any
+    /// range already at <see cref="LedgerLocalKey.MaxRangeDepth"/> (256), even when hot; without local streams, the same
+    /// hot range at depth 256 splits.
+    /// </summary>
+    [Fact]
+    public async Task SplitsStopAtLocalKeyMaxRangeDepthWhenLocalStreamsAreRegistered()
+    {
+        var openings = new List<LedgerOpening>();
+        var current = KeyRange.Root;
+        var replicas = new[] { Node(1), Node(2), Node(3) };
+        for (var d = 0; d < LedgerLocalKey.MaxRangeDepth; d++)
+        {
+            var (lower, upper) = current.Children;
+            openings.Add(Opening(upper, replicas));
+            current = lower;
+        }
+
+        openings.Add(Opening(current, replicas));
+
+        var register = new ScriptedConditionalRegister();
+        var view = await LedgerMapView.OpenAsync(register, Token);
+        await using var committer = new LedgerMapCommitter(register, 1 << 20, view);
+        var applied = await committer.CommitAsync(new LedgerMapChange.Install([], [.. openings], 1), Token);
+        Assert.IsType<LedgerMapCommitOutcome.Applied>(applied.Value);
+
+        var deepest = view.Current.Ledgers.Single(l => l.Range == current);
+        var withLocal = new ClusterController(_options, view, committer, ClusterArchive.Logs.Instance, _time, NullLogger.Instance, hasLocalStreams: true);
+        var withoutLocal = new ClusterController(_options, view, committer, ClusterArchive.Logs.Instance, _time, NullLogger.Instance, hasLocalStreams: false);
+
+        var registry = new RegisteredNodes(1, _nodes.ToFrozenDictionary());
+        var membership = _membership.ToFrozenDictionary();
+        withLocal.Observe(registry, membership);
+        withoutLocal.Observe(registry, membership);
+        var hotReport = Idle(Node(1), Generation) with { ProposedBytesPerSecond = ImmutableDictionary<LedgerId, long>.Empty.Add(deepest.Id, _options.SplitBytesPerSecond * 10) };
+        _ = withLocal.Report(hotReport);
+        _ = withoutLocal.Report(hotReport);
+
+        Assert.DoesNotContain(withLocal.RunPass().Transitions, t => t.Purpose == TransitionPurpose.Split && t.Transition.Value is Transition.Split s && s.Ledger == deepest.Id);
+        Assert.Contains(withoutLocal.RunPass().Transitions, t => t.Purpose == TransitionPurpose.Split && t.Transition.Value is Transition.Split s && s.Ledger == deepest.Id);
+    }
+
     private async Task<(LedgerMetadata Lower, LedgerMetadata Upper)> SplitRootAsync(NodeId[] lower, NodeId[] upper)
     {
         var root = await InstallRootAsync(lower);

@@ -29,3 +29,7 @@ An empty Delete, with an empty body, followed by an Append of the same key, whos
   length 39, start True, offset 0, ordinal base 0, row count 2
   row 0: Delete, defines ordinal 0, key 6a6f75726e616c2f39 (length 9), version before (empty, 4), token empty, body empty
   row 1: Append, references ordinal 0, body 6166746572 (length 5)
+A LocalAppend row defining a ledger-local key and a second LocalAppend referencing it by ordinal 0.
+  length 60, start True, offset 0, ordinal base 0, row count 2
+  row 0: LocalAppend, defines ordinal 0, key 00000000ff000000...732e77616b657570 (length 27), version before (empty, 0), token empty, body 776b3031 (length 4)
+  row 1: LocalAppend, references ordinal 0, body 776b3032 (length 4)

@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Hashing;
+using System.Text;
 
 namespace Orleans.Durable.Storage.Fuzz.Journals;
 
@@ -17,6 +18,9 @@ public static class EntryRules
     private const int KeyLengthField = sizeof(ushort);
     private const int MinLength = 6;
     private const int MaxBase = 32;
+    private const int MaxLocalStreamLength = 64;
+    private const int MaxLocalPayloadLength = 65_536;
+    private const byte HasLocalAppendsFlag = 0x80;
     private const long LastTick = 3_155_378_975_999_999_999;
 
     /// <summary>Returns a fuzz input of <paramref name="rowKey"/> and <paramref name="record"/>.</summary>
@@ -53,7 +57,7 @@ public static class EntryRules
     /// <summary>Reads <paramref name="record"/>, written for the row key <paramref name="rowKey"/>, as the format's rules give it.</summary>
     public static EntryReading Read(ReadOnlySpan<byte> rowKey, ReadOnlySpan<byte> record)
     {
-        // 1. The CRC, the kind, and the base's length.
+        // 1. The CRC, the kind/flags byte, and the base's length.
         if (record.Length < MinLength)
         {
             return EntryReading.Rejected("truncated");
@@ -65,14 +69,22 @@ public static class EntryRules
             return EntryReading.Rejected("crc-mismatch");
         }
 
-        // 3. The kind.
-        var kind = record[4];
+        // 3. The kind and HasLocalAppendsFlag.
+        var kindByte = record[4];
+        var hasLocalAppends = (kindByte & HasLocalAppendsFlag) != 0;
+        var kind = (byte)(kindByte & ~HasLocalAppendsFlag);
         if (kind > 3)
         {
             return EntryReading.Rejected("unknown-kind");
         }
 
-        // 4. The expected version: the base's length, the base, and the count.
+        // 4. Expired cannot carry local appends.
+        if (hasLocalAppends && kind == 3)
+        {
+            return EntryReading.Rejected("expired-local-appends");
+        }
+
+        // 5. The expected version: the base's length, the base, and the count.
         int baseLength = record[5];
         if (baseLength > MaxBase)
         {
@@ -94,7 +106,7 @@ public static class EntryRules
 
         position += countLength;
 
-        // 5. A Delete's deletion time.
+        // 6. A Delete's deletion time.
         long ticks = 0;
         if (kind == 2)
         {
@@ -112,7 +124,79 @@ public static class EntryRules
             position += 8;
         }
 
-        // 6. The body.
+        // 7. Optional local appends.
+        var localAppends = new List<RuleLocalAppend>();
+        if (hasLocalAppends)
+        {
+            if (record.Length - position < 1)
+            {
+                return EntryReading.Rejected("truncated");
+            }
+
+            int localCount = record[position++];
+            if (localCount == 0)
+            {
+                return EntryReading.Rejected("empty-local-appends");
+            }
+
+            for (var i = 0; i < localCount; i++)
+            {
+                if (record.Length - position < 1)
+                {
+                    return EntryReading.Rejected("truncated");
+                }
+
+                int streamLength = record[position++];
+                if (streamLength == 0)
+                {
+                    return EntryReading.Rejected("empty-local-stream");
+                }
+
+                if (streamLength > MaxLocalStreamLength)
+                {
+                    return EntryReading.Rejected("local-stream-too-long");
+                }
+
+                if (record.Length - position < streamLength)
+                {
+                    return EntryReading.Rejected("truncated");
+                }
+
+                var streamBytes = record.Slice(position, streamLength);
+                position += streamLength;
+                if (!IsValidStream(streamBytes))
+                {
+                    return EntryReading.Rejected("bad-local-stream");
+                }
+
+                if (record.Length - position < 1)
+                {
+                    return EntryReading.Rejected("truncated");
+                }
+
+                if (!TryReadCount(record[position..], out var payloadLength, out var payloadVarintLength))
+                {
+                    return EntryReading.Rejected("bad-varint");
+                }
+
+                position += payloadVarintLength;
+                if (payloadLength > MaxLocalPayloadLength)
+                {
+                    return EntryReading.Rejected("local-payload-too-long");
+                }
+
+                if ((ulong)(record.Length - position) < payloadLength)
+                {
+                    return EntryReading.Rejected("truncated");
+                }
+
+                var payload = record.Slice(position, (int)payloadLength).ToArray();
+                position += (int)payloadLength;
+                localAppends.Add(new RuleLocalAppend(Encoding.ASCII.GetString(streamBytes), payload));
+            }
+        }
+
+        // 8. The body.
         var body = record[position..];
         if (kind == 0 && body.IsEmpty)
         {
@@ -124,7 +208,20 @@ public static class EntryRules
             return EntryReading.Rejected("trailing-bytes");
         }
 
-        return EntryReading.Accepted(new RuleEntry(kind, versionBase, count, ticks, body.ToArray()));
+        return EntryReading.Accepted(new RuleEntry(kind, versionBase, count, ticks, body.ToArray(), localAppends));
+    }
+
+    private static bool IsValidStream(ReadOnlySpan<byte> bytes)
+    {
+        foreach (var b in bytes)
+        {
+            if (b is not (>= (byte)'a' and <= (byte)'z' or >= (byte)'0' and <= (byte)'9' or (byte)'.' or (byte)'_' or (byte)'-'))
+            {
+                return false;
+            }
+        }
+
+        return !bytes.IsEmpty;
     }
 
     /// <summary>
@@ -193,8 +290,11 @@ public sealed record EntryReading(string? Reason, RuleEntry? Entry)
     internal static EntryReading Accepted(RuleEntry entry) => new(null, entry);
 }
 
+/// <summary>One attached ledger-local append as the format's rules give it.</summary>
+public sealed record RuleLocalAppend(string Stream, byte[] Payload);
+
 /// <summary>
-/// An entry as the format's rules give it: its kind byte, its expected version's base and count, its deletion ticks, and
-/// its payload.
+/// An entry as the format's rules give it: its kind byte, its expected version's base and count, its deletion ticks, its
+/// payload, and any attached local appends.
 /// </summary>
-public sealed record RuleEntry(byte Kind, byte[] Base, ulong Count, long Ticks, byte[] Payload);
+public sealed record RuleEntry(byte Kind, byte[] Base, ulong Count, long Ticks, byte[] Payload, IReadOnlyList<RuleLocalAppend>? LocalAppends = null);

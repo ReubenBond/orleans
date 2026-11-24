@@ -127,6 +127,58 @@ public sealed class SimulatedJournalStoreConformanceTests
     }
 
     /// <summary>
+    /// Atomic journal + <see cref="LocalAppendRecord"/> writes conform to <see cref="JournalStoreSpec"/> (JS-I11) and
+    /// <see cref="SimLocalSessionOracle"/> (JS-I12: strict slot order, non-empty records, <c>OnBatchDurable</c> before
+    /// caller <c>Accepted</c>, <c>Dispose()</c> once after the last possible <c>OnBatchDurable</c>) across Clockwork
+    /// explored windows and seeded three-replica quorum sequences, including takeovers, fenced writes, crashing
+    /// <c>Ambiguous</c> writes, and reads skipping <see cref="RowKind.LocalAppend"/>.
+    /// </summary>
+    [Fact]
+    public async Task AtomicLocalAppendsConformUnderSimulatedSchedulesAndExploredWindows()
+    {
+        var stream = LocalStreamName.Parse("orleans.wakeup");
+        var exploredConformance = new SimulatedConformance(ScheduleBound.Current);
+        var exploredKit = Kit(
+            exploredConformance,
+            (environment, seed) => Target.StartAsync(
+                environment,
+                seed,
+                replicas: 1,
+                maxLatency: TimeSpan.Zero,
+                staleRate: 0,
+                warmStateBytes: seed % 2 == 0 ? 0 : null,
+                rejectionMutation: LedgerAdmission.RejectionMutant.None,
+                localStream: stream));
+
+        ConformanceCase[] exploredCases =
+        [
+            new([Group(Write(0, JournalWriteKind.Append, 0, 1), Write(1, JournalWriteKind.Replace, 0, 2)), Group(Read(0), Read(1))], Seed: 1),
+            new([Group(Write(0, JournalWriteKind.Append, 0, 1)), Group(FencedWrite(0, JournalWriteKind.Append, 0, 2)), Group(Write(0, JournalWriteKind.Replace, 0, 3)), Group(Read(0))], Seed: 2),
+            new([Group(CrashingWrite(0, JournalWriteKind.Append, 0, 1)), Group(Takeover()), Group(Read(0), Write(0, JournalWriteKind.Append, 0, 2)), Group(Read(0))], Seed: 3),
+        ];
+        foreach (var @case in exploredCases)
+        {
+            await exploredKit.RunAsync(@case);
+        }
+
+        var seededConformance = new SimulatedConformance();
+        var seededKit = Kit(
+            seededConformance,
+            (environment, seed) => Target.StartAsync(
+                environment,
+                seed,
+                replicas: 3,
+                maxLatency: TimeSpan.FromMilliseconds(2),
+                staleRate: 0.1,
+                warmStateBytes: seed % 2 == 0 ? 0 : null,
+                rejectionMutation: LedgerAdmission.RejectionMutant.None,
+                localStream: stream));
+
+        await seededKit.SampleAsync(seededKit.Sequences(15), iterations: 20, threads: 1);
+        await seededKit.SampleAsync(seededKit.ConcurrentSequences(8), iterations: 20, threads: 1);
+    }
+
+    /// <summary>
     /// A <see cref="LedgerAdmission"/> which decides a write arriving while its key's state is still loading
     /// (<see cref="LedgerAdmission.RejectionMutant.DecidesWhileLoading"/>) against the unloaded state rejects it with
     /// <c>Origin</c> even when the journal is already at a newer version (JS-I1, JS-I4, journals.md §8.1). On the default
@@ -362,6 +414,7 @@ public sealed class SimulatedJournalStoreConformanceTests
         private readonly ImmutableArray<NodeId> _replicaNodes;
         private readonly JournalStoreOptions _options;
         private readonly LedgerAdmission.RejectionMutant _rejectionMutation;
+        private readonly SimLocalSessionOracle? _localOracle;
         private readonly int _seed;
         private readonly Lock _lock = new();
         private readonly List<JournalVersion>[] _learned = [.. JournalStoreSpec.Keys.Select(static _ => new List<JournalVersion> { JournalVersion.Origin })];
@@ -383,6 +436,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             ImmutableArray<NodeId> replicaNodes,
             JournalStoreOptions options,
             LedgerAdmission.RejectionMutant rejectionMutation,
+            SimLocalSessionOracle? localOracle,
             int seed,
             LedgerMapView map,
             LedgerReader reader,
@@ -399,6 +453,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             _replicaNodes = replicaNodes;
             _options = options;
             _rejectionMutation = rejectionMutation;
+            _localOracle = localOracle;
             _seed = seed;
             _map = map;
             _reader = reader;
@@ -415,7 +470,8 @@ public sealed class SimulatedJournalStoreConformanceTests
             TimeSpan maxLatency,
             double staleRate,
             long? warmStateBytes,
-            LedgerAdmission.RejectionMutant rejectionMutation)
+            LedgerAdmission.RejectionMutant rejectionMutation,
+            LocalStreamName? localStream = null)
         {
             var replicaNodes = replicas == 1 ? [PrimaryNode] : ThreeReplicas;
             var register = new SimulatedConditionalRegister(environment, "map") { MaxLatency = maxLatency };
@@ -433,12 +489,15 @@ public sealed class SimulatedJournalStoreConformanceTests
                 options.WarmStateBytes = budget;
             }
 
+            var localOracle = localStream is not null ? new SimLocalSessionOracle(localStream) : null;
+
             var (map, reader, committer, registry, executor, journals) = await OpenProcessAsync(
                 register,
                 transport,
                 archive,
                 options,
                 rejectionMutation,
+                localOracle,
                 seed,
                 generation: 0);
 
@@ -451,6 +510,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 replicaNodes,
                 options,
                 rejectionMutation,
+                localOracle,
                 seed,
                 map,
                 reader,
@@ -558,6 +618,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             await _committer.DisposeAsync();
             _replicas.Dispose();
             _archive.Dispose();
+            _localOracle?.AssertClean();
         }
 
         private static async Task<(
@@ -572,6 +633,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             IArchiveStore archive,
             JournalStoreOptions options,
             LedgerAdmission.RejectionMutant rejectionMutation,
+            SimLocalSessionOracle? localOracle,
             int seed,
             int generation)
         {
@@ -587,7 +649,13 @@ public sealed class SimulatedJournalStoreConformanceTests
                 NullLoggerFactory.Instance,
                 new Random(HashCode.Combine(seed, generation)));
             var executor = new TransitionExecutor(registry, NullLogger<TransitionExecutor>.Instance);
-            var journals = new JournalStore(registry, archive, options, clock)
+            var journals = new JournalStore(
+                registry,
+                archive,
+                options,
+                clock,
+                stateDatabase: null,
+                localStreamHandlers: localOracle is not null ? [localOracle] : null)
             {
                 RejectionMutation = rejectionMutation,
             };
@@ -675,14 +743,24 @@ public sealed class SimulatedJournalStoreConformanceTests
         {
             var rowKey = JournalRowKey.Encode(JournalStoreSpec.Keys[key]);
             using var buffer = payload.Length == 0 ? default : ArcBuffer.Wrap(payload);
+            var localTag = _localOracle is { } oracle ? oracle.NextTag(key) : 0;
+            LocalAppendRecord[] locals = _localOracle is { } h
+                ? [new LocalAppendRecord(h.Stream, BitConverter.GetBytes(localTag))]
+                : [];
             using var record = kind switch
             {
-                JournalWriteKind.Append => _journals.EncodeAppend(rowKey, expected, buffer),
-                JournalWriteKind.Replace => _journals.EncodeReplace(rowKey, expected, buffer),
-                JournalWriteKind.Delete => _journals.EncodeDelete(rowKey, expected),
+                JournalWriteKind.Append => _journals.EncodeAppend(rowKey, expected, buffer, locals),
+                JournalWriteKind.Replace => _journals.EncodeReplace(rowKey, expected, buffer, locals),
+                JournalWriteKind.Delete => _journals.EncodeDelete(rowKey, expected, locals),
                 _ => throw new UnreachableException(),
             };
-            return await _journals.WriteAsync(record, CancellationToken.None);
+            var outcome = await _journals.WriteAsync(record, CancellationToken.None);
+            if (_localOracle is not null && outcome.Value is JournalWriteOutcome.Accepted)
+            {
+                _localOracle.AssertObserved(localTag);
+            }
+
+            return outcome;
         }
 
         private async Task<JournalWriteOutcome> FencedAsync(int key, JournalWriteKind kind, JournalVersion expected, byte[] payload)
@@ -764,6 +842,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 _archive,
                 _options,
                 _rejectionMutation,
+                _localOracle,
                 _seed,
                 ++_generation);
             return outcome;
@@ -781,6 +860,112 @@ public sealed class SimulatedJournalStoreConformanceTests
             {
                 throw new InvalidOperationException($"The transition {transition.Value} answered {outcome.Value}.");
             }
+        }
+    }
+
+    /// <summary>
+    /// White-box JS-I12 oracle for simulated conformance runs: verifies strict slot order, non-empty records,
+    /// <c>OnBatchDurable</c> before caller <c>Accepted</c>, and <c>Dispose()</c> called once strictly after the last
+    /// <c>OnBatchDurable</c>.
+    /// </summary>
+    private sealed class SimLocalSessionOracle(LocalStreamName stream) : ILocalStreamHandler
+    {
+        private readonly Lock _lock = new();
+        private readonly List<TrackedSession> _sessions = [];
+        private readonly HashSet<int> _observedTags = [];
+        private readonly List<string> _violations = [];
+        private int _nextTag;
+
+        public LocalStreamName Stream { get; } = stream;
+
+        public int NextTag(int key) => Interlocked.Increment(ref _nextTag);
+
+        public InvalidDataException? Validate(ReadOnlySpan<byte> payload) =>
+            payload.Length == sizeof(int) ? null : new InvalidDataException("Expected 4-byte tag.");
+
+        public ILocalStreamSession OpenLedger(LedgerId ledger)
+        {
+            lock (_lock)
+            {
+                var session = new TrackedSession(this, ledger);
+                _sessions.Add(session);
+                return session;
+            }
+        }
+
+        public void AssertObserved(int tag)
+        {
+            lock (_lock)
+            {
+                if (!_observedTags.Contains(tag))
+                {
+                    _violations.Add($"Write tag {tag} completed Accepted before OnBatchDurable observed it (JS-I12).");
+                }
+            }
+        }
+
+        public void AssertClean()
+        {
+            lock (_lock)
+            {
+                Assert.Empty(_violations);
+                foreach (var session in _sessions)
+                {
+                    Assert.Equal(1, session.DisposeCount);
+                }
+            }
+        }
+
+        private void OnDurable(TrackedSession session, Slot slot, ReadOnlySpan<LocalAppendRecord> records)
+        {
+            lock (_lock)
+            {
+                if (session.DisposeCount > 0)
+                {
+                    _violations.Add($"OnBatchDurable after Dispose on ledger {session.Ledger} slot {slot}.");
+                }
+
+                if (records.IsEmpty)
+                {
+                    _violations.Add($"Empty OnBatchDurable on ledger {session.Ledger} slot {slot}.");
+                }
+
+                if (session.LastSlot is { } prev && slot <= prev)
+                {
+                    _violations.Add($"Out-of-order OnBatchDurable on ledger {session.Ledger}: {slot} after {prev}.");
+                }
+
+                session.LastSlot = slot;
+                foreach (var rec in records)
+                {
+                    _ = _observedTags.Add(BitConverter.ToInt32(rec.Payload.Span));
+                }
+            }
+        }
+
+        private void OnDispose(TrackedSession session)
+        {
+            lock (_lock)
+            {
+                session.DisposeCount++;
+                if (session.DisposeCount > 1)
+                {
+                    _violations.Add($"Duplicate Dispose ({session.DisposeCount}) on ledger {session.Ledger}.");
+                }
+            }
+        }
+
+        private sealed class TrackedSession(SimLocalSessionOracle owner, LedgerId ledger) : ILocalStreamSession
+        {
+            public LedgerId Ledger { get; } = ledger;
+
+            public Slot? LastSlot { get; set; }
+
+            public int DisposeCount { get; set; }
+
+            public void OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records) => owner.OnDurable(this, slot, records);
+
+            public void Dispose() => owner.OnDispose(this);
         }
     }
 

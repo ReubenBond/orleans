@@ -134,6 +134,7 @@ internal static class TokenChainChecker
             RowKind.Append => ArchiveCommand.Append(row.BodyLength),
             RowKind.Replace => ArchiveCommand.Replace(row.BodyLength),
             RowKind.Delete => ArchiveCommand.Delete(row.Tombstone),
+            RowKind.LocalAppend => throw new ArgumentOutOfRangeException(nameof(rows), "RowKind.LocalAppend is excluded from archive writes (LG-I15)."),
             _ => throw new ArgumentOutOfRangeException(nameof(rows), "A row's kind is defined."),
         });
         return new ArchiveWrite(rows[0].Segment, rows[0].Token, [.. commands], opener);

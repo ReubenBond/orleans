@@ -79,22 +79,25 @@ public sealed class EntryTarget : FuzzTarget
     private static JournalEntryRecord Encode(JournalRowKey key, RuleEntry expected)
     {
         var version = new JournalVersion(new RowToken(expected.Base), expected.Count);
+        var locals = expected.LocalAppends is { Count: > 0 } list
+            ? list.Select(static item => new LocalAppendRecord(LocalStreamName.Parse(item.Stream), item.Payload)).ToArray()
+            : [];
         switch ((JournalEntryKind)expected.Kind)
         {
             case JournalEntryKind.Expired:
                 return JournalEntryRecord.Expired(key, version);
             case JournalEntryKind.Delete:
-                return JournalEntryRecord.Delete(key, version, new DateTimeOffset(expected.Ticks, TimeSpan.Zero));
+                return JournalEntryRecord.Delete(key, version, new DateTimeOffset(expected.Ticks, TimeSpan.Zero), locals);
             case JournalEntryKind.Append:
                 using (var payload = ArcBuffer.Wrap(expected.Payload))
                 {
-                    return JournalEntryRecord.Append(key, version, payload);
+                    return JournalEntryRecord.Append(key, version, payload, locals);
                 }
 
             case JournalEntryKind.Replace:
                 using (var snapshot = ArcBuffer.Wrap(expected.Payload))
                 {
-                    return JournalEntryRecord.Replace(key, version, snapshot);
+                    return JournalEntryRecord.Replace(key, version, snapshot, locals);
                 }
 
             default:
@@ -117,12 +120,36 @@ public sealed class EntryTarget : FuzzTarget
         return rowKey.Span.SequenceEqual(key) ? rowKey : null;
     }
 
-    private static bool Matches(JournalEntry entry, RuleEntry expected) =>
-        (byte)entry.Kind == expected.Kind
-        && entry.ExpectedVersion.Base.AsSpan().SequenceEqual(expected.Base)
-        && entry.ExpectedVersion.Count == expected.Count
-        && entry.DeletionTicks == expected.Ticks
-        && entry.PayloadLength == expected.Payload.Length;
+    private static bool Matches(JournalEntry entry, RuleEntry expected)
+    {
+        if ((byte)entry.Kind != expected.Kind
+            || !entry.ExpectedVersion.Base.AsSpan().SequenceEqual(expected.Base)
+            || entry.ExpectedVersion.Count != expected.Count
+            || entry.DeletionTicks != expected.Ticks
+            || entry.PayloadLength != expected.Payload.Length)
+        {
+            return false;
+        }
+
+        var expectedLocals = expected.LocalAppends ?? [];
+        if (entry.LocalAppends.Length != expectedLocals.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < expectedLocals.Count; i++)
+        {
+            var actual = entry.LocalAppends[i];
+            var exp = expectedLocals[i];
+            if (!string.Equals(actual.Stream.Value, exp.Stream, StringComparison.Ordinal)
+                || !actual.Payload.Span.SequenceEqual(exp.Payload))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// Returns <paramref name="input"/> as a sequence of segments of <paramref name="length"/> bytes each, the last

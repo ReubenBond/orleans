@@ -84,6 +84,12 @@ public sealed class InterfaceTests
         // (journals.md §8.3).
         "Orleans.Durable.Storage.Engine.Journals.IJournalIndex",
 
+        // Ledger-local append stream inversion seam: higher compositions (such as Orleans' WakeupStreamHandler) and
+        // Orleans-free simulation/unit test handlers plug into JournalStore/LedgerAdmission without reversing the
+        // downward dependency direction (journals.md §4.2, JS-I11, JS-I12).
+        "Orleans.Durable.Storage.Engine.Journals.ILocalStreamHandler",
+        "Orleans.Durable.Storage.Engine.Journals.ILocalStreamSession",
+
         // An open file: the operating system's, the reporting wrapper of the WAL's fail-stop seam, and the test doubles
         // which stand in for the file system's I/O.
         "Orleans.Durable.Storage.Engine.Wal.FileSystem.IWalFileSystemFile",

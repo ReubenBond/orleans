@@ -157,30 +157,36 @@ public sealed partial class JournalVectorTests : IDisposable
     {
         var kind = Enum.Parse<JournalEntryKind>(Text(vector, "kind"));
         var expected = ExpectedVersion(vector);
+        var locals = LocalAppends(vector);
         switch (kind)
         {
             case JournalEntryKind.Delete:
-                return JournalEntryRecord.Delete(key, expected, new DateTimeOffset(Int64(vector, "deletedAt"), TimeSpan.Zero));
+                return JournalEntryRecord.Delete(key, expected, new DateTimeOffset(Int64(vector, "deletedAt"), TimeSpan.Zero), locals);
             case JournalEntryKind.Expired:
                 return JournalEntryRecord.Expired(key, expected);
 
             case JournalEntryKind.Append:
                 using (var payload = ArcBuffer.Wrap(Hex(vector, "payload")))
                 {
-                    return JournalEntryRecord.Append(key, expected, payload);
+                    return JournalEntryRecord.Append(key, expected, payload, locals);
                 }
 
             case JournalEntryKind.Replace:
                 var bytes = Hex(vector, "payload");
                 using (var snapshot = bytes.Length == 0 ? default : ArcBuffer.Wrap(bytes))
                 {
-                    return JournalEntryRecord.Replace(key, expected, snapshot);
+                    return JournalEntryRecord.Replace(key, expected, snapshot, locals);
                 }
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(vector), kind, "Undefined kind.");
         }
     }
+
+    private static LocalAppendRecord[] LocalAppends(JsonElement vector) =>
+        vector.TryGetProperty("localAppends", out var array)
+            ? [.. array.EnumerateArray().Select(static item => new LocalAppendRecord(LocalStreamName.Parse(Text(item, "stream")), Hex(item, "payload")))]
+            : [];
 
     private static void AssertFields(JsonElement vector, JournalEntry entry)
     {
@@ -189,6 +195,13 @@ public sealed partial class JournalVectorTests : IDisposable
         Assert.Equal(ExpectedVersion(vector), entry.ExpectedVersion);
         Assert.Equal(kind == JournalEntryKind.Delete ? Int64(vector, "deletedAt") : 0, entry.DeletionTicks);
         Assert.Equal(vector.TryGetProperty("payload", out _) ? Hex(vector, "payload").Length : 0, entry.PayloadLength);
+        var expectedLocals = LocalAppends(vector);
+        Assert.Equal(expectedLocals.Length, entry.LocalAppends.Length);
+        for (var i = 0; i < expectedLocals.Length; i++)
+        {
+            Assert.Equal(expectedLocals[i].Stream, entry.LocalAppends[i].Stream);
+            Assert.Equal(expectedLocals[i].Payload.ToArray(), entry.LocalAppends[i].Payload.ToArray());
+        }
     }
 
     /// <summary>

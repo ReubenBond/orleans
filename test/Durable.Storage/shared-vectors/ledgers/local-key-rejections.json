@@ -1,0 +1,85 @@
+{
+  "description": "Ledger-local row keys rejected by LedgerLocalKey.Validate (ledgers.md §7), each naming the first rule broken.",
+  "cases": [
+    {
+      "name": "Range depth 257 exceeds MaxRangeDepth (256).",
+      "ledger": "1",
+      "depth": 257,
+      "prefix": "000000000000000000000000000000000000000000000000000000000000000000",
+      "reason": "range-depth-too-deep",
+      "hex": "00"
+    },
+    {
+      "name": "Key shorter than prefix + sentinel + ledger ID header.",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "truncated",
+      "hex": "00000000ff000000"
+    },
+    {
+      "name": "Prefix byte differs from range prefix.",
+      "ledger": "1",
+      "depth": 3,
+      "prefix": "a0",
+      "reason": "prefix-mismatch",
+      "hex": "80000000ff000000000000000161"
+    },
+    {
+      "name": "Non-zero unused low bit in prefix byte.",
+      "ledger": "1",
+      "depth": 3,
+      "prefix": "a0",
+      "reason": "prefix-mismatch",
+      "hex": "a1000000ff000000000000000161"
+    },
+    {
+      "name": "Non-zero padding byte between range prefix and sentinel.",
+      "ledger": "1",
+      "depth": 3,
+      "prefix": "a0",
+      "reason": "prefix-mismatch",
+      "hex": "a0000100ff000000000000000161"
+    },
+    {
+      "name": "Sentinel byte is 0xFE instead of 0xFF.",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "bad-sentinel",
+      "hex": "00000000fe000000000000000161"
+    },
+    {
+      "name": "Encoded ledger ID does not match expected ledger.",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "ledger-mismatch",
+      "hex": "00000000ff000000000000000261"
+    },
+    {
+      "name": "Empty stream name after ledger ID.",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "empty-stream",
+      "hex": "00000000ff0000000000000001"
+    },
+    {
+      "name": "Stream name of 65 bytes exceeds MaxLength (64).",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "stream-too-long",
+      "hex": "00000000ff00000000000000016161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+    },
+    {
+      "name": "Stream name contains uppercase ASCII character.",
+      "ledger": "1",
+      "depth": 0,
+      "prefix": "",
+      "reason": "bad-stream",
+      "hex": "00000000ff000000000000000141"
+    }
+  ]
+}

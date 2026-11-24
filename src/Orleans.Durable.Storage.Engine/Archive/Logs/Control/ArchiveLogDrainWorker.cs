@@ -477,6 +477,10 @@ public sealed class ArchiveLogDrainWorker
         {
             throw ArchiveLogDrainBlockedException.ForDamagedSegment(id, exception);
         }
+        catch (ArchiveCorruptException exception)
+        {
+            throw ArchiveLogDrainBlockedException.ForCorruptSegment(id, exception);
+        }
 
         switch (scanned.Value)
         {
@@ -867,6 +871,13 @@ public sealed class ArchiveLogDrainWorker
             long charge = 0;
             foreach (var row in item.Rows)
             {
+                if (row.Kind == RowKind.LocalAppend)
+                {
+                    // LG-I15: fail closed when no ILedgerLocalDrainBarrier is configured (wired in J2).
+                    throw new ArchiveCorruptException(
+                        string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                }
+
                 if (!lookup.TryGetValue(row.Key, out var write))
                 {
                     Debug.Assert(row.IsDefining, "A key's first row in its segment defines it (ledgers.md §2.2).");
@@ -883,6 +894,7 @@ public sealed class ArchiveLogDrainWorker
                     RowKind.Append => ArchiveCommand.Append(row.BodyLength),
                     RowKind.Replace => ArchiveCommand.Replace(row.BodyLength),
                     RowKind.Delete => ArchiveCommand.Delete(row.Body.ToArray()),
+                    RowKind.LocalAppend => throw new UnreachableException("RowKind.LocalAppend is handled before command conversion."),
                     _ => throw new UnreachableException("A row's kind is defined."),
                 };
                 charge += taken - write.Add(command, row.Kind == RowKind.Delete ? default : row.RetainBody(), taken);

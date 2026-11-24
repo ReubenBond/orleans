@@ -193,6 +193,31 @@
         }
       ],
       "hex": "434c4c42010000000100000206096a6f75726e616c2f390004000000000561667465728e08d965"
+    },
+    {
+      "name": "A LocalAppend row defining a ledger-local key and a second LocalAppend referencing it by ordinal 0.",
+      "segmentStart": true,
+      "segmentOffset": "0",
+      "ordinalBase": "0",
+      "rows": [
+        {
+          "kind": "LocalAppend",
+          "defining": true,
+          "key": "00000000ff00000000000000016f726c65616e732e77616b657570",
+          "versionBase": "",
+          "versionCount": "0",
+          "token": "",
+          "body": "776b3031",
+          "ordinal": "0"
+        },
+        {
+          "kind": "LocalAppend",
+          "defining": false,
+          "ordinal": "0",
+          "body": "776b3032"
+        }
+      ],
+      "hex": "434c4c420100000001000002071b00000000ff00000000000000016f726c65616e732e77616b65757000000004776b3031030004776b3032091b9735"
     }
   ]
 }

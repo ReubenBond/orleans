@@ -2571,6 +2571,8 @@ public sealed class JournalSimulationTests
                         exists = false;
                         content.Clear();
                         break;
+                    case RowKind.LocalAppend:
+                        break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(rows));
                 }

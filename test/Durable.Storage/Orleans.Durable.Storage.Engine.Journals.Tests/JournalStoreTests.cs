@@ -1273,7 +1273,15 @@ public sealed class JournalStoreTests : IDisposable
         await using var cluster = await JournalCluster.StartAsync(options);
         options.MaxBodyBytes = 1;
 
-        Assert.Equal(new Dictionary<string, string> { ["max-body-bytes"] = "1234567" }, cluster.Journals.StoreParameters);
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                ["max-body-bytes"] = "1234567",
+                ["local-streams"] = string.Empty,
+                ["max-local-appends"] = options.MaxLocalAppendsPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["max-local-append-bytes"] = options.MaxLocalAppendBytesPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            },
+            cluster.Journals.StoreParameters);
         _ = Accepted(await cluster.AppendAsync("a", Origin, "more than one byte"));
     }
 

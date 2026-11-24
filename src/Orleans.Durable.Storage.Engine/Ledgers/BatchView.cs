@@ -355,11 +355,11 @@ public readonly ref struct BatchView
             return RowTruncation(rowIndex, "flags");
         }
 
-        if ((flags & KindMask) == KindMask || (flags & ~(KindMask | DefiningFlag)) != 0)
+        if ((flags & ~(KindMask | DefiningFlag)) != 0)
         {
             return DecodeRejection.Create(
                 ReasonBadRowFlags,
-                string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex} has flags 0x{flags:x2}: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set."));
+                string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex} has flags 0x{flags:x2}: a bit other than the kind and defining is set."));
         }
 
         if ((flags & DefiningFlag) == 0)

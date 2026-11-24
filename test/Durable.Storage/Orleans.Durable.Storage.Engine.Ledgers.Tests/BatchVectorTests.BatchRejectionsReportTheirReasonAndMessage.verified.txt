@@ -32,10 +32,12 @@ A referencing row whose ordinal reaches the CRC-32C unterminated: a row's varint
   row-truncated: Row 0's ordinal runs past the batch's CRC-32C.
 A body whose length runs one byte past the CRC-32C.
   row-truncated: Row 0's body runs past the batch's CRC-32C.
-A row of kind 3.
-  bad-row-flags: Row 0 has flags 0x07: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
 A row with bit 3 set.
-  bad-row-flags: Row 0 has flags 0x0c: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
+  bad-row-flags: Row 0 has flags 0x0c: a bit other than the kind and defining is set.
+A LocalAppend row with bit 3 set.
+  bad-row-flags: Row 0 has flags 0x0f: a bit other than the kind and defining is set.
+A row with bit 7 set.
+  bad-row-flags: Row 0 has flags 0x84: a bit other than the kind and defining is set.
 A body length of 0 in two bytes, longer than its shortest form.
   bad-varint: Row 0's body length is not a varint which ends within 10 bytes, fits a u64, and is in its shortest form.
 A defining row with an empty key.
@@ -56,5 +58,5 @@ Flags 0x02, without the start flag, and segment offset 0, which breaks bad-segme
   bad-flags: The batch's flags are 0x02; only bit 0 may be set.
 No rows without the start flag, and trailing bytes: no-rows comes first.
   no-rows: The batch holds no rows, and only a marker, which begins a segment, holds none.
-A row of kind 3 with an empty key: bad-row-flags comes first.
-  bad-row-flags: Row 0 has flags 0x07: its kind is not 0, 1, or 2, or a bit other than the kind and defining is set.
+A row with bit 3 set and an empty key: bad-row-flags comes first.
+  bad-row-flags: Row 0 has flags 0x0c: a bit other than the kind and defining is set.

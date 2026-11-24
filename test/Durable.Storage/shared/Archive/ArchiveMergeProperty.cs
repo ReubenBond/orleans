@@ -40,6 +40,7 @@ public abstract class ArchiveMergeProperty : IDisposable
             RowKind.Append => length + 1,
             RowKind.Delete => length == 0 ? 0 : 8,
             RowKind.Replace => length,
+            RowKind.LocalAppend => throw new ArgumentOutOfRangeException(nameof(kind)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         }, same));
 

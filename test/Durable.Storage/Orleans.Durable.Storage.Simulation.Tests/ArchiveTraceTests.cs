@@ -182,6 +182,7 @@ public sealed class ArchiveTraceTests
             RowKind.Append => "A",
             RowKind.Replace => "R",
             RowKind.Delete => "E",
+            RowKind.LocalAppend => throw new UnreachableException("RowKind.LocalAppend is not part of LSM traces."),
             _ => throw new UnreachableException(),
         });
 

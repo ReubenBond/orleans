@@ -72,7 +72,14 @@ internal sealed class JournalNodeHost(LocalNode local, LocalJournals journals, F
 
             using (record)
             {
-                return Forwarded(await journals.WriteAsync(record, cancellationToken).ConfigureAwait(false));
+                try
+                {
+                    return Forwarded(await journals.WriteAsync(record, cancellationToken).ConfigureAwait(false));
+                }
+                catch (ArgumentException ex)
+                {
+                    return new JournalCallRefused(JournalRefusal.Argument, ex.Message);
+                }
             }
         }
         finally

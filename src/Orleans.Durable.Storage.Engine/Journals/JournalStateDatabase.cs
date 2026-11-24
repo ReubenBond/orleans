@@ -273,6 +273,69 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Non-blocking O(1) presence probe over this node's caught-up key index (journals.md §8.3): returns
+    /// <see langword="false"/> only when <paramref name="ledger"/> is replicated on this node, the index is not
+    /// corrupt, and its applied watermark has reached <paramref name="tail"/> with zero indexed rows for
+    /// <paramref name="key"/> below <paramref name="tail"/>; returns <see langword="true"/> when at least one indexed
+    /// row exists; and returns <see langword="null"/> otherwise without starting a predecessor scan.
+    /// </summary>
+    public async ValueTask<bool?> TryHasKeyEntryAsync(
+        LedgerMetadata ledger,
+        ReadOnlyMemory<byte> key,
+        Slot tail,
+        CancellationToken cancellationToken = default)
+    {
+        if (tail == Slot.Zero)
+        {
+            return false;
+        }
+
+        if (!ledger.IsOnNode(_node))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            if (_corruptException is not null
+                || !_appliedWatermarks.TryGetValue(ledger.Id, out var watermark)
+                || watermark < tail)
+            {
+                return null;
+            }
+        }
+
+        using var admission = _gate.TryEnter();
+        if (!admission.Entered)
+        {
+            return null;
+        }
+
+        var keyHash = JournalKeyHash.Compute(key.Span);
+        bool present;
+        try
+        {
+            present = await HasKeyIndexEntryAsync(ledger.Id, keyHash, Slot.Zero, 0, tail, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JournalIndexCorruptException)
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            if (_corruptException is not null
+                || !_appliedWatermarks.TryGetValue(ledger.Id, out var watermarkAfter)
+                || watermarkAfter < tail)
+            {
+                return null;
+            }
+        }
+
+        return present;
+    }
+
     /// <summary>Gets the durable watermark for <paramref name="ledger"/>.</summary>
     public Slot DurableWatermark(LedgerId ledger)
     {

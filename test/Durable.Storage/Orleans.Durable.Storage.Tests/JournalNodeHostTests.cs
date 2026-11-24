@@ -242,6 +242,32 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
         Assert.Equal(new JournalMoved(Owner: null), (await holding.WaitAsync(Bound, Token)).Value);
     }
 
+    /// <summary>
+    /// orleans.md §5.5, journals.md §8.1: a pre-admission <see cref="ArgumentException"/> from <c>JournalStore.WriteAsync</c>
+    /// (such as an unregistered local-append stream) returns <see cref="JournalCallRefused"/> with
+    /// <see cref="JournalRefusal.Argument"/> rather than settling as <c>Ambiguous</c>.
+    /// </summary>
+    [Fact]
+    public async Task PreAdmissionArgumentExceptionReturnsRefusedArgument()
+    {
+        var host = await HostAsync(reachable: true);
+        var stream = LocalStreamName.Parse("unregistered.stream");
+        using var payload = ArcBuffer.Wrap("x"u8.ToArray());
+        using var record = JournalEntryRecord.Append(
+            JournalRowKey.Encode("k"),
+            JournalVersion.Origin,
+            payload,
+            [new LocalAppendRecord(stream, "wk"u8.ToArray())]);
+        using var raw = record.ToArcBuffer();
+        var forwarded = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Of(raw.ToArray())) };
+
+        var outcome = await host.WriteAsync(Self, forwarded, Token);
+
+        var refused = Assert.IsType<JournalCallRefused>(outcome.Value);
+        Assert.Equal(JournalRefusal.Argument, refused.Kind);
+        Assert.Contains("unregistered.stream", refused.Message, StringComparison.Ordinal);
+    }
+
     private static byte[] RecordBytes(string key)
     {
         using var record = JournalEntryRecord.Delete(JournalRowKey.Encode(key), JournalVersion.Origin, DateTimeOffset.UnixEpoch);

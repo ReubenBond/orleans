@@ -192,6 +192,12 @@ public sealed class ArchiveReader
     {
         foreach (var row in item.Rows)
         {
+            if (row.Kind == RowKind.LocalAppend)
+            {
+                // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                continue;
+            }
+
             scan.AddLive(ArchiveRow.Of(row, segment, scan.GetBodiesWriter(), includeBodies));
         }
     }
@@ -1119,6 +1125,12 @@ public sealed class ArchiveReader
                         string.Create(CultureInfo.InvariantCulture, $"Row {defRow.Index} of the batch at slot {slot} would advance its key's count past the u64 maximum."));
                 }
 
+                if (defRow.Kind == RowKind.LocalAppend)
+                {
+                    // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                    return ScanPass.Reached;
+                }
+
                 var segment = new LedgerSegmentId(ledger.Id, new Slot(slot.Value - (long)batch.LedgerSegmentOffset));
                 var version = new RowVersion(versionBefore.Base.IsEmpty ? default : new RowToken(versionBefore.Base.ToArray()), versionBefore.Count + 1);
                 var token = defRow.Token.IsEmpty ? default : new RowToken(defRow.Token.ToArray());
@@ -1393,6 +1405,12 @@ public sealed class ArchiveReader
                 }
 
                 state.Count++;
+                if (row.Kind == RowKind.LocalAppend)
+                {
+                    // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                    continue;
+                }
+
                 var version = new RowVersion(state.VersionBase is null ? default : new RowToken(state.VersionBase), state.Count);
                 var token = state.Token is null ? default : new RowToken(state.Token);
                 AddIndexedRow(entry.Tag, row.Kind, version, state.Segment, token, row.Body, row.BodyLength);

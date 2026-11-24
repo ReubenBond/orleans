@@ -87,14 +87,19 @@
       "hex": "434c4c42010000000100000104016b0000000200c94e51e9"
     },
     {
-      "name": "A row of kind 3.",
-      "reason": "bad-row-flags",
-      "hex": "434c4c42010000000100000107016b000000006695de4a"
-    },
-    {
       "name": "A row with bit 3 set.",
       "reason": "bad-row-flags",
       "hex": "434c4c4201000000010000010c016b000000006d1df6bc"
+    },
+    {
+      "name": "A LocalAppend row with bit 3 set.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c4201000000010000010f016b000000003568f304"
+    },
+    {
+      "name": "A row with bit 7 set.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c42010000000100000184016b00000000caeeb507"
     },
     {
       "name": "A body length of 0 in two bytes, longer than its shortest form.",
@@ -147,9 +152,9 @@
       "hex": "434c4c420100000000010000001ce3c8c0"
     },
     {
-      "name": "A row of kind 3 with an empty key: bad-row-flags comes first.",
+      "name": "A row with bit 3 set and an empty key: bad-row-flags comes first.",
       "reason": "bad-row-flags",
-      "hex": "434c4c42010000000100000107000000000087219602"
+      "hex": "434c4c4201000000010000010c000000000042f22c56"
     }
   ]
 }

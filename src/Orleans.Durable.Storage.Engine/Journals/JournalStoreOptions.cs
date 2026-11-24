@@ -49,6 +49,18 @@ public sealed class JournalStoreOptions
     /// </summary>
     public int MaxConcurrentHistoryReads { get; set; } = 4;
 
+    /// <summary>
+    /// Gets or sets the maximum number of <see cref="LocalAppendRecord"/> items attached to a single journal write
+    /// (1 to 255, default 8; journals.md §8.8).
+    /// </summary>
+    public int MaxLocalAppendsPerWrite { get; set; } = 8;
+
+    /// <summary>
+    /// Gets or sets the maximum combined payload bytes of all <see cref="LocalAppendRecord"/> items attached to a
+    /// single journal write (default 64 KiB; journals.md §8.8).
+    /// </summary>
+    public int MaxLocalAppendBytesPerWrite { get; set; } = 65_536;
+
     /// <summary>Returns a copy, which a store keeps, so it enforces the settings it checked whatever its caller changes.</summary>
     internal JournalStoreOptions Clone() => (JournalStoreOptions)MemberwiseClone();
 
@@ -59,6 +71,12 @@ public sealed class JournalStoreOptions
     /// proposals each hold at least it.
     /// </summary>
     public long LargestBatch() => LedgerAdmission.LargestBatch(this);
+
+    /// <summary>
+    /// Returns the bytes of the largest batch admission builds under these options, including local-append rows when
+    /// <paramref name="hasLocalStreams"/> is <see langword="true"/> (journals.md §8.4).
+    /// </summary>
+    public long LargestBatch(bool hasLocalStreams) => LedgerAdmission.LargestBatch(this, hasLocalStreams);
 
     /// <summary>Throws unless each setting is within its range (journals.md §8.8), naming the setting.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A setting is out of its range.</exception>
@@ -72,5 +90,8 @@ public sealed class JournalStoreOptions
         ArgumentOutOfRangeException.ThrowIfLessThan(TombstoneRetention, TimeSpan.Zero, nameof(TombstoneRetention));
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ExpiryInterval, TimeSpan.Zero, nameof(ExpiryInterval));
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxConcurrentHistoryReads, 1, nameof(MaxConcurrentHistoryReads));
+        ArgumentOutOfRangeException.ThrowIfLessThan(MaxLocalAppendsPerWrite, 1, nameof(MaxLocalAppendsPerWrite));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(MaxLocalAppendsPerWrite, byte.MaxValue, nameof(MaxLocalAppendsPerWrite));
+        ArgumentOutOfRangeException.ThrowIfNegative(MaxLocalAppendBytesPerWrite, nameof(MaxLocalAppendBytesPerWrite));
     }
 }

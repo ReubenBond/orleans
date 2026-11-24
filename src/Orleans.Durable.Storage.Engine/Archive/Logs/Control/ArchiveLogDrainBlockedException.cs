@@ -98,6 +98,10 @@ public sealed class ArchiveLogDrainBlockedException : Exception
     public static ArchiveLogDrainBlockedException ForDamagedSegment(LedgerSegmentId segment, Exception innerException) =>
         new(null, null, segment, ArchiveLogDrainBlockedCause.Damaged, innerException);
 
+    /// <summary>Returns the exception of a segment whose ledger-local rows fail corruption validation, naming no key.</summary>
+    public static ArchiveLogDrainBlockedException ForCorruptSegment(LedgerSegmentId segment, Exception innerException) =>
+        new(null, null, segment, ArchiveLogDrainBlockedCause.Corrupt, innerException);
+
     /// <summary>Returns the exception of a drain marker which is corrupt, naming the segment it marks.</summary>
     public static ArchiveLogDrainBlockedException ForCorruptMarker(LedgerSegmentId segment, Exception innerException) =>
         new(null, null, segment, ArchiveLogDrainBlockedCause.CorruptMarker, innerException);

@@ -104,7 +104,7 @@ public static class LedgerSegmentRules
             }
 
             var kind = (byte)(rowFlags[0] & 3);
-            if (kind == 3 || (rowFlags[0] & 0xf8) != 0)
+            if ((rowFlags[0] & 0xf8) != 0)
             {
                 return BatchReading.Rejected("bad-row-flags");
             }

@@ -584,6 +584,13 @@ public sealed class DrainWorker
             var cursorOffset = 0;
             foreach (var row in item.Rows)
             {
+                if (row.Kind == RowKind.LocalAppend)
+                {
+                    // LG-I15: fail closed when no ILedgerLocalDrainBarrier is configured (wired in J2).
+                    throw new ArchiveCorruptException(
+                        string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
+                }
+
                 Reserve(1);
                 var key = row.Key;
                 if (row.IsDefining)

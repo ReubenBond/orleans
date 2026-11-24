@@ -23,6 +23,7 @@ internal static class ArchiveLogOpeners
             RowKind.Replace => new(ArchiveLogOpenerKind.Replace, null, rows),
             RowKind.Delete => new(ArchiveLogOpenerKind.Delete, command.Tombstone is { } body ? TombstoneOf(body.Span) : null, rows),
             RowKind.Append => throw new ArgumentException("An Append opens no generation.", nameof(write)),
+            RowKind.LocalAppend => throw new ArgumentException("RowKind.LocalAppend opens no generation (LG-I15).", nameof(write)),
             _ => throw new ArgumentException($"Row kind {(byte)command.Kind} is not defined.", nameof(write)),
         };
     }
