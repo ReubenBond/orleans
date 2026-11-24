@@ -50,8 +50,7 @@ internal static class InboxTestAccess
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "Emit")]
     public static extern void Emit(Inbox inbox, InboxCommand command);
 
-    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_wakeupJobId")]
-    public static extern ref string? WakeupJobId(MessagingPump pump);
+    public static string? WakeupJobId(MessagingPump pump) => pump.WakeupJobId;
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_messages")]
     private static extern ref Dictionary<MessageId, InboxEntry> GetMessages(Inbox inbox);

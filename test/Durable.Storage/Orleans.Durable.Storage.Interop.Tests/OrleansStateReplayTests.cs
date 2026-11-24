@@ -85,6 +85,141 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
         services.AssertNoViolations();
     }
 
+    /// <summary>
+    /// Verifies that a closed ledger mixing journal rows and <see cref="RowKind.LocalAppend"/> wakeup rows drains
+    /// cleanly to Azure Archive Logs via <see cref="ArchiveLogDrainWorker"/> (with an
+    /// <see cref="Engine.Archive.Control.ILedgerLocalDrainBarrier"/>) and replays identically through plain
+    /// <c>AzureBlobJournalStorage</c> with zero local-append rows leaking into the archive log (LG-I15, LG-I16).
+    /// </summary>
+    [Fact]
+    public async Task MixedJournalAndLocalAppendLedgerDrainsToArchiveLogsAndReplaysThroughPlainOrleans()
+    {
+        const string format = "json";
+        await using var services = await InteropServices.CreateAsync(InteropBackend.Fake, emulators);
+        var captured = new CapturingStorage();
+        Dictionary<string, int> expectedScores;
+        string? expectedTitle;
+        await using (var writer = Writer(captured, format))
+        {
+            var (manager, states) = await ManagerAsync(writer, "replay/mixed-local");
+            await using (manager)
+            {
+                var (dictionary, value) = states;
+                dictionary["x"] = 10;
+                value.Value = "initial";
+                await manager.WriteStateAsync(Token);
+                dictionary["y"] = 20;
+                captured.CompactionRequested = true;
+                await manager.WriteStateAsync(Token);
+                captured.CompactionRequested = false;
+                value.Value = "updated";
+                await manager.WriteStateAsync(Token);
+                expectedScores = dictionary.ToDictionary(StringComparer.Ordinal);
+                expectedTitle = value.Value;
+            }
+        }
+
+        Assert.NotNull(captured.Snapshot);
+        Assert.Single(captured.Appended);
+
+        await using var journals = new ArchiveLogJournals(services, AzureArchiveLogStore.AzureLayout, format);
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = format };
+        var record = await journals.Archive.StoreRecordAsync(parameters, Token);
+        var gate = await Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogGate.PassAsync(
+            journals.Archive,
+            new Orleans.Durable.Storage.Engine.Archive.ArchiveStoreIdentity(Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind.Logs, Orleans.Durable.Storage.Engine.Archive.ArchiveStorePrefix.Of("interop"), record.Id),
+            parameters,
+            Token);
+
+        var register = new Orleans.Durable.Storage.Engine.MetaStore.InMemoryConditionalRegister();
+        var map = await LedgerMapView.OpenAsync(register, Token);
+        await using var committer = new Orleans.Durable.Storage.Engine.Ledgers.Control.LedgerMapCommitter(register, int.MaxValue, map);
+        var nodeId = NodeId.New();
+        using var transport = new Orleans.Durable.Storage.Engine.Ledgers.Memory.InMemoryLedgerReplicaTransport();
+        await using var reader = new LedgerReader(map, transport, TimeProvider.System, nodeId);
+        await using var registry = new LedgerWriterRegistry(reader, 1 << 20, LedgerWriterOptions.Default, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var executor = new Orleans.Durable.Storage.Engine.Ledgers.Control.TransitionExecutor(registry, Microsoft.Extensions.Logging.Abstractions.NullLogger<Orleans.Durable.Storage.Engine.Ledgers.Control.TransitionExecutor>.Instance);
+
+        var bootChoice = new Orleans.Durable.Storage.Engine.Ledgers.Control.TransitionChoice(nodeId, new LedgerLocation.Nodes([nodeId]), k: 4, chosenAt: 0, epoch: map.Current.Epoch);
+        Assert.IsType<Orleans.Durable.Storage.Engine.Ledgers.Control.LedgerMapCommitOutcome.Applied>((await executor.ExecuteAsync(new Orleans.Durable.Storage.Engine.Ledgers.Control.Transition.Bootstrap(bootChoice), committer.CommitAsync, Token)).Value);
+        await registry.ReconciledAsync(map.Current.Epoch, Token);
+
+        var open = map.Current.Ledgers.Single(static l => l.IsOpen);
+        var ledgerId = open.Id;
+        var rowKey = Orleans.Durable.Storage.Engine.Journals.JournalRowKey.Encode("replay/mixed-local").Span.ToArray();
+        var stream = LocalStreamName.Parse("orleans.wakeup");
+        var localKey = LedgerLocalKey.Encode(ledgerId, open.Range, stream);
+        var writerHandle = registry.TryGet(ledgerId)!;
+
+        // Propose Replace + Append journal rows interleaved with RowKind.LocalAppend rows in the same batch.
+        using (var batch = await writerHandle.CreateBatchAsync(4, 1 << 20, Token))
+        {
+            _ = batch.BeginRow(rowKey, RowKind.Replace, default, default, captured.Snapshot.Length, captured.Snapshot);
+            _ = batch.BeginRow(localKey, RowKind.LocalAppend, default, default, 4, "wk-1"u8);
+            _ = batch.BeginRow(rowKey, RowKind.Append, batch.HeldVersion(rowKey), default, captured.Appended[0].Length, captured.Appended[0]);
+            _ = batch.BeginRow(localKey, RowKind.LocalAppend, batch.HeldVersion(localKey), default, 4, "wk-2"u8);
+            Assert.IsType<ProposalOutcome.Durable>((await writerHandle.ProposeAsync(batch, Token)).Value);
+        }
+
+        var replaceChoice = new Orleans.Durable.Storage.Engine.Ledgers.Control.TransitionChoice(nodeId, new LedgerLocation.Nodes([nodeId]), k: 4, chosenAt: 0, epoch: map.Current.Epoch);
+        Assert.IsType<Orleans.Durable.Storage.Engine.Ledgers.Control.LedgerMapCommitOutcome.Applied>((await executor.ExecuteAsync(new Orleans.Durable.Storage.Engine.Ledgers.Control.Transition.Replace(ledgerId, replaceChoice), committer.CommitAsync, Token)).Value);
+        _ = await map.ReadAsync(Token);
+        var closedMeta = map.Current.Get(ledgerId)!.Value;
+        var closedTail = Assert.IsType<LedgerStatus.Closed>(closedMeta.Status.Value).T;
+
+        var barrierCalls = 0;
+        var validatedKeys = 0;
+        var barrier = new InteropLocalBarrier(
+            stream,
+            onValidate: () => Interlocked.Increment(ref validatedKeys),
+            onDrain: () => Interlocked.Increment(ref barrierCalls));
+        var drainWorker = new ArchiveLogDrainWorker(gate, map, reader, new Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogOptions(), TimeProvider.System, localDrainBarrier: barrier);
+
+        var outcome = await drainWorker.DrainAsync(closedMeta, closedTail, Token);
+        Assert.IsType<ArchiveLogDrainOutcome.Complete>(outcome.Value);
+        Assert.True(validatedKeys >= 1);
+        Assert.Equal(1, barrierCalls);
+
+        // Plain Orleans reads the drained journal cleanly via read-only AzureBlobJournalStorage!
+        var (recovering, recovered) = await ManagerAsync(journals.Orleans, "replay/mixed-local");
+        await using (recovering)
+        {
+            var (dictionary, value) = recovered;
+            Assert.Equal(expectedScores.OrderBy(static pair => pair.Key, StringComparer.Ordinal), dictionary.OrderBy(static pair => pair.Key, StringComparer.Ordinal));
+            Assert.Equal(expectedTitle, value.Value);
+        }
+
+        services.AssertNoViolations();
+    }
+
+    private sealed class InteropLocalBarrier(LocalStreamName stream, Action onValidate, Action onDrain) : Orleans.Durable.Storage.Engine.Archive.Control.ILedgerLocalDrainBarrier
+    {
+        public void ValidateLocalAppendKey(LedgerMetadata ledger, ReadOnlySpan<byte> rowKey)
+        {
+            if (LedgerLocalKey.Validate(rowKey, ledger.Range, ledger.Id, out var streamSpan) is { } error)
+            {
+                throw new Orleans.Durable.Storage.Engine.Archive.ArchiveCorruptException(error.Message, error);
+            }
+
+            if (!streamSpan.SequenceEqual(stream.Span))
+            {
+                throw new Orleans.Durable.Storage.Engine.Archive.ArchiveCorruptException("Unknown stream.");
+            }
+
+            onValidate();
+        }
+
+        public ValueTask<Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome> EnsureLocalStreamsDrainedAsync(
+            LedgerMetadata ledger,
+            Slot tail,
+            CancellationToken cancellationToken)
+        {
+            onDrain();
+            return ValueTask.FromResult<Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome>(
+                Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome.Drained.Instance);
+        }
+    }
+
     /// <summary>Returns plain Orleans' services over a provider which captures its journal's segments.</summary>
     private static PlainOrleans Writer(CapturingStorage captured, string format) => PlainOrleans.With(format, silo => silo.AddJournalStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, _ => new CapturingProvider(captured)));
 

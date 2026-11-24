@@ -50,6 +50,7 @@ public static class DurableJobsExtensions
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
         services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
+        services.TryAddScoped<GrainWakeupCoordinator>();
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),

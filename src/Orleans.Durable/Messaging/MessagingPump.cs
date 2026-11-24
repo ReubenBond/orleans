@@ -28,7 +28,7 @@ namespace Orleans.Durable.Messaging;
 /// The loop keeps the activation alive while a pass runs over queued work and while outbox deliveries are in flight.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
-internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
+internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainWakeupSource, ILifecycleObserver
 {
     internal const string JobName = "orleans.messaging.pump";
     internal static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
@@ -37,24 +37,19 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private static readonly Type StatelessWorkerPlacementType = new StatelessWorkerAttribute().PlacementStrategy.GetType();
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly GrainWakeupCoordinator _wakeupCoordinator;
     private Inbox? _inbox;
     private Outbox? _outbox;
     private Task? _loop;
     private TaskCompletionSource? _nextPass;
-    private Task<DurableJob>? _scheduling;
-    private DateTimeOffset _schedulingDueTime;
     private bool _keepingAlive;
 
-    // The job which wakes the grain next, if any, and its due time. A job run which completes clears it.
-    private string? _wakeupJobId;
-    private DateTimeOffset _wakeupDueTime;
-
-    // Advances whenever a job run completes. A schedule requested in an earlier epoch may belong to a job which has
-    // already run and completed, so it no longer guarantees a wake-up.
-    private int _wakeupEpoch;
-    private int _schedulingEpoch;
-
-    public MessagingPump(IGrainContext grainContext, IJournaledStateManager stateManager, IDurableJobHandlerRegistry jobHandlers, MessagingShared shared)
+    public MessagingPump(
+        IGrainContext grainContext,
+        IJournaledStateManager stateManager,
+        IDurableJobHandlerRegistry jobHandlers,
+        MessagingShared shared,
+        GrainWakeupCoordinator? wakeupCoordinator = null)
     {
         // Messaging requires one activation per grain identity, so every activation of a stateless worker fails.
         if (grainContext.GetComponent<PlacementStrategy>()?.GetType() == StatelessWorkerPlacementType)
@@ -67,6 +62,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         StateManager = stateManager;
         Shared = shared;
         GrainTypeTag = shared.GetGrainTypeTag(grainContext.GrainId.Type);
+        _wakeupCoordinator = wakeupCoordinator ?? new GrainWakeupCoordinator(grainContext, stateManager, shared.JobManager, shared.JobTimeProvider);
+        _wakeupCoordinator.RegisterSource(this, RecheckDelay);
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Activate, this);
 
@@ -95,6 +92,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     /// <summary>Gets the metric tag for this activation's grain type.</summary>
     public string GrainTypeTag { get; }
+
+    /// <summary>Gets the currently tracked backing wakeup job ID for this pump, if any; for tests.</summary>
+    internal string? WakeupJobId => _wakeupCoordinator.GetTrackedBackingJobId(this);
 
     /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>
     public CancellationToken ShutdownToken => _shutdown.Token;
@@ -131,100 +131,35 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
     }
 
+    string IGrainWakeupSource.JobName => JobName;
+
+    DateTimeOffset? IGrainWakeupSource.GetNextDueTime(DateTimeOffset now) =>
+        GetNextWakeupDelay(now) is { } delay ? MessagingTime.AddClamped(now, delay) : null;
+
     /// <summary>
-    /// Ensures a durable job will wake this grain no later than <paramref name="dueTime"/>, or within
-    /// <see cref="RecheckDelay"/> for work which is due sooner, on the Durable Jobs clock.
+    /// Ensures a durable wakeup covers <paramref name="dueTime"/> during <c>PrepareWriteAsync</c>: skipped when
+    /// companion writes are supported (emitted atomically with the journal write) and delegated to
+    /// <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> otherwise.
     /// </summary>
-    public async ValueTask EnsureWakeupAsync(DateTimeOffset dueTime, CancellationToken cancellationToken)
-    {
-        // The live loop performs work as soon as it is due, so any tracked or scheduling wake-up within RecheckDelay
-        // covers it should the activation fail.
-        var earliest = MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), RecheckDelay);
-        if (dueTime < earliest) dueTime = earliest;
-        if (_wakeupJobId is not null && _wakeupDueTime <= dueTime) return;
-        if (_scheduling is null || _schedulingEpoch != _wakeupEpoch || _schedulingDueTime > dueTime)
-        {
-            _schedulingEpoch = _wakeupEpoch;
-            _schedulingDueTime = dueTime;
-            _scheduling = Shared.JobManager.ScheduleJobAsync(new ScheduleJobRequest
-            {
-                Target = GrainContext.GrainId,
-                JobName = JobName,
-                DueTime = _schedulingDueTime
-            }, _shutdown.Token);
-        }
+    public ValueTask EnsureWakeupAsync(DateTimeOffset dueTime, CancellationToken cancellationToken) =>
+        _wakeupCoordinator.EnsureFallbackWakeupAsync(this, dueTime, _shutdown.Token, cancellationToken);
 
-        var scheduling = _scheduling;
-        var epoch = _schedulingEpoch;
-        try
-        {
-            var job = await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
-            if (epoch == _wakeupEpoch && (_wakeupJobId is null || job.DueTime < _wakeupDueTime))
-            {
-                _wakeupJobId = job.Id;
-                _wakeupDueTime = job.DueTime;
-            }
-        }
-        finally
-        {
-            if (scheduling.IsCompleted && ReferenceEquals(_scheduling, scheduling)) _scheduling = null;
-        }
-    }
+    public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) =>
+        _wakeupCoordinator.ExecuteJobAsync(this, context, RunPassForJobAsync, cancellationToken);
 
-    public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    private async ValueTask RunPassForJobAsync(CancellationToken cancellationToken)
     {
-        // A running job keeps rescheduling itself until both queues and every registered wake-up report no work.
-        var jobId = context.Job.Id;
-        if (_wakeupJobId is null)
-        {
-            _wakeupJobId = jobId;
-            _wakeupDueTime = context.Job.DueTime;
-        }
         EnsureStarted();
         var pass = _nextPass ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
         _signal.Signal();
-        try
-        {
-            await pass.Task.WaitAsync(cancellationToken).ConfigureAwait(true);
-            // A failed pass can leave only staged removals; its job must survive the activation's failure.
-            _shutdown.Token.ThrowIfCancellationRequested();
-        }
-        catch
-        {
-            // Durable Jobs retries the failed run (see GetRetryTime), which wakes a recovered activation.
-            CompleteWakeup(jobId);
-            throw;
-        }
-
-        var now = Shared.JobTimeProvider.GetUtcNow();
-        if (GetNextWakeupDelay(now) is not { } delay)
-        {
-            CompleteWakeup(jobId);
-            return DurableJobRunResult.Completed;
-        }
-
-        var next = MessagingTime.AddClamped(now, delay > TimeSpan.Zero ? delay : RecheckDelay);
-        if (_wakeupJobId is not null && _wakeupJobId != jobId && _wakeupDueTime <= next)
-        {
-            // Another job wakes the grain first, and its run reschedules for any remaining work.
-            CompleteWakeup(jobId);
-            return DurableJobRunResult.Completed;
-        }
-
-        _wakeupJobId = jobId;
-        _wakeupDueTime = next;
-        return DurableJobRunResult.RescheduleAt(next);
-    }
-
-    private void CompleteWakeup(string jobId)
-    {
-        if (_wakeupJobId == jobId) _wakeupJobId = null;
-        _wakeupEpoch++;
+        await pass.Task.WaitAsync(cancellationToken).ConfigureAwait(true);
+        // A failed pass can leave only staged removals; its job must survive the activation's failure.
+        _shutdown.Token.ThrowIfCancellationRequested();
     }
 
     // The delay until the inbox, the outbox, or a registered wake-up next holds work, or null when none does.
     private TimeSpan? GetNextWakeupDelay(DateTimeOffset now) =>
-        (Inbox.GetNextWakeupDelay(now), _outbox?.GetNextWakeupDelay(now)) switch
+        (_inbox?.GetNextWakeupDelay(now), _outbox?.GetNextWakeupDelay(now)) switch
         {
             ({ } inbox, { } outbox) => inbox < outbox ? inbox : outbox,
             (var inbox, var outbox) => inbox ?? outbox
@@ -234,7 +169,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     {
         try
         {
-            await EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), CancellationToken.None).ConfigureAwait(true);
+            // Non-journaled handler-registration transitions always ensure a backing wake-up even when companion writes are supported.
+            await _wakeupCoordinator.EnsureBackingWakeupAsync(this, Shared.JobTimeProvider.GetUtcNow(), _shutdown.Token, CancellationToken.None).ConfigureAwait(true);
         }
         catch (Exception exception) when (!_shutdown.IsCancellationRequested)
         {
@@ -302,11 +238,15 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         if (_outbox is { } outbox) await outbox.StartAsync(cancellationToken).ConfigureAwait(true);
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
 
-        // Recovered work keeps a wake-up at its real due time, even if the job which woke this activation completes.
-        var now = Shared.JobTimeProvider.GetUtcNow();
-        if (GetNextWakeupDelay(now) is { } delay)
+        // When companion writes are supported, recovered work is already covered by the open ledger's wakeup session
+        // or by the backing job drained when its ledger closed; skip EnsureWakeupAsync to avoid an extra job write.
+        if (!_wakeupCoordinator.SupportsCompanionWrites)
         {
-            await EnsureWakeupAsync(MessagingTime.AddClamped(now, delay), cancellationToken).ConfigureAwait(true);
+            var now = Shared.JobTimeProvider.GetUtcNow();
+            if (GetNextWakeupDelay(now) is { } delay)
+            {
+                await _wakeupCoordinator.EnsureBackingWakeupAsync(this, MessagingTime.AddClamped(now, delay), _shutdown.Token, cancellationToken).ConfigureAwait(true);
+            }
         }
     }
 
@@ -323,7 +263,6 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async Task OnStop(CancellationToken cancellationToken)
     {
-        var scheduling = _scheduling;
         Stop();
 
         // Grain calls finish before deactivation stops the lifecycle, so the loop and outbox deliveries own every remaining write.
@@ -332,10 +271,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             await loop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
 
-        if (scheduling is not null)
-        {
-            await ((Task)scheduling).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
-        }
+        await _wakeupCoordinator.WaitForPendingSchedulingAsync().ConfigureAwait(true);
 
         if (_outbox is { } outbox) await outbox.StopAsync().ConfigureAwait(true);
 

@@ -159,6 +159,13 @@ namespace Orleans.Durable.Jobs
         System.Threading.Tasks.ValueTask<DurableJobsStorageStatus> InspectAsync(string providerName, System.Threading.CancellationToken cancellationToken = default);
     }
 
+    public partial interface IGrainWakeupSource
+    {
+        string JobName { get; }
+
+        System.DateTimeOffset? GetNextDueTime(System.DateTimeOffset now);
+    }
+
     public partial interface IJobRunContext
     {
         int DequeueCount { get; }
@@ -377,6 +384,12 @@ namespace Orleans.Durable.Journaling
         Completed = 1,
         Faulted = 2,
         Canceled = 3
+    }
+
+    public partial interface ICompanionJournalStorage : IJournalStorage
+    {
+        System.Threading.Tasks.ValueTask AppendWithCompanionsAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalCompanionRecord> companions, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceWithCompanionsAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalCompanionRecord> companions, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>
@@ -793,6 +806,19 @@ namespace Orleans.Durable.Journaling
         public JournalId MinId { get { throw null; } set { } }
 
         public JournalId Prefix { get { throw null; } set { } }
+    }
+
+    public readonly partial struct JournalCompanionRecord
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public const int MaxPayloadLength = 65536;
+        public const int MaxStreamNameLength = 64;
+        public JournalCompanionRecord(string streamName, System.ReadOnlyMemory<byte> payload) { }
+
+        public System.ReadOnlyMemory<byte> Payload { get { throw null; } }
+
+        public string StreamName { get { throw null; } }
     }
 
     public sealed partial class JournaledStateManagerOptions
