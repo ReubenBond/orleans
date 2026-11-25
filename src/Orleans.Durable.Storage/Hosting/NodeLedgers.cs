@@ -61,8 +61,8 @@ namespace Orleans.Durable.Storage.Hosting;
 /// It starts at the stage after the one at which the node registers, and stops before the node stops serving, in this
 /// order (§5.2): (1) the node hands off: it executes no transition, and asks the controller grain to hand off each ledger it
 /// is primary of, at once and each <c>ControlInterval</c> until the runtime stops, waiting for its map view to name it
-/// primary of none, or for its registry and membership views to show fewer than <c>N</c> other active nodes, when no
-/// hand-off can be placed;
+/// primary of none, or for its registry and membership views to show fewer than <c>Q = (N + 1) / 2</c> other active
+/// diskful nodes, when no quorum hand-off can be placed;
 /// (2) it closes the admission of grain calls and drain starts and waits, within <c>TransitionTimeout</c>, for those
 /// admitted, and every drain the node started, to end; (3) it checks its view again, and hands off once more when a late install made it primary; (4) it
 /// stops the Journals and disposes their store, which waits for the outcomes of its proposals, and cancels the runtime's
@@ -789,14 +789,15 @@ internal sealed partial class NodeLedgers(
     private FrozenDictionary<NodeId, int> DeadNodes() => DeadNodes(registry.Current, membership.CurrentSnapshot.Members, silo.SiloAddress.Generation);
 
     /// <summary>
-    /// Returns whether the registry and membership views show at least <c>N</c> other active diskful nodes' silos active,
-    /// among which the controller places a quorum ledger hand-off's replicas, the stopping node holding none.
+    /// Returns whether the registry and membership views show at least <c>Q = (N + 1) / 2</c> other active diskful
+    /// nodes' silos active, among which the controller can place a full or degraded quorum ledger hand-off (OR-I5).
     /// </summary>
     private bool QuorumTargetExists(NodeId node)
     {
         var members = membership.CurrentSnapshot.Members;
+        var quorum = (control.Replicas + 1) / 2;
         return registry.Current?.Nodes.Count(entry => entry.Node != node && !entry.IsRetired && !entry.Diskless
-            && members.TryGetValue(entry.Silo, out var member) && member.Status == SiloStatus.Active) >= control.Replicas;
+            && members.TryGetValue(entry.Silo, out var member) && member.Status == SiloStatus.Active) >= quorum;
     }
 
     /// <summary>

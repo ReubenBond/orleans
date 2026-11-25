@@ -8,7 +8,8 @@ namespace Orleans.Durable.Storage.Engine.Cluster.Control;
 /// Chooses the replicas of the ledgers a transition opens (orleans.md §5.7, OR-I5): <c>N</c> distinct nodes, each active
 /// in the controller's registry value and live in its membership view, the executor first. A node with its hand-off
 /// pending holds no new replica, and a node under disk pressure comes last. A degraded choice, which only a takeover or a
-/// hand-off off a leaving primary asks for, may also keep the ledger's dead replicas while <c>Q</c> chosen nodes are live.
+/// hand-off off a leaving primary asks for, may also keep the ledger's dead or gracefully leaving active replicas while
+/// <c>Q</c> chosen nodes are live.
 /// </summary>
 internal static class Placement
 {
@@ -20,9 +21,10 @@ internal static class Placement
     /// ranks above pressure, since spreading domains protects acknowledged entries and pressure only slows the node.
     /// When fewer than <paramref name="replicas"/> nodes may, a <paramref name="degraded"/> choice, once every node which may
     /// is chosen and they are at least <c>Q = (replicas + 1) / 2</c>, fills the remaining places with the current replicas
-    /// which membership shows dead and the registry active, not <paramref name="leaving"/>, in their order: the
-    /// successor then runs as a ledger whose replicas died after it opened, and the grace and repair roll them out
-    /// (orleans.md §5.7). <see langword="null"/> when no such choice exists.
+    /// not in <paramref name="leaving"/> which the registry holds active and non-diskless: first those membership shows dead,
+    /// then those gracefully leaving (departing or handing off), each in their order in <paramref name="current"/>: the
+    /// successor then runs at <c>Q</c>-of-<c>N</c> quorum, and the grace and repair roll out any replica that does not
+    /// return (orleans.md §5.7). <see langword="null"/> when no such choice exists.
     /// </summary>
     public static ImmutableArray<NodeId>? Place(ClusterState state, NodeId executor, ImmutableArray<NodeId> current, ImmutableArray<NodeId> leaving, int replicas, bool degraded = false)
     {
@@ -70,12 +72,20 @@ internal static class Placement
                 }
             }
 
+            foreach (var node in current)
+            {
+                if (chosen.Count < replicas && !chosen.Contains(node) && state.IsDepartingOrHandingOffActive(node) && !leaving.Contains(node))
+                {
+                    chosen.Add(node);
+                }
+            }
+
             Debug.Assert(
                 chosen.Count < replicas
                 || live == state.QuorumExecutors.Count(node => !leaving.Contains(node))
                     && chosen.Take(live).All(state.CanExecuteQuorum)
-                    && chosen.Skip(live).All(node => state.IsDeadActive(node) && current.Contains(node)),
-                "A degraded choice names every non-diskless node which may be given work, at least Q, then current replicas dead in membership and active in the registry (OR-I5).");
+                    && chosen.Skip(live).All(node => state.IsKeepableDegradedReplica(node) && current.Contains(node)),
+                "A degraded choice names every non-diskless node which may be given work, at least Q, then current replicas dead or gracefully leaving in membership and active in the registry (OR-I5).");
         }
 
         return chosen.Count == replicas ? [.. chosen] : null;

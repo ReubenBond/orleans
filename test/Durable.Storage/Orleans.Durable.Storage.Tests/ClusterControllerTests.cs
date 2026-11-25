@@ -569,6 +569,58 @@ public sealed class ClusterControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// OR-I5: in an <c>N</c>-node cluster (<c>N = 3, Q = 2</c>), a gracefully leaving primary (handing off or
+    /// departing) hands off cooperatively onto the remaining <c>Q</c> live nodes while keeping its own active replica
+    /// slot; on a 4-node cluster it is excluded completely; and a retired or diskless leaving node is never kept (OR-I4).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AGracefullyLeavingPrimaryOnANNodeClusterHandsOffCooperativelyKeepingItsReplicaSlot(bool departing)
+    {
+        // 3-node cluster (N = 3, Q = 2): cooperative PrepareRelease + degraded Departure keeping Node(1) in slot 3.
+        Register(1, 2, 3);
+        var root = await InstallRootAsync(Node(1), Node(2), Node(3));
+        if (departing)
+        {
+            _membership[Node(1)] = NodeLiveness.Departing.Instance;
+            Observe();
+        }
+        else
+        {
+            _controller.RequestHandOff(Node(1), Generation);
+        }
+
+        var firstPass = _controller.RunPass();
+        var prepare = Assert.Single(firstPass.PrepareReleases);
+        Assert.Equal((Node(1), root.Id, TransitionPurpose.Departure), (prepare.Node, prepare.Request.Ledger, prepare.Purpose));
+        Assert.Empty(firstPass.Transitions);
+
+        _ = _controller.PrepareReleaseCompleted(prepare, new PrepareReleaseReply.Released(Slot.Zero));
+        var secondPass = _controller.RunPass();
+        var departure = Assert.Single(secondPass.Transitions);
+        Assert.Equal((TransitionPurpose.Departure, Node(2)), (departure.Purpose, departure.Executor));
+        Assert.Equal(PredecessorReleaseHint.Cooperative, Assert.IsType<Transition.Replace>(departure.Transition.Value).PredecessorHint);
+        Assert.Equal([Node(2), Node(3), Node(1)], departure.Transition.Choice.Replicas);
+        _controller.TransitionCompleted(departure, reply: null);
+
+        // Retired leaving node on a 3-node cluster is NEVER kept (OR-I4).
+        Retire(1);
+        Assert.Empty(_controller.RunPass().PrepareReleases);
+        Assert.Empty(_controller.RunPass().Transitions);
+
+        // Adding a 4th live node gives N = 3 live executors, so Node(1) is excluded completely (Node(3) executes since
+        // Node(2)'s earlier attempt received no reply).
+        _nodes[Node(4)] = new RegisteredNode(RetiredRevision: null, FailureDomain: null, Generation, Ordinal: null);
+        _membership[Node(4)] = NodeLiveness.Live.Instance;
+        Observe();
+        var fullPass = RunPassCompletingPrepareReleases().Transitions;
+        var fullDeparture = Assert.Single(fullPass);
+        Assert.Equal([Node(3), Node(2), Node(4)], fullDeparture.Transition.Choice.Replicas);
+        Assert.DoesNotContain(Node(1), fullDeparture.Transition.Choice.Replicas);
+    }
+
+    /// <summary>
     /// OR-I5: only a takeover or a leaving primary's hand-off may keep a dead replica. With node 3 dead inside its grace and
     /// fewer than <c>N</c> nodes which may hold its ledgers, no other purpose sends a transition naming it: primary balance,
     /// a split toward the target, a merge of cold siblings, a roll for the window or for failure domains, the repair of a

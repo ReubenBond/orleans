@@ -386,6 +386,87 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// orleans.md §5.2, §5.7, OR-I5: in a three-silo cluster (<c>N = 3, Q = 2</c>), a gracefully stopping silo waits
+    /// for degraded quorum hand-off and hands its open ledgers off cooperatively before its stop completes and while
+    /// membership still shows it <c>Active</c>; writes continue on the remaining two silos with zero lost acknowledged
+    /// entries.
+    /// </summary>
+    [Fact(Timeout = 180_000)]
+    public async Task AStoppingSiloOnAThreeSiloClusterHandsOffCooperativelyBeforeDeathDeclaration()
+    {
+        var cluster = await DeployAsync(3, TestContext.Current.CancellationToken);
+        var map = await ServedAsync(cluster, ranges: 3, done: value => Balanced(cluster, value));
+        var (stoppingNode, _, handle) = Nodes(cluster).Last(entry => entry.Handle != cluster.Primary && map.Ledgers.Any(ledger => ledger.IsOpen && ledger.Primary.Node == entry.Node));
+        await EventuallyAsync(() => Nodes(cluster).All(entry => _state.Journals[entry.Handle.Name].State == LocalJournals.JournalsState.Serving), "all three silos' Journals to serve");
+
+        var stoppingLedger = (await ReadMapAsync()).Ledgers.First(ledger => ledger.IsOpen && ledger.Primary.Node == stoppingNode);
+        var key = KeyIn(stoppingLedger);
+        var rowKey = JournalRowKey.Encode(key);
+        var survivingHandle = Nodes(cluster).First(entry => entry.Node != stoppingNode).Handle;
+        var router = Services(survivingHandle).GetRequiredService<JournalRouter>();
+        using (var firstBody = Payload([1, 2, 3]))
+        using (var firstRecord = JournalEntryRecord.Append(rowKey, JournalVersion.Origin, firstBody))
+        {
+            var firstOutcome = await router.WriteAsync(key, rowKey, firstRecord, Token);
+            _ = Assert.IsType<JournalWriteOutcome.Accepted>(firstOutcome.Value);
+        }
+
+        // Hold right after NodeLedgers.StopAsync finishes (before silo teardown / membership death detection).
+        var held = _state.StopGate.Hold(handle.Name);
+        var stop = cluster.StopSiloAsync(handle, Token);
+        await held.WaitAsync(Patience, Token);
+
+        var members = Services(survivingHandle).GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members;
+        Assert.Equal(SiloStatus.Active, members[handle.SiloAddress].Status);
+        var afterHandOff = await ReadMapAsync();
+        Assert.DoesNotContain(afterHandOff.Ledgers, ledger => ledger.IsOpen && ledger.Primary.Node == stoppingNode);
+        var successor = Assert.NotNull(afterHandOff.FindOpen(rowKey.Span));
+        Assert.NotEqual(stoppingNode, successor.Primary.Node);
+        Assert.Contains(stoppingNode, successor.Replicas);
+
+        _state.StopGate.Release();
+        await stop.WaitAsync(Patience, Token);
+
+        // Surviving two silos keep serving reads and writes on the handed-off range at Q-of-N quorum!
+        var readBefore = await router.ReadAsync(key, rowKey, Token);
+        JournalVersion versionBefore;
+        using (readBefore.Content)
+        {
+            versionBefore = readBefore.Version;
+            var slice = readBefore.Content.Reader.PeekSlice(readBefore.Content.Length);
+            try
+            {
+                Assert.Equal([1, 2, 3], slice.ToArray());
+            }
+            finally
+            {
+                slice.Dispose();
+            }
+        }
+
+        using (var secondBody = Payload([4, 5, 6]))
+        using (var secondRecord = JournalEntryRecord.Append(rowKey, versionBefore, secondBody))
+        {
+            var secondOutcome = await router.WriteAsync(key, rowKey, secondRecord, Token);
+            _ = Assert.IsType<JournalWriteOutcome.Accepted>(secondOutcome.Value);
+        }
+
+        var readAfter = await router.ReadAsync(key, rowKey, Token);
+        using (readAfter.Content)
+        {
+            var slice = readAfter.Content.Reader.PeekSlice(readAfter.Content.Length);
+            try
+            {
+                Assert.Equal([1, 2, 3, 4, 5, 6], slice.ToArray());
+            }
+            finally
+            {
+                slice.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
     /// orleans.md §5.2, §5.6: a stopping node asks to hand off before its runtime checks its view, so a node primary of
     /// nothing is pending too: held below its runtime's stage, where membership still shows its silo active, it is no
     /// replica of a ledger the controller places meanwhile, here a roll of a ledger which names it. Balancing is paused

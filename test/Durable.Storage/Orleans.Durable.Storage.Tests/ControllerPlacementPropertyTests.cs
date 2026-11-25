@@ -38,7 +38,7 @@ public sealed class ControllerPlacementPropertyTests : IDisposable
     private static readonly Gen<(int Size, NodeKind[] Kinds, int[] Order, int Pick, bool Degraded)> DegradedWindow =
         Gen.Int[1, 2].SelectMany(static size => Gen.Select(
             Gen.Int[size, 2 * size + 1],
-            Gen.OneOfConst(NodeKind.DeadActive, NodeKind.DeadActive, NodeKind.DeadActive, NodeKind.DeadRetired, NodeKind.Absent, NodeKind.LiveRetired, NodeKind.HandingOff, NodeKind.Leaving).Array[0, 2 * size + 2],
+            Gen.OneOfConst(NodeKind.DeadActive, NodeKind.DeadActive, NodeKind.DeadActive, NodeKind.DeadRetired, NodeKind.Absent, NodeKind.LiveRetired, NodeKind.HandingOff, NodeKind.DepartingActive, NodeKind.DepartingRetired, NodeKind.Leaving).Array[0, 2 * size + 2],
             Gen.Int[0, 1000].Array[16],
             Gen.Int[0, 100],
             Gen.Int[0, 3]).Select(sample => (size, Enumerable.Repeat(NodeKind.Live, sample.Item1).Concat(sample.Item2).ToArray(), sample.Item3, sample.Item4, sample.Item5 != 0)));
@@ -157,17 +157,27 @@ public sealed class ControllerPlacementPropertyTests : IDisposable
         var quorum = size + 1;
         var all = Enumerable.Range(1, kinds.Length).Select(static index => Node(index)).ToArray();
         NodeKind KindOf(NodeId node) => kinds[Index(node)];
-        var registry = new RegisteredNodes(1, all.ToFrozenDictionary(static node => node, node => new RegisteredNode(KindOf(node) is NodeKind.DeadRetired or NodeKind.LiveRetired ? 1UL : null, null, Generation: 1, Ordinal: null)));
+        var registry = new RegisteredNodes(1, all.ToFrozenDictionary(static node => node, node => new RegisteredNode(KindOf(node) is NodeKind.DeadRetired or NodeKind.LiveRetired or NodeKind.DepartingRetired ? 1UL : null, null, Generation: 1, Ordinal: null)));
         var liveness = all.Where(node => KindOf(node) != NodeKind.Absent).ToFrozenDictionary(
             static node => node,
-            node => KindOf(node) is NodeKind.DeadActive or NodeKind.DeadRetired ? new NodeLiveness.Dead(DateTimeOffset.UnixEpoch) : (NodeLiveness)NodeLiveness.Live.Instance);
+            node => KindOf(node) switch
+            {
+                NodeKind.DeadActive or NodeKind.DeadRetired => (NodeLiveness)new NodeLiveness.Dead(DateTimeOffset.UnixEpoch),
+                NodeKind.DepartingActive or NodeKind.DepartingRetired => NodeLiveness.Departing.Instance,
+                NodeKind.Live or NodeKind.Absent or NodeKind.LiveRetired or NodeKind.HandingOff or NodeKind.Leaving => NodeLiveness.Live.Instance,
+                _ => throw new System.Diagnostics.UnreachableException(),
+            });
         var handingOff = all.Where(node => KindOf(node) == NodeKind.HandingOff).ToFrozenDictionary(static node => node, static _ => 1);
         var state = new ClusterState(new MapCache(LedgerMapValue.Empty), new NodeView(registry, liveness), handingOff, FrozenDictionary<NodeId, int>.Empty, FrozenDictionary<LedgerId, long>.Empty, unserved: FrozenDictionary<NodeId, FrozenSet<LedgerId>>.Empty, lost: FrozenDictionary<NodeId, FrozenSet<LedgerId>>.Empty, underDiskPressure: FrozenSet<NodeId>.Empty, draining: FrozenDictionary<NodeId, bool>.Empty, now: DateTimeOffset.UnixEpoch);
         var givenWork = all.Where(node => KindOf(node) == NodeKind.Live).ToArray();
         var executor = givenWork[pick % givenWork.Length];
         ImmutableArray<NodeId> current = [.. all.OrderBy(node => order[Index(node)]).Take(replicas)];
         ImmutableArray<NodeId> leaving = [.. all.Where(node => KindOf(node) == NodeKind.Leaving)];
-        ImmutableArray<NodeId> keepable = [.. current.Where(node => KindOf(node) == NodeKind.DeadActive)];
+        ImmutableArray<NodeId> keepable =
+        [
+            .. current.Where(node => KindOf(node) == NodeKind.DeadActive),
+            .. current.Where(node => KindOf(node) is NodeKind.HandingOff or NodeKind.DepartingActive),
+        ];
 
         var placed = Engine.Cluster.Control.Placement.Place(state, executor, current, leaving, replicas, degraded);
 
@@ -583,14 +593,24 @@ public sealed class ControllerPlacementPropertyTests : IDisposable
                     : chosenAt.DeadSince(closed.Primary.Node) is not null || primaryState == 2 ? PredecessorPrimary.Ended
                     : chosenAt.IsRetired(closed.Primary.Node) || chosenAt.IsDeparting(closed.Primary.Node) || closed.Primary.Node == handingOff ? PredecessorPrimary.Leaving
                     : PredecessorPrimary.Serving;
-                Assert.Null(ReplicaChoice.Violation(sent, options.Replicas, predecessor, standing, givenWork, node => chosenAt.DeadSince(node) is not null && chosenAt.Registry.Find(node) is { IsRetired: false }));
+                Assert.Null(ReplicaChoice.Violation(
+                    sent,
+                    options.Replicas,
+                    predecessor,
+                    standing,
+                    givenWork,
+                    node => chosenAt.DeadSince(node) is not null && chosenAt.Registry.Find(node) is { IsRetired: false },
+                    node => chosenAt.IsUp(node) && (chosenAt.IsDeparting(node) || node == handingOff) && chosenAt.Registry.Find(node) is { IsRetired: false }));
                 if (!choice.Replicas.All(givenWork.Contains))
                 {
                     _ = degradedSends?.AddOrUpdate($"{replicaCount}:{sent.Purpose}", 1, static (_, count) => count + 1);
                 }
 
                 Assert.False(choice.Executor == handingOff, $"{sent} is executed by a node whose hand-off is pending.");
-                Assert.False(handingOff is { } pending && choice.Replicas.Contains(pending), $"{sent} names a replica whose hand-off is pending.");
+                if (givenWork.Count >= options.Replicas)
+                {
+                    Assert.False(handingOff is { } pending && choice.Replicas.Contains(pending), $"{sent} names a replica whose hand-off is pending while {givenWork.Count} nodes may be given work.");
+                }
                 controller.TransitionCompleted(sent, reply: null);
             }
 
@@ -625,8 +645,14 @@ public sealed class ControllerPlacementPropertyTests : IDisposable
         /// <summary>Live and retired.</summary>
         LiveRetired,
 
-        /// <summary>Live and active with its hand-off pending.</summary>
+        /// <summary>Live and active with its hand-off pending: a degraded choice may keep it after dead active replicas.</summary>
         HandingOff,
+
+        /// <summary>Departing in membership and active in the registry: a degraded choice may keep it after dead active replicas.</summary>
+        DepartingActive,
+
+        /// <summary>Departing and retired: never placed (OR-I4).</summary>
+        DepartingRetired,
 
         /// <summary>Live and active, and leaving the ledger the placement is for.</summary>
         Leaving,

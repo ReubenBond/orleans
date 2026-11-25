@@ -2065,9 +2065,9 @@ internal sealed partial class ClusterController
             return false;
         }
 
-        if (ledger is { } replaced && replicas.Any(state.IsDeadActive))
+        if (ledger is { } replaced && replicas.Any(state.IsKeepableDegradedReplica))
         {
-            LogDegraded(_logger, purpose, replaced.Id, replicas.Count(state.IsDeadActive), state.QuorumExecutors.Length, _options.Replicas);
+            LogDegraded(_logger, purpose, replaced.Id, replicas.Count(state.IsKeepableDegradedReplica), state.QuorumExecutors.Length, _options.Replicas);
         }
 
         return true;
@@ -2302,8 +2302,8 @@ internal sealed partial class ClusterController
     [LoggerMessage(Level = LogLevel.Warning, Message = "The repair of ledger {Ledger} found {Nodes} nodes which may be given work, fewer than its {Replicas} replicas; it waits for more.")]
     private static partial void LogRepairUnplaced(ILogger logger, LedgerId ledger, int nodes, int replicas);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "The {Purpose} of ledger {Ledger} keeps {Dead} dead replicas: {Nodes} nodes may be given work, fewer than its {Replicas} replicas; repair rolls them out after their grace.")]
-    private static partial void LogDegraded(ILogger logger, TransitionPurpose purpose, LedgerId ledger, int dead, int nodes, int replicas);
+    [LoggerMessage(Level = LogLevel.Information, Message = "The {Purpose} of ledger {Ledger} keeps {Degraded} dead or leaving replicas: {Nodes} nodes may be given work, fewer than its {Replicas} replicas; repair rolls them out after their grace if they do not return.")]
+    private static partial void LogDegraded(ILogger logger, TransitionPurpose purpose, LedgerId ledger, int degraded, int nodes, int replicas);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The configured {Wanted} open ranges do not fit the ledger map's value limit of {Limit} bytes; the controller balances toward {Capacity}.")]
     private static partial void LogCapacity(ILogger logger, long wanted, int capacity, int limit);

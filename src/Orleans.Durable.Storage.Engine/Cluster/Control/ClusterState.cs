@@ -94,6 +94,22 @@ internal sealed class ClusterState(
     /// </summary>
     public bool IsDeadActive(NodeId node) => DeadSince(node) is not null && Nodes.Registry.Find(node) is { IsRetired: false, Diskless: false };
 
+    /// <summary>
+    /// Returns whether <paramref name="node"/> is active and non-diskless in the registry while gracefully leaving
+    /// (membership shows it <see cref="NodeLiveness.Departing"/>, or it is live with a hand-off pending): a degraded
+    /// choice may keep it among a successor's replicas after any dead active replicas while at least <c>Q</c> live
+    /// replicas exist (OR-I5), and a retired or diskless node it never keeps, so the retirement gate holds (OR-I4).
+    /// </summary>
+    public bool IsDepartingOrHandingOffActive(NodeId node) =>
+        IsUp(node) && (IsDeparting(node) || IsHandingOff(node)) && Nodes.Registry.Find(node) is { IsRetired: false, Diskless: false };
+
+    /// <summary>
+    /// Returns whether a degraded choice may keep <paramref name="node"/> among a successor's replicas when fewer than
+    /// <c>N</c> nodes may be given work (at least <c>Q</c> live): active and non-diskless in the registry, and either
+    /// dead in membership or gracefully leaving (departing or handing off) (OR-I5, OR-I4).
+    /// </summary>
+    public bool IsKeepableDegradedReplica(NodeId node) => IsDeadActive(node) || IsDepartingOrHandingOffActive(node);
+
     public string? DomainOf(NodeId node) => Nodes.DomainOf(node);
 
     /// <summary>

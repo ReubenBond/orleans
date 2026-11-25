@@ -782,7 +782,8 @@ public sealed class ControllerSimulationTests
                 predecessor,
                 standing,
                 givenWork,
-                node => registry.Find(node) is { IsRetired: false } && Shows<NodeLiveness.Dead>(node)) is { } violation)
+                node => registry.Find(node) is { IsRetired: false } && Shows<NodeLiveness.Dead>(node),
+                node => registry.Find(node) is { IsRetired: false } && (Shows<NodeLiveness.Departing>(node) || Shows<NodeLiveness.Live>(node) && Pending(node))) is { } violation)
             {
                 _violations.Add(Invariant($"controller {controller.Writer}: {violation} (revision {choice.ChosenAt})"));
             }

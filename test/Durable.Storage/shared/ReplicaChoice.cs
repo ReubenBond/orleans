@@ -25,8 +25,9 @@ internal enum PredecessorPrimary
 /// executor first, each of which may be given work (active in the registry value at <c>ChosenAt</c>, live in the
 /// controller's membership view, with no hand-off pending); or, for a takeover of a ledger whose primary's claim ended or
 /// a hand-off of a ledger whose primary is leaving, chosen while fewer than <c>N</c> nodes may be given work, a degraded
-/// choice: every node which may, at least <c>Q = (N + 1) / 2</c>, then the closed ledger's replicas which membership shows
-/// dead and the registry active, in their order, as many as fill <c>N</c>.
+/// choice: every node which may, at least <c>Q = (N + 1) / 2</c>, then the closed ledger's active non-diskless replicas
+/// which membership shows dead, then those gracefully leaving (departing or handing off), each in their order in the
+/// closed ledger, as many as fill <c>N</c>.
 /// </summary>
 internal static class ReplicaChoice
 {
@@ -36,8 +37,16 @@ internal static class ReplicaChoice
     /// <param name="predecessor">The ledger a <c>Replace</c> closes, as the controller's map listed it; otherwise <see langword="null"/>.</param>
     /// <param name="primary">The standing of <paramref name="predecessor"/>'s primary at <c>ChosenAt</c>.</param>
     /// <param name="givenWork">The nodes which may be given work at <c>ChosenAt</c>: active, live, and with no hand-off pending.</param>
-    /// <param name="isDeadActive">Whether membership shows a node dead and the registry at <c>ChosenAt</c> holds it active.</param>
-    public static string? Violation(SentTransition sent, int replicas, LedgerMetadata? predecessor, PredecessorPrimary primary, IReadOnlySet<NodeId> givenWork, Func<NodeId, bool> isDeadActive)
+    /// <param name="isDeadActive">Whether membership shows a node dead and the registry at <c>ChosenAt</c> holds it active and non-diskless.</param>
+    /// <param name="isDepartingOrHandingOffActive">Whether the node is up, gracefully leaving (departing or handing off), and held active and non-diskless in the registry at <c>ChosenAt</c>.</param>
+    public static string? Violation(
+        SentTransition sent,
+        int replicas,
+        LedgerMetadata? predecessor,
+        PredecessorPrimary primary,
+        IReadOnlySet<NodeId> givenWork,
+        Func<NodeId, bool> isDeadActive,
+        Func<NodeId, bool>? isDepartingOrHandingOffActive = null)
     {
         var choice = sent.Transition.Choice;
         var chosen = choice.Replicas;
@@ -76,9 +85,12 @@ internal static class ReplicaChoice
             return $"OR-I5: {sent} keeps {string.Join(", ", kept)} after {live} of the {givenWork.Count} nodes which may be given work.";
         }
 
-        ImmutableArray<NodeId> expected = [.. replaced.Replicas.Where(isDeadActive).Take(replicas - live)];
+        var keepable = isDepartingOrHandingOffActive is null
+            ? replaced.Replicas.Where(isDeadActive)
+            : replaced.Replicas.Where(isDeadActive).Concat(replaced.Replicas.Where(node => !isDeadActive(node) && isDepartingOrHandingOffActive(node)));
+        ImmutableArray<NodeId> expected = [.. keepable.Take(replicas - live)];
         return kept.SequenceEqual(expected)
             ? null
-            : $"OR-I5: {sent} keeps {string.Join(", ", kept)}, not s{replaced.Id}'s replicas dead in membership and active in the registry, in their order: {string.Join(", ", expected)}.";
+            : $"OR-I5: {sent} keeps {string.Join(", ", kept)}, not s{replaced.Id}'s replicas dead or gracefully leaving in membership and active in the registry, in their order: {string.Join(", ", expected)}.";
     }
 }
