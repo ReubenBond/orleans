@@ -6103,6 +6103,13 @@ namespace Orleans.Durable.Storage.Engine.Threading
 
 namespace Orleans.Durable.Storage.Engine.Wal
 {
+    public abstract partial class PreparedWalFile : System.IAsyncDisposable
+    {
+        public abstract long Length { get; }
+
+        public abstract System.Threading.Tasks.ValueTask DisposeAsync();
+    }
+
     public readonly partial struct WalCorruption : System.IEquatable<WalCorruption>
     {
         private readonly int _dummyPrimitive;
@@ -6149,6 +6156,8 @@ namespace Orleans.Durable.Storage.Engine.Wal
         public abstract System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<string>> ListNamedFilesAsync(string extension, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.ValueTask<WalFile> OpenFileAsync(ulong file, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.ValueTask<WalFile> OpenNamedFileAsync(string name, System.Threading.CancellationToken cancellationToken);
+        public abstract System.Threading.Tasks.ValueTask<PreparedWalFile> PrepareFileAsync(long preallocatedLength, WalFillPace? pace, System.Threading.CancellationToken cancellationToken);
+        public abstract System.Threading.Tasks.ValueTask<WalFile> PublishPreparedFileAsync(PreparedWalFile prepared, ulong file, Buffers.ArcBuffer header, System.Threading.CancellationToken cancellationToken);
     }
 
     public readonly partial struct WalDirectoryUsage : System.IEquatable<WalDirectoryUsage>
@@ -6776,6 +6785,8 @@ namespace Orleans.Durable.Storage.Engine.Wal.Simulation
         public int OpenHandleCount { get { throw null; } }
 
         public int PendingWriteCount { get { throw null; } }
+
+        public System.Func<string, long, System.Exception?>? PrepareFault { get { throw null; } set { } }
 
         public System.Func<string, ulong, long, int, System.Exception?>? ReadFault { get { throw null; } set { } }
 

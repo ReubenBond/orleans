@@ -95,6 +95,12 @@ internal sealed class GatedWalStorage : WalStorage
         public override async ValueTask<WalFile> CreateAllocatedFileAsync(ulong file, ArcBuffer header, long length, CancellationToken cancellationToken) =>
             new File(storage, await inner.CreateAllocatedFileAsync(file, header, length, cancellationToken));
 
+        public override ValueTask<PreparedWalFile> PrepareFileAsync(long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken) =>
+            inner.PrepareFileAsync(preallocatedLength, pace, cancellationToken);
+
+        public override async ValueTask<WalFile> PublishPreparedFileAsync(PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken) =>
+            new File(storage, await inner.PublishPreparedFileAsync(prepared, file, header, cancellationToken));
+
         public override async ValueTask<WalFile> OpenFileAsync(ulong file, CancellationToken cancellationToken) =>
             new File(storage, await inner.OpenFileAsync(file, cancellationToken));
 

@@ -777,6 +777,71 @@ public sealed class CrashStateTests : IDisposable
         }
     });
 
+    /// <summary>
+    /// Staging an unpublished file (<see cref="WalDirectory.PrepareFileAsync"/>) and publishing it under a file number
+    /// (<see cref="WalDirectory.PublishPreparedFileAsync"/>) leave every crash state with the log file either absent or
+    /// holding its complete header and zero-filled body, and with no surviving temporary once the directory reopens
+    /// (WAL-I3, WAL-I10).
+    /// </summary>
+    [Fact]
+    public Task PreparedFileStagingAndPublicationMaintainWalI3InEveryCrashState() => SeededSimulation.RunAsync(0x5eef, async run =>
+    {
+        const int FileLength = 2 * 4096;
+        var fileSystem = new RecordingFileSystem(Root);
+        var header = Enumerable.Range(0, 4096).Select(static index => (byte)((index * 11 + 3) & 0xFF)).ToArray();
+        var expectedBody = new byte[FileLength];
+        header.CopyTo(expectedBody, 0);
+        var expectedHex = Hex(expectedBody);
+        var walPath = At("wal");
+        using var headerContents = Buffer(header);
+        await fileSystem.Storage.CreateDirectoryAsync(walPath, Token);
+        var from = fileSystem.OperationCount;
+        int publishStarted;
+        int publishReturned;
+        await using (var directory = await fileSystem.Storage.OpenDirectoryAsync(walPath, Token))
+        {
+            // An unpublished prepared file which is disposed leaves no published file and cleans up its temporary.
+            await using (var unused = await directory.PrepareFileAsync(FileLength, pace: null, Token))
+            {
+                Assert.Equal(FileLength, unused.Length);
+            }
+
+            // A prepared file which is published becomes file 1 atomically with its complete header and zero-filled body.
+            await using var staged = await directory.PrepareFileAsync(FileLength, pace: null, Token);
+            publishStarted = fileSystem.OperationCount;
+            await using (var published = await directory.PublishPreparedFileAsync(staged, 1, headerContents, Token))
+            {
+                Assert.Equal(FileLength, published.Length);
+            }
+
+            publishReturned = fileSystem.OperationCount;
+        }
+
+        var enumerator = CrashStateEnumerator.Of(fileSystem, run.Seed);
+        var states = enumerator.Enumerate(from, fileSystem.OperationCount, int.MaxValue);
+        run.Record(states.ToString());
+        foreach (var state in states.States)
+        {
+            var replayed = new RecordingFileSystem(Root, enumerator.Build(state));
+            await using var directory = await replayed.Storage.OpenDirectoryAsync(walPath, Token);
+            Assert.Empty(replayed.EnumerateFiles(walPath, "*" + WalFormat.TemporaryExtension));
+            var files = await directory.ListFilesAsync(Token);
+            if (state.Point <= publishStarted)
+            {
+                Assert.Empty(files);
+            }
+            else if (state.Point >= publishReturned)
+            {
+                Assert.Equal([1UL], files);
+                Assert.Equal(expectedHex, await ReadLogAsync(directory, 1, FileLength));
+            }
+            else if (files.Contains(1UL))
+            {
+                Assert.Equal(expectedHex, await ReadLogAsync(directory, 1, FileLength));
+            }
+        }
+    });
+
     private static string At(string path) => Path.Combine(Root, path.Replace('/', Path.DirectorySeparatorChar));
 
     private static string Hex(byte[] bytes) => Convert.ToHexString(bytes);

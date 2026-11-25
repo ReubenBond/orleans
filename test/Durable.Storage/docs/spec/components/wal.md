@@ -172,7 +172,7 @@ next incarnation's open flushes the directory, before any answer.
 | `WriteAheadLog.CreateAsync(WalDirectory directory, WalOptions options, CancellationToken)` | As above, with no parent; the caller owns `directory` | As above, flushing only inside `directory`; disposing the log leaves `directory` open. |
 | `WriteAheadLog.OpenAsync(WalStorage storage, string path, WalOptions options, CancellationToken)` | `options` valid | Takes exclusive ownership, opens and flushes every file and the directory (WAL-I10), validates each file header, finalizes the last open (WAL-I4), then publishes the new open's first file, numbered one above the highest existing file. Throws `WalNotFoundException` when the directory is missing or holds no files, and `WalUnsupportedFormatException` when a file has a recognized magic with an unknown version, or a page size (in `options` or in an existing file) is below the storage minimum. |
 | `WriteAheadLog.OpenAsync(WalDirectory directory, WalOptions options, ulong minimumFirstFile, CancellationToken)` | As above; the caller owns `directory` | As above; the new open's first file is numbered above every existing file and at least `minimumFirstFile`. A caller holding positions or pages in files the directory has since lost passes a number above them, so a lost file's number is never reused; scans treat the skipped numbers as an earlier open's lost tail. |
-| `DisposeAsync()` | — | Rejects new requests (`ObjectDisposedException`), waits until every accepted request has its outcome and storage I/O has retired, finishes and closes the prepared next file (its fill at full speed), and releases files, buffers, and an owned directory. Repeated calls return the same completion. |
+| `DisposeAsync()` | — | Rejects new requests (`ObjectDisposedException`), waits until every accepted request has its outcome and storage I/O has retired, cancels any in-flight prepared file or disposes a completed unpublished one (removing its temporary without publishing a log file), and releases files, buffers, and an owned directory. Repeated calls return the same completion. |
 
 The options an open passes are recorded in the header of every file it creates (page size, write window), so a later
 open may choose different values; readers decode each file with its own.
@@ -230,7 +230,7 @@ which the next open finds, so the directory still holds a contiguous suffix.
 
 ### Storage and directories
 
-`WalStorage`, `WalDirectory`, and `WalFile` are abstract classes, so members can be added with default
+`WalStorage`, `WalDirectory`, `PreparedWalFile`, and `WalFile` are abstract classes, so members can be added with default
 implementations. A caller which owns a directory uses them directly.
 
 | Type | Member | Contract |
@@ -243,6 +243,9 @@ implementations. A caller which owns a directory uses them directly.
 | `WalDirectory` | `MinimumPageSize` | The largest of the filesystem block, physical sector, and direct-I/O alignment sizes: the smallest page which a write never shares with another page. |
 | | `ListFilesAsync(ct)` | The published log-file numbers, ascending, each durable (WAL-I12). |
 | | `CreateFileAsync(ulong file, ArcBuffer header, long preallocatedLength, WalFillPace? pace, ct)` | Creates a log file holding `header` at offset 0 and publishes its name. The header, the length, and the name are durable on return, and the name never refers to a file without its complete header (WAL-I3). A non-zero `preallocatedLength` makes the file that long with every byte after the header written as zero; each zero-fill write first awaits `pace(written, count, ct)` when it is set. A storage which cannot serve the file refuses it before its name is published. A failed or cancelled creation asserts nothing: its name may be published, with its complete header, and is durable once the directory's next flush completes. `IOException` when the name exists, once its name is durable. |
+| | `CreateAllocatedFileAsync(ulong file, ArcBuffer header, long length, ct)` | Creates a log file holding `header` at offset 0 with `length` bytes allocated (unwritten extents read as zero) and publishes its name without zero-filling; header, length, and name are durable on return. |
+| | `PrepareFileAsync(long preallocatedLength, WalFillPace? pace, ct)` | Stages an unpublished, zero-filled temporary file of `preallocatedLength` bytes for a future roll without assigning a file number or publishing a directory entry. Every byte is written as zero and synced before returning; each zero-fill write first awaits `pace(written, count, ct)` when set. Cancelling `ct` stops the fill, closes the handle, and removes the temporary cleanly without reporting a storage failure. |
+| | `PublishPreparedFileAsync(PreparedWalFile prepared, ulong file, ArcBuffer header, ct)` | Writes `header` at offset 0 of an already zero-filled `prepared` file, syncs that page, verifies the storage can serve the file, atomically renames the temporary to `{file:D20}.clfl`, flushes the directory, and opens the published file. Header, length, and name are durable on return (WAL-I3). Consumes `prepared` so later disposal of `prepared` is a no-op; `IOException` when the name exists. |
 | | `OpenFileAsync(ulong file, ct)` | Opens a log file and makes every byte it holds durable before returning (WAL-I10); `FileNotFoundException` when it is missing, once its absence is durable (WAL-I12). |
 | | `DeleteFileAsync(ulong file, ct)` | Deletes an unopened log file, if it exists; durable on return. |
 | | `CreateNamedFileAsync(name, ArcBuffer contents, ct)` | Creates a named file and publishes its name once its contents are durable; the name and contents are durable on return. `IOException` when the name exists, once its name is durable. A failed creation asserts nothing, as for `CreateFileAsync`; the temporary it leaves is never read, and the next owner's open deletes it. |
@@ -250,6 +253,8 @@ implementations. A caller which owns a directory uses them directly.
 | | `ListNamedFilesAsync(extension, ct)` | The published named files ending with `extension`, in ordinal order, each durable (WAL-I12). |
 | | `DeleteNamedFileAsync(name, ct)` | Deletes a named file, if it exists; durable on return. |
 | | `DisposeAsync()` | Releases ownership. |
+| `PreparedWalFile` | `Length` | The staged file length in bytes. |
+| | `DisposeAsync()` | Removes an unpublished temporary file cleanly; a no-op once `PublishPreparedFileAsync` has consumed it. |
 | `WalFile` | `Length` | The file length in bytes. |
 | | `WriteAsync(long offset, ReadOnlyMemory<ArcBuffer> buffers)` | Writes the buffers back to back at `offset` and completes when they are durable. Every buffer is whole pages of the aligned class, written at an offset which is a multiple of their size, as direct I/O requires. Each write reports its own failure: one which completes is durable whatever becomes of the file's other writes. Calls for disjoint ranges may overlap and complete in any order; a call runs to completion once made, finishing short writes internally. The caller keeps its views and bytes unchanged until completion. |
 | | `ReadAsync(long offset, int length, ct)` | An owned buffer of up to `length` bytes, shorter only at the end of the file. The bytes are the device's: a failed write's bytes are read only as far as the device holds them. |
@@ -327,8 +332,8 @@ The WAL requires of its callers:
 | `WalWriteRequest` | A record submitted for one durable outcome (§2). |
 | `WalDurableRecord` | Zero-allocation proof struct (`internal` constructor, non-default validated) delivered to `OnDurable` once every page holding a record has synced; exposes `Position`, `Page`, `IsValid`, and `EnsureDurable()` ([conventions §13](../conventions.md#13-durable-answers)). |
 | `WalOptions` | One open's configuration (§8). |
-| `WalStorage`, `WalDirectory`, `WalFile` | Storage abstraction (§2). |
-| `WalFillPace` | `ValueTask (long written, int count, CancellationToken)`: what a preallocating `CreateFileAsync` awaits before writing `count` zeros after `written` bytes (§8). |
+| `WalStorage`, `WalDirectory`, `PreparedWalFile`, `WalFile` | Storage abstraction (§2). |
+| `WalFillPace` | `ValueTask (long written, int count, CancellationToken)`: what a preallocating `CreateFileAsync` or `PrepareFileAsync` awaits before writing `count` zeros after `written` bytes (§8). |
 
 ```mermaid
 classDiagram
@@ -764,47 +769,55 @@ treats as a possible crash tear.
 Each open creates a fresh file (WAL-I6). A record whose pages would pass the current file's last data page starts the
 next file, which holds the larger of the planned number of data pages and the record's pages.
 
-With `PreallocateFiles`, creation writes zeros through the whole file before publishing it, so later writes change no
+With `PreallocateFiles`, zero-filling initializes every block before writes reach it, so later writes change no
 file metadata (NTFS valid data length, ext4 unwritten extents) and need no metadata sync. An open's first file is
-4 MiB (or `FileSize`, if smaller), and each next file doubles the current file's size up to `FileSize`. Preparing a
-file writes its whole size to the WAL's device, so it is paced to keep that load small and steady:
+4 MiB (or `FileSize`, if smaller), created synchronously via `CreateFileAsync`, and each next file doubles the current
+file's size up to `FileSize`. Background preparation is decoupled from file-number publication so a write burst never
+stalls waiting for a zero-fill:
 
-- The next file's preparation starts on a background task once the current file is a quarter full (its built data
-  pages at least a quarter of its data pages).
-- The zero-fill writes 4 MiB at a time through the page cache, syncs the file after every 16 MiB and at the end, and
-  drops the synced pages from the Linux page cache. The device thus sees the fill at about its pace, with one device
-  flush per 16 MiB, not one per write or one for the whole file. Syncing every write was the previous design. On the
-  measured consumer NVMe each sync cost a device flush: synced 256 KiB writes filled at 50 MiB/s, below a busy log's
-  rate, so rolls waited seconds for their file, and synced 4 MiB writes still contended with the log's own flushes
+- The next file is staged in the background via `WalDirectory.PrepareFileAsync` as an unpublished temporary
+  (`prealloc-{id}.tmp` on file-system directories) once the current file reaches one eighth full (`12.5%`) while file
+  sizes are doubling, or one quarter full (`25%`) at steady `FileSize`.
+- The zero-fill writes 4 MiB at a time through the page cache, syncs the file after every 64 MiB and at the end, and
+  drops the synced pages from the Linux page cache. Syncing every 64 MiB (16 device flushes per 1 GiB file, 4× fewer
+  than 16 MiB) bounds dirty page-cache buildup while minimizing device-flush contention with live `fdatasync`s
   ([io_uring WAL performance](../../performance/io-uring-wal.md)).
   Before each write it waits for the remaining bytes spread evenly over the time the current
   file takes, at its fill rate since it started taking records, to become three quarters full, and at most 1 s; once
-  the current file is three quarters full it does not wait. The fill thus writes at about twice the log's own rate
-  (four times while file sizes double), and the file is ready with a quarter of the current file to spare.
-- A roll which needs the file, or disposal, hurries the fill: it continues without waiting, and the roll or disposal
-  waits for it.
+  the current file reaches three quarters full, the pump cancels the hurry token immediately so the fill wakes without
+  waiting out the 1 s cap and finishes at full speed.
+- **Zero-stall rolling:** when a roll needs a file of `dataPages`,
+  - if the staged file has completed and holds at least `dataPages`, the roll publishes it under the next file number
+    via `WalDirectory.PublishPreparedFileAsync` (writing the 1-page header, syncing it, renaming to `{file:D20}.clfl`,
+    and flushing the directory);
+  - if the staged file is still in flight (for example, a write burst outran the background fill), the roll hurries it
+    in the background, keeps it running, and rolls immediately via `WalDirectory.CreateAllocatedFileAsync` (unwritten
+    allocated extents, `Allocated = true`); once the background fill completes, the next fitting record rolls early to
+    it via `PublishPreparedFileAsync`;
+  - if the staged file has completed with fewer than `dataPages` (a single record larger than the staged file), the
+    roll leaves the unpublished staged file available for the next normal roll and creates the large record's file
+    directly via `CreateAllocatedFileAsync`, publishing zero empty `.clfl` files;
+  - if the staged file faulted, the roll surfaces the failure and stops the log (WAL-I8).
+- **Instant disposal:** `DisposeAsync` cancels any in-flight staged file immediately via its cancellation token (stopping
+  at the next chunk and unlinking the temporary) or disposes an already completed unpublished staged file, publishing no
+  empty `.clfl` file and leaving no `.tmp` files behind.
 
 **Bulk mode.** Zero-filling makes every logged byte reach the device twice, which matters only when the log's
 writes are large; an allocated file's unwritten blocks avoid it, but each durable write into them costs a metadata
 commit, which matters only when they are small. On the measured NVMe a 4 KiB write plus `fdatasync` took 1.14 ms in a
 zero-filled file and 3.6 ms in an allocated one, and a 1 MiB one 2.09 and 2.07 ms. The log therefore keeps an
 exponentially weighted average (weight 1/8) of its durable groups' bytes. It enters bulk mode when the average reaches
-3 MiB and leaves when it falls below 1 MiB; the gap keeps the mode from flapping. In bulk mode the log prepares no
-zero-filled file, and a roll which finds no prepared file of its size creates the next file allocated
-(`WalDirectory.CreateAllocatedFileAsync`), at once. A file whose preparation started before bulk mode is still taken.
-Out of bulk mode, while it appends to an allocated file, the log prepares a zero-filled file at once and unpaced, and
-the first record after it is ready starts that file, leaving the allocated file's unused pages behind as any roll
-does. Replay truncates them with the rest of an earlier file's zero tail. Allocated and zero-filled files are
-indistinguishable on disk: unwritten blocks read as zero.
+3 MiB and leaves when it falls below 1 MiB; the gap keeps the mode from flapping. In bulk mode the log stages no new
+zero-filled file, and a roll which finds no ready staged file of its size creates the next file allocated
+(`WalDirectory.CreateAllocatedFileAsync`), at once. A staged file whose preparation started before bulk mode is still
+taken once ready. Out of bulk mode, while it appends to an allocated file (either after leaving bulk mode or after a
+burst rolled past an in-flight fill), the log prepares a zero-filled file at once and unpaced (or keeps an already
+hurried in-flight fill running), and the first fitting record after it is ready starts that file, leaving the allocated
+file's unused pages behind as any roll does. Replay truncates them with the rest of an earlier file's zero tail.
+Allocated and zero-filled files are indistinguishable on disk: unwritten blocks read as zero.
 
-The waits use `WalOptions.TimeProvider`. A record which does not fit in the current file's remaining pages and finds no
-prepared file of its size (a record larger than the prepared file, or larger than the current file's unused part
-before the next file's preparation starts) creates its file at once, unpaced. A prepared file which a larger record
-passes keeps no data page and takes no records; the record's file takes the following number. The passed file joins
-the log as a closed file without data pages, so a release deletes it in its turn (WAL-I5) and a scan reads none of it,
-and the next open truncates it to its header. A passed file's preparation which failed stopped the process. Without
-preallocation, files are created holding only their header and grow with writes, up to `FileSize` data bytes unless a
-record needs more, and the log reads no clock.
+The waits use `WalOptions.TimeProvider`. Without preallocation, files are created holding only their header and grow
+with writes, up to `FileSize` data bytes unless a record needs more, and the log reads no clock.
 
 ### Replay
 
@@ -868,7 +881,7 @@ algorithm from its storage implementations, in matching folders and namespaces:
 
 | Namespace | Contents |
 | --- | --- |
-| `Orleans.Durable.Storage.Engine.Wal` | `WriteAheadLog`, its storage contracts (`WalStorage`, `WalDirectory`, `WalFile`), record and position types, options, format, metrics, and write-group concurrency |
+| `Orleans.Durable.Storage.Engine.Wal` | `WriteAheadLog`, its storage contracts (`WalStorage`, `WalDirectory`, `PreparedWalFile`, `WalFile`), record and position types, options, format, metrics, and write-group concurrency |
 | `Orleans.Durable.Storage.Engine.Wal.FileSystem` | Shared file-system directories, the `WalFileSystem` seam and its supporting types, direct I/O, file locking, and directory sync |
 | `Orleans.Durable.Storage.Engine.Wal.Portable` | `PortableWalStorage` and `PortableWalFile` |
 | `Orleans.Durable.Storage.Engine.Wal.IoUring` | `IoUringWalStorage`, its engine and operations, and Linux interop |
@@ -937,13 +950,16 @@ do the LedgerStore's node root when it publishes its cluster claim
   caller's root or a directory created beneath it, and no flush reaches above the root (§3). The seam's
   `CreateDirectoryDurably` is that one step: it creates the directory if it is absent, then flushes the parent whether
   or not it created it. The file-system MetaStore's cluster directory takes the same step.
-- A log file is created as `{file:D20}.clfl.tmp`, its header and (when preallocated) zeros are written through,
-  paced as above, and it is synced; on Linux the sync then advises the kernel to drop the temporary's cached pages
-  (`POSIX_FADV_DONTNEED`), which the direct handles that later open the file never read and would otherwise
-  invalidate at each write, keeping io_uring from issuing it inline. The temporary is then opened as the storage opens
-  its files, which refuses a file system that cannot serve it (below) before its name is published, renamed to its
-  published name, and the directory is flushed (WAL-I3). A failed creation stops the process, and the next owner's open
-  deletes the temporary it left. Named files are written and published the same way.
+- A log file created directly is written as `{file:D20}.clfl.tmp`, its header and (when preallocated) zeros are written
+  through, paced as above, and it is synced; on Linux the sync then advises the kernel to drop the temporary's cached
+  pages (`POSIX_FADV_DONTNEED`), which the direct handles that later open the file never read and would otherwise
+  invalidate at each write, keeping io_uring from issuing it inline. A staged log file (`PrepareFileAsync`) is written
+  as `prealloc-{id}.tmp`, zero-filled and synced the same way, and closed until either cancelled/disposed (which removes
+  the temporary without flushing the directory) or published (`PublishPreparedFileAsync`), which writes the header at
+  offset 0 and syncs that page. Either temporary is then opened as the storage opens its files, which refuses a file
+  system that cannot serve it (below) before its name is published, renamed to its published name, and the directory is
+  flushed (WAL-I3). A failed creation stops the process, and the next owner's open deletes every `*.tmp` it left. Named
+  files are written and published the same way.
 - Opening a file syncs it before returning; opening a directory flushes it, not its parent (WAL-I10). Truncation and
   deletion are synced; deleting a directory flushes its parent, even when the directory is already gone.
 - An owned directory runs each name change (a publishing rename or a deletion) with its directory flush under one
@@ -1052,7 +1068,7 @@ issued and become durable when it completes. Every choice comes from the seed.
 | `HoldWrites` | Writes stay in flight until completed. |
 | `CompleteWrite()`, `CompleteWrite(Func<string?, ulong, long, bool> select)` | Completes one write in flight, chosen by the seed or by named-file name, file number, and offset, making its bytes durable. |
 | `Crash(bool operatingSystem)` | Returns the storage a restarted process observes. A process crash keeps every cached byte; an operating-system crash keeps durable bytes and, for each unfinished write, an arbitrary subset of its sectors, each old, new, or torn. Writes in flight on the crashed instance fail. |
-| `WriteFault`, `ReadFault`, `NamedWriteFault`, `NamedReadFault`, `DeleteFault`, `NamedDeleteFault` | Hooks which fail a write, read, named-file write, named-file read, log-file deletion, or named-file deletion before any byte or name changes; a hook which returns no exception observes the operation. |
+| `WriteFault`, `ReadFault`, `NamedWriteFault`, `NamedReadFault`, `DeleteFault`, `NamedDeleteFault`, `PrepareFault` | Hooks which fail a write, read, named-file write, named-file read, log-file deletion, named-file deletion, or staged file preparation before any byte or name changes; a hook which returns no exception observes the operation. |
 | Fault reporting | Every fault a hook injects is reported to the fatal-error handler with the exit code of the operation it fails, and stops the instance where the process would stop: every later operation on it throws without reporting, so nothing the process does after the failure reaches the device. `Crash` returns the storage the restarted process observes. |
 | `NamedPublishedFault` | Fails a named file's creation after its name and contents are durable. |
 | `TornWriteFault` | Fails a log-file write after a seeded subset of its sectors, each old, new, or torn, reached the device, as a failed direct write leaves them: reads return those bytes, and they are durable. |
@@ -1078,9 +1094,9 @@ core's separation from each storage namespace (§9).
 | --- | --- |
 | WAL-I1 | `WalCrashTests.EveryAcknowledgedRecordSurvivesACrash`, `RepeatedCrashesNeverLoseAnAcknowledgedRecordOrResurrectAnAbandonedOne`, `AWriteWhichFailsAfterSomeSectorsLandLosesNoAnswerToASameBootReopenOrALaterCrash` (an open in the same boot after a write fails part way finds every acknowledged record, and an operating-system crash afterwards keeps every record it reported); `WalCutTests.TruncatingTheFinalWriteGroupAtEveryByteRecoversExactlyTheCompletePrefix`, `ZeroingTheFinalWriteGroupFromEveryByteRecoversExactlyTheCompletePrefix`; `WalLifecycleTests.PortableStorageRoundTripsAcrossReopen`; `IoUringWalStorageTests.ConcurrentAppendsAreDurableAndRecoverAcrossReopen` and `ADataSyncCoversOnlyWritesCompletedBeforeItsSubmission`; `CrashStateTests.APortableFilesCompletedWritesSurviveEveryCrash` (the portable storage's file, with a sync after every write and with write-through writes synced only when they extend the file, keeps every completed write in every crash state) |
 | WAL-I2 | `WalCrashTests.DamageOutsideTheCrashRegionIsCorruption`; `WalReplayTests.TornPageInTheCrashRegionIsTornAndLaterRecordsRecover`, `DamageBeforeTheWindowIsCorruption`, `ARunStraddlingTheWindowSplitsIntoCorruptionThenTorn`, `DamageInAFileFollowedByValidDataOfTheSameOpenIsCorruption`, `ATornMiddlePageLosesOnlyItsRecordAndTheOrphanFragmentIsSkipped`, `AValidPageWhichBreaksTheFrameRulesIsCorruption`, `AValidPageWhichBreaksTheFrameRulesIsAnEntryOfItsOwn`, `APointReadOfAFirstFrameNamingTheLongestRecordIsCorruption`, `ALeadingContinuationAfterASettledPageIsCorruption`, `AFirstFrameWithoutAPayloadByteIsCorruption`, `AnInvalidNeighbouringFrameMakesAPointReadCorrupt`, `PointReadOfADamagedPageReportsCorruption`, `ReadingFromAPositionYieldsOnlyLaterEntries`, `AFaultInsideTheStartingPageStartsAtTheRequestedPosition`; `WalPageTests.PagesFromDurabilityScansAndKeyReadsAgreeForAnyRecordSizes`, `KeyReadsDistinguishPackedRecordsAndKeysWhichSpanPages`, `KeyReadsSkipARecordTornAtTheFileEnd`, `KeyReadsSkipARecordWhoseContinuationIsNotYetDurable` (on either continuation page), `KeyReadsSkipARecordTornOnItsLastPage` (a hole page, or the file's end), `KeyReadsReportEveryUnreadablePageAsCorruption`, `ScansReportAFileLostWithinAnOpen`, `ScansStartingInALostTailReportNothing`; `WalVectorTests` (`PageVectorsMatchTheFrameLayoutInBothDirections`, `PageRejectionVectorsAreInvalidOrIllFormedForTheirReason`) with `test/Durable.Storage/shared-vectors/wal/pages.json` and `page-rejections.json` |
-| WAL-I3 | `WalPublicationTests.ACrashBeforeTheRenameLeavesNoPublishedFileAndTheNextOpenRemovesTheTemporary` (a temporary holding any prefix of the header, or the whole header and zeros, is never listed, and the next open deletes it and publishes the same file number) and `ACrashBeforeTheFirstFileIsRenamedLeavesNoLog` (`PortableWalStorage`); `WalReplayTests.AFileWithAnInvalidHeaderIsCorruptionAndOtherFilesRecover`; `WalPageTests.ACreatedNamedFileSurvivesAnOperatingSystemCrashAndAnUnfinishedWriteTears`; `CrashStateTests.PublishedNamesNameCompleteContentsInEveryCrashState` (a created and deleted log file, a created and deleted named file, and a directory deleted by a path with a trailing separator, in every crash state of the recorded file-system trace). `WalVectorTests.HeaderRejectionVectorsAreDamageOrUnsupported` pins which headers are damage and which unsupported (`test/Durable.Storage/shared-vectors/wal/header-rejections.json`). |
-| WAL-I4 | `WalReplayTests.AnInterruptedReplayIsRepeatedWithTheSameResult`, `ReplayTruncatesTheOpenAfterItsLastValidPage`, `DamageAfterReplayIsCorruptionEvenAtTheEndOfAnOpen`; `WalLifecycleTests.RecordLargerThanThePreparedFileLeavesItEmpty` |
-| WAL-I5 | `WalReleaseTests.ReleasedFilesAreGoneAndTheRetainedSuffixRecoversAfterReopen`, `TheCurrentFileAndFilesWithPagesInFlightAreNeverReleased`, `ACrashAfterAReleaseRecoversTheRetainedFiles`, `AReleaseWhoseDeletionFailsClosesEveryReleasedFile`, `AReleaseWhoseSecondDeletionFailsLeavesAPrefixTheRestartedProcessFinds` (the failed deletion stops the process, whose next open finds a contiguous suffix), `APreparedFileARollPassesIsReleasedInItsTurn` (a scan of the open reads none of the passed file, and each release deletes it in its turn), `ARollWhichPassesAFailedPreparedFileStopsTheLog`, `AFileIsReleasedOnlyOnceTheFrontierPassesEveryRecordInIt` (a file whose every page is durable stays while a record in it is completing `OnDurable`) |
+| WAL-I3 | `WalPublicationTests.ACrashBeforeTheRenameLeavesNoPublishedFileAndTheNextOpenRemovesTheTemporary` (a temporary holding any prefix of the header, or the whole header and zeros, is never listed, and the next open deletes it and publishes the same file number) and `ACrashBeforeTheFirstFileIsRenamedLeavesNoLog` (`PortableWalStorage`); `WalReplayTests.AFileWithAnInvalidHeaderIsCorruptionAndOtherFilesRecover`; `WalPageTests.ACreatedNamedFileSurvivesAnOperatingSystemCrashAndAnUnfinishedWriteTears`; `CrashStateTests.PublishedNamesNameCompleteContentsInEveryCrashState` (a created and deleted log file, a created and deleted named file, and a directory deleted by a path with a trailing separator, in every crash state of the recorded file-system trace) and `PreparedFileStagingAndPublicationMaintainWalI3InEveryCrashState` (`PrepareFileAsync` + `PublishPreparedFileAsync` and unpublished disposal across every crash state). `WalVectorTests.HeaderRejectionVectorsAreDamageOrUnsupported` pins which headers are damage and which unsupported (`test/Durable.Storage/shared-vectors/wal/header-rejections.json`). |
+| WAL-I4 | `WalReplayTests.AnInterruptedReplayIsRepeatedWithTheSameResult`, `ReplayTruncatesTheOpenAfterItsLastValidPage`, `DamageAfterReplayIsCorruptionEvenAtTheEndOfAnOpen`; `WalLifecycleTests.RecordLargerThanThePreparedFileDoesNotPublishAnEmptyFile` |
+| WAL-I5 | `WalReleaseTests.ReleasedFilesAreGoneAndTheRetainedSuffixRecoversAfterReopen`, `TheCurrentFileAndFilesWithPagesInFlightAreNeverReleased`, `ACrashAfterAReleaseRecoversTheRetainedFiles`, `AReleaseWhoseDeletionFailsClosesEveryReleasedFile`, `AReleaseWhoseSecondDeletionFailsLeavesAPrefixTheRestartedProcessFinds` (the failed deletion stops the process, whose next open finds a contiguous suffix), `APreparedFileARollPassesIsReusedWithoutPublishingAnEmptyFile` (no skipped empty file; staged file reused on the next roll and releases keep a contiguous suffix), `ARollWhichPassesAFailedPreparedFileStopsTheLog`, `AFileIsReleasedOnlyOnceTheFrontierPassesEveryRecordInIt` (a file whose every page is durable stays while a record in it is completing `OnDurable`) |
 | WAL-I6 | `WalWriterTests.PositionsFollowAdmissionOrder`; `WalLifecycleTests.EachOpenAppendsToAFreshFileAndPositionsKeepIncreasing`; `WalPageTests.AnOpenStartsAtLeastAtTheMinimumFirstFile` |
 | WAL-I7 | `WalWriterTests.ARecordLargerThanTheWindowAndTheFileIsWrittenInWaves`; `IoUringWalStorageTests.ALargeRecordIsWrittenAndReadInWaves`; `WalReplayTests.DamageBeforeTheWindowIsCorruption` |
 | WAL-I8 | `WalWriterTests.ConcurrentAppendsAreEachDurableOnceAndReadBack`, `OutOfOrderCompletionHoldsTheFrontier`, `AFailedWriteStopsTheLogAndTheRestartedProcessRecoversTheAcknowledgedRecords`, `AThrowingOutcomeCallbackIsReportedAndStopsTheLog`, `CancellationAppliesOnlyBeforeAcceptance`, `EmptyRecordsConsumeThePageBufferBudget`; `WalPageTests.TheFrontierNeverPassesARecordWhoseDurableCallbackIsRunning`, `AnAppendCompletesBeforeTheFrontierPassesItsRecord`; `WalLifecycleTests.DisposeWaitsForAcceptedRequests`; `WalDirectIoTests.OnLinuxEveryLogFileDescriptorIsDirectWithItsStoragesSyncMode` (portable descriptors are `O_DIRECT \| O_DSYNC`; io_uring descriptors are `O_DIRECT` and each write is followed by its data sync), `IoUringWalStorageTests.AWriteCompletesOnlyAfterItsDataSyncAndReportsItsFailure`, `AFileQualifiesForDirectIoOnlyWhenStatxReportsAnAlignmentDividingTheDirectAlignment`, `ThePortableStorageOpensEveryFileForDirectIo`, and `OnWindowsADirectHandleRefusesAnUnalignedRead`; per-write error reporting on a real device lies outside the tests ([verification §13](../verification.md#13-qualification-boundaries)) |
@@ -1094,4 +1110,4 @@ core's separation from each storage namespace (§9).
 | Directories | `CrashStateTests.ACreatedDirectorySurvivesEveryCrash` (every crash state after `CreateDirectoryAsync` returns holds the directory, with or without a trailing separator), `ACreationTheStorageRefusesPublishesNothing` (a file the storage cannot serve is refused while it is a temporary, so no crash state holds its name) and `ADeletionARestartedProcessRepeatsIsDurableOnceItReturns` (a deletion whose parent flush failed, repeated by a restarted process once the directory is gone, leaves it gone in every crash state), `CreatingADirectoryDurablyFlushesItsParentWhetherOrNotItExisted` (the seam's one step creates an absent directory or accepts a present one, and flushes the parent in both cases) and `CreatingADirectoryDurablyStopsOnAFailedParentFlush`; `WalLifecycleTests.PortableStorageCreatesNoAncestor`; `CrashStateTests` model checks (`AnUnflushedWriteIsLostKeptTornOrZeroExtendedAndAFlushedOneSurvivesWhole`, `AFileFlushLeavesItsNameUnsyncedAndADirectoryFlushLeavesItsOwnName`, `AWriteThroughWritesBytesAreDurableOnceItCompletesAndItsLengthOnceItsFileIsFlushed`, `UnsyncedEntriesPersistInEverySubset`, `EveryPointKeepsItsOwnImagesSoAnUnflushedWriteIsLostAtTheLastPoint`, `ACapBelowTwoStatesPerPointKeepsEveryPointsStrictestAndMostCompleteImages`, `EveryUnsyncedOperationCanSurviveBeyondTenAtAPoint`, `OperationsInADurablyRemovedDirectoryAreUnreachable`); deleting any directory flush of `FileWalDirectory` fails a `CrashStateTests` test, creating a missing parent fails `PortableStorageCreatesNoAncestor`, and an open which also flushes its parent fails `OpeningADirectoryFlushesOnlyTheDirectory`; on Windows, making `WalFileSystem.Os`'s directory flush a no-op, dropping the flush, which takes the handle its open returns, ignoring the open's or the flush's failure, skipping the volume check or its remote test, dropping backup semantics, the extended path, or a sharing mode, swapping the two rights or requesting both, or flushing an opened directory or a created directory's parent with the other right fails a `WalDirectorySyncTests` test |
 | Local storage failures (§6, §9) | `LocalStorageFailureTests` (`AFailedOperationIsReportedOnceAsItselfAndRethrown`, for each of the seam's 21 directory and file operations, `AnAnswerIsRethrownUnreported`, `TheOperatingSystemsAnswersAreNotReported`, `OnWindowsAnotherHandlesContentionIsWaitedOut`, and `EachSimulatedFaultIsReportedAndStopsTheStorageUntilItsCrash`, for each of the simulated storage's fault hooks); `CrashStateTests.AFailureAtAnyOperationIsReportedOnceAndTheRestartedProcessKeepsEveryAcknowledgedRecord` (a failure at each operation of a log's life in turn, from its directory's creation through appends which roll files and a release, is reported once, and the restarted process finds no damage, every acknowledged record the release kept, and no record no append wrote) |
 | Disposal | `WalLifecycleTests.DisposalClosesTheDirectoryAndEveryFile`, `PortableStorageRoundTripsAcrossReopen`, `PreallocatedFilesAreZeroFilledPreparedAheadAndDoubleInSize` (every file closes, the prepared file included); `WalCrashTests.EveryAcknowledgedRecordSurvivesACrash`, `RepeatedCrashesNeverLoseAnAcknowledgedRecordOrResurrectAnAbandonedOne` (a log disposed after a crash holds no handle, and every append it accepted completes); every `Orleans.Durable.Storage.Engine.Wal.Tests` class returns the pages it rented, the log's own leases included ([verification §11.1](../verification.md#111-leak-checks)); `HandleLeakCheckTests` shows that the handle checks see an open portable or io_uring WAL file and an undisposed simulated handle |
-| Preparation | `WalPreparationTests.TheNextFileIsPreparedOnceTheCurrentFileIsAQuarterFull`, `TheFillSpreadsItsBytesOverTheTimeTheCurrentFileTakesToBecomeThreeQuartersFull`, `TheFillGoesAtFullSpeedOnceTheCurrentFileIsThreeQuartersFullAndWaitsAtMostOneSecond`, `ARollHurriesAPacedFill`, `DisposalHurriesAPacedFill`; `WalLifecycleTests.PreallocatedFilesAreZeroFilledPreparedAheadAndDoubleInSize`; `LargeGroupsAllocateFilesAndSmallGroupsReturnToZeroFilledOnes` (bulk mode: large groups make rolls create allocated files; small groups prepare a zero-filled file and roll to it early; every record recovers across a reopen) |
+| Preparation | `WalPreparationTests.TheNextFileIsPreparedOnceTheCurrentFileIsAQuarterFull`, `DoublingStartsPreparingAtOneEighthFull`, `TheFillSpreadsItsBytesOverTheTimeTheCurrentFileTakesToBecomeThreeQuartersFull`, `TheFillGoesAtFullSpeedOnceTheCurrentFileIsThreeQuartersFullAndWaitsAtMostOneSecond`, `CrossingThreeQuartersWakesAPacedFillImmediately`, `ARollHurriesAPacedFillAndPublishesWhenReady`, `ARollWhilePreparationIsInFlightRollsImmediatelyToAnAllocatedFileThenSwitchesWhenReady`, `DisposalCancelsAPacedFillImmediatelyWithoutPublishingOrLeakingTemporaries`, `DisposalOnPortableStorageRemovesUnpublishedTemporaryFiles`; `WalLifecycleTests.PreallocatedFilesAreZeroFilledPreparedAheadAndDoubleInSize`; `LargeGroupsAllocateFilesAndSmallGroupsReturnToZeroFilledOnes` (bulk mode: large groups make rolls create allocated files; small groups prepare a zero-filled file and roll to it early; every record recovers across a reopen) |

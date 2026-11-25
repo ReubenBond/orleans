@@ -136,6 +136,12 @@ public sealed class SimulatedWalStorage : WalStorage
     public Func<string, ulong, Exception?>? DeleteFault { get; set; }
 
     /// <summary>
+    /// Gets or sets a hook which may fail a log file's staged preparation (<see cref="WalDirectory.PrepareFileAsync"/>)
+    /// before it completes. It receives the directory path and the preallocated length.
+    /// </summary>
+    public Func<string, long, Exception?>? PrepareFault { get; set; }
+
+    /// <summary>
     /// Gets or sets a hook which may fail a named-file creation after its name and contents are durable, as a creation
     /// whose rename published the file can fail afterwards. It receives the directory path and the file name.
     /// </summary>
@@ -852,6 +858,78 @@ public sealed class SimulatedWalStorage : WalStorage
         public override ValueTask<WalFile> CreateAllocatedFileAsync(ulong file, ArcBuffer header, long length, CancellationToken cancellationToken) =>
             CreateFileAsync(file, header, length, pace: null, cancellationToken);
 
+        public override async ValueTask<PreparedWalFile> PrepareFileAsync(
+            long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(preallocatedLength);
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (storage._sync)
+            {
+                storage.ThrowIfCrashed();
+                if (storage.PrepareFault?.Invoke(directory.Path, preallocatedLength) is { } fault)
+                {
+                    throw storage.Stop(FatalErrorSite.CreateFile, System.IO.Path.Combine(directory.Path, "prealloc.tmp"), fault);
+                }
+            }
+
+            if (pace is not null)
+            {
+                for (var position = 0L; position < preallocatedLength; position += FillChunkLength)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await pace(position, (int)Math.Min(FillChunkLength, preallocatedLength - position), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+
+            lock (storage._sync)
+            {
+                storage.ThrowIfCrashed();
+                if (pace is not null && storage.PrepareFault?.Invoke(directory.Path, preallocatedLength) is { } fault)
+                {
+                    throw storage.Stop(FatalErrorSite.CreateFile, System.IO.Path.Combine(directory.Path, "prealloc.tmp"), fault);
+                }
+
+                storage._openHandles++;
+                return new SimulatedPreparedWalFile(storage, directory, preallocatedLength);
+            }
+        }
+
+        public override ValueTask<WalFile> PublishPreparedFileAsync(
+            PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(prepared);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (prepared is not SimulatedPreparedWalFile staged || !ReferenceEquals(staged.Directory, directory))
+            {
+                throw new ArgumentException("The prepared file does not belong to this simulated directory.", nameof(prepared));
+            }
+
+            var bytes = new byte[Math.Max(staged.Length, header.Length)];
+            _ = header.CopyTo(bytes);
+            lock (storage._sync)
+            {
+                staged.ConsumeLocked();
+                storage.ThrowIfCrashed();
+                if (directory.Files.ContainsKey(file))
+                {
+                    throw new IOException($"File {file} already exists.");
+                }
+
+                var simulated = new SimulatedFile(directory, file);
+                simulated.MakeDurable(0, bytes);
+                directory.Files.Add(file, simulated);
+                if (directory.FlushChange(simulated, removed: false, storage.DirectoryFlushFault?.Invoke(directory.Path)) is { } unsynced)
+                {
+                    throw storage.Stop(FatalErrorSite.FlushDirectory, directory.Path, unsynced);
+                }
+
+#pragma warning disable CA2000 // Ownership of the file transfers to the caller.
+                return ValueTask.FromResult<WalFile>(storage.OpenFileHandle(simulated));
+#pragma warning restore CA2000
+            }
+        }
+
         public override async ValueTask<WalFile> CreateFileAsync(
             ulong file, ArcBuffer header, long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken)
         {
@@ -1012,6 +1090,29 @@ public sealed class SimulatedWalStorage : WalStorage
         public override ValueTask DisposeAsync()
         {
             storage.CloseHandle(ref _closed, directory);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class SimulatedPreparedWalFile(SimulatedWalStorage storage, SimulatedDirectory directory, long length) : PreparedWalFile
+    {
+        private bool _closed;
+
+        public SimulatedDirectory Directory => directory;
+
+        public override long Length => length;
+
+        // Called under storage._sync.
+        public void ConsumeLocked()
+        {
+            ObjectDisposedException.ThrowIf(_closed, this);
+            _closed = true;
+            storage._openHandles--;
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            storage.CloseHandle(ref _closed);
             return ValueTask.CompletedTask;
         }
     }

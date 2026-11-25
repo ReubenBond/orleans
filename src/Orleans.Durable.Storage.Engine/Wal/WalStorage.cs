@@ -131,6 +131,37 @@ public abstract class WalDirectory : IAsyncDisposable
     public abstract ValueTask<WalFile> CreateAllocatedFileAsync(ulong file, ArcBuffer header, long length, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Stages an unpublished, zero-filled log file of <paramref name="preallocatedLength"/> bytes for a future roll,
+    /// without assigning it a file number or publishing a directory entry.
+    /// </summary>
+    /// <remarks>
+    /// Every byte is written as zero and synced before this returns; when <paramref name="pace"/> is set, each
+    /// zero-fill write waits for it first. Cancelling <paramref name="cancellationToken"/> stops the fill, closes the
+    /// handle, and removes the unpublished temporary file without reporting a storage failure. Disposing the returned
+    /// <see cref="PreparedWalFile"/> without passing it to <see cref="PublishPreparedFileAsync"/> removes the temporary
+    /// file cleanly.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="preallocatedLength"/> is not positive.</exception>
+    public abstract ValueTask<PreparedWalFile> PrepareFileAsync(
+        long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Publishes an already zero-filled <paramref name="prepared"/> file under log-file number <paramref name="file"/>
+    /// with <paramref name="header"/> at offset 0, and opens it for writing.
+    /// </summary>
+    /// <remarks>
+    /// Writes <paramref name="header"/> at offset 0, syncs it, verifies the storage can serve the file, atomically
+    /// renames the temporary to the published log-file name, flushes the directory, and opens the published file. The
+    /// header, length, and name are durable before this returns (WAL-I3). Consumes <paramref name="prepared"/> so later
+    /// disposal of <paramref name="prepared"/> is a no-op; passing an already consumed or foreign
+    /// <paramref name="prepared"/> throws. The caller keeps its lease on <paramref name="header"/> until the call
+    /// completes; the directory keeps no reference to it.
+    /// </remarks>
+    /// <exception cref="IOException">A file with the number exists.</exception>
+    public abstract ValueTask<WalFile> PublishPreparedFileAsync(
+        PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Opens an existing log file and makes every byte it holds durable before returning, so subsequent reads observe
     /// only durable bytes.
     /// </summary>
@@ -170,6 +201,25 @@ public abstract class WalDirectory : IAsyncDisposable
     /// Deletes a named file, if it exists, and completes when the deletion is durable.
     /// </summary>
     public abstract ValueTask DeleteNamedFileAsync(string name, CancellationToken cancellationToken);
+
+    /// <inheritdoc/>
+    public abstract ValueTask DisposeAsync();
+}
+
+/// <summary>
+/// An unpublished, zero-filled log file staged by <see cref="WalDirectory.PrepareFileAsync"/> for a future roll.
+/// </summary>
+/// <remarks>
+/// Holds no log-file number or published directory entry until <see cref="WalDirectory.PublishPreparedFileAsync"/>
+/// consumes and publishes it. Disposing an unpublished instance deletes its temporary staging file cleanly; disposing
+/// a published instance is a no-op.
+/// </remarks>
+public abstract class PreparedWalFile : IAsyncDisposable
+{
+    /// <summary>
+    /// Gets the staged file length in bytes.
+    /// </summary>
+    public abstract long Length { get; }
 
     /// <inheritdoc/>
     public abstract ValueTask DisposeAsync();

@@ -119,6 +119,7 @@ public sealed class LocalStorageFailureTests : IDisposable
         nameof(SimulatedWalStorage.NamedDeleteFault),
         nameof(SimulatedWalStorage.DeleteFault),
         nameof(SimulatedWalStorage.NamedPublishedFault),
+        nameof(SimulatedWalStorage.PrepareFault),
     ];
 
     /// <summary>
@@ -526,6 +527,11 @@ public sealed class LocalStorageFailureTests : IDisposable
                 FatalErrorSite.FlushDirectory,
                 LogPath,
                 async () => await (await directory.CreateNamedFileAsync("b.chk", page, Token)).DisposeAsync()),
+            nameof(SimulatedWalStorage.PrepareFault) => Inject(
+                () => storage.PrepareFault = (_, _) => failure,
+                FatalErrorSite.CreateFile,
+                Path.Combine(LogPath, "prealloc.tmp"),
+                async () => await (await directory.PrepareFileAsync(4096, null, Token)).DisposeAsync()),
             _ => throw new ArgumentOutOfRangeException(nameof(hook), hook, "An unknown hook."),
         };
         var since = FatalErrors.ReportedCount;

@@ -207,24 +207,31 @@ public sealed class WalLifecycleTests : IDisposable
         {
             var storage = new PortableWalStorage();
             var options = Options(fileSize: 16 << 20) with { PreallocateFiles = true };
-            var payloads = Enumerable.Range(0, 1600).Select(static index => Bytes(4000, index)).ToArray();
+            var payloads = Enumerable.Range(0, 5200).Select(static index => Bytes(4000, index)).ToArray();
+            ulong lastFile;
             await using (var wal = await WriteAheadLog.CreateAsync(storage, directory, options, TestContext.Current.CancellationToken))
             {
                 foreach (var batch in payloads.Chunk(64))
                 {
                     await Task.WhenAll(batch.Select(payload => AppendAsync(wal, payload).AsTask()));
                 }
+
+                lastFile = wal.CurrentFile;
             }
 
             FileHandleLeakCheck.AssertClosed(directory);
+            Assert.Empty(Directory.EnumerateFiles(directory, "*" + WalFormat.TemporaryExtension));
 
-            // The first file starts at 4 MiB; a roll uses the prepared 8 MiB file, and 16 MiB is prepared once that one is a
-            // quarter full.
-            Assert.Equal(
-                [4L << 20, 8L << 20, 16L << 20],
-                Enumerable.Range(1, 3).Select(number => new FileInfo(FilePath(directory, (ulong)number)).Length));
-            var prepared = await File.ReadAllBytesAsync(FilePath(directory, 3), TestContext.Current.CancellationToken);
-            Assert.False(prepared.AsSpan(4096).ContainsAnyExcept((byte)0));
+            // The first file starts at 4 MiB; subsequent files double up to 16 MiB, and no unused future file is published.
+            var published = Directory.EnumerateFiles(directory, "*" + WalFormat.FileExtension)
+                .Select(static path => WalFormat.TryParseFileName(System.IO.Path.GetFileName(path), out var number) ? number : 0)
+                .Order()
+                .ToArray();
+            Assert.Equal(Enumerable.Range(1, (int)lastFile).Select(static i => (ulong)i), published);
+            var lengths = published.Select(number => new FileInfo(FilePath(directory, number)).Length).ToArray();
+            Assert.Equal(4L << 20, lengths[0]);
+            Assert.Contains(8L << 20, lengths);
+            Assert.Equal(16L << 20, lengths[^1]);
 
             await using var reopened = await WriteAheadLog.OpenAsync(storage, directory, options, TestContext.Current.CancellationToken);
             var entries = await ReadAllAsync(reopened);
@@ -232,9 +239,8 @@ public sealed class WalLifecycleTests : IDisposable
                 payloads.Select(Convert.ToHexString).Order(),
                 entries.Select(static entry => Convert.ToHexString(entry.Payload!)).Order());
 
-            // Reopening truncates the last open's files after their data and the prepared file to its header.
-            Assert.InRange(new FileInfo(FilePath(directory, 2)).Length, 2 * 4096, (8L << 20) - 4096);
-            Assert.Equal(4096, new FileInfo(FilePath(directory, 3)).Length);
+            // Reopening truncates the last open's final file after its data.
+            Assert.InRange(new FileInfo(FilePath(directory, lastFile)).Length, 2 * 4096, (16L << 20) - 4096);
         }
         finally
         {
@@ -243,7 +249,7 @@ public sealed class WalLifecycleTests : IDisposable
     }
 
     [Fact]
-    public async Task RecordLargerThanThePreparedFileLeavesItEmpty()
+    public async Task RecordLargerThanThePreparedFileDoesNotPublishAnEmptyFile()
     {
         var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "clog-wal-" + Guid.NewGuid().ToString("N"));
         try
@@ -254,11 +260,11 @@ public sealed class WalLifecycleTests : IDisposable
             var small = Bytes(10, 2);
             await using (var wal = await WriteAheadLog.CreateAsync(storage, directory, options, TestContext.Current.CancellationToken))
             {
-                Assert.Equal(3UL, (await AppendAsync(wal, large)).File);
-                Assert.Equal(4UL, (await AppendAsync(wal, small)).File);
+                Assert.Equal(2UL, (await AppendAsync(wal, large)).File);
+                _ = await AppendAsync(wal, small);
             }
 
-            Assert.Equal(4 * 4096, new FileInfo(FilePath(directory, 2)).Length);
+            Assert.Empty(Directory.EnumerateFiles(directory, "*" + WalFormat.TemporaryExtension));
             await using var reopened = await WriteAheadLog.OpenAsync(storage, directory, options, TestContext.Current.CancellationToken);
             var entries = await ReadAllAsync(reopened);
             Assert.Equal([large, small], entries.Select(static entry => entry.Payload!));

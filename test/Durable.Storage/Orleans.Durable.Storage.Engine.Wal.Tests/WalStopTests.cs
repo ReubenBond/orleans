@@ -35,8 +35,9 @@ public sealed class WalStopTests : IDisposable
         await using var directory = new DefectiveDirectory(await storage.OpenDirectoryAsync(LogPath, Token));
         var defect = new InvalidOperationException("A defect no storage seam reported.");
 
-        // A roll creates file 2; with preallocation, the log prepares file 2 as soon as it starts.
-        directory.CreateFault = file => site is "WalRoll" or "WalDiscard" && file >= 2 ? defect : null;
+        // A roll creates file 2; with preallocation, the log stages a prepared file as soon as it starts.
+        directory.CreateFault = file => site == "WalRoll" && file >= 2 ? defect : null;
+        directory.PrepareFault = site == "WalDiscard" ? defect : null;
         var options = site == "WalDiscard"
             ? Options(pageSize: 512, fileSize: 4 * 512) with { PreallocateFiles = true }
             : Options(fileSize: 4 * 4096) with { PreallocateFiles = false };
@@ -90,11 +91,11 @@ public sealed class WalStopTests : IDisposable
             : Options(fileSize: 4 * 4096) with { PreallocateFiles = false };
         if (operation == "preparation")
         {
-            // The log prepares file 2 as soon as file 1 starts taking records. The preparation waits for the append to be
-            // durable, and only then does a directory flush, the one which publishes file 2, fail, so the stop follows the
-            // append's answer rather than racing it (#167).
-            directory.CreateHold = file => file >= 2 ? preparation.Task : null;
-            storage.DirectoryFlushFault = _ => preparation.Task.IsCompleted ? fault : null;
+            // The log stages the next file as soon as file 1 starts taking records. The preparation waits for the append
+            // to be durable, and only then does PrepareFault fail staging, so the stop follows the append's answer rather
+            // than racing it (#167).
+            directory.PrepareHold = preparation.Task;
+            storage.PrepareFault = (_, _) => preparation.Task.IsCompleted ? fault : null;
         }
 
         var wal = await WriteAheadLog.CreateAsync(directory, options, Token);
@@ -136,8 +137,13 @@ public sealed class WalStopTests : IDisposable
     {
         public Func<ulong, Exception?>? CreateFault { get; set; }
 
+        public Exception? PrepareFault { get; set; }
+
         /// <summary>Gets or sets what returns the task, if any, which a file's creation waits for before it begins.</summary>
         public Func<ulong, Task?>? CreateHold { get; set; }
+
+        /// <summary>Gets or sets the task, if any, which staged preparation waits for before it begins.</summary>
+        public Task? PrepareHold { get; set; }
 
         public Exception? WriteDefect { get; set; }
 
@@ -176,6 +182,36 @@ public sealed class WalStopTests : IDisposable
             }
 
             return new DefectiveFile(this, await inner.CreateAllocatedFileAsync(file, header, length, cancellationToken));
+        }
+
+        public override async ValueTask<PreparedWalFile> PrepareFileAsync(long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken)
+        {
+            if (PrepareHold is { } hold)
+            {
+                await hold;
+            }
+
+            if (PrepareFault is { } fault)
+            {
+                throw fault;
+            }
+
+            return await inner.PrepareFileAsync(preallocatedLength, pace, cancellationToken);
+        }
+
+        public override async ValueTask<WalFile> PublishPreparedFileAsync(PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken)
+        {
+            if (CreateHold?.Invoke(file) is { } hold)
+            {
+                await hold;
+            }
+
+            if (CreateFault?.Invoke(file) is { } fault)
+            {
+                throw fault;
+            }
+
+            return new DefectiveFile(this, await inner.PublishPreparedFileAsync(prepared, file, header, cancellationToken));
         }
 
         public override async ValueTask<WalFile> OpenFileAsync(ulong file, CancellationToken cancellationToken) =>

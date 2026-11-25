@@ -239,37 +239,36 @@ public sealed class WalReleaseTests : IDisposable
     }
 
     /// <summary>
-    /// Regression test: a record larger than the prepared file rolls past it, and the prepared file, published but
-    /// never the log's, made a scan of the open report a gap at it, outlived every release, and so made a later open find
-    /// a gap below it, damage within its open. The passed file now joins the log, holding no record, a release deletes
-    /// it in its turn, and the directory keeps a contiguous suffix (WAL-I5).
+    /// A record larger than the staged prepared file rolls directly to its own allocated file without publishing an
+    /// empty intermediate file, keeping the staged file for the next normal roll and keeping the directory's files a
+    /// contiguous suffix across releases (WAL-I5).
     /// </summary>
     [Fact]
-    public async Task APreparedFileARollPassesIsReleasedInItsTurn()
+    public async Task APreparedFileARollPassesIsReusedWithoutPublishingAnEmptyFile()
     {
         var storage = new SimulatedWalStorage();
         var options = Options(pageSize: 512, fileSize: 4 * 512) with { PreallocateFiles = true };
 
-        // The large record passes the prepared file 2 for its own file 3, and the small one, too long for the room left on
-        // file 3's last page, rolls to the next prepared file, 4.
+        // The large record rolls directly to file 2 (no skipped empty file!), and the small record rolls to the staged
+        // prepared file as file 3.
         var large = Bytes(5 * 512, 1);
         var small = Bytes(500, 2);
         await using (var wal = await WriteAheadLog.CreateAsync(storage, LogPath, options, TestContext.Current.CancellationToken))
         {
-            Assert.Equal(3ul, (await AppendAsync(wal, large)).File);
+            Assert.Equal(2ul, (await AppendAsync(wal, large)).File);
             var last = await AppendAsync(wal, small);
-            Assert.Equal(4ul, last.File);
+            Assert.Equal(3ul, last.File);
             await WaitForFrontierAsync(wal, last);
             var scanned = await ReadAllAsync(wal);
             Assert.DoesNotContain(scanned, static entry => entry.IsCorruption);
             Assert.Equal([large, small], scanned.Select(static entry => entry.Payload));
 
-            for (var bound = 2ul; bound <= 4; bound++)
+            for (var bound = 2ul; bound <= 3; bound++)
             {
                 await wal.ReleaseAsync(bound, TestContext.Current.CancellationToken);
                 Assert.Equal(
-                    Enumerable.Range((int)bound, 5 - (int)bound).Select(static file => (ulong)file),
-                    storage.ListFiles(LogPath).Where(static file => file <= 4));
+                    Enumerable.Range((int)bound, 4 - (int)bound).Select(static file => (ulong)file),
+                    storage.ListFiles(LogPath).Where(static file => file <= 3));
             }
 
             Assert.Equal([small], (await ReadAllAsync(wal)).Select(static entry => entry.Payload));
@@ -286,10 +285,9 @@ public sealed class WalReleaseTests : IDisposable
     }
 
     /// <summary>
-    /// Regression test: a roll which passed a prepared file whose creation failed discarded the failure and created the
-    /// next file, leaving a gap at the prepared file's number, whose name may yet be published. The failed creation is
-    /// reported and stops the log, as it stops the process (conventions.md §14), so the roll fails, no file is created
-    /// past it, and the restarted process's open finds a contiguous log (§6).
+    /// Regression test: a roll which encounters a staged prepared file whose preparation failed stops the log with that
+    /// reported failure (conventions.md §14), creates no file past it, and the restarted process's open finds a
+    /// contiguous log (§6).
     /// </summary>
     [Fact]
     public async Task ARollWhichPassesAFailedPreparedFileStopsTheLog()
@@ -297,22 +295,20 @@ public sealed class WalReleaseTests : IDisposable
         var storage = new SimulatedWalStorage();
         var options = Options(pageSize: 512, fileSize: 4 * 512) with { PreallocateFiles = true };
 
-        // The first creation is file 1's; the second, the prepared file 2's, fails its directory flush.
-        var creations = 0;
-        var failed = new IOException("The directory flush failed.");
-        storage.DirectoryFlushFault = _ => Interlocked.Increment(ref creations) == 2 ? failed : null;
+        var failed = new IOException("The staged preparation failed.");
+        storage.PrepareFault = (_, _) => failed;
         var since = FatalErrors.ReportedCount;
         var wal = await WriteAheadLog.CreateAsync(storage, LogPath, options, TestContext.Current.CancellationToken);
         Assert.Same(failed, (await Assert.ThrowsAsync<IOException>(async () => await AppendAsync(wal, Bytes(5 * 512, 1)))).InnerException);
         await wal.DisposeAsync();
-        Assert.Same(failed, AssertReported(since, FatalErrorSite.FlushDirectory, LogPath).Failure.Exception);
-        Assert.DoesNotContain(3ul, storage.ListFiles(LogPath));
+        Assert.Same(failed, AssertReported(since, FatalErrorSite.CreateFile, Path.Combine(LogPath, "prealloc.tmp")).Failure.Exception);
+        Assert.DoesNotContain(2ul, storage.ListFiles(LogPath));
         Assert.Equal(0, storage.OpenHandleCount);
 
         var restarted = storage.Crash(operatingSystem: false);
         await using var reopened = await WriteAheadLog.OpenAsync(restarted, LogPath, options, TestContext.Current.CancellationToken);
         Assert.DoesNotContain(await ReadAllAsync(reopened), static entry => entry.IsCorruption);
-        Assert.Equal(3ul, (await AppendAsync(reopened, [1])).File);
+        Assert.Equal(2ul, (await AppendAsync(reopened, [1])).File);
     }
 
     /// <summary>

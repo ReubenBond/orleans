@@ -1,3 +1,4 @@
+using System.Globalization;
 using Orleans.Durable.Storage.Diagnostics;
 using Orleans.Durable.Storage.Engine.Buffers;
 
@@ -17,16 +18,17 @@ namespace Orleans.Durable.Storage.Engine.Wal.FileSystem;
 /// </remarks>
 internal sealed class FileWalDirectory : WalDirectory
 {
-    // The zero-fill writes this much at a time, buffered, and syncs every ZeroFillSyncBytes. On an NVMe without power-loss
-    // protection each sync costs a device flush, so syncing every write (256 KiB synced writes filled at 50 MiB/s, 4 MiB
-    // ones at 470 MiB/s) left a busy log waiting for its next file and contending with its flushes (io-uring-wal.md).
+    // The zero-fill writes this much at a time, buffered, and syncs every ZeroFillSyncBytes (64 MiB, 16 device flushes
+    // per 1 GiB file). On NVMe each sync costs a device flush that contends with live WAL fdatasyncs, while periodic
+    // syncing keeps page-cache dirty buildup bounded and drops flushed pages on Linux (io-uring-wal.md).
     private static readonly byte[] Zeros = new byte[4 << 20];
-    private const long ZeroFillSyncBytes = 16 << 20;
+    private const long ZeroFillSyncBytes = 64 << 20;
 
     private readonly string _path;
     private readonly WalFileSystem _fileSystem;
     private readonly IDisposable _lock;
     private readonly Func<string, bool, WalFile> _openFile;
+    private long _nextPreparedId;
 
     // Held across each name change and its directory flush.
     private readonly Lock _names = new();
@@ -135,6 +137,93 @@ internal sealed class FileWalDirectory : WalDirectory
 
     public override ValueTask<WalFile> CreateAllocatedFileAsync(ulong file, ArcBuffer header, long length, CancellationToken cancellationToken) =>
         CreateFileCoreAsync(file, header, length, zeroFill: false, pace: null, cancellationToken);
+
+    public override async ValueTask<PreparedWalFile> PrepareFileAsync(
+        long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(preallocatedLength);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var id = Interlocked.Increment(ref _nextPreparedId);
+        var temporary = System.IO.Path.Combine(_path, string.Create(CultureInfo.InvariantCulture, $"prealloc-{id}{WalFormat.TemporaryExtension}"));
+        try
+        {
+            using (var handle = _fileSystem.CreateFile(temporary, replace: true, writeThrough: false, preallocatedLength))
+            {
+                for (var position = 0L; position < preallocatedLength; position += Zeros.Length)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var count = (int)Math.Min(Zeros.Length, preallocatedLength - position);
+                    if (pace is not null)
+                    {
+                        await pace(position, count, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await handle.WriteAsync(Zeros.AsMemory(0, count), position, cancellationToken).ConfigureAwait(false);
+                    if ((position + count) / ZeroFillSyncBytes != position / ZeroFillSyncBytes)
+                    {
+                        handle.Flush();
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                handle.Flush();
+            }
+
+            return new FilePreparedWalFile(this, temporary, preallocatedLength);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                await RemoveTemporaryAsync(temporary).ConfigureAwait(false);
+            }
+            catch (Exception cleanup) when (FatalErrorHandler.IsReported(cleanup))
+            {
+                // The storage already reported a failure and stopped the process; Own() removes any *.tmp on open.
+            }
+
+            throw;
+        }
+    }
+
+    public override async ValueTask<WalFile> PublishPreparedFileAsync(
+        PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        if (prepared is not FilePreparedWalFile staged || !ReferenceEquals(staged.Directory, this))
+        {
+            throw new ArgumentException("The prepared file does not belong to this write-ahead log directory.", nameof(prepared));
+        }
+
+        staged.Consume();
+        var path = System.IO.Path.Combine(_path, WalFormat.GetFileName(file));
+        try
+        {
+            using (var handle = _fileSystem.OpenFile(staged.Temporary, direct: false))
+            {
+                await handle.WriteAsync([.. header.MemorySegments], 0, cancellationToken).ConfigureAwait(false);
+                handle.Flush();
+            }
+
+            await PublishAsync(staged.Temporary, path, cancellationToken).ConfigureAwait(false);
+            return _openFile(path, false);
+        }
+        catch (Exception exception) when (exception is WalNameExistsException or OperationCanceledException)
+        {
+            try
+            {
+                await RemoveTemporaryAsync(staged.Temporary).ConfigureAwait(false);
+            }
+            catch (Exception cleanup) when (FatalErrorHandler.IsReported(cleanup))
+            {
+                // The storage already reported a failure and stopped the process; Own() removes any *.tmp on open.
+            }
+
+            throw;
+        }
+    }
 
     private async ValueTask<WalFile> CreateFileCoreAsync(
         ulong file, ArcBuffer header, long preallocatedLength, bool zeroFill, WalFillPace? pace, CancellationToken cancellationToken)
@@ -426,6 +515,21 @@ internal sealed class FileWalDirectory : WalDirectory
     }
 
     /// <summary>
+    /// Deletes an unpublished temporary file without flushing the directory: temporaries are never published and
+    /// <see cref="Own"/> deletes any left by a crash.
+    /// </summary>
+    private async ValueTask RemoveTemporaryAsync(string temporary)
+    {
+        var started = _fileSystem.TimeProvider.GetTimestamp();
+        var pause = FileSystemAnswers.FirstContentionPause;
+        while (!_fileSystem.TryDeleteFile(temporary, started))
+        {
+            await Task.Delay(pause, _fileSystem.TimeProvider).ConfigureAwait(false);
+            pause = FileSystemAnswers.NextPause(pause);
+        }
+    }
+
+    /// <summary>
     /// Opens a file and answers with it, or with its absence, once the answer is durable.
     /// </summary>
     private async ValueTask<WalFile> OpenAnsweredAsync(string path)
@@ -482,6 +586,27 @@ internal sealed class FileWalDirectory : WalDirectory
         {
             lockHandle.Dispose();
             throw;
+        }
+    }
+
+    private sealed class FilePreparedWalFile(FileWalDirectory directory, string temporary, long length) : PreparedWalFile
+    {
+        private int _consumed;
+
+        public FileWalDirectory Directory => directory;
+
+        public string Temporary => temporary;
+
+        public override long Length => length;
+
+        public void Consume() => ObjectDisposedException.ThrowIf(Interlocked.Exchange(ref _consumed, 1) != 0, this);
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _consumed, 1) == 0)
+            {
+                await directory.RemoveTemporaryAsync(temporary).ConfigureAwait(false);
+            }
         }
     }
 }

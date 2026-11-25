@@ -373,7 +373,7 @@ public sealed partial class LedgerStoreCrashStateTests : IDisposable
     [Fact]
     public Task PreallocatedFilesAndAPreparedNextFileRecoverFromEveryCrashState() => RunAsync(0x5e65, writeThrough: false, Preallocated, async (recorder, _) =>
     {
-        recorder.FileSystem.HoldCreations = static path => path.EndsWith(".clfl.tmp", StringComparison.Ordinal);
+        recorder.FileSystem.HoldCreations = static path => path.Contains("prealloc-", StringComparison.Ordinal) && path.EndsWith(WalFormat.TemporaryExtension, StringComparison.Ordinal);
         await recorder.CreateAsync(S1);
         await recorder.WriteAsync(S1, 0, 1, 2, 3);
         await recorder.PrepareNextFileAsync();
@@ -1934,13 +1934,8 @@ public sealed partial class LedgerStoreCrashStateTests : IDisposable
             var prepared = FileSystem.HeldCreations[0];
             prepared.Release();
             await UntilAsync(
-                () =>
-                {
-                    var operations = FileSystem.Operations;
-                    var publication = operations.ToList().FindIndex(operation => operation.Kind == FileSystemOperationKind.Rename && operation.Path == prepared.Path);
-                    return publication >= 0 && operations.Skip(publication + 1).Any(operation => operation.Kind == FileSystemOperationKind.FlushDirectory && operation.Node == operations[publication].Directory);
-                },
-                "The prepared file was not published.");
+                () => FileSystem.Operations.Any(operation => operation.Kind == FileSystemOperationKind.Flush && operation.Path == prepared.Path),
+                "The prepared file did not finish staging.");
         }
 
         /// <summary>

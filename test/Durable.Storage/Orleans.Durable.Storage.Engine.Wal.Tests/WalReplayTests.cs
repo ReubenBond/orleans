@@ -86,7 +86,7 @@ public sealed class WalReplayTests : IDisposable
         Assert.True(WalFormat.IsHolePage(storage.ReadDurable(LogPath, 1).AsSpan((int)DataPage(6), Page)));
         var restarted = storage.Crash(operatingSystem: false);
         var files = await ListFilesAsync(restarted);
-        Assert.Equal([1UL, 2UL], files);
+        Assert.Equal([1UL], files);
 
         var entries = await ReopenAndReadAsync(restarted, options);
 
@@ -136,16 +136,18 @@ public sealed class WalReplayTests : IDisposable
     public async Task ReplayTruncatesTheOpenAfterItsLastValidPage()
     {
         var storage = new SimulatedWalStorage();
-        var options = Options(fileSize: 16 * Page, window: 4) with { PreallocateFiles = true };
-        var payloads = await WritePageRecordsAsync(storage, options, count: 5);
+        var options = Options(fileSize: 8 * Page, window: 4) with { PreallocateFiles = true };
+        var payloads = await WritePageRecordsAsync(storage, options, count: 8);
         var files = await ListFilesAsync(storage);
         Assert.Equal([1UL, 2UL], files);
         storage.Damage(LogPath, 1, DataPage(4), Garbage());
-        storage.Damage(LogPath, 1, DataPage(7), Garbage());
+        storage.Damage(LogPath, 1, DataPage(5), Garbage());
+        storage.Damage(LogPath, 1, DataPage(6), Garbage());
+        storage.Damage(LogPath, 2, DataPage(0), Garbage());
 
         var entries = await ReopenAndReadAsync(storage, options);
 
-        // Pages after the last valid page were in flight at the crash, and the prepared file was never written.
+        // Pages after the last valid page (page 3 in file 1) were in flight at the crash, and file 2 holds no valid page.
         Assert.Equal(payloads[..4], entries.Select(static entry => entry.Payload!));
         Assert.Equal(DataPage(4), storage.ReadDurable(LogPath, 1).Length);
         Assert.Equal(Page, storage.ReadDurable(LogPath, 2).Length);

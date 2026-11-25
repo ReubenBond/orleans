@@ -40,11 +40,12 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     // before its first write while a busy log still reaches full-size files.
     private const long InitialPreallocatedFileSize = 4L << 20;
 
-    // The next preallocated file is prepared once the current file is PrepareStartFill full, and its zero-fill is
-    // paced to finish when the current file is PrepareReadyFill full at the current file's observed fill rate. The
-    // fill then writes at about twice the log's own rate (four times while file sizes double), in small writes,
-    // and the file is ready with a quarter of the current file to spare.
+    // The next preallocated file is staged once the current file is PrepareStartFill full (or DoublingPrepareStartFill
+    // while file sizes double, giving extra headroom for the 2x fill), and its zero-fill is paced to finish when the
+    // current file is PrepareReadyFill full at the current file's observed fill rate. Crossing PrepareReadyFill cancels
+    // the hurry token immediately so the fill finishes at full speed without waiting out MaxFillDelay.
     private const double PrepareStartFill = 0.25;
+    private const double DoublingPrepareStartFill = 0.125;
     private const double PrepareReadyFill = 0.75;
 
     // The longest a paced zero-fill waits between writes, so it notices a change in the fill rate.
@@ -606,14 +607,31 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
         bool allocated,
         CancellationToken cancellationToken)
     {
+        using var buffer = EncodeHeader(options, firstOfOpen);
+        return allocated
+            ? await directory.CreateAllocatedFileAsync(number, buffer, preallocatedLength, cancellationToken).ConfigureAwait(false)
+            : await directory.CreateFileAsync(number, buffer, preallocatedLength, pace, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<WalFile> PublishPreparedFileAsync(
+        WalDirectory directory,
+        PreparedWalFile prepared,
+        ulong number,
+        WalOptions options,
+        bool firstOfOpen,
+        CancellationToken cancellationToken)
+    {
+        using var buffer = EncodeHeader(options, firstOfOpen);
+        return await directory.PublishPreparedFileAsync(prepared, number, buffer, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static ArcBuffer EncodeHeader(WalOptions options, bool firstOfOpen)
+    {
         var page = new byte[options.PageSize];
         WalFormat.WriteHeader(page, options.WriteWindowPages, firstOfOpen);
         using var writer = ArcBufferWriter.CreateAligned();
         writer.Write(page);
-        using var buffer = writer.ConsumeSlice(options.PageSize);
-        return allocated
-            ? await directory.CreateAllocatedFileAsync(number, buffer, preallocatedLength, cancellationToken).ConfigureAwait(false)
-            : await directory.CreateFileAsync(number, buffer, preallocatedLength, pace, cancellationToken).ConfigureAwait(false);
+        return writer.ConsumeSlice(options.PageSize);
     }
 
     /// <summary>
@@ -683,19 +701,21 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
             : DataPageLimit(_options.FileSize);
 
     /// <summary>
-    /// Starts creating and zero-filling the next preallocated file, paced so a roll finds it ready.
+    /// Starts staging and zero-filling an unpublished preallocated file in the background, paced so a roll finds it
+    /// ready without assigning a log-file number until roll time.
     /// </summary>
     private void PrepareNext()
     {
-        var number = checked(_current.Number + 1);
         var dataPages = NextDataPageLimit();
         var length = _pageSize * (1 + dataPages);
-#pragma warning disable CA2000 // Ownership of the source transfers to the prepared file, whose taker disposes it.
+#pragma warning disable CA2000 // Ownership of both sources transfers to the prepared file, whose taker or discarder disposes them.
         var hurry = new CancellationTokenSource();
+        var cancel = new CancellationTokenSource();
 #pragma warning restore CA2000
         var hurried = hurry.Token;
+        var cancelled = cancel.Token;
         ValueTask Pace(long written, int count, CancellationToken _) =>
-            PaceFillAsync(length, written, count, hurried);
+            PaceFillAsync(length, written, count, hurried, cancelled);
 
         // Leaving bulk mode from an allocated file, the log rolls to this file as soon as it is ready, so it goes unpaced.
         var pace = _current.Allocated ? null : (WalFillPace)Pace;
@@ -704,7 +724,7 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
             {
                 try
                 {
-                    return await CreateFileAsync(_directory, number, _options, firstOfOpen: false, length, pace, allocated: false, CancellationToken.None).ConfigureAwait(false);
+                    return await _directory.PrepareFileAsync(length, pace, cancelled).ConfigureAwait(false);
                 }
                 catch (Exception exception) when (FatalErrorHandler.IsReported(exception))
                 {
@@ -715,29 +735,51 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
                 }
             },
             CancellationToken.None);
-        _prepared = new PreparedFile(number, dataPages, file, hurry);
+        _prepared = new PreparedFile(dataPages, file, hurry, cancel) { Hurried = pace is null };
     }
 
     /// <summary>
-    /// Determines whether to start preparing the next zero-filled file: files are preallocated, none is prepared, the log
-    /// is not in bulk mode, and the current file is <see cref="PrepareStartFill"/> full, or allocated, which the log
-    /// leaves as soon as the prepared file is ready.
+    /// Determines whether to start staging the next zero-filled file: files are preallocated, none is staged, the log
+    /// is not in bulk mode, and the current file is past its start threshold (<see cref="DoublingPrepareStartFill"/>
+    /// while file sizes double, <see cref="PrepareStartFill"/> otherwise) or allocated, which the log leaves as soon as
+    /// the staged file is ready.
     /// </summary>
-    private bool ShouldPrepareNext() =>
-        _options.PreallocateFiles
-        && _prepared is null
-        && _stopped is null
-        && !_disposing
-        && !_rollPending
-        && !_bulk
-        && (_current.Allocated || _current.BuiltPages >= (long)(_current.DataPageLimit * PrepareStartFill));
+    private bool ShouldPrepareNext()
+    {
+        if (!_options.PreallocateFiles || _prepared is not null || _stopped is not null || _disposing || _rollPending || _bulk)
+        {
+            return false;
+        }
+
+        if (_current.Allocated)
+        {
+            return true;
+        }
+
+        var startFill = NextDataPageLimit() > _current.DataPageLimit ? DoublingPrepareStartFill : PrepareStartFill;
+        return _current.BuiltPages >= (long)(_current.DataPageLimit * startFill);
+    }
 
     /// <summary>
-    /// Determines whether the next record starts the prepared zero-filled file now: the log left bulk mode while
-    /// appending to an allocated file, whose small durable writes each cost a metadata commit.
+    /// Determines whether an in-flight paced preparation should be hurried now because the current file has reached
+    /// <see cref="PrepareReadyFill"/> or is allocated.
     /// </summary>
-    private bool ShouldRollEarly() =>
-        _current.Allocated && !_bulk && _prepared is { File.IsCompletedSuccessfully: true };
+    private bool ShouldHurryPrepared() =>
+        _prepared is { Hurried: false, File.IsCompleted: false }
+        && (_current.Allocated || _current.BuiltPages >= (long)(_current.DataPageLimit * PrepareReadyFill));
+
+    /// <summary>
+    /// Determines whether the next record starts the staged zero-filled file now: the log is out of bulk mode while
+    /// appending to a non-empty allocated file (either after leaving bulk mode or after a burst rolled past an
+    /// in-flight fill), and the staged file is ready and large enough for the record. Requiring at least one page in
+    /// the allocated file avoids leaving an empty file behind if staging completes immediately after the roll.
+    /// </summary>
+    private bool ShouldRollEarly(long recordPages) =>
+        _current.Allocated
+        && _current.NextPage > 0
+        && !_bulk
+        && _prepared is { File.IsCompletedSuccessfully: true } prepared
+        && prepared.DataPages >= recordPages;
 
     /// <summary>
     /// Folds a durable group's size into the average which chooses between bulk mode and zero-filled files. The caller
@@ -763,10 +805,12 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
 
     /// <summary>
     /// Waits until the next file's zero-fill may write <paramref name="count"/> more bytes. Once
-    /// <paramref name="hurry"/> is cancelled, because the log waits for the file, the fill continues at full speed.
+    /// <paramref name="hurry"/> is cancelled, because the current file crossed <see cref="PrepareReadyFill"/> or rolled,
+    /// the fill continues at full speed; once <paramref name="cancel"/> is cancelled, preparation aborts cleanly.
     /// </summary>
-    private async ValueTask PaceFillAsync(long length, long written, int count, CancellationToken hurry)
+    private async ValueTask PaceFillAsync(long length, long written, int count, CancellationToken hurry, CancellationToken cancel)
     {
+        cancel.ThrowIfCancellationRequested();
         TimeSpan delay;
         lock (_sync)
         {
@@ -775,13 +819,14 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
 
         if (delay > TimeSpan.Zero)
         {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(hurry, cancel);
             try
             {
-                await Task.Delay(delay, _timeProvider, hurry).ConfigureAwait(false);
+                await Task.Delay(delay, _timeProvider, linked.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (hurry.IsCancellationRequested)
+            catch (OperationCanceledException) when (hurry.IsCancellationRequested && !cancel.IsCancellationRequested)
             {
-                // The log waits for the file; the rest of the fill goes at full speed.
+                // The log reached PrepareReadyFill or rolled; the rest of the fill goes at full speed.
             }
         }
     }
@@ -814,24 +859,8 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     }
 
     /// <summary>
-    /// Waits for a prepared file, hurrying its fill.
-    /// </summary>
-    private static async Task<WalFile> TakePreparedAsync(PreparedFile prepared)
-    {
-        await prepared.Hurry.CancelAsync().ConfigureAwait(false);
-        try
-        {
-            return await prepared.File.ConfigureAwait(false);
-        }
-        finally
-        {
-            prepared.Hurry.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Closes a prepared file the log will not use. Its published file holds no data page, and the next open
-    /// truncates it to its header.
+    /// Cancels an in-flight staged file or disposes an already completed unpublished staged file on shutdown, deleting
+    /// its temporary cleanly without publishing a log file or waiting for remaining zero-fill.
     /// </summary>
     private async Task DiscardPreparedAsync()
     {
@@ -841,17 +870,36 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
         }
 
         _prepared = null;
+        await prepared.Cancel.CancelAsync().ConfigureAwait(false);
         try
         {
-            await (await TakePreparedAsync(prepared).ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false);
+            var staged = await prepared.File.ConfigureAwait(false);
+            await staged.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (prepared.Cancel.IsCancellationRequested)
+        {
+            // Disposal cancelled the in-flight preparation cleanly; its temporary was already removed.
+        }
+        catch (Exception exception) when (FatalErrorHandler.IsReported(exception))
+        {
+            // The storage already reported a failure and stopped the process; record it if the log has not stopped yet.
+            lock (_sync)
+            {
+                _stopped ??= exception;
+            }
         }
         catch (Exception exception)
         {
-            // A failure the storage reported, or a defect, which stops the process (conventions.md §14).
+            // A defect no storage seam reported stops the process (conventions.md §14).
             lock (_sync)
             {
                 Stop("WalDiscard", exception);
             }
+        }
+        finally
+        {
+            prepared.Hurry.Dispose();
+            prepared.Cancel.Dispose();
         }
     }
 
@@ -938,6 +986,7 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
         {
             List<Group>? groups = null;
             List<PendingRecord>? failed;
+            CancellationTokenSource? hurry = null;
             long rollPages = -1;
             Task? wait = null;
             bool exit;
@@ -957,6 +1006,12 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
                     {
                         PrepareNext();
                     }
+
+                    if (ShouldHurryPrepared())
+                    {
+                        _prepared!.Hurried = true;
+                        hurry = _prepared.Hurry;
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -971,6 +1026,11 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
                     _wake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     wait = _wake.Task;
                 }
+            }
+
+            if (hurry is not null)
+            {
+                await hurry.CancelAsync().ConfigureAwait(false);
             }
 
             if (groups is not null)
@@ -1006,46 +1066,84 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     private async Task RollAsync(long dataPages)
     {
         ulong number;
-        bool bulk;
+        PreparedFile? readyPrepared = null;
+        PreparedFile? faultedPrepared = null;
+        CancellationTokenSource? hurry = null;
         lock (_sync)
         {
             number = checked(_current.Number + 1);
-            bulk = _bulk;
+            if (_prepared is { } prepared)
+            {
+                if (prepared.File.IsFaulted || prepared.File.IsCanceled)
+                {
+                    _prepared = null;
+                    faultedPrepared = prepared;
+                }
+                else if (prepared.File.IsCompletedSuccessfully)
+                {
+                    if (prepared.DataPages >= dataPages)
+                    {
+                        _prepared = null;
+                        readyPrepared = prepared;
+                    }
+
+                    // Otherwise a record larger than the prepared file rolls directly to its own allocated file,
+                    // keeping the unpublished prepared file ready for the next normal roll (zero empty .clfl files).
+                }
+                else if (!prepared.Hurried)
+                {
+                    // Still zero-filling in flight: hurry it in the background and roll immediately without blocking.
+                    prepared.Hurried = true;
+                    hurry = prepared.Hurry;
+                }
+            }
+        }
+
+        if (hurry is not null)
+        {
+            await hurry.CancelAsync().ConfigureAwait(false);
         }
 
         var allocated = false;
 
         try
         {
+            if (faultedPrepared is not null)
+            {
+                try
+                {
+                    _ = await faultedPrepared.File.ConfigureAwait(false);
+                }
+                finally
+                {
+                    faultedPrepared.Hurry.Dispose();
+                    faultedPrepared.Cancel.Dispose();
+                }
+            }
+
             var header = new WalFileHeader(_pageSize, _options.WriteWindowPages, FirstOfOpen: false);
             WalFile file;
-            if (_prepared is { } prepared && prepared.DataPages >= dataPages)
+            if (readyPrepared is not null)
             {
-                _prepared = null;
-                file = await TakePreparedAsync(prepared).ConfigureAwait(false);
-                dataPages = prepared.DataPages;
+                PreparedWalFile staged;
+                try
+                {
+                    staged = await readyPrepared.File.ConfigureAwait(false);
+                }
+                finally
+                {
+                    readyPrepared.Hurry.Dispose();
+                    readyPrepared.Cancel.Dispose();
+                }
+
+                file = await PublishPreparedFileAsync(_directory, staged, number, _options, firstOfOpen: false, CancellationToken.None)
+                    .ConfigureAwait(false);
+                dataPages = readyPrepared.DataPages;
             }
             else
             {
-                // Only a record larger than the prepared file, or than the current file's unused part before the next
-                // file's preparation starts, rolls without a prepared file of its size. The prepared file is published,
-                // so it joins the log as a closed file without data pages: a release deletes it in its turn, keeping the
-                // directory's files a contiguous suffix (WAL-I5), and a scan reads none of it.
-                if (_prepared is { } passedPrepared)
-                {
-                    _prepared = null;
-                    var passedFile = await TakePreparedAsync(passedPrepared).ConfigureAwait(false);
-                    lock (_sync)
-                    {
-                        var writer = new FileWriter(passedPrepared.Number, passedFile, passedPrepared.DataPages, previous: null, started: 0) { Closed = true };
-                        _files = [.. _files, new LogFile(passedPrepared.Number, passedFile, header, writer)];
-                    }
-
-                    number = checked(passedPrepared.Number + 1);
-                }
-
                 var length = _options.PreallocateFiles ? _pageSize * (1 + dataPages) : 0;
-                allocated = _options.PreallocateFiles && bulk;
+                allocated = _options.PreallocateFiles;
                 file = await CreateFileAsync(_directory, number, _options, firstOfOpen: false, length, pace: null, allocated, CancellationToken.None)
                     .ConfigureAwait(false);
             }
@@ -1128,14 +1226,16 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     private Placement StartRecord(PendingRecord record, out long rollPages)
     {
         rollPages = -1;
-        if (ShouldRollEarly())
+        var fresh = _pageSize - WalFormat.CrcLength;
+        var recordPages = LastPage(0, fresh, record.Length) + 1;
+        if (ShouldRollEarly(recordPages))
         {
             if (_openPage >= 0)
             {
                 ClosePage();
             }
 
-            rollPages = LastPage(0, _pageSize - WalFormat.CrcLength, record.Length) + 1;
+            rollPages = recordPages;
             return Placement.NeedsRoll;
         }
 
@@ -1157,10 +1257,9 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
             ClosePage();
         }
 
-        var fresh = _pageSize - WalFormat.CrcLength;
         if (LastPage(_current.NextPage, fresh, record.Length) >= _current.DataPageLimit)
         {
-            rollPages = Math.Max(NextDataPageLimit(), LastPage(0, fresh, record.Length) + 1);
+            rollPages = Math.Max(NextDataPageLimit(), recordPages);
             return Placement.NeedsRoll;
         }
 
@@ -1357,13 +1456,15 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     /// Determines whether a file's first data page may be submitted.
     /// </summary>
     /// <remarks>
-    /// WAL-I7: a file's first data page is submitted "only when every page of the open's previous file is durable".
-    /// A closed file whose pages are durable stays so, so the writer then forgets its predecessor: otherwise each writer
-    /// would keep every earlier one, with its file handle, for the life of the open.
+    /// WAL-I7: a file's first data page is submitted "only when every page of the open's previous file is durable"
+    /// (and transitively every earlier file of the open, even if an intermediate file closed with zero data pages).
+    /// A closed file whose pages and predecessors are durable stays so, so the writer then forgets its predecessor:
+    /// otherwise each writer would keep every earlier one, with its file handle, for the life of the open.
     /// </remarks>
     private static bool PreviousFilesDurable(FileWriter file)
     {
-        if (file.Previous is { } previous && !(previous.Closed && previous.DurablePrefix == previous.BuiltPages))
+        if (file.Previous is { } previous
+            && !(previous.Closed && previous.DurablePrefix == previous.BuiltPages && PreviousFilesDurable(previous)))
         {
             return false;
         }
@@ -1850,9 +1951,21 @@ public sealed partial class WriteAheadLog : IAsyncDisposable
     }
 
     /// <summary>
-    /// The next file in preparation, and the source which hurries its paced fill once the log waits for it.
+    /// An unpublished preallocated file in preparation: its data-page capacity, staging task, hurry source (wakes
+    /// paced waits at <see cref="PrepareReadyFill"/> or on a roll), and cancel source (aborts staging on disposal).
     /// </summary>
-    private sealed record PreparedFile(ulong Number, long DataPages, Task<WalFile> File, CancellationTokenSource Hurry);
+    private sealed class PreparedFile(long dataPages, Task<PreparedWalFile> file, CancellationTokenSource hurry, CancellationTokenSource cancel)
+    {
+        public long DataPages { get; } = dataPages;
+
+        public Task<PreparedWalFile> File { get; } = file;
+
+        public CancellationTokenSource Hurry { get; } = hurry;
+
+        public CancellationTokenSource Cancel { get; } = cancel;
+
+        public bool Hurried { get; set; }
+    }
 
     /// <summary>
     /// Tracks the pages one open wrote to one of its files.
