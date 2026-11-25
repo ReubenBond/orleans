@@ -74,6 +74,7 @@ public sealed record BenchRunResponse(
     BlobCounterSnapshot BlobDelta,
     Dictionary<string, BlobCounterSnapshot> PerSiloBlobDelta,
     List<SiloTelemetrySummary> SiloTelemetry,
+    List<BenchLifecycleEvent> Events,
     List<string> UnreachableSilos,
     string? UploadedResultUri);
 

@@ -30,6 +30,8 @@ public sealed class BenchOptions
 
     public string? AdvertisedIPAddress { get; set; }
 
+    public long RocksDbWriteBufferBytes { get; set; } = 256L << 20;
+
     public BenchStorageOptions Storage { get; set; } = new();
 
     public BenchMode ParsedMode => Mode.Trim().ToLowerInvariant() switch

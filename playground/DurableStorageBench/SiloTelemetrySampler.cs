@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Globalization;
+using Orleans.Durable.Storage.Hosting;
 
 namespace Orleans.Durable.Storage.Bench;
 
@@ -74,6 +76,8 @@ public sealed class SiloTelemetrySampler : IHostedService, IDisposable
     private const int MaxHistogramReservoirPerTick = 2048;
 
     private readonly BlobRequestCounterPolicy _blobPolicy;
+    private readonly BenchEventLogStore _eventLog;
+    private readonly IServiceProvider _services;
     private readonly ILogger<SiloTelemetrySampler> _logger;
     private readonly Process _process = Process.GetCurrentProcess();
     private readonly Lock _ringLock = new();
@@ -85,6 +89,11 @@ public sealed class SiloTelemetrySampler : IHostedService, IDisposable
     private readonly ConcurrentDictionary<string, CounterAccumulator> _counters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, GaugeHolder> _gauges = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, HistogramAccumulator> _histograms = new(StringComparer.Ordinal);
+
+    private readonly Dictionary<ulong, (bool IsOpen, string Primary)> _knownLedgers = [];
+    private readonly Dictionary<ulong, (long Watermark, long UndrainedBytes)> _knownPrimaries = [];
+    private ulong _lastMapEpoch;
+    private ulong? _lastRetainedWalFiles;
 
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
@@ -98,9 +107,15 @@ public sealed class SiloTelemetrySampler : IHostedService, IDisposable
     private long _prevCompletedWorkItems;
     private BlobCounterSnapshot _prevBlobSnapshot = BlobCounterSnapshot.Empty;
 
-    public SiloTelemetrySampler(BlobRequestCounterPolicy blobPolicy, ILogger<SiloTelemetrySampler> logger)
+    public SiloTelemetrySampler(
+        BlobRequestCounterPolicy blobPolicy,
+        BenchEventLogStore eventLog,
+        IServiceProvider services,
+        ILogger<SiloTelemetrySampler> logger)
     {
         _blobPolicy = blobPolicy;
+        _eventLog = eventLog;
+        _services = services;
         _logger = logger;
         ConfigureMeterListener();
     }
@@ -465,6 +480,140 @@ public sealed class SiloTelemetrySampler : IHostedService, IDisposable
             if (_ringCount < RingCapacity)
             {
                 _ringCount++;
+            }
+        }
+
+        ObserveStorageLifecycle();
+    }
+
+    private void ObserveStorageLifecycle()
+    {
+        // Track ledger map transitions (ledger open / seal / drop / primary handoff).
+        var routing = _services.GetService<LocalRouting>();
+        if (routing?.Current is { } current)
+        {
+            var map = current.View.Current;
+            if (map.Epoch != _lastMapEpoch)
+            {
+                _lastMapEpoch = map.Epoch;
+                var seen = new HashSet<ulong>(map.Ledgers.Length);
+                foreach (var ledger in map.Ledgers)
+                {
+                    var id = ledger.Id.Value;
+                    var primary = ledger.Primary.Node.ToString();
+                    _ = seen.Add(id);
+
+                    if (!_knownLedgers.TryGetValue(id, out var prev))
+                    {
+                        _knownLedgers[id] = (ledger.IsOpen, primary);
+                        _eventLog.Record(
+                            "Bench.Ledger",
+                            eventId: 7201,
+                            level: "Information",
+                            message: string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"LedgerOpened id={id} isOpen={ledger.IsOpen} primary={primary} epoch={map.Epoch}"),
+                            writeConsole: true);
+                    }
+                    else
+                    {
+                        if (prev.IsOpen && !ledger.IsOpen)
+                        {
+                            _eventLog.Record(
+                                "Bench.Ledger",
+                                eventId: 7202,
+                                level: "Information",
+                                message: string.Create(
+                                    CultureInfo.InvariantCulture,
+                                    $"LedgerSealed id={id} primary={primary} epoch={map.Epoch}"),
+                                writeConsole: true);
+                        }
+
+                        if (!string.Equals(prev.Primary, primary, StringComparison.Ordinal))
+                        {
+                            _eventLog.Record(
+                                "Bench.Ledger",
+                                eventId: 7203,
+                                level: "Information",
+                                message: string.Create(
+                                    CultureInfo.InvariantCulture,
+                                    $"LedgerPrimaryChanged id={id} from={prev.Primary} to={primary} epoch={map.Epoch}"),
+                                writeConsole: true);
+                        }
+
+                        _knownLedgers[id] = (ledger.IsOpen, primary);
+                    }
+                }
+
+                List<ulong>? dropped = null;
+                foreach (var id in _knownLedgers.Keys)
+                {
+                    if (!seen.Contains(id))
+                    {
+                        dropped ??= [];
+                        dropped.Add(id);
+                    }
+                }
+
+                if (dropped is not null)
+                {
+                    foreach (var id in dropped)
+                    {
+                        _ = _knownLedgers.Remove(id);
+                        _ = _knownPrimaries.Remove(id);
+                        _eventLog.Record(
+                            "Bench.Ledger",
+                            eventId: 7204,
+                            level: "Information",
+                            message: string.Create(CultureInfo.InvariantCulture, $"LedgerDropped id={id} epoch={map.Epoch}"),
+                            writeConsole: true);
+                    }
+                }
+            }
+        }
+
+        // Track segment drains (watermark advances) and retained WAL file count changes.
+        var dsStatus = _services.GetService<DurableStorageStatus>();
+        if (dsStatus?.NodeStatus is { } nodeStatus)
+        {
+            if (nodeStatus.Resources is { } res)
+            {
+                if (_lastRetainedWalFiles is null || _lastRetainedWalFiles.Value != res.RetainedWalFiles)
+                {
+                    var prevFiles = _lastRetainedWalFiles;
+                    _lastRetainedWalFiles = res.RetainedWalFiles;
+                    _eventLog.Record(
+                        "Bench.Wal",
+                        eventId: 7210,
+                        level: "Information",
+                        message: string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"WalRetainedFilesChanged prev={prevFiles?.ToString(CultureInfo.InvariantCulture) ?? "none"} current={res.RetainedWalFiles} diskUsedMb={res.DiskUsedBytes / (1024.0 * 1024.0):F1} underPressure={res.UnderPressure}"),
+                        writeConsole: true);
+                }
+            }
+
+            foreach (var p in nodeStatus.Primaries)
+            {
+                var id = p.Ledger.Value;
+                var watermark = p.Watermark.Value;
+                var undrained = p.Undrained.Bytes;
+                if (_knownPrimaries.TryGetValue(id, out var prev))
+                {
+                    if (watermark > prev.Watermark)
+                    {
+                        _eventLog.Record(
+                            "Bench.Segment",
+                            eventId: 7220,
+                            level: "Information",
+                            message: string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"SegmentDrained ledger={id} watermark={prev.Watermark}->{watermark} tail={p.ContiguousTail.Value} undrainedMb={undrained / (1024.0 * 1024.0):F2}"),
+                            writeConsole: true);
+                    }
+                }
+
+                _knownPrimaries[id] = (watermark, undrained);
             }
         }
     }

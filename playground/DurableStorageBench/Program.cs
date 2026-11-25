@@ -75,6 +75,10 @@ if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URL
     builder.WebHost.UseUrls($"http://0.0.0.0:{benchOptions.HttpPort}");
 }
 
+// Correlated storage lifecycle event log store + ILoggerProvider (Information+ for DurableStorage & CasPaxos).
+var eventLogStore = new BenchEventLogStore(siloName);
+builder.Logging.AddProvider(new BenchEventLogProvider(eventLogStore));
+
 // Configure Azure Blob and Azure Table clients (DefaultAzureCredential when endpoints are set, connection string fallback).
 TokenCredential? credential = null;
 TokenCredential GetCredential() => credential ??= new DefaultAzureCredential();
@@ -83,7 +87,8 @@ var storage = benchOptions.Storage;
 var blobCounterPolicy = new BlobRequestCounterPolicy(
     storage.LsmContainer,
     storage.JobsContainer,
-    storage.BaselineJournalsContainer);
+    storage.BaselineJournalsContainer,
+    eventLogStore);
 
 var blobClientOptions = AzureArchiveLogStore.ConfigureClientOptions(new BlobClientOptions());
 blobClientOptions.AddPolicy(blobCounterPolicy, HttpPipelinePosition.PerRetry);
@@ -165,32 +170,36 @@ if (storage.CreateContainersIfNotExists)
     }
 }
 
-// Select WAL storage for Clog mode: IoUringWalStorage on Linux 6.1+ with PortableWalStorage fallback.
+// Select WAL storage for Clog mode: IoUringWalStorage on Linux 6.1+ with PortableWalStorage fallback,
+// wrapped in ObservingWalStorage to log correlated WAL file creation/deletion/checkpoint events.
 WalStorage? walStorage = null;
 var walStorageType = "None";
 if (mode == BenchMode.Clog)
 {
+    WalStorage rawWal;
     if (OperatingSystem.IsLinux())
     {
         try
         {
-            walStorage = new IoUringWalStorage();
+            rawWal = new IoUringWalStorage();
             walStorageType = nameof(IoUringWalStorage);
             Console.WriteLine("[BenchStartup] WAL storage active: IoUringWalStorage (Linux io_uring O_DIRECT).");
         }
         catch (PlatformNotSupportedException ex)
         {
-            walStorage = new PortableWalStorage();
+            rawWal = new PortableWalStorage();
             walStorageType = nameof(PortableWalStorage);
             Console.WriteLine($"[BenchStartup] IoUringWalStorage unavailable ({ex.Message}); falling back to PortableWalStorage.");
         }
     }
     else
     {
-        walStorage = new PortableWalStorage();
+        rawWal = new PortableWalStorage();
         walStorageType = nameof(PortableWalStorage);
         Console.WriteLine("[BenchStartup] WAL storage active: PortableWalStorage (non-Linux host).");
     }
+
+    walStorage = new ObservingWalStorage(rawWal, eventLogStore);
 }
 
 var runtimeInfo = new BenchRuntimeInfo(
@@ -206,6 +215,7 @@ var runtimeInfo = new BenchRuntimeInfo(
     ResolvedVoters: resolvedVoters?.Select(v => $"{v.Id}={v.Endpoint}").ToList() ?? []);
 
 builder.Services.AddSingleton(runtimeInfo);
+builder.Services.AddSingleton(eventLogStore);
 builder.Services.AddSingleton(blobCounterPolicy);
 builder.Services.AddSingleton<BenchJobCounters>();
 builder.Services.AddSingleton<SiloTelemetrySampler>();
@@ -294,12 +304,33 @@ builder.UseOrleans(silo =>
 
         silo.AddDurableJournalStorage(options => options.Configure(ds =>
         {
+            // Optimal NVMe defaults for 3x Standard_L8s_v3 (8 vCPU, 64 GiB RAM, 1.92 TB local NVMe per node).
+            // All settings can still be overridden via DurableStorage:* configuration/env vars.
             ds.Node.Cluster = BenchBootstrapHelpers.DeterministicClusterGuid(benchOptions.ClusterId);
             ds.Node.Root = nodeRoot;
             ds.Node.Ordinal = ordinal;
             ds.Node.ArchiveStore = ArchiveStoreKind.Lsm;
             ds.Node.ArchiveStorePrefix = BenchBootstrapHelpers.SanitizeArchivePrefix(benchOptions.ClusterId);
+
+            ds.Node.WalFileSize = 1L << 30;                 // 1 GiB preallocated WAL files
+            ds.Node.PreallocateWalFiles = true;
+            ds.Node.WalRetentionBytes = 64L << 30;          // 64 GiB retention (many un-drained WAL files)
+            ds.Node.DiskBudgetBytes = 512L << 30;           // 512 GiB disk budget
+            ds.Node.MaxSegmentBytes = 128L << 20;           // 128 MiB segments
+            ds.Node.MaxSegmentAge = TimeSpan.FromHours(1);
+            ds.Node.MaxProposalBytes = 128L << 20;          // 128 MiB proposal window
+            ds.Node.Lsm.DrainMemoryBytes = 512L << 20;      // 512 MiB drain memory
+            ds.Node.Lsm.BlockCacheBytes = 512L << 20;       // 512 MiB LSM block cache budget
+            ds.Node.MaxReplicaCalls = 256;
+            ds.Node.MaxReplicaCallBytes = 256L << 20;
+            ds.Node.MaxNodeCalls = 128;
+            ds.Node.MaxNodeCallBytes = 128L << 20;
+            ds.Node.MaxForwardCallBytes = 128L << 20;
+
             ds.Control.Replicas = resolvedVoters!.Count;
+            ds.Control.LedgersPerNode = 8;
+            ds.Control.SequencerWindow = 64;
+            ds.Control.MaxConcurrentDrains = 8;
 
             builder.Configuration.GetSection("DurableStorage").Bind(ds);
             if (ds.Node.Cluster == Guid.Empty)
@@ -319,7 +350,9 @@ builder.UseOrleans(silo =>
             }
         }));
 
-        silo.AddDurableJournalIndex(RocksDbJournalIndex.ForNode);
+        var rocksDbWriteBufferBytes = Math.Max(16L << 20, benchOptions.RocksDbWriteBufferBytes);
+        Console.WriteLine($"[BenchStartup] RocksDB derived index write buffer budget: {rocksDbWriteBufferBytes / (1024 * 1024)} MiB (FlushInterval=Infinite, size-based flushing).");
+        silo.AddDurableJournalIndex(root => new RocksDbJournalIndex(Path.Combine(root, "index"), rocksDbWriteBufferBytes));
     }
     else
     {
@@ -360,7 +393,8 @@ app.MapGet("/metrics/blob", static async (
 app.MapGet("/telemetry", static (
     string? sinceUtc,
     ILocalSiloDetails localSilo,
-    SiloTelemetrySampler sampler) =>
+    SiloTelemetrySampler sampler,
+    BenchEventLogStore eventLog) =>
 {
     DateTimeOffset? since = null;
     if (!string.IsNullOrWhiteSpace(sinceUtc)
@@ -370,12 +404,15 @@ app.MapGet("/telemetry", static (
     }
 
     var samples = sampler.GetSamples(since);
+    var events = eventLog.GetEvents(since);
     return Results.Ok(new
     {
         siloAddress = localSilo.SiloAddress.ToParsableString(),
         siloName = localSilo.Name,
         sampleCount = samples.Count,
         samples,
+        eventCount = events.Count,
+        events,
     });
 });
 

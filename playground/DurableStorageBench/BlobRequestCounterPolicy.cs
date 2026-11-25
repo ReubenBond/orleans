@@ -11,6 +11,7 @@ namespace Orleans.Durable.Storage.Bench;
 public sealed class BlobRequestCounterPolicy : HttpPipelinePolicy
 {
     private readonly Dictionary<string, string> _containerAliases;
+    private readonly BenchEventLogStore? _eventLog;
     private readonly ConcurrentDictionary<(string Container, string Method), CounterEntry> _counts = new();
     private long _totalRequests;
     private long _failedRequests;
@@ -18,8 +19,10 @@ public sealed class BlobRequestCounterPolicy : HttpPipelinePolicy
     public BlobRequestCounterPolicy(
         string lsmContainer,
         string jobsContainer,
-        string baselineJournalsContainer)
+        string baselineJournalsContainer,
+        BenchEventLogStore? eventLog = null)
     {
+        _eventLog = eventLog;
         _containerAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(lsmContainer))
         {
@@ -41,17 +44,30 @@ public sealed class BlobRequestCounterPolicy : HttpPipelinePolicy
     {
         var (container, method) = Classify(message.Request);
         Increment(container, method);
+        var shouldLog = ShouldLogBlobWrite(container, method);
+        var sw = shouldLog ? System.Diagnostics.Stopwatch.StartNew() : null;
         try
         {
             ProcessNext(message, pipeline);
-            if (message.HasResponse && message.Response.Status >= 400)
+            var status = message.HasResponse ? message.Response.Status : 0;
+            if (status >= 400)
             {
                 Interlocked.Increment(ref _failedRequests);
             }
+
+            if (shouldLog)
+            {
+                LogBlobWrite(container, method, message.Request, status, sw!.Elapsed.TotalMilliseconds);
+            }
         }
-        catch
+        catch (Exception ex)
         {
             Interlocked.Increment(ref _failedRequests);
+            if (shouldLog)
+            {
+                LogBlobWriteFailure(container, method, message.Request, ex, sw!.Elapsed.TotalMilliseconds);
+            }
+
             throw;
         }
     }
@@ -60,19 +76,58 @@ public sealed class BlobRequestCounterPolicy : HttpPipelinePolicy
     {
         var (container, method) = Classify(message.Request);
         Increment(container, method);
+        var shouldLog = ShouldLogBlobWrite(container, method);
+        var sw = shouldLog ? System.Diagnostics.Stopwatch.StartNew() : null;
         try
         {
             await ProcessNextAsync(message, pipeline).ConfigureAwait(false);
-            if (message.HasResponse && message.Response.Status >= 400)
+            var status = message.HasResponse ? message.Response.Status : 0;
+            if (status >= 400)
             {
                 Interlocked.Increment(ref _failedRequests);
             }
+
+            if (shouldLog)
+            {
+                LogBlobWrite(container, method, message.Request, status, sw!.Elapsed.TotalMilliseconds);
+            }
         }
-        catch
+        catch (Exception ex)
         {
             Interlocked.Increment(ref _failedRequests);
+            if (shouldLog)
+            {
+                LogBlobWriteFailure(container, method, message.Request, ex, sw!.Elapsed.TotalMilliseconds);
+            }
+
             throw;
         }
+    }
+
+    private bool ShouldLogBlobWrite(string container, string method) =>
+        _eventLog is not null
+        && (method is "PUT" or "DELETE")
+        && (container is "lsm" or "jobs");
+
+    private void LogBlobWrite(string container, string method, Azure.Core.Request request, int status, double elapsedMs)
+    {
+        var contentLen = request.Content is { } c && c.TryComputeLength(out var len) ? len : -1L;
+        _eventLog?.Record(
+            "Bench.Blob",
+            eventId: 7101,
+            level: status >= 400 ? "Warning" : "Information",
+            message: $"Blob{method} container={container} path={request.Uri.Path} status={status} bytes={contentLen} elapsedMs={elapsedMs:F1}",
+            writeConsole: true);
+    }
+
+    private void LogBlobWriteFailure(string container, string method, Azure.Core.Request request, Exception ex, double elapsedMs)
+    {
+        _eventLog?.Record(
+            "Bench.Blob",
+            eventId: 7102,
+            level: "Warning",
+            message: $"Blob{method}Failed container={container} path={request.Uri.Path} error={ex.GetType().Name} elapsedMs={elapsedMs:F1}",
+            writeConsole: true);
     }
 
     public BlobCounterSnapshot Snapshot()

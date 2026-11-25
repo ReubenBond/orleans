@@ -67,7 +67,8 @@ public sealed record SiloTelemetrySnapshot(
 public sealed record SiloSamplesResponse(
     [property: Id(0)] string SiloAddress,
     [property: Id(1)] string SiloName,
-    [property: Id(2)] List<SiloTelemetrySample> Samples);
+    [property: Id(2)] List<SiloTelemetrySample> Samples,
+    [property: Id(3)] List<BenchLifecycleEvent> Events);
 
 /// <summary>
 /// One lightweight telemetry grain per active silo, placed directly on that silo via <see cref="SiloKeyPlacement"/>,
@@ -87,7 +88,8 @@ internal sealed class BenchSiloTelemetryGrain(
     ILocalSiloDetails localSilo,
     BlobRequestCounterPolicy blobPolicy,
     BenchJobCounters jobCounters,
-    SiloTelemetrySampler sampler) : Grain, IBenchSiloTelemetryGrain
+    SiloTelemetrySampler sampler,
+    BenchEventLogStore eventLog) : Grain, IBenchSiloTelemetryGrain
 {
     public Task<SiloTelemetrySnapshot> GetTelemetryAsync(string? runTag = null)
     {
@@ -113,7 +115,8 @@ internal sealed class BenchSiloTelemetryGrain(
         Task.FromResult(new SiloSamplesResponse(
             SiloAddress: localSilo.SiloAddress.ToParsableString(),
             SiloName: localSilo.Name,
-            Samples: sampler.GetSamples(sinceUtc)));
+            Samples: sampler.GetSamples(sinceUtc),
+            Events: eventLog.GetEvents(sinceUtc)));
 }
 
 public sealed record ClusterTelemetrySnapshot(
@@ -144,6 +147,7 @@ public sealed class ClusterTelemetryAggregator(
     BlobRequestCounterPolicy localBlobPolicy,
     BenchJobCounters localJobCounters,
     SiloTelemetrySampler localSampler,
+    BenchEventLogStore localEventLog,
     ILogger<ClusterTelemetryAggregator> logger)
 {
     private static readonly TimeSpan PerSiloTimeout = TimeSpan.FromSeconds(2);
@@ -215,7 +219,7 @@ public sealed class ClusterTelemetryAggregator(
             UnreachableSilos: unreachable);
     }
 
-    public async Task<(List<SiloTelemetrySummary> Summaries, List<string> UnreachableSilos)> CollectSiloTelemetryAsync(
+    public async Task<(List<SiloTelemetrySummary> Summaries, List<BenchLifecycleEvent> Events, List<string> UnreachableSilos)> CollectSiloTelemetryAsync(
         DateTimeOffset sinceUtc,
         bool includeSeries,
         CancellationToken cancellationToken = default)
@@ -225,6 +229,7 @@ public sealed class ClusterTelemetryAggregator(
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         var summaries = new List<SiloTelemetrySummary>();
+        var events = new List<BenchLifecycleEvent>();
         var unreachable = new List<string>();
 
         foreach (var (siloAddr, response) in results)
@@ -240,9 +245,15 @@ public sealed class ClusterTelemetryAggregator(
                 response.SiloName,
                 response.Samples,
                 includeSeries));
+
+            if (response.Events.Count > 0)
+            {
+                events.AddRange(response.Events);
+            }
         }
 
-        return (summaries, unreachable);
+        events.Sort(static (a, b) => a.UtcTimestamp.CompareTo(b.UtcTimestamp));
+        return (summaries, events, unreachable);
     }
 
     public static ClusterBlobDiff DiffBlobs(ClusterTelemetrySnapshot before, ClusterTelemetrySnapshot after)
@@ -301,7 +312,7 @@ public sealed class ClusterTelemetryAggregator(
         var addr = silo.ToParsableString();
         if (silo.Equals(localSilo.SiloAddress))
         {
-            return (addr, new SiloSamplesResponse(addr, localSilo.Name, localSampler.GetSamples(sinceUtc)));
+            return (addr, new SiloSamplesResponse(addr, localSilo.Name, localSampler.GetSamples(sinceUtc), localEventLog.GetEvents(sinceUtc)));
         }
 
         try

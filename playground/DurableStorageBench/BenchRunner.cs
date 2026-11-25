@@ -273,7 +273,7 @@ public sealed class BenchRunner(
         var overallBlobDiff = ClusterTelemetryAggregator.DiffBlobs(beforeAll, afterAll);
 
         var includeSeries = scenario == "s6-failover";
-        var (siloTelemetry, telemetryUnreachable) = await telemetry.CollectSiloTelemetryAsync(
+        var (siloTelemetry, lifecycleEvents, telemetryUnreachable) = await telemetry.CollectSiloTelemetryAsync(
             startedAtUtc.AddSeconds(-1),
             includeSeries,
             cancellationToken).ConfigureAwait(false);
@@ -299,6 +299,7 @@ public sealed class BenchRunner(
             BlobDelta: overallBlobDiff.Total,
             PerSiloBlobDelta: overallBlobDiff.BySilo,
             SiloTelemetry: siloTelemetry,
+            Events: lifecycleEvents,
             UnreachableSilos: unreachable,
             UploadedResultUri: null);
 
