@@ -750,11 +750,13 @@ Each node keeps, in its state database:
   - **WAL-less writes and atomic multi-CF flush.** `RocksDbJournalIndex` writes every batch directly into RocksDB's
     native memtables with `disableWAL = true` (eliminating RocksDB WAL I/O and fsyncs) and opens RocksDB with
     `atomic_flush = true`. Each batch's `key_index` writes, `tombstones` writes/deletes, and watermark advance commit
-    together in one `WriteBatch`, so lookups see every batch's changes atomically. Periodic/size-bounded and clean
-    shutdown flushes (`FlushAsync`) issue an atomic multi-CF flush (`rocksdb_flush_cfs` with `force_atomic_flush`) so
-    `key_index`, `tombstones`, and `watermarks` advance together durably in SSTs + `MANIFEST`; `db_write_buffer_size`
-    bounds total memtable memory so crash replay from `LedgerStore` starting at each ledger's durable watermark stays
-    short.
+    together in one `WriteBatch`, so lookups see every batch's changes atomically. Size-bounded
+    (`JournalIndexOptions.MaxWriteBufferBytes`, default 64 MiB), clean-shutdown, and optional periodic
+    (`JournalIndexOptions.FlushInterval`, defaulting to `Timeout.InfiniteTimeSpan` so flushing scales with traffic
+    rather than emitting small L0 SSTs on a fixed timer) flushes (`FlushAsync`) issue an atomic multi-CF flush
+    (`rocksdb_flush_cfs` with `force_atomic_flush`) so `key_index`, `tombstones`, and `watermarks` advance together
+    durably in SSTs + `MANIFEST`; `db_write_buffer_size` bounds total memtable memory so crash replay from `LedgerStore`
+    starting at each ledger's durable watermark stays short.
   - **Domain-tuned options and fast ledger drops.** `RocksDbJournalIndex` disables memory-mapped I/O explicitly
     (`allow_mmap_reads = false`, `allow_mmap_writes = false`), configures prefix bloom filters (`FixedPrefix(40)` on
     `key_index` and `FixedPrefix(8)` on `tombstones`), runs all blocking RocksDB calls on dedicated threads (never

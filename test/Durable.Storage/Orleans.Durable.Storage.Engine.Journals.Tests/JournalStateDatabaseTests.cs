@@ -879,6 +879,65 @@ public sealed class JournalStateDatabaseTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies <see cref="JournalIndexOptions.FlushInterval"/> defaults to <see cref="Timeout.InfiniteTimeSpan"/>
+    /// (size-based + explicit/clean-shutdown flushing without periodic timer flushes), while an explicit positive
+    /// <see cref="JournalIndexOptions.FlushInterval"/> still triggers periodic flushes.
+    /// </summary>
+    [Fact]
+    public async Task DefaultFlushIntervalDisablesPeriodicFlushWhileExplicitIntervalFlushesPeriodically()
+    {
+        var defaults = new JournalIndexOptions();
+        Assert.Equal(Timeout.InfiniteTimeSpan, defaults.FlushInterval);
+        Assert.Equal(64L * 1024 * 1024, defaults.MaxWriteBufferBytes);
+
+        // With default FlushInterval (Timeout.InfiniteTimeSpan), advancing time does not advance DurableWatermark
+        // until an explicit FlushAsync is called.
+        await using (var env = new MultiNodeEnvironment())
+        {
+            var storage = new InMemoryJournalIndex();
+            var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+            await using var node = await env.OpenNodeAsync(NodeA, storage, new JournalIndexOptions { QuickCheckInterval = Timeout.InfiniteTimeSpan }, timeProvider: time);
+            await env.BootstrapAsync(node, [NodeA]);
+            var ledgerId = node.Map.Current.Find(JournalRowKey.Encode("k").Span)!.Value.Open.Id;
+
+            await using var store = new JournalStore(node.Registry, env.Store, new JournalStoreOptions(), time, node.StateDb);
+            _ = await AppendAsync(store, "k", JournalVersion.Origin, "v1");
+            node.ApplyLoop.Wake(ledgerId);
+            await WaitUntilAsync(() => node.StateDb.Watermark(ledgerId) >= new Slot(1), Signal);
+
+            time.Advance(TimeSpan.FromMinutes(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(30), TimeProvider.System, Token);
+            Assert.Equal(Slot.Zero, node.StateDb.DurableWatermark(ledgerId));
+
+            await node.StateDb.FlushAsync(Token);
+            Assert.Equal(new Slot(1), node.StateDb.DurableWatermark(ledgerId));
+        }
+
+        // With an explicit positive FlushInterval, advancing time triggers a periodic atomic flush.
+        await using (var env = new MultiNodeEnvironment())
+        {
+            var storage = new InMemoryJournalIndex();
+            var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+            await using var node = await env.OpenNodeAsync(
+                NodeA,
+                storage,
+                new JournalIndexOptions { FlushInterval = TimeSpan.FromSeconds(2), QuickCheckInterval = Timeout.InfiniteTimeSpan },
+                timeProvider: time);
+            await env.BootstrapAsync(node, [NodeA]);
+            var ledgerId = node.Map.Current.Find(JournalRowKey.Encode("k").Span)!.Value.Open.Id;
+
+            await using var store = new JournalStore(node.Registry, env.Store, new JournalStoreOptions(), time, node.StateDb);
+            _ = await AppendAsync(store, "k", JournalVersion.Origin, "v1");
+            node.ApplyLoop.Wake(ledgerId);
+            await WaitUntilAsync(() => node.StateDb.Watermark(ledgerId) >= new Slot(1), Signal);
+            Assert.Equal(Slot.Zero, node.StateDb.DurableWatermark(ledgerId));
+
+            time.Advance(TimeSpan.FromSeconds(2));
+            await WaitUntilAsync(() => node.StateDb.DurableWatermark(ledgerId) >= new Slot(1), Signal);
+        }
+    }
+
     private static JournalIndexOptions ManualFlushOptions() => new()
     {
         FlushInterval = Timeout.InfiniteTimeSpan,
@@ -984,8 +1043,9 @@ public sealed class JournalStateDatabaseTests : IDisposable
             InMemoryJournalIndex storage,
             JournalIndexOptions options,
             bool startApplyLoop = true,
-            Func<LedgerId, Slot, Task>? onRead = null) =>
-            await NodeProcess.OpenAsync(node, Register, Transport, storage, options, startApplyLoop, onRead);
+            Func<LedgerId, Slot, Task>? onRead = null,
+            TimeProvider? timeProvider = null) =>
+            await NodeProcess.OpenAsync(node, Register, Transport, storage, options, startApplyLoop, onRead, timeProvider);
 
         public async Task ReplaceAsync(NodeProcess newPrimary, LedgerId ledger, NodeId[] newReplicas)
         {
@@ -1094,14 +1154,15 @@ public sealed class JournalStateDatabaseTests : IDisposable
             InMemoryJournalIndex storage,
             JournalIndexOptions options,
             bool startApplyLoop,
-            Func<LedgerId, Slot, Task>? onRead)
+            Func<LedgerId, Slot, Task>? onRead,
+            TimeProvider? timeProvider = null)
         {
             var map = await LedgerMapView.OpenAsync(register, Token);
             var counting = new CountingTransport(transport, onRead);
             var process = new NodeProcess(node, map, counting);
             try
             {
-                await process.InitializeAsync(storage, options, startApplyLoop);
+                await process.InitializeAsync(storage, options, startApplyLoop, timeProvider ?? TimeProvider.System);
                 return process;
             }
             catch
@@ -1114,9 +1175,10 @@ public sealed class JournalStateDatabaseTests : IDisposable
         private async Task InitializeAsync(
             InMemoryJournalIndex storage,
             JournalIndexOptions options,
-            bool startApplyLoop)
+            bool startApplyLoop,
+            TimeProvider timeProvider)
         {
-            _stateDb = await JournalStateDatabase.OpenAsync(storage, Reader, options, TimeProvider.System, Token);
+            _stateDb = await JournalStateDatabase.OpenAsync(storage, Reader, options, timeProvider, Token);
             if (startApplyLoop)
             {
                 _applyLoop = new LedgerApplyLoop(Reader, _stateDb.Applier, TimeProvider.System);

@@ -25,10 +25,11 @@ namespace Orleans.Durable.Storage.Engine.Journals;
 /// before answering (JS-I9).
 /// </para>
 /// <para>
-/// Writes land directly in the index's memtables without a separate index WAL; periodic and clean-shutdown flushes
-/// invoke an atomic multi-column-family flush so key-index entries, tombstones, and watermarks advance together
-/// durably. On crash, any unflushed suffix is replayed from local <c>LedgerStore</c> starting at each ledger's
-/// durable watermark.
+/// Writes land directly in the index's memtables without a separate index WAL; size-bounded memtable flushes
+/// (<see cref="JournalIndexOptions.MaxWriteBufferBytes"/>), clean-shutdown flushes, and optional periodic flushes
+/// (<see cref="JournalIndexOptions.FlushInterval"/>) invoke an atomic multi-column-family flush so key-index entries,
+/// tombstones, and watermarks advance together durably. On crash, any unflushed suffix is replayed from local
+/// <c>LedgerStore</c> starting at each ledger's durable watermark.
 /// </para>
 /// </remarks>
 public sealed class JournalStateDatabase : IAsyncDisposable
