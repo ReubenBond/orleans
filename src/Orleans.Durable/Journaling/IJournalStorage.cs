@@ -44,7 +44,7 @@ namespace Orleans.Durable.Journaling;
 /// <see cref="ReplaceAsync"/>, and <see cref="DeleteAsync"/> succeed only if the journal is still at that version, so a
 /// write after observing an absent journal requires the journal to still be absent. Otherwise they throw
 /// <see cref="Orleans.Storage.InconsistentStateException"/>; each conflicting request leaves storage unchanged. A successful write, including creating
-/// the journal with <see cref="CreateIfNotExistsAsync"/>, advances the precondition to the version it produced. Callers read
+/// the journal with <see cref="CreateIfNotExistsAsync(IReadOnlyDictionary{string, string}?, CancellationToken)"/>, advances the precondition to the version it produced. Callers read
 /// the journal, or create it, before writing through an instance: a write through an instance which has done neither throws
 /// <see cref="InvalidOperationException"/>. Metadata operations never establish or move the precondition, and metadata-only
 /// updates never change the journal's content.
@@ -93,6 +93,38 @@ public interface IJournalStorage
         IReadOnlyDictionary<string, string>? metadata = null,
         CancellationToken cancellationToken = default)
         => throw new NotSupportedException($"{nameof(IJournalStorage)} implementation does not support journal storage metadata operations.");
+
+    /// <summary>
+    /// Atomically creates this journal storage instance with initial <paramref name="value"/> and
+    /// <paramref name="metadata"/> if it does not already exist.
+    /// </summary>
+    /// <remarks>
+    /// Providers that support atomic publication (such as Azure Blob, S3, and volatile storage) publish both
+    /// <paramref name="value"/> and <paramref name="metadata"/> together so concurrent readers never observe an
+    /// empty half-created journal. If the journal already exists, returns <see langword="false"/> without modifying
+    /// the existing journal.
+    /// </remarks>
+    /// <param name="value">Initial encoded journal bytes to publish when created.</param>
+    /// <param name="metadata">Initial caller-owned metadata properties.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns><see langword="true"/> if storage was created; otherwise, <see langword="false"/>.</returns>
+    async ValueTask<bool> CreateIfNotExistsAsync(
+        ReadOnlySequence<byte> value,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await CreateIfNotExistsAsync(metadata, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        if (!value.IsEmpty)
+        {
+            await AppendAsync(value, cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// Gets metadata for this journal storage instance.

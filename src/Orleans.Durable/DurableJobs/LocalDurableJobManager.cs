@@ -20,7 +20,7 @@ using Orleans.Runtime.Scheduler;
 namespace Orleans.Durable.Jobs;
 
 /// <inheritdoc/>
-internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ISealedJobShardPublisher, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
 
@@ -79,6 +79,36 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         // Other silos route cancellation of jobs in shards this silo owns to this system target.
         shared.ActivationDirectory.RecordNewTarget(this);
+    }
+
+    /// <inheritdoc/>
+    public TimeSpan ShardDuration => _options.ShardDuration;
+
+    /// <inheritdoc/>
+    public async Task<bool> PublishSealedShardAsync(
+        string deterministicId,
+        DateTimeOffset minDueTime,
+        DateTimeOffset maxDueTime,
+        IReadOnlyList<ScheduleJobRequest> jobs,
+        CancellationToken cancellationToken)
+    {
+        var created = await _shardManager.PublishSealedShardAsync(
+            deterministicId,
+            minDueTime,
+            maxDueTime,
+            jobs,
+            metadata: null,
+            cancellationToken);
+        if (created)
+        {
+            var lookaheadLimit = new DateTimeOffset(_timeProvider.GetUtcNow().UtcDateTime.AddClamped(_options.ShardLoadLookaheadPeriod));
+            if (minDueTime <= lookaheadLimit)
+            {
+                _shardCheckSignal.Release();
+            }
+        }
+
+        return created;
     }
 
     /// <inheritdoc/>

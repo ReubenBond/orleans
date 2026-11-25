@@ -66,7 +66,7 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _jobQueue;
 
-    public DurableJob? TryScheduleJob(ScheduleJobRequest request)
+    public DurableJob? TryScheduleJob(ScheduleJobRequest request, string? explicitJobId = null)
     {
         if (IsAddingCompleted)
         {
@@ -80,7 +80,7 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
 
         var job = new DurableJob
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = explicitJobId ?? Guid.NewGuid().ToString(),
             TargetGrainId = request.Target,
             Name = request.JobName,
             DueTime = request.DueTime,

@@ -306,7 +306,7 @@ internal sealed partial class DurableJobQueue :
 
     async Task ILifecycleObserver.OnStart(CancellationToken cancellationToken)
     {
-        if (!_wakeupCoordinator.SupportsCompanionWrites && _dueOrder.Count > 0)
+        if (!_wakeupCoordinator.SupportsMessageWrites && _dueOrder.Count > 0)
         {
             var minDue = _jobs[_dueOrder.Min.Id].Job.DueTime;
             await _wakeupCoordinator.EnsureFallbackWakeupAsync(this, minDue, _shutdown.Token, cancellationToken).ConfigureAwait(true);

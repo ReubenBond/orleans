@@ -238,9 +238,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
         if (_outbox is { } outbox) await outbox.StartAsync(cancellationToken).ConfigureAwait(true);
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
 
-        // When companion writes are supported, recovered work is already covered by the open ledger's wakeup session
-        // or by the backing job drained when its ledger closed; skip EnsureWakeupAsync to avoid an extra job write.
-        if (!_wakeupCoordinator.SupportsCompanionWrites)
+        // When message writes are supported, recovered work is already covered by the open ledger's wakeup session
+        // or by the sealed job shard drained when its segment completed; skip EnsureWakeupAsync to avoid an extra job write.
+        if (!_wakeupCoordinator.SupportsMessageWrites)
         {
             var now = Shared.JobTimeProvider.GetUtcNow();
             if (GetNextWakeupDelay(now) is { } delay)

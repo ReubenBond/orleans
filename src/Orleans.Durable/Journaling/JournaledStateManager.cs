@@ -30,11 +30,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private Exception? _failure;
     private bool _migrationSnapshotRequired;
     private int _disposed;
-    private List<ICompanionWriteParticipant>? _companionParticipants;
-    private JournalCompanionRecord[] _stagedCompanions = [];
-    private int _stagedCompanionCount;
-    private JournalCompanionRecord[] _inFlightCompanions = [];
-    private int _inFlightCompanionCount;
+    private List<IMessageWriteParticipant>? _messageParticipants;
+    private JournalMessageRecord[] _stagedMessages = [];
+    private int _stagedMessageCount;
+    private JournalMessageRecord[] _inFlightMessages = [];
+    private int _inFlightMessageCount;
 
     internal bool HasUncommittedChanges
     {
@@ -42,7 +42,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         {
             lock (_lock)
             {
-                if (_journalWriter.CommittedLength > 0 || _journalWriter.HasActiveEntry || _stagedCompanionCount > 0)
+                if (_journalWriter.CommittedLength > 0 || _journalWriter.HasActiveEntry || _stagedMessageCount > 0)
                 {
                     return true;
                 }
@@ -70,79 +70,79 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Fence(exception);
     }
 
-    /// <summary>Gets a value indicating whether the underlying storage supports atomic companion writes.</summary>
-    internal bool SupportsCompanionWrites => _storage is ICompanionJournalStorage;
+    /// <summary>Gets a value indicating whether the underlying storage supports atomic message writes.</summary>
+    internal bool SupportsMessageWrites => _storage is IMessageJournalStorage;
 
     /// <summary>
-    /// Registers an internal companion-write participant (such as <see cref="Jobs.GrainWakeupCoordinator"/>) to receive
+    /// Registers an internal message-write participant (such as <see cref="Jobs.GrainWakeupCoordinator"/>) to receive
     /// recovery, write-capture, completion, and reset notifications.
     /// </summary>
-    internal void RegisterCompanionParticipant(ICompanionWriteParticipant participant)
+    internal void RegisterMessageParticipant(IMessageWriteParticipant participant)
     {
         ArgumentNullException.ThrowIfNull(participant);
         lock (_lock)
         {
-            _companionParticipants ??= [];
-            if (!_companionParticipants.Contains(participant))
+            _messageParticipants ??= [];
+            if (!_messageParticipants.Contains(participant))
             {
-                _companionParticipants.Add(participant);
+                _messageParticipants.Add(participant);
             }
         }
     }
 
     /// <summary>
-    /// Stages a ledger-local companion record to be committed atomically with the next journal write.
+    /// Stages a message record to be committed atomically with the next journal write.
     /// </summary>
-    /// <exception cref="NotSupportedException">The underlying storage does not implement <see cref="ICompanionJournalStorage"/>.</exception>
+    /// <exception cref="NotSupportedException">The underlying storage does not implement <see cref="IMessageJournalStorage"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="record"/> is the uninitialized <see langword="default"/> value.</exception>
-    internal void StageCompanionWrite(JournalCompanionRecord record)
+    internal void StageMessageWrite(JournalMessageRecord record)
     {
-        if (!SupportsCompanionWrites)
+        if (!SupportsMessageWrites)
         {
-            throw new NotSupportedException("The configured journal storage does not support companion writes.");
+            throw new NotSupportedException("The configured journal storage does not support message writes.");
         }
 
         if (record.IsDefault)
         {
-            throw new ArgumentException("A companion write record must not be the default value.", nameof(record));
+            throw new ArgumentException("A message write record must not be the default value.", nameof(record));
         }
 
         lock (_lock)
         {
-            StageCompanionWriteLocked(record);
+            StageMessageWriteLocked(record);
         }
     }
 
-    private void StageCompanionWriteLocked(JournalCompanionRecord record)
+    private void StageMessageWriteLocked(JournalMessageRecord record)
     {
-        if (_stagedCompanionCount == _stagedCompanions.Length)
+        if (_stagedMessageCount == _stagedMessages.Length)
         {
-            var newSize = _stagedCompanions.Length == 0 ? 4 : _stagedCompanions.Length * 2;
-            Array.Resize(ref _stagedCompanions, newSize);
+            var newSize = _stagedMessages.Length == 0 ? 4 : _stagedMessages.Length * 2;
+            Array.Resize(ref _stagedMessages, newSize);
         }
 
-        _stagedCompanions[_stagedCompanionCount++] = record;
+        _stagedMessages[_stagedMessageCount++] = record;
     }
 
-    private void ClearCompanionBuffersLocked(bool clearPendingWork)
+    private void ClearMessageBuffersLocked(bool clearPendingWork)
     {
-        if (_stagedCompanionCount > 0)
+        if (_stagedMessageCount > 0)
         {
-            _stagedCompanions.AsSpan(0, _stagedCompanionCount).Clear();
-            _stagedCompanionCount = 0;
+            _stagedMessages.AsSpan(0, _stagedMessageCount).Clear();
+            _stagedMessageCount = 0;
         }
 
-        if (_inFlightCompanionCount > 0)
+        if (_inFlightMessageCount > 0)
         {
-            _inFlightCompanions.AsSpan(0, _inFlightCompanionCount).Clear();
-            _inFlightCompanionCount = 0;
+            _inFlightMessages.AsSpan(0, _inFlightMessageCount).Clear();
+            _inFlightMessageCount = 0;
         }
 
-        if (_companionParticipants is { } participants)
+        if (_messageParticipants is { } participants)
         {
             foreach (var participant in participants)
             {
-                participant.OnReset(clearPendingWork);
+                participant.OnWriteFailedOrReset(clearPendingWork);
             }
         }
     }
@@ -527,43 +527,43 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                         bufferToConsume = default;
                                                     }
 
-                                                    if (isSnapshot && _companionParticipants is { } snapshotParticipants && SupportsCompanionWrites)
+                                                    if (isSnapshot && _messageParticipants is { } snapshotParticipants && SupportsMessageWrites)
                                                     {
                                                         foreach (var participant in snapshotParticipants)
                                                         {
-                                                            participant.CaptureCompanions(this);
+                                                            participant.CaptureMessages(this);
                                                         }
                                                     }
 
-                                                    if (!isSnapshot && _stagedCompanionCount > 0)
+                                                    if (!isSnapshot && _stagedMessageCount > 0)
                                                     {
-                                                        ClearCompanionBuffersLocked(clearPendingWork: false);
-                                                        throw new InvalidOperationException("Cannot append companion records when the journal delta is empty.");
+                                                        ClearMessageBuffersLocked(clearPendingWork: false);
+                                                        throw new InvalidOperationException("Cannot append messages when the journal delta is empty.");
                                                     }
 
-                                                    if (isSnapshot && _stagedCompanionCount > 0)
+                                                    if (isSnapshot && _stagedMessageCount > 0)
                                                     {
-                                                        (_stagedCompanions, _inFlightCompanions) = (_inFlightCompanions, _stagedCompanions);
-                                                        _inFlightCompanionCount = _stagedCompanionCount;
-                                                        _stagedCompanionCount = 0;
+                                                        (_stagedMessages, _inFlightMessages) = (_inFlightMessages, _stagedMessages);
+                                                        _inFlightMessageCount = _stagedMessageCount;
+                                                        _stagedMessageCount = 0;
                                                         writeVersion = OnWriteCaptured();
                                                     }
                                                 }
                                                 else
                                                 {
-                                                    if (_companionParticipants is { } writeParticipants && SupportsCompanionWrites)
+                                                    if (_messageParticipants is { } writeParticipants && SupportsMessageWrites)
                                                     {
                                                         foreach (var participant in writeParticipants)
                                                         {
-                                                            participant.CaptureCompanions(this);
+                                                            participant.CaptureMessages(this);
                                                         }
                                                     }
 
-                                                    if (_stagedCompanionCount > 0)
+                                                    if (_stagedMessageCount > 0)
                                                     {
-                                                        (_stagedCompanions, _inFlightCompanions) = (_inFlightCompanions, _stagedCompanions);
-                                                        _inFlightCompanionCount = _stagedCompanionCount;
-                                                        _stagedCompanionCount = 0;
+                                                        (_stagedMessages, _inFlightMessages) = (_inFlightMessages, _stagedMessages);
+                                                        _inFlightMessageCount = _stagedMessageCount;
+                                                        _stagedMessageCount = 0;
                                                     }
 
                                                     hasCommittedBuffer = true;
@@ -599,7 +599,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         bufferToConsume.Dispose();
                                     }
 
-                                    if (hasCommittedBuffer || (isSnapshot && _inFlightCompanionCount > 0))
+                                    if (hasCommittedBuffer || (isSnapshot && _inFlightMessageCount > 0))
                                     {
                                         recordQueueDuration = true;
                                         var writeSequence = hasCommittedBuffer ? committedBuffer.AsReadOnlySequence() : ReadOnlySequence<byte>.Empty;
@@ -615,14 +615,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                         try
                                         {
-                                            var companions = _inFlightCompanionCount > 0
-                                                ? _inFlightCompanions.AsMemory(0, _inFlightCompanionCount)
-                                                : ReadOnlyMemory<JournalCompanionRecord>.Empty;
+                                            var messages = _inFlightMessageCount > 0
+                                                ? _inFlightMessages.AsMemory(0, _inFlightMessageCount)
+                                                : ReadOnlyMemory<JournalMessageRecord>.Empty;
                                             if (isSnapshot)
                                             {
-                                                if (!companions.IsEmpty)
+                                                if (!messages.IsEmpty)
                                                 {
-                                                    await ReplaceStorageWithCompanionsAsync(writeSequence, companions, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                    await ReplaceStorageWithMessagesAsync(writeSequence, messages, _shutdownCancellation.Token).ConfigureAwait(true);
                                                 }
                                                 else
                                                 {
@@ -631,9 +631,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             }
                                             else
                                             {
-                                                if (!companions.IsEmpty)
+                                                if (!messages.IsEmpty)
                                                 {
-                                                    await AppendStorageWithCompanionsAsync(writeSequence, companions, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                    await AppendStorageWithMessagesAsync(writeSequence, messages, _shutdownCancellation.Token).ConfigureAwait(true);
                                                 }
                                                 else
                                                 {
@@ -651,10 +651,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         }
                                         finally
                                         {
-                                            if (_inFlightCompanionCount > 0)
+                                            if (_inFlightMessageCount > 0)
                                             {
-                                                _inFlightCompanions.AsSpan(0, _inFlightCompanionCount).Clear();
-                                                _inFlightCompanionCount = 0;
+                                                _inFlightMessages.AsSpan(0, _inFlightMessageCount).Clear();
+                                                _inFlightMessageCount = 0;
                                             }
 
                                             if (hasCommittedBuffer)
@@ -686,7 +686,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 state.OnWriteCompleted();
                                             }
 
-                                            if (_companionParticipants is { } completedParticipants)
+                                            if (_messageParticipants is { } completedParticipants)
                                             {
                                                 foreach (var participant in completedParticipants)
                                                 {
@@ -714,7 +714,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     {
                                         // Discard entries for the state being reset before writing the new directory.
                                         _journalWriter.Reset();
-                                        ClearCompanionBuffersLocked(clearPendingWork: true);
+                                        ClearMessageBuffersLocked(clearPendingWork: true);
 
                                         // Reset the state id collection.
                                         _journalStreamDirectory.ResetVolatileState();
@@ -879,16 +879,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 if (!preparation.IsCompletedSuccessfully) return false;
                 preparation.GetAwaiter().GetResult();
             }
-
-            if (_companionParticipants is { } participants)
-            {
-                foreach (var participant in participants)
-                {
-                    preparation = participant.PrepareWriteAsync(cancellationToken);
-                    if (!preparation.IsCompletedSuccessfully) return false;
-                    preparation.GetAwaiter().GetResult();
-                }
-            }
         }
 
         preparation = default;
@@ -906,7 +896,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
             _state = ManagerState.Fenced;
             _failure = exception;
-            ClearCompanionBuffersLocked(clearPendingWork: false);
+            ClearMessageBuffersLocked(clearPendingWork: false);
         }
 
         try
@@ -1077,7 +1067,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 }
             }
 
-            if (_companionParticipants is { } participants)
+            if (_messageParticipants is { } participants)
             {
                 foreach (var participant in participants)
                 {
@@ -1090,7 +1080,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private void ResetForRecovery()
     {
         _journalWriter.Reset();
-        ClearCompanionBuffersLocked(clearPendingWork: true);
+        ClearMessageBuffersLocked(clearPendingWork: true);
         _migrationSnapshotRequired = false;
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
@@ -1265,12 +1255,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    private async ValueTask AppendStorageWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+    private async ValueTask AppendStorageWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            await ((ICompanionJournalStorage)_storage).AppendWithCompanionsAsync(value, companions, cancellationToken).ConfigureAwait(true);
+            await ((IMessageJournalStorage)_storage).AppendWithMessagesAsync(value, messages, cancellationToken).ConfigureAwait(true);
             _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
         }
         catch
@@ -1280,12 +1270,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    private async ValueTask ReplaceStorageWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+    private async ValueTask ReplaceStorageWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            await ((ICompanionJournalStorage)_storage).ReplaceWithCompanionsAsync(value, companions, cancellationToken).ConfigureAwait(true);
+            await ((IMessageJournalStorage)_storage).ReplaceWithMessagesAsync(value, messages, cancellationToken).ConfigureAwait(true);
             _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationSnapshot, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
         }
         catch

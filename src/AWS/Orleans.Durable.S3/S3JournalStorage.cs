@@ -108,6 +108,77 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
     }
 
+    public async ValueTask<bool> CreateIfNotExistsAsync(
+        ReadOnlySequence<byte> value,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (value.IsEmpty)
+        {
+            return await CreateIfNotExistsAsync(metadata, cancellationToken).ConfigureAwait(false);
+        }
+
+        var startTimestamp = Stopwatch.GetTimestamp();
+        var succeeded = false;
+        var callerMetadata = CopyAndValidateCallerMetadata(metadata);
+        try
+        {
+            var marker = RandomNumberGenerator.GetBytes(CompactedWalMarkerBytes);
+            var combinedLength = marker.Length + value.Length;
+            if (combinedLength > MaxSinglePutObjectBytes || combinedLength > int.MaxValue)
+            {
+                throw new InvalidOperationException($"Initial journal payload length {combinedLength:N0} bytes exceeds S3 single PutObject limit.");
+            }
+
+            var buffer = new byte[(int)combinedLength];
+            marker.CopyTo(buffer, 0);
+            value.CopyTo(buffer.AsSpan(marker.Length));
+            var walMetadata = CreateWalMetadata(checkpointName: null, checkpointOffset: marker.Length, callerMetadata);
+
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    using var stream = new MemoryStream(buffer, writable: false);
+                    var request = CreatePutObjectRequest(_walObjectKey, stream, walMetadata);
+                    request.IfNoneMatch = "*";
+                    var response = await _client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
+                    var manifest = CreateWalManifest(walMetadata);
+                    SetWal(response.ETag, CreateWalProviderState(manifest, buffer.Length, partsCount: 1));
+                    succeeded = true;
+                    return true;
+                }
+                catch (AmazonS3Exception exception) when (IsObjectAlreadyExists(exception))
+                {
+                    succeeded = true;
+                    return false;
+                }
+                catch (AmazonS3Exception exception) when (
+                    IsConditionalRequestConflict(exception)
+                    && attempt < MaxConditionalRequestConflictRetries)
+                {
+                    var current = await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
+                    if (current is not null)
+                    {
+                        succeeded = true;
+                        return false;
+                    }
+
+                    await DelayForRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
+                    _shared.Instruments.OnRetry("metadata_conflict");
+                }
+            }
+        }
+        finally
+        {
+            _shared.Instruments.OnOperationCompleted(
+                S3JournalStorageInstruments.OperationCreate,
+                Stopwatch.GetElapsedTime(startTimestamp),
+                bytes: value.Length,
+                succeeded);
+        }
+    }
+
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
         var startTimestamp = Stopwatch.GetTimestamp();

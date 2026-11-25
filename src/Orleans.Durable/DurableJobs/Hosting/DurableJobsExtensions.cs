@@ -48,6 +48,7 @@ public static class DurableJobsExtensions
         services.AddSingleton<ShardExecutor>();
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
+        services.AddFromExisting<ISealedJobShardPublisher, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
         services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
         services.TryAddScoped<GrainWakeupCoordinator>();

@@ -13,7 +13,7 @@ namespace Orleans.Durable.Jobs;
 /// <c>orleans.wakeup</c> companion writes when supported by <see cref="JournaledStateManager"/>, or falls back to
 /// <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> otherwise (orleans.md §5.15).
 /// </summary>
-internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
+internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
 {
     internal static readonly TimeSpan DefaultRecheckDelay = TimeSpan.FromSeconds(1);
 
@@ -41,14 +41,14 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
 
         if (_stateManager is JournaledStateManager journaledStateManager)
         {
-            journaledStateManager.RegisterCompanionParticipant(this);
+            journaledStateManager.RegisterMessageParticipant(this);
         }
     }
 
     /// <summary>
-    /// Gets a value indicating whether the grain's journal storage supports atomic companion writes.
+    /// Gets a value indicating whether the grain's journal storage supports atomic message writes.
     /// </summary>
-    public bool SupportsCompanionWrites => _stateManager is JournaledStateManager { SupportsCompanionWrites: true };
+    public bool SupportsMessageWrites => _stateManager is JournaledStateManager { SupportsMessageWrites: true };
 
     /// <summary>Registers a wakeup source on this grain activation.</summary>
     /// <param name="source">The wakeup source.</param>
@@ -82,7 +82,7 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
         CancellationToken shutdownToken,
         CancellationToken cancellationToken)
     {
-        if (SupportsCompanionWrites)
+        if (SupportsMessageWrites)
         {
             return ValueTask.CompletedTask;
         }
@@ -229,7 +229,7 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
     }
 
     /// <inheritdoc />
-    void ICompanionWriteParticipant.OnRecoveryCompleted()
+    void IMessageWriteParticipant.OnRecoveryCompleted()
     {
         var now = _timeProvider.GetUtcNow();
         foreach (var entry in _sources)
@@ -241,11 +241,7 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
     }
 
     /// <inheritdoc />
-    ValueTask ICompanionWriteParticipant.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        ValueTask.CompletedTask;
-
-    /// <inheritdoc />
-    void ICompanionWriteParticipant.CaptureCompanions(JournaledStateManager stateManager)
+    void IMessageWriteParticipant.CaptureMessages(JournaledStateManager stateManager)
     {
         var now = _timeProvider.GetUtcNow();
         foreach (var entry in _sources)
@@ -259,16 +255,16 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
                     continue;
                 }
 
-                var payload = WakeupCompanionCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, clamped.UtcTicks));
-                stateManager.StageCompanionWrite(new JournalCompanionRecord(WakeupCompanionCodec.StreamName, payload));
+                var payload = WakeupMessageCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, clamped.UtcTicks));
+                stateManager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, payload));
                 entry.PendingHadPendingWork = true;
                 entry.PendingEmittedDueTime = clamped;
                 entry.HasPendingCapture = true;
             }
             else if (entry.HadPendingWork)
             {
-                var payload = WakeupCompanionCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, DueTimeUtcTicks: null));
-                stateManager.StageCompanionWrite(new JournalCompanionRecord(WakeupCompanionCodec.StreamName, payload));
+                var payload = WakeupMessageCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, DueTimeUtcTicks: null));
+                stateManager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, payload));
                 entry.PendingHadPendingWork = false;
                 entry.PendingEmittedDueTime = null;
                 entry.HasPendingCapture = true;
@@ -277,7 +273,7 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
     }
 
     /// <inheritdoc />
-    void ICompanionWriteParticipant.OnWriteCompleted()
+    void IMessageWriteParticipant.OnWriteCompleted()
     {
         foreach (var entry in _sources)
         {
@@ -291,7 +287,7 @@ internal sealed class GrainWakeupCoordinator : ICompanionWriteParticipant
     }
 
     /// <inheritdoc />
-    void ICompanionWriteParticipant.OnReset(bool clearPendingWork)
+    void IMessageWriteParticipant.OnWriteFailedOrReset(bool clearPendingWork)
     {
         foreach (var entry in _sources)
         {

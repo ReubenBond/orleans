@@ -95,6 +95,75 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
+    public async ValueTask<bool> CreateIfNotExistsAsync(
+        ReadOnlySequence<byte> value,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (value.IsEmpty)
+        {
+            return await CreateIfNotExistsAsync(metadata, cancellationToken).ConfigureAwait(false);
+        }
+
+        var startTimestamp = Stopwatch.GetTimestamp();
+        var succeeded = false;
+        var callerMetadata = CopyAndValidateCallerMetadata(metadata);
+        try
+        {
+            using var checkpointStream = new ReadOnlySequenceStream(value);
+            string checkpointName;
+            while (true)
+            {
+                checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));
+                var checkpointClient = GetCheckpointClient(checkpointName);
+                try
+                {
+                    checkpointStream.Position = 0;
+                    await checkpointClient.UploadAsync(
+                        checkpointStream,
+                        new BlobUploadOptions
+                        {
+                            Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
+                            HttpHeaders = CreateHttpHeaders(_shared.MimeType),
+                            Metadata = CreateCheckpointBlobMetadata(),
+                        },
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+                catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
+                {
+                    _shared.Instruments.OnRetry("checkpoint_collision");
+                }
+            }
+
+            try
+            {
+                var created = await CreateWalAsync(
+                    checkpointName,
+                    new AppendBlobRequestConditions { IfNoneMatch = ETag.All },
+                    cancellationToken,
+                    callerMetadata).ConfigureAwait(false);
+                SetWal(created.Response.Value.ETag, created.ProviderState);
+                succeeded = true;
+                return true;
+            }
+            catch (RequestFailedException exception) when (exception.Status is 409 or 412)
+            {
+                await DeleteCheckpointIfExistsAsync(checkpointName, CancellationToken.None).ConfigureAwait(false);
+                succeeded = true;
+                return false;
+            }
+        }
+        finally
+        {
+            _shared.Instruments.OnOperationCompleted(
+                AzureBlobJournalStorageInstruments.OperationCreate,
+                Stopwatch.GetElapsedTime(startTimestamp),
+                bytes: value.Length,
+                succeeded);
+        }
+    }
+
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
         var startTimestamp = Stopwatch.GetTimestamp();

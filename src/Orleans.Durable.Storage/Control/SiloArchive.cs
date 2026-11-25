@@ -129,16 +129,16 @@ internal abstract class SiloArchive
                 cancellationToken).ConfigureAwait(false);
             identity.Check(Kind, record.Id);
 
-            // OR-I8, LG-I16: verify local-streams agreement before Gate.Pass so a silo with a mismatched
-            // local-stream set never runs LSM drains or marks closed ledgers complete.
-            var storedLocalStreams = record.Parameters.GetValueOrDefault(JournalStore.LocalStreamsParameter);
-            var callerLocalStreams = parameters.TryGetValue(JournalStore.LocalStreamsParameter, out var value) ? value : null;
-            if (!string.Equals(storedLocalStreams, callerLocalStreams, StringComparison.Ordinal))
+            // OR-I8, LG-I16: verify message-channels agreement before Gate.Pass so a silo with a mismatched
+            // message-channel set never runs LSM drains or marks closed ledgers complete.
+            var storedChannels = record.Parameters.GetValueOrDefault(JournalStore.MessageChannelsParameter);
+            var callerChannels = parameters.TryGetValue(JournalStore.MessageChannelsParameter, out var value) ? value : null;
+            if (!string.Equals(storedChannels, callerChannels, StringComparison.Ordinal))
             {
                 throw new ArchiveStoreMismatchException(
-                    new ArchiveStoreRecordField(JournalStore.LocalStreamsParameter, IsParameter: true),
-                    storedLocalStreams,
-                    callerLocalStreams);
+                    new ArchiveStoreRecordField(JournalStore.MessageChannelsParameter, IsParameter: true),
+                    storedChannels,
+                    callerChannels);
             }
 
             Gate.Pass(new ArchiveGateEvidence.Lsm(Objects));

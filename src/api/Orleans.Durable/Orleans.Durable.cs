@@ -257,6 +257,13 @@ namespace Orleans.Durable.Jobs
         System.Threading.Tasks.Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface ISealedJobShardPublisher
+    {
+        System.TimeSpan ShardDuration { get; }
+
+        System.Threading.Tasks.Task<bool> PublishSealedShardAsync(string deterministicId, System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IReadOnlyList<ScheduleJobRequest> jobs, System.Threading.CancellationToken cancellationToken);
+    }
+
     public abstract partial class JobShard : IJobShard, System.IAsyncDisposable
     {
         protected JobShard(string id, System.DateTimeOffset startTime, System.DateTimeOffset endTime) { }
@@ -303,6 +310,8 @@ namespace Orleans.Durable.Jobs
 
         public abstract System.Threading.Tasks.Task<System.Collections.Generic.List<IJobShard>> AssignJobShardsAsync(System.DateTimeOffset maxDueTime, int maxNewClaims, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.Task<IJobShard> CreateShardAsync(System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IDictionary<string, string> metadata, System.Threading.CancellationToken cancellationToken);
+        public virtual System.Threading.Tasks.Task<bool> PublishSealedShardAsync(string deterministicId, System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IReadOnlyList<ScheduleJobRequest> jobs, System.Collections.Generic.IDictionary<string, string>? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public abstract System.Threading.Tasks.Task UnregisterShardAsync(IJobShard shard, System.Threading.CancellationToken cancellationToken);
     }
 
@@ -352,23 +361,21 @@ namespace Orleans.Durable.Jobs
         public string? TraceState { get { throw null; } init { } }
     }
 
-    public static partial class WakeupCompanionCodec
+    public static partial class WakeupMessageCodec
     {
+        public const string ChannelName = "orleans.wakeup";
         public const byte HasDueTimeFlag = 1;
         public const int MaxEncodedLength = 1294;
         public const int MaxGrainIdUtf8Length = 1024;
         public const int MaxJobNameUtf8Length = 256;
-        public const string StreamName = "orleans.wakeup";
         public const byte Version = 1;
-        public static System.IO.InvalidDataException? Decode(System.Buffers.ReadOnlySequence<byte> source, out WakeupRecord record) { throw null; }
+        public static System.IO.InvalidDataException? Decode(System.Buffers.ReadOnlySequence<byte> payload, out WakeupRecord record) { throw null; }
 
-        public static System.IO.InvalidDataException? Decode(System.ReadOnlySpan<byte> source, out WakeupRecord record) { throw null; }
+        public static System.IO.InvalidDataException? Decode(System.ReadOnlySpan<byte> payload, out WakeupRecord record) { throw null; }
 
-        public static int Encode(WakeupRecord record, System.Span<byte> destination) { throw null; }
+        public static int Encode(in WakeupRecord record, System.Span<byte> destination) { throw null; }
 
-        public static byte[] Encode(WakeupRecord record) { throw null; }
-
-        public static int EncodedLength(WakeupRecord record) { throw null; }
+        public static byte[] Encode(in WakeupRecord record) { throw null; }
     }
 
     public readonly partial struct WakeupRecord : System.IEquatable<WakeupRecord>
@@ -465,12 +472,6 @@ namespace Orleans.Durable.Journaling
         Completed = 1,
         Faulted = 2,
         Canceled = 3
-    }
-
-    public partial interface ICompanionJournalStorage : IJournalStorage
-    {
-        System.Threading.Tasks.ValueTask AppendWithCompanionsAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalCompanionRecord> companions, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReplaceWithCompanionsAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalCompanionRecord> companions, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>
@@ -732,6 +733,7 @@ namespace Orleans.Durable.Journaling
         bool IsCompactionRequested { get; }
 
         System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Buffers.ReadOnlySequence<byte> value, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<IJournalMetadata?> GetMetadataAsync(System.Threading.CancellationToken cancellationToken = default);
@@ -753,6 +755,12 @@ namespace Orleans.Durable.Journaling
     public partial interface IJournalStorageProvider
     {
         IJournalStorage CreateStorage(JournalId journalId);
+    }
+
+    public partial interface IMessageJournalStorage : IJournalStorage
+    {
+        System.Threading.Tasks.ValueTask AppendWithMessagesAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalMessageRecord> messages, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceWithMessagesAsync(System.Buffers.ReadOnlySequence<byte> value, System.ReadOnlyMemory<JournalMessageRecord> messages, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IPersistentStateCommandCodec<T>
@@ -889,19 +897,6 @@ namespace Orleans.Durable.Journaling
         public JournalId Prefix { get { throw null; } set { } }
     }
 
-    public readonly partial struct JournalCompanionRecord
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public const int MaxPayloadLength = 65536;
-        public const int MaxStreamNameLength = 64;
-        public JournalCompanionRecord(string streamName, System.ReadOnlyMemory<byte> payload) { }
-
-        public System.ReadOnlyMemory<byte> Payload { get { throw null; } }
-
-        public string StreamName { get { throw null; } }
-    }
-
     public sealed partial class JournaledStateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
@@ -997,6 +992,19 @@ namespace Orleans.Durable.Journaling
     public static partial class JournalingTimeProviderNames
     {
         public const string Journaling = "Orleans.Journaling";
+    }
+
+    public readonly partial struct JournalMessageRecord
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public const int MaxChannelLength = 64;
+        public const int MaxPayloadLength = 65536;
+        public JournalMessageRecord(string channel, System.ReadOnlyMemory<byte> payload) { }
+
+        public string Channel { get { throw null; } }
+
+        public System.ReadOnlyMemory<byte> Payload { get { throw null; } }
     }
 
     public sealed partial class JournalMetadata : IJournalMetadata
@@ -1272,6 +1280,8 @@ namespace Orleans.Durable.Journaling
         public bool IsCompactionRequested { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Buffers.ReadOnlySequence<byte> value, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 

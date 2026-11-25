@@ -55,12 +55,12 @@ namespace Orleans.Durable.Storage;
 /// version. Orleans' manager drives an instance one operation at a time, so its fields need no synchronization.
 /// </para>
 /// </remarks>
-internal sealed class DurableJournalStorage : ICompanionJournalStorage
+internal sealed class DurableJournalStorage : IMessageJournalStorage
 {
-    private static readonly FrozenDictionary<string, LocalStreamName> KnownStreamNames =
-        new Dictionary<string, LocalStreamName>(StringComparer.Ordinal)
+    private static readonly FrozenDictionary<string, MessageChannel> KnownChannels =
+        new Dictionary<string, MessageChannel>(StringComparer.Ordinal)
         {
-            [WakeupStreamHandler.WakeupStream.Value] = WakeupStreamHandler.WakeupStream,
+            [WakeupMessageHandler.WakeupChannel.Value] = WakeupMessageHandler.WakeupChannel,
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private readonly string _key;
@@ -144,17 +144,17 @@ internal sealed class DurableJournalStorage : ICompanionJournalStorage
             throw new ArgumentOutOfRangeException(nameof(value), "An Append carries a non-empty segment.");
         }
 
-        return WriteAsync(WriteKind.Append, value, ReadOnlyMemory<JournalCompanionRecord>.Empty, cancellationToken);
+        return WriteAsync(WriteKind.Append, value, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
     }
 
     /// <inheritdoc/>
     public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) =>
-        WriteAsync(WriteKind.Replace, value, ReadOnlyMemory<JournalCompanionRecord>.Empty, cancellationToken);
+        WriteAsync(WriteKind.Replace, value, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
 
     /// <inheritdoc/>
-    public ValueTask AppendWithCompanionsAsync(
+    public ValueTask AppendWithMessagesAsync(
         ReadOnlySequence<byte> value,
-        ReadOnlyMemory<JournalCompanionRecord> companions,
+        ReadOnlyMemory<JournalMessageRecord> messages,
         CancellationToken cancellationToken)
     {
         if (value.IsEmpty)
@@ -162,21 +162,21 @@ internal sealed class DurableJournalStorage : ICompanionJournalStorage
             throw new ArgumentOutOfRangeException(nameof(value), "An Append carries a non-empty segment.");
         }
 
-        return WriteAsync(WriteKind.Append, value, companions, cancellationToken);
+        return WriteAsync(WriteKind.Append, value, messages, cancellationToken);
     }
 
     /// <inheritdoc/>
-    public ValueTask ReplaceWithCompanionsAsync(
+    public ValueTask ReplaceWithMessagesAsync(
         ReadOnlySequence<byte> value,
-        ReadOnlyMemory<JournalCompanionRecord> companions,
+        ReadOnlyMemory<JournalMessageRecord> messages,
         CancellationToken cancellationToken) =>
-        WriteAsync(WriteKind.Replace, value, companions, cancellationToken);
+        WriteAsync(WriteKind.Replace, value, messages, cancellationToken);
 
     /// <inheritdoc/>
     public ValueTask DeleteAsync(CancellationToken cancellationToken) =>
-        WriteAsync(WriteKind.Delete, ReadOnlySequence<byte>.Empty, ReadOnlyMemory<JournalCompanionRecord>.Empty, cancellationToken);
+        WriteAsync(WriteKind.Delete, ReadOnlySequence<byte>.Empty, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
 
-    private async ValueTask WriteAsync(WriteKind kind, ReadOnlySequence<byte> body, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+    private async ValueTask WriteAsync(WriteKind kind, ReadOnlySequence<byte> body, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
     {
         var operation = string.Create(CultureInfo.InvariantCulture, $"{kind}Async");
         var expected = _version ?? throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"{operation} requires reading the journal first."));
@@ -185,8 +185,8 @@ internal sealed class DurableJournalStorage : ICompanionJournalStorage
             throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"A journal entry's body is at most MaxBodyBytes, {_maxBodyBytes} bytes, not {body.Length}."), "value");
         }
 
-        // Validate and copy companion payloads once outside the rebase-retry loop so retries preserve exact companions.
-        var localAppends = CopyCompanions(companions);
+        // Validate and copy message payloads once outside the rebase-retry loop so retries preserve exact messages.
+        var engineMessages = CopyMessages(messages);
 
         var routing = await _routing.ReadyAsync(cancellationToken).ConfigureAwait(false);
         if (!routing.Archive.AdmitsKey(_rowKey.Span))
@@ -200,9 +200,9 @@ internal sealed class DurableJournalStorage : ICompanionJournalStorage
         {
             using var record = kind switch
             {
-                WriteKind.Append => JournalEntryRecord.Append(_rowKey, expected, payload, localAppends.AsSpan()),
-                WriteKind.Replace => JournalEntryRecord.Replace(_rowKey, expected, payload, localAppends.AsSpan()),
-                WriteKind.Delete => JournalEntryRecord.Delete(_rowKey, expected, _timeProvider.GetUtcNow(), localAppends.AsSpan()),
+                WriteKind.Append => JournalEntryRecord.Append(_rowKey, expected, payload, engineMessages.AsSpan()),
+                WriteKind.Replace => JournalEntryRecord.Replace(_rowKey, expected, payload, engineMessages.AsSpan()),
+                WriteKind.Delete => JournalEntryRecord.Delete(_rowKey, expected, _timeProvider.GetUtcNow(), engineMessages.AsSpan()),
                 _ => throw new UnreachableException(),
             };
             var outcome = await _router.WriteAsync(_key, _rowKey, record, cancellationToken).ConfigureAwait(false);
@@ -314,29 +314,29 @@ internal sealed class DurableJournalStorage : ICompanionJournalStorage
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static ImmutableArray<LocalAppendRecord> CopyCompanions(ReadOnlyMemory<JournalCompanionRecord> companions)
+    private static ImmutableArray<MessageRecord> CopyMessages(ReadOnlyMemory<JournalMessageRecord> messages)
     {
-        if (companions.IsEmpty)
+        if (messages.IsEmpty)
         {
             return [];
         }
 
-        var span = companions.Span;
-        var builder = ImmutableArray.CreateBuilder<LocalAppendRecord>(span.Length);
+        var span = messages.Span;
+        var builder = ImmutableArray.CreateBuilder<MessageRecord>(span.Length);
         for (var i = 0; i < span.Length; i++)
         {
-            var companion = span[i];
-            if (companion.IsDefault)
+            var message = span[i];
+            if (message.IsDefault)
             {
-                throw new ArgumentException("A companion record must not be the default value.", nameof(companions));
+                throw new ArgumentException("A message record must not be the default value.", nameof(messages));
             }
 
-            if (!KnownStreamNames.TryGetValue(companion.StreamName, out var streamName))
+            if (!KnownChannels.TryGetValue(message.Channel, out var channel))
             {
-                streamName = LocalStreamName.Parse(companion.StreamName);
+                channel = MessageChannel.Parse(message.Channel);
             }
 
-            builder.Add(new LocalAppendRecord(streamName, companion.Payload.ToArray()));
+            builder.Add(new MessageRecord(channel, message.Payload.ToArray()));
         }
 
         return builder.MoveToImmutable();

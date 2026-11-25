@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -303,6 +304,124 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 return shard;
             }
         }
+    }
+
+    public override async Task<bool> PublishSealedShardAsync(
+        string deterministicId,
+        DateTimeOffset minDueTime,
+        DateTimeOffset maxDueTime,
+        IReadOnlyList<ScheduleJobRequest> jobs,
+        IDictionary<string, string>? metadata,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deterministicId);
+        ArgumentNullException.ThrowIfNull(jobs);
+        if (maxDueTime < minDueTime)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxDueTime), "Shard end time must be greater than or equal to the start time.");
+        }
+
+        if (jobs.Count == 0)
+        {
+            throw new ArgumentException("A sealed shard must contain at least one job.", nameof(jobs));
+        }
+
+        var shardId = JobShardId.ForDeterministic(minDueTime, deterministicId);
+        var storageId = shardId.ToJournalId();
+        var sealedBytes = await EncodeSealedShardAsync(shardId, minDueTime, maxDueTime, jobs, cancellationToken).ConfigureAwait(false);
+        var properties = CreateUnownedSealedProperties(minDueTime, maxDueTime, metadata);
+        var storage = WriteProvider.Storage.CreateStorage(storageId);
+        return await storage.CreateIfNotExistsAsync(new ReadOnlySequence<byte>(sealedBytes), properties, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<byte[]> EncodeSealedShardAsync(
+        JobShardId shardId,
+        DateTimeOffset minDueTime,
+        DateTimeOffset maxDueTime,
+        IReadOnlyList<ScheduleJobRequest> jobs,
+        CancellationToken cancellationToken)
+    {
+        var shared = _serviceProvider.GetRequiredService<JournaledStateManagerShared>();
+        var capture = new SealedShardCaptureStorage();
+        var codec = CreateOperationCodec();
+        var state = new JournaledJobShardState(shardId, minDueTime, maxDueTime, codec, _timeProvider);
+        var fence = new JournaledJobShardOwnershipFence(
+            _serviceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(_journaledStateManagerOptions.JournalFormatKey));
+        var manager = new JournaledStateManager(shared, capture);
+        try
+        {
+            manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
+            manager.RegisterStateMachine(JournaledJobShardOwnershipFence.StateName, fence);
+            await manager.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+            for (var i = 0; i < jobs.Count; i++)
+            {
+                var request = jobs[i];
+                request.Validate();
+                var deterministicJobId = string.Create(CultureInfo.InvariantCulture, $"{shardId.Value}:{i}");
+                _ = state.TryScheduleJob(request, deterministicJobId);
+            }
+
+            await manager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+            return capture.Bytes;
+        }
+        finally
+        {
+            ((IDisposable)manager).Dispose();
+        }
+    }
+
+    private Dictionary<string, string> CreateUnownedSealedProperties(
+        DateTimeOffset minDueTime,
+        DateTimeOffset maxDueTime,
+        IDictionary<string, string>? metadata)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [MembershipVersionProperty] = GetMembershipVersionString(),
+            [MinDueTimeProperty] = minDueTime.ToString("O", CultureInfo.InvariantCulture),
+            [MaxDueTimeProperty] = maxDueTime.ToString("O", CultureInfo.InvariantCulture),
+            [AdoptedCountProperty] = "0",
+            [ClosedProperty] = bool.TrueString
+        };
+
+        if (metadata is not null)
+        {
+            foreach (var (key, value) in metadata)
+            {
+                result[MetadataPropertyPrefix + EncodeMetadataKey(key)] = value;
+            }
+        }
+
+        return result;
+    }
+
+    private sealed class SealedShardCaptureStorage : IJournalStorage
+    {
+        public byte[] Bytes { get; private set; } = [];
+
+        public bool IsCompactionRequested => true;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            using var writer = new Orleans.Serialization.Buffers.ArcBufferWriter();
+            consumer.Read(new JournalBufferReader(writer.Reader, isCompleted: true), JournalMetadata.Empty);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            Bytes = value.ToArray();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            Bytes = value.ToArray();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     public override async Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)

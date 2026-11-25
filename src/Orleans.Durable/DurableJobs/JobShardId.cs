@@ -23,6 +23,12 @@ internal readonly record struct JobShardId
     public static JobShardId New(DateTimeOffset startTime)
         => new($"{FormatStartTime(startTime)}-{Guid.NewGuid():N}");
 
+    public static JobShardId ForDeterministic(DateTimeOffset startTime, string deterministicSuffix)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deterministicSuffix);
+        return new($"{FormatStartTime(startTime)}-{deterministicSuffix}");
+    }
+
     public static JournalId GetMaxJournalId(DateTimeOffset startTime)
         => JournalId.Create(RootSegment, ShardsSegment, $"{FormatStartTime(startTime)}~");
 

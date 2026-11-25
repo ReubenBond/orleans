@@ -275,6 +275,35 @@ public sealed class VolatileJournalStorage : IJournalStorage
     }
 
     /// <inheritdoc/>
+    public ValueTask<bool> CreateIfNotExistsAsync(
+        ReadOnlySequence<byte> value,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var values = JournalMetadata.CopyProperties(metadata);
+        var data = value.IsEmpty ? null : value.ToArray();
+        lock (_store.SyncRoot)
+        {
+            if (_store.Exists)
+            {
+                return new(false);
+            }
+
+            _store.Create(values);
+            if (data is not null)
+            {
+                _store.StoredJournalFormatKey = _configuredJournalFormatKey;
+                _store.Segments.Add(data);
+                _store.OnContentChanged();
+            }
+
+            _writeVersion = _store.ContentVersion;
+            return new(true);
+        }
+    }
+
+    /// <inheritdoc/>
     public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

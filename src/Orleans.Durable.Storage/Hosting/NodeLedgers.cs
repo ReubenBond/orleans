@@ -94,7 +94,7 @@ internal sealed partial class NodeLedgers(
     TimeProvider timeProvider,
     ILoggerFactory loggers,
     IJournalIndex? journalIndex = null,
-    LocalStreamRegistration? localStreams = null) : ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable
+    MessageChannelRegistration? messageChannels = null) : ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable
 {
     /// <summary>The lifecycle stage of the runtime: after <see cref="ServiceLifecycleStage.Active"/>, at which the node registers.</summary>
     public const int Stage = ServiceLifecycleStage.Active + 1;
@@ -312,7 +312,7 @@ internal sealed partial class NodeLedgers(
                 timeProvider,
                 loggers,
                 journalIndex,
-                localStreams,
+                messageChannels,
                 cancellationToken).ConfigureAwait(false);
             _runtime = runtime;
             nodeControl.Serve(runtime.Controller, runtime.Scheduler, runtime.Stopping);
@@ -1472,8 +1472,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
         JournalStateDatabase? stateDatabase,
         LedgerApplyLoop? applyLoop,
         JournalStore journals,
-        WakeupStreamHandler? wakeupHandler,
-        LocalStreamDrainCoordinator? localDrainCoordinator,
+        WakeupMessageHandler? wakeupHandler,
         IReadOnlyDictionary<string, string> recordParameters)
     {
         Disk = disk;
@@ -1490,11 +1489,10 @@ internal sealed class NodeRuntime : IAsyncDisposable
         LsmStore = lsmStore;
         Journals = journals;
         WakeupHandler = wakeupHandler;
-        LocalDrainCoordinator = localDrainCoordinator;
         RecordParameters = recordParameters;
         var executor = new TransitionExecutor(Writers, loggers.CreateLogger<TransitionExecutor>());
         LogDrains = nodeArchive.Value as NodeArchive.Logs is { } logs ? logs.Drains : null;
-        Controller = new NodeController(node, generation, view, Writers, _reader, executor, isActive, deadNodes, nodeArchive, timeProvider, control.LoadWindow, control.MaxConcurrentDrains, loggers.CreateLogger<NodeController>(), metrics.Meter, objectStoreShare, objectLedgersReady, (ledger, range, deadline, token) => Journals.PrepareReleaseAsync(ledger, range, deadline, token), localDrainCoordinator);
+        Controller = new NodeController(node, generation, view, Writers, _reader, executor, isActive, deadNodes, nodeArchive, timeProvider, control.LoadWindow, control.MaxConcurrentDrains, loggers.CreateLogger<NodeController>(), metrics.Meter, objectStoreShare, objectLedgersReady, (ledger, range, deadline, token) => Journals.PrepareReleaseAsync(ledger, range, deadline, token));
         Reconciler = store is not null ? new ReplicaReconciler(store, view) : null;
     }
 
@@ -1532,11 +1530,8 @@ internal sealed class NodeRuntime : IAsyncDisposable
     /// <summary>Gets the node's Journals, which serve once the archive store's record holds <see cref="RecordParameters"/> (OR-I8).</summary>
     public JournalStore Journals { get; }
 
-    /// <summary>Gets the node's wakeup local-stream handler when registered, or <see langword="null"/>.</summary>
-    internal WakeupStreamHandler? WakeupHandler { get; }
-
-    /// <summary>Gets the node's closed-ledger local-stream drain coordinator when local streams are registered, or <see langword="null"/>.</summary>
-    internal LocalStreamDrainCoordinator? LocalDrainCoordinator { get; }
+    /// <summary>Gets the node's wakeup message handler when registered, or <see langword="null"/>.</summary>
+    internal WakeupMessageHandler? WakeupHandler { get; }
 
     /// <summary>Gets the node's journal state database when configured with local state storage, or <see langword="null"/>; for tests.</summary>
     internal JournalStateDatabase? StateDatabase => _stateDatabase;
@@ -1601,7 +1596,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
         TimeProvider timeProvider,
         ILoggerFactory loggers,
         IJournalIndex? journalIndex,
-        LocalStreamRegistration? localStreams = null,
+        MessageChannelRegistration? messageChannels = null,
         CancellationToken cancellationToken = default)
     {
         NodeMetrics? metrics = null;
@@ -1613,9 +1608,9 @@ internal sealed class NodeRuntime : IAsyncDisposable
         JournalStore? journalStore = null;
         try
         {
-            var streams = localStreams ?? LocalStreamRegistration.Empty;
-            ValidateLocalStreamParity(streams.Handlers, streams.Processors);
-            var parameters = RecordParametersOf(journals, journalFormat, streams.Handlers);
+            var channels = messageChannels ?? MessageChannelRegistration.Empty;
+            ValidateMessageChannelParity(channels.Handlers, channels.Processors);
+            var parameters = RecordParametersOf(journals, journalFormat, channels.Handlers);
             metrics = new NodeMetrics(node, pressure);
             reader = new LedgerReader(view, transport, timeProvider, node)
             {
@@ -1648,11 +1643,6 @@ internal sealed class NodeRuntime : IAsyncDisposable
                 stateDatabase.Attach(applyLoop);
             }
 
-            ILocalKeyPresenceLookup? presenceLookup = stateDatabase is not null ? new JournalStateLocalKeyPresenceLookup(stateDatabase) : null;
-            LocalStreamDrainCoordinator? localDrainCoordinator = streams.Processors.IsEmpty
-                ? null
-                : new LocalStreamDrainCoordinator(view, reader, streams.Processors, control.LocalDrainMemoryBytes, presenceLookup);
-
             IArchiveStore archiveStore;
             LsmArchiveStore? lsmStore = null;
             NodeArchive nodeArchive;
@@ -1670,7 +1660,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
                             timeProvider,
                             metrics.Meter,
                             loggers.CreateLogger<ArchiveLogNodeDrains>(),
-                            localDrainCoordinator)
+                            channels.Processors)
                         {
                             RetryBlockedAfter = blockedDrainRetryInterval,
                         };
@@ -1693,7 +1683,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
 
                         lsmStore = new LsmArchiveStore(objects, manifest, tails, lsmOptions, timeProvider, blockCache);
                         archiveStore = lsmStore;
-                        nodeArchive = new NodeArchive.Lsm(new DrainWorker(objects, manifest, reader, lsmOptions, timeProvider, blockCache, localDrainCoordinator), new CompactionWorker(objects, tails, manifest, lsmOptions, blockCache), manifest);
+                        nodeArchive = new NodeArchive.Lsm(new DrainWorker(objects, manifest, reader, lsmOptions, timeProvider, blockCache, channels.Processors), new CompactionWorker(objects, tails, manifest, lsmOptions, blockCache), manifest);
                         break;
                     }
 
@@ -1701,8 +1691,8 @@ internal sealed class NodeRuntime : IAsyncDisposable
                     throw new UnreachableException("A silo's archive store is the LSM or archive logs.");
             }
 
-            journalStore = new JournalStore(registry, archiveStore, journals, timeProvider, stateDatabase, streams.Handlers);
-            return new NodeRuntime(node, generation, disk, releaseDistance, view, store, isActive, deadNodes, objectStoreShare, () => objectLedgers.IsConfigured && objectLedgers.Gate.IsPassed, clearObjectStorePacing, control, timeProvider, loggers, metrics, reader, registry, nodeArchive, archiveStore, lsmStore, blockCache, stateDatabase, applyLoop, journalStore, streams.WakeupHandler, localDrainCoordinator, parameters);
+            journalStore = new JournalStore(registry, archiveStore, journals, timeProvider, stateDatabase, channels.Handlers);
+            return new NodeRuntime(node, generation, disk, releaseDistance, view, store, isActive, deadNodes, objectStoreShare, () => objectLedgers.IsConfigured && objectLedgers.Gate.IsPassed, clearObjectStorePacing, control, timeProvider, loggers, metrics, reader, registry, nodeArchive, archiveStore, lsmStore, blockCache, stateDatabase, applyLoop, journalStore, channels.WakeupHandler, parameters);
         }
         catch
         {
@@ -1744,43 +1734,43 @@ internal sealed class NodeRuntime : IAsyncDisposable
     }
 
     /// <summary>
-    /// Validates exact set equality between registered <see cref="ILocalStreamHandler"/> and
-    /// <see cref="ILocalStreamProcessor"/> stream names (orleans.md §5.15, LG-I16).
+    /// Validates exact set equality between registered <see cref="IMessageHandler"/> and
+    /// <see cref="IMessageProcessor"/> channel names (orleans.md §5.15, LG-I16).
     /// </summary>
-    /// <exception cref="ArgumentException">The registered handler and processor stream sets differ or contain duplicates.</exception>
-    internal static void ValidateLocalStreamParity(
-        IEnumerable<ILocalStreamHandler> handlers,
-        IEnumerable<ILocalStreamProcessor> processors)
+    /// <exception cref="ArgumentException">The registered handler and processor channel sets differ or contain duplicates.</exception>
+    internal static void ValidateMessageChannelParity(
+        IEnumerable<IMessageHandler> handlers,
+        IEnumerable<IMessageProcessor> processors)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         ArgumentNullException.ThrowIfNull(processors);
 
-        var handlerStreams = new HashSet<LocalStreamName>();
+        var handlerChannels = new HashSet<MessageChannel>();
         foreach (var handler in handlers)
         {
             ArgumentNullException.ThrowIfNull(handler);
-            if (!handlerStreams.Add(handler.Stream))
+            if (!handlerChannels.Add(handler.Channel))
             {
-                throw new ArgumentException($"Duplicate local stream handler registered for '{handler.Stream}'.", nameof(handlers));
+                throw new ArgumentException($"Duplicate message handler registered for '{handler.Channel}'.", nameof(handlers));
             }
         }
 
-        var processorStreams = new HashSet<LocalStreamName>();
+        var processorChannels = new HashSet<MessageChannel>();
         foreach (var processor in processors)
         {
             ArgumentNullException.ThrowIfNull(processor);
-            if (!processorStreams.Add(processor.Stream))
+            if (!processorChannels.Add(processor.Channel))
             {
-                throw new ArgumentException($"Duplicate local stream processor registered for '{processor.Stream}'.", nameof(processors));
+                throw new ArgumentException($"Duplicate message processor registered for '{processor.Channel}'.", nameof(processors));
             }
         }
 
-        if (!handlerStreams.SetEquals(processorStreams))
+        if (!handlerChannels.SetEquals(processorChannels))
         {
-            var missingProcessors = handlerStreams.Except(processorStreams).Select(static s => s.Value).Order(StringComparer.Ordinal);
-            var missingHandlers = processorStreams.Except(handlerStreams).Select(static s => s.Value).Order(StringComparer.Ordinal);
+            var missingProcessors = handlerChannels.Except(processorChannels).Select(static c => c.Value).Order(StringComparer.Ordinal);
+            var missingHandlers = processorChannels.Except(handlerChannels).Select(static c => c.Value).Order(StringComparer.Ordinal);
             throw new ArgumentException(
-                $"Registered local stream handlers and processors must match exactly (missing processors: [{string.Join(", ", missingProcessors)}]; missing handlers: [{string.Join(", ", missingHandlers)}]).");
+                $"Registered message handlers and processors must match exactly (missing processors: [{string.Join(", ", missingProcessors)}]; missing handlers: [{string.Join(", ", missingHandlers)}]).");
         }
     }
 
@@ -1794,10 +1784,10 @@ internal sealed class NodeRuntime : IAsyncDisposable
     public static IReadOnlyDictionary<string, string> RecordParametersOf(
         JournalStoreOptions journals,
         string journalFormat,
-        IEnumerable<ILocalStreamHandler>? localStreamHandlers = null)
+        IEnumerable<IMessageHandler>? messageHandlers = null)
     {
         ArgumentNullException.ThrowIfNull(journals);
-        var parameters = new Dictionary<string, string>(JournalStore.StoreParametersOf(journals, localStreamHandlers), StringComparer.Ordinal)
+        var parameters = new Dictionary<string, string>(JournalStore.StoreParametersOf(journals, messageHandlers), StringComparer.Ordinal)
         {
             [JournalFormatParameter] = journalFormat,
         };
@@ -1809,7 +1799,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
     public Task CancelAsync() => _stopping.CancelAsync();
 
     /// <summary>
-    /// Stops any registered <see cref="WakeupStreamHandler"/> timer loops and in-flight dispatches, then disposes the
+    /// Stops any registered <see cref="WakeupMessageHandler"/> timer loops and in-flight dispatches, then disposes the
     /// node's Journals, which retires every admission and waits for the outcomes of their proposals while the registry
     /// lives (journals.md §9, orleans.md §5.15). Every call returns the one disposal.
     /// </summary>

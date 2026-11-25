@@ -65,6 +65,30 @@ public abstract class JobShardManager
     public abstract Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Atomically publishes a sealed, unowned job shard with a deterministic identity and initial jobs.
+    /// </summary>
+    /// <param name="deterministicId">
+    /// A deterministic suffix uniquely identifying this sealed shard within its time bucket.
+    /// </param>
+    /// <param name="minDueTime">The minimum due time for jobs in this shard.</param>
+    /// <param name="maxDueTime">The maximum due time for jobs in this shard.</param>
+    /// <param name="jobs">The non-empty, canonically ordered jobs to include in the shard.</param>
+    /// <param name="metadata">Optional metadata for the shard.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// <see langword="true"/> if the sealed shard was newly published; <see langword="false"/> if a shard with the
+    /// same deterministic identity already existed.
+    /// </returns>
+    public virtual Task<bool> PublishSealedShardAsync(
+        string deterministicId,
+        DateTimeOffset minDueTime,
+        DateTimeOffset maxDueTime,
+        IReadOnlyList<ScheduleJobRequest> jobs,
+        IDictionary<string, string>? metadata,
+        CancellationToken cancellationToken)
+        => throw new NotSupportedException($"{GetType().Name} does not support publishing deterministic sealed job shards.");
+
+    /// <summary>
     /// Unregisters a shard owned by this silo.
     /// </summary>
     /// <param name="shard">The shard to unregister.</param>

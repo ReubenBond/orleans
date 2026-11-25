@@ -58,8 +58,7 @@ internal sealed partial class ClusterControllerGrain(
     SiloObjectLedgers objectLedgers,
     SweepHost sweeps,
     TimeProvider timeProvider,
-    ILoggerFactory loggers,
-    LocalStreamRegistration? localStreams = null) : Grain, IClusterControllerGrain
+    ILoggerFactory loggers) : Grain, IClusterControllerGrain
 {
     private static readonly TimeSpan FirstBackoff = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan LongestBackoff = TimeSpan.FromSeconds(30);
@@ -111,7 +110,7 @@ internal sealed partial class ClusterControllerGrain(
 
             // The archive store is taken once the silo's archive gate passes, by the kind the gate's check found the
             // registry's (OR-I20): until then the controller does no archive work, and a refused gate deactivates it.
-            _controller = new ClusterController(control, map, _mapCommitter, archive: null, timeProvider, loggers.CreateLogger<ClusterController>(), hasLocalStreams: localStreams?.HasLocalStreams ?? false);
+            _controller = new ClusterController(control, map, _mapCommitter, archive: null, timeProvider, loggers.CreateLogger<ClusterController>());
             _pass = new CoalescedPass(() => _ = PassAsync(CancellationToken.None));
             _ = this.RegisterGrainTimer(PassAsync, new GrainTimerCreationOptions(control.BalanceInterval, control.BalanceInterval) { KeepAlive = true });
             _ = FollowGateAsync(_controller, map, _deactivating.Token);
