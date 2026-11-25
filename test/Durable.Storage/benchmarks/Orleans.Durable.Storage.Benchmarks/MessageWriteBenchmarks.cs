@@ -14,12 +14,12 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Storage.Benchmarks;
 
 /// <summary>
-/// Measures <see cref="JournalStore"/> warm-primary <c>Append</c> write cost with 0 local appends (ordinary path,
-/// confirming zero regression) versus 1 atomic <c>orleans.wakeup</c> companion record (1-RTT path) over a 3-replica
+/// Measures <see cref="JournalStore"/> warm-primary <c>Append</c> write cost with 0 attached messages (ordinary path,
+/// confirming zero regression) versus 1 atomic <c>orleans.reminder</c> message record (1-RTT path) over a 3-replica
 /// in-memory quorum ledger (verification.md §8.4).
 /// </summary>
 [MemoryDiagnoser]
-public class LocalAppendWriteBenchmarks : IAsyncDisposable
+public class MessageWriteBenchmarks : IAsyncDisposable
 {
     private const int OperationsPerInvoke = 32;
     private static readonly ImmutableArray<NodeId> Nodes = [MakeNodeId(1), MakeNodeId(2), MakeNodeId(3)];
@@ -29,12 +29,12 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     private LedgerReader? _reader;
     private LedgerWriterRegistry? _registry;
     private InMemoryArchiveStore? _archive;
-    private WakeupMessageHandler? _wakeupHandler;
+    private ReminderMessageHandler? _reminderHandler;
     private JournalStore? _journals;
     private ArcBuffer _payload;
     private JournalRowKey _key = null!;
     private JournalVersion _version;
-    private byte[] _wakeupPayload = [];
+    private byte[] _reminderPayload = [];
 
     [GlobalSetup]
     public async Task SetupAsync()
@@ -56,8 +56,8 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
         _ = await map.ReadAsync(CancellationToken.None).ConfigureAwait(false);
         await _registry.ReconciledAsync(map.Current.Epoch, CancellationToken.None).ConfigureAwait(false);
 
-        _wakeupHandler = new WakeupMessageHandler(
-            new WakeupOptions(),
+        _reminderHandler = new ReminderMessageHandler(
+            new ReminderOptions(),
             new NoOpDispatcher(),
             TimeProvider.System);
         _archive = new InMemoryArchiveStore();
@@ -67,13 +67,13 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
             new JournalStoreOptions { MaxBodyBytes = 16 << 20, MaxQueuedBytes = 128 << 20, WarmStateBytes = 128 << 20 },
             TimeProvider.System,
             stateDatabase: null,
-            messageHandlers: [_wakeupHandler]);
+            messageHandlers: [_reminderHandler]);
 
         var bytes = new byte[1024];
         RandomNumberGenerator.Fill(bytes);
         _payload = ArcBuffer.Wrap(bytes);
         _key = JournalRowKey.Encode("bench-message");
-        _wakeupPayload = WakeupMessageCodec.Encode(new WakeupRecord(
+        _reminderPayload = ReminderMessageCodec.Encode(new ReminderRecord(
             GrainId.Create("bench", "1"),
             "orleans.messaging.pump",
             (DateTimeOffset.UtcNow + TimeSpan.FromHours(1)).UtcTicks));
@@ -95,9 +95,9 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     }
 
     [Benchmark(OperationsPerInvoke = OperationsPerInvoke)]
-    public async Task AppendOneWakeupMessageAsync()
+    public async Task AppendOneReminderMessageAsync()
     {
-        var message = new MessageRecord(WakeupMessageHandler.WakeupChannel, _wakeupPayload);
+        var message = new MessageRecord(ReminderMessageHandler.ReminderChannel, _reminderPayload);
         for (var i = 0; i < OperationsPerInvoke; i++)
         {
             using var record = _journals!.EncodeAppend(_key, _version, _payload, [message]);
@@ -111,9 +111,9 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     {
         _payload.Dispose();
         _payload = default;
-        if (_wakeupHandler is not null)
+        if (_reminderHandler is not null)
         {
-            await _wakeupHandler.StopAsync().ConfigureAwait(false);
+            await _reminderHandler.StopAsync().ConfigureAwait(false);
         }
 
         if (_journals is not null)
@@ -149,7 +149,7 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
         return new NodeId(new Guid(bytes));
     }
 
-    private sealed class NoOpDispatcher : IGrainWakeupDispatcher
+    private sealed class NoOpDispatcher : IGrainReminderDispatcher
     {
         public ValueTask<DurableJobRunResult> DispatchAsync(GrainId target, IJobRunContext context, CancellationToken cancellationToken) =>
             ValueTask.FromResult(DurableJobRunResult.Completed);

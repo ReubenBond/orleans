@@ -28,7 +28,7 @@ namespace Orleans.Durable.Messaging;
 /// The loop keeps the activation alive while a pass runs over queued work and while outbox deliveries are in flight.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
-internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainWakeupSource, ILifecycleObserver
+internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainReminderSource, ILifecycleObserver
 {
     internal const string JobName = "orleans.messaging.pump";
     internal static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
@@ -37,7 +37,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
     private static readonly Type StatelessWorkerPlacementType = new StatelessWorkerAttribute().PlacementStrategy.GetType();
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
-    private readonly GrainWakeupCoordinator _wakeupCoordinator;
+    private readonly GrainReminderCoordinator _reminderCoordinator;
     private Inbox? _inbox;
     private Outbox? _outbox;
     private Task? _loop;
@@ -49,7 +49,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
         IJournaledStateManager stateManager,
         IDurableJobHandlerRegistry jobHandlers,
         MessagingShared shared,
-        GrainWakeupCoordinator? wakeupCoordinator = null)
+        GrainReminderCoordinator? reminderCoordinator = null)
     {
         // Messaging requires one activation per grain identity, so every activation of a stateless worker fails.
         if (grainContext.GetComponent<PlacementStrategy>()?.GetType() == StatelessWorkerPlacementType)
@@ -62,8 +62,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
         StateManager = stateManager;
         Shared = shared;
         GrainTypeTag = shared.GetGrainTypeTag(grainContext.GrainId.Type);
-        _wakeupCoordinator = wakeupCoordinator ?? new GrainWakeupCoordinator(grainContext, stateManager, shared.JobManager, shared.JobTimeProvider);
-        _wakeupCoordinator.RegisterSource(this, RecheckDelay);
+        _reminderCoordinator = reminderCoordinator ?? new GrainReminderCoordinator(grainContext, stateManager, shared.JobManager, shared.JobTimeProvider);
+        _reminderCoordinator.RegisterSource(this, RecheckDelay);
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Activate, this);
 
@@ -94,7 +94,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
     public string GrainTypeTag { get; }
 
     /// <summary>Gets the currently tracked backing wakeup job ID for this pump, if any; for tests.</summary>
-    internal string? WakeupJobId => _wakeupCoordinator.GetTrackedBackingJobId(this);
+    internal string? WakeupJobId => _reminderCoordinator.GetTrackedBackingJobId(this);
 
     /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>
     public CancellationToken ShutdownToken => _shutdown.Token;
@@ -131,21 +131,21 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
         }
     }
 
-    string IGrainWakeupSource.JobName => JobName;
+    string IGrainReminderSource.JobName => JobName;
 
-    DateTimeOffset? IGrainWakeupSource.GetNextDueTime(DateTimeOffset now) =>
+    DateTimeOffset? IGrainReminderSource.GetNextDueTime(DateTimeOffset now) =>
         GetNextWakeupDelay(now) is { } delay ? MessagingTime.AddClamped(now, delay) : null;
 
     /// <summary>
     /// Ensures a durable wakeup covers <paramref name="dueTime"/> during <c>PrepareWriteAsync</c>: skipped when
-    /// companion writes are supported (emitted atomically with the journal write) and delegated to
+    /// message writes are supported (emitted atomically with the journal write) and delegated to
     /// <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> otherwise.
     /// </summary>
     public ValueTask EnsureWakeupAsync(DateTimeOffset dueTime, CancellationToken cancellationToken) =>
-        _wakeupCoordinator.EnsureFallbackWakeupAsync(this, dueTime, _shutdown.Token, cancellationToken);
+        _reminderCoordinator.EnsureFallbackReminderAsync(this, dueTime, _shutdown.Token, cancellationToken);
 
     public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) =>
-        _wakeupCoordinator.ExecuteJobAsync(this, context, RunPassForJobAsync, cancellationToken);
+        _reminderCoordinator.ExecuteJobAsync(this, context, RunPassForJobAsync, cancellationToken);
 
     private async ValueTask RunPassForJobAsync(CancellationToken cancellationToken)
     {
@@ -169,8 +169,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
     {
         try
         {
-            // Non-journaled handler-registration transitions always ensure a backing wake-up even when companion writes are supported.
-            await _wakeupCoordinator.EnsureBackingWakeupAsync(this, Shared.JobTimeProvider.GetUtcNow(), _shutdown.Token, CancellationToken.None).ConfigureAwait(true);
+            // Non-journaled handler-registration transitions always ensure a backing reminder even when message writes are supported.
+            await _reminderCoordinator.EnsureBackingReminderAsync(this, Shared.JobTimeProvider.GetUtcNow(), _shutdown.Token, CancellationToken.None).ConfigureAwait(true);
         }
         catch (Exception exception) when (!_shutdown.IsCancellationRequested)
         {
@@ -240,12 +240,12 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
 
         // When message writes are supported, recovered work is already covered by the open ledger's wakeup session
         // or by the sealed job shard drained when its segment completed; skip EnsureWakeupAsync to avoid an extra job write.
-        if (!_wakeupCoordinator.SupportsMessageWrites)
+        if (!_reminderCoordinator.SupportsMessageWrites)
         {
             var now = Shared.JobTimeProvider.GetUtcNow();
             if (GetNextWakeupDelay(now) is { } delay)
             {
-                await _wakeupCoordinator.EnsureBackingWakeupAsync(this, MessagingTime.AddClamped(now, delay), _shutdown.Token, cancellationToken).ConfigureAwait(true);
+                await _reminderCoordinator.EnsureBackingReminderAsync(this, MessagingTime.AddClamped(now, delay), _shutdown.Token, cancellationToken).ConfigureAwait(true);
             }
         }
     }
@@ -271,7 +271,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, IGrainW
             await loop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
 
-        await _wakeupCoordinator.WaitForPendingSchedulingAsync().ConfigureAwait(true);
+        await _reminderCoordinator.WaitForPendingSchedulingAsync().ConfigureAwait(true);
 
         if (_outbox is { } outbox) await outbox.StopAsync().ConfigureAwait(true);
 

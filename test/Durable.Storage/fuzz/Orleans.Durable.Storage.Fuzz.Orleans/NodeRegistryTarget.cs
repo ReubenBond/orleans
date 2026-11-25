@@ -126,5 +126,5 @@ public sealed class NodeRegistryTarget : FuzzTarget
 /// <summary>The fuzz targets of the formats <c>Orleans.Durable.Storage</c> decodes: the node registry and the journal node grain's answers.</summary>
 public static class OrleansTargets
 {
-    public static IReadOnlyList<FuzzTarget> All { get; } = [new NodeRegistryTarget(), new WakeupCompanionTarget(), new JournalWriteAnswerTarget(), new JournalReadAnswerTarget(), new JournalPageAnswerTarget(), new ReplicaWriteAnswerTarget(), new ReplicaReadAnswerTarget(), new ReplicaTailAnswerTarget()];
+    public static IReadOnlyList<FuzzTarget> All { get; } = [new NodeRegistryTarget(), new ReminderMessageTarget(), new JournalWriteAnswerTarget(), new JournalReadAnswerTarget(), new JournalPageAnswerTarget(), new ReplicaWriteAnswerTarget(), new ReplicaReadAnswerTarget(), new ReplicaTailAnswerTarget()];
 }

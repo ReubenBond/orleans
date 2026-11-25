@@ -1441,11 +1441,11 @@ parameterize the group committer ([conventions §6](../conventions.md#6-retries-
 ## 10. Verification
 
 - **Model.** [`MessageDrain.qnt`](../../../specs/message-drain/MessageDrain.qnt) checks unified single-pass `DrainScan`
-  message draining and deterministic sealed `JobShard` publishing on both LSM (`DrainWorker`) and Archive Logs
-  (`ArchiveLogDrainWorker`), covering `LG-I15`, `LG-I16`, `JS-I11`, and `JS-I12` (`WakeupPreserved`,
-  `NoDropBeforeMessagesCommitted`, `ClearedInSegmentWritesNothing`, `IdempotentShardPublish`, weak-fairness liveness
-  `EventuallyDrainedAndDropped` and `EventuallyWakeupDelivered`, five witnesses, and six safety/volatile-answer mutants;
-  [message-drain model](../../../specs/message-drain/README.md)).
+  message draining and idempotent per-segment durable-sink commits on both LSM (`DrainWorker`) and Archive Logs
+  (`ArchiveLogDrainWorker`), covering `LG-I15`, `LG-I16`, `JS-I11`, and `JS-I12` (`MessagesPreserved`,
+  `NoDropBeforeMessagesCommitted`, `EmptyFoldWritesNothing`, `IdempotentCommit`, weak-fairness liveness
+  `EventuallyDrainedAndDropped` and `EventuallyMessagesDelivered`, five witnesses, and six safety/volatile-answer
+  mutants; [message-drain model](../../../specs/message-drain/README.md)).
 - **Ledger messages (`RowKind.Message`).** Golden vectors (`ledgers/batches.json`, `batch-rejections.json`) and fuzz
   targets (`ledgers-batch`, `ledgers-segment`) verify the unversioned `RowKind.Message = 3` layout, `bad-row-flags` for
   `0x07`/bits 3..7, `bad-channel` for empty/oversized/non-ASCII channels, and zero segment-dictionary growth.

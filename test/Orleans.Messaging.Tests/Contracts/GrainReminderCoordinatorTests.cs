@@ -17,10 +17,10 @@ namespace Orleans.Durable.Messaging.Tests.Contracts;
 
 /// <summary>
 /// Unit tests for Phase J3: <see cref="JournaledStateManager"/> internal double-buffered companion staging and
-/// <see cref="GrainWakeupCoordinator"/> over <see cref="FakeTimeProvider"/> (orleans.md §5.15).
+/// <see cref="GrainReminderCoordinator"/> over <see cref="FakeTimeProvider"/> (orleans.md §5.15).
 /// </summary>
 [TestCategory("BVT")]
-public sealed class GrainWakeupCoordinatorTests
+public sealed class GrainReminderCoordinatorTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -39,7 +39,7 @@ public sealed class GrainWakeupCoordinatorTests
         // First write persists the initial stream directory entry; second write with no state change has an empty delta,
         // so staging a message on it must throw InvalidOperationException (and fence).
         await manager.WriteStateAsync(Token);
-        manager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, new byte[] { 1, 2, 3 }));
+        manager.StageMessageWrite(new JournalMessageRecord(ReminderMessageCodec.ChannelName, new byte[] { 1, 2, 3 }));
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(Token).AsTask());
 
         // Fresh manager: empty Replace snapshot with staged message succeeds via ReplaceWithMessagesAsync.
@@ -100,17 +100,17 @@ public sealed class GrainWakeupCoordinatorTests
     }
 
     [Fact]
-    public async Task CoordinatorEmitsClampedCoalescedAndClearedWakeupsAndSeedsOnRecovery()
+    public async Task CoordinatorEmitsClampedCoalescedAndClearedRemindersAndSeedsOnRecovery()
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(now);
         var storage = new RecordingMessageStorage();
         var jobManager = new FakeJobManager();
         var grainId = GrainId.Create("order", "42");
-        var source = new FakeWakeupSource("orleans.messaging.pump");
+        var source = new FakeReminderSource("orleans.messaging.pump");
 
         await using var harness = CreateManager(storage, grainId, initialize: false);
-        var coordinator = new GrainWakeupCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
+        var coordinator = new GrainReminderCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
         coordinator.RegisterSource(source, TimeSpan.FromSeconds(1));
 
         // Seed pending work BEFORE recovery so OnRecoveryCompleted sets _hadPendingWork = true!
@@ -122,7 +122,7 @@ public sealed class GrainWakeupCoordinatorTests
         harness.Value.Value = "cleared-after-recovery";
         await harness.Manager.WriteStateAsync(Token);
         Assert.Equal(0, jobManager.ScheduleCalls);
-        var clearRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
+        var clearRec = DecodeSingleReminder(storage.Writes[^1].Messages);
         Assert.Equal(grainId, clearRec.Target);
         Assert.Equal("orleans.messaging.pump", clearRec.JobName);
         Assert.Null(clearRec.DueTimeUtcTicks);
@@ -136,7 +136,7 @@ public sealed class GrainWakeupCoordinatorTests
         source.NextDue = now;
         harness.Value.Value = "work-1";
         await harness.Manager.WriteStateAsync(Token);
-        var clampedRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
+        var clampedRec = DecodeSingleReminder(storage.Writes[^1].Messages);
         Assert.Equal((now + TimeSpan.FromSeconds(1)).UtcTicks, clampedRec.DueTimeUtcTicks);
 
         // Redundant later re-emission while now < prev and clamped >= prev is coalesced (0 messages)!
@@ -152,14 +152,14 @@ public sealed class GrainWakeupCoordinatorTests
         source.NextDue = tNow + TimeSpan.FromSeconds(10);
         harness.Value.Value = "work-3-after-prev";
         await harness.Manager.WriteStateAsync(Token);
-        var afterPrevRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
+        var afterPrevRec = DecodeSingleReminder(storage.Writes[^1].Messages);
         Assert.Equal((tNow + TimeSpan.FromSeconds(10)).UtcTicks, afterPrevRec.DueTimeUtcTicks);
 
         // Earlier due time than prev re-emits immediately!
         source.NextDue = tNow + TimeSpan.FromSeconds(3);
         harness.Value.Value = "work-4-earlier";
         await harness.Manager.WriteStateAsync(Token);
-        var earlierRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
+        var earlierRec = DecodeSingleReminder(storage.Writes[^1].Messages);
         Assert.Equal((tNow + TimeSpan.FromSeconds(3)).UtcTicks, earlierRec.DueTimeUtcTicks);
 
         Assert.Equal(0, jobManager.ScheduleCalls);
@@ -173,10 +173,10 @@ public sealed class GrainWakeupCoordinatorTests
         var storage = new RecordingMessageStorage();
         var jobManager = new FakeJobManager();
         var grainId = GrainId.Create("order", "99");
-        var source = new FakeWakeupSource("orleans.messaging.pump");
+        var source = new FakeReminderSource("orleans.messaging.pump");
 
         await using var harness = CreateManager(storage, grainId);
-        var coordinator = new GrainWakeupCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
+        var coordinator = new GrainReminderCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
         coordinator.RegisterSource(source, TimeSpan.FromSeconds(1));
 
         // 1. Ephemeral wakeup runs due work, reschedules itself, and NEVER sets WakeupJobId!
@@ -224,23 +224,23 @@ public sealed class GrainWakeupCoordinatorTests
         var plainStorage = new PlainNonCompanionStorage();
         var jobManager = new FakeJobManager();
         var grainId = GrainId.Create("fallback", "1");
-        var source = new FakeWakeupSource("orleans.messaging.pump");
+        var source = new FakeReminderSource("orleans.messaging.pump");
 
         await using var harness = CreateManager(plainStorage, grainId);
-        var coordinator = new GrainWakeupCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
+        var coordinator = new GrainReminderCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
         coordinator.RegisterSource(source, TimeSpan.FromSeconds(1));
 
         Assert.False(coordinator.SupportsMessageWrites);
-        await coordinator.EnsureFallbackWakeupAsync(source, now, CancellationToken.None, Token);
+        await coordinator.EnsureFallbackReminderAsync(source, now, CancellationToken.None, Token);
         Assert.Equal(1, jobManager.ScheduleCalls);
         Assert.Equal(now + TimeSpan.FromSeconds(1), Assert.Single(jobManager.Requests).DueTime);
     }
 
-    private static WakeupRecord DecodeSingleWakeup(JournalMessageRecord[] messages)
+    private static ReminderRecord DecodeSingleReminder(JournalMessageRecord[] messages)
     {
         var rec = Assert.Single(messages);
-        Assert.Equal(WakeupMessageCodec.ChannelName, rec.Channel);
-        Assert.Null(WakeupMessageCodec.Decode(rec.Payload.Span, out var decoded));
+        Assert.Equal(ReminderMessageCodec.ChannelName, rec.Channel);
+        Assert.Null(ReminderMessageCodec.Decode(rec.Payload.Span, out var decoded));
         return decoded;
     }
 
@@ -249,7 +249,7 @@ public sealed class GrainWakeupCoordinatorTests
             new DurableJob { Id = id, Name = jobName, DueTime = due, TargetGrainId = target, ShardId = "s0" },
             Guid.NewGuid().ToString("N"),
             retryCount: 1,
-            isEphemeralWakeup: isEphemeral);
+            isEphemeralReminder: isEphemeral);
 
     private static TestHarness CreateManager(IJournalStorage storage, GrainId? grainId = null, bool initialize = true)
     {
@@ -289,7 +289,7 @@ public sealed class GrainWakeupCoordinatorTests
         }
     }
 
-    private sealed class FakeWakeupSource(string jobName) : IGrainWakeupSource
+    private sealed class FakeReminderSource(string jobName) : IGrainReminderSource
     {
         public string JobName { get; } = jobName;
         public DateTimeOffset? NextDue { get; set; }

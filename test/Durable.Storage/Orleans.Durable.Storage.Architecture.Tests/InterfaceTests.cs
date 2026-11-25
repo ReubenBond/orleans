@@ -84,7 +84,7 @@ public sealed class InterfaceTests
         // (journals.md §8.3).
         "Orleans.Durable.Storage.Engine.Journals.IJournalIndex",
 
-        // Message channel inversion seam: higher compositions (such as Orleans' WakeupMessageHandler) and
+        // Message channel inversion seam: higher compositions (such as Orleans' ReminderMessageHandler) and
         // Orleans-free simulation/unit test handlers plug into JournalStore/LedgerAdmission without reversing the
         // downward dependency direction (journals.md §4.2, JS-I11, JS-I12).
         "Orleans.Durable.Storage.Engine.Journals.IMessageHandler",
@@ -96,9 +96,9 @@ public sealed class InterfaceTests
         "Orleans.Durable.Storage.Engine.Archive.Control.IMessageProcessor",
         "Orleans.Durable.Storage.Engine.Archive.Control.IMessageFold",
 
-        // Ephemeral wakeup dispatch boundary in the Orleans composition: GrainFactoryWakeupDispatcher calls Orleans'
+        // Ephemeral reminder dispatch boundary in the Orleans composition: GrainFactoryReminderDispatcher calls Orleans'
         // IDurableJobReceiverExtension while unit tests substitute a fake dispatcher over FakeTimeProvider (orleans.md §5.15).
-        "Orleans.Durable.Storage.IGrainWakeupDispatcher",
+        "Orleans.Durable.Storage.IGrainReminderDispatcher",
 
         // An open file: the operating system's, the reporting wrapper of the WAL's fail-stop seam, and the test doubles
         // which stand in for the file system's I/O.

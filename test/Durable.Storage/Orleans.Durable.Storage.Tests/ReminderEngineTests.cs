@@ -20,29 +20,29 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="WakeupMessageCodec"/> (golden vectors + Verify snapshots),
-/// <see cref="WakeupMessageHandler"/> / <see cref="WakeupMessageHandler.WakeupLedgerSession"/> (<see cref="FakeTimeProvider"/>),
-/// <see cref="WakeupMessageProcessor"/> (time-bucketed deterministic sealed shards, canonical ordering, zero writes on
+/// Unit tests for <see cref="ReminderMessageCodec"/> (golden vectors + Verify snapshots),
+/// <see cref="ReminderMessageHandler"/> / <see cref="ReminderMessageHandler.ReminderLedgerSession"/> (<see cref="FakeTimeProvider"/>),
+/// <see cref="ReminderMessageProcessor"/> (time-bucketed deterministic sealed shards, canonical ordering, zero writes on
 /// clear, retry skipping succeeded buckets), <see cref="SiloArchive.Lsm"/> pre-gate <c>message-channels</c> check, and
 /// <see cref="NodeRuntime"/> handler/processor parity (orleans.md §5.15, §6).
 /// </summary>
-public sealed class WakeupEngineTests
+public sealed class ReminderEngineTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public Task WakeupCompanionGoldenVectorsDecodeAndRoundTrip()
+    public Task ReminderMessageGoldenVectorsDecodeAndRoundTrip()
     {
         var lines = new List<string>();
-        foreach (var vector in Cases("orleans", "wakeup-companions.json"))
+        foreach (var vector in Cases("orleans", "reminder-messages.json"))
         {
             var bytes = Hex(vector);
-            var spanErr = WakeupMessageCodec.Decode(bytes, out var spanRec);
+            var spanErr = ReminderMessageCodec.Decode(bytes, out var spanRec);
             Assert.Null(spanErr);
-            var seqErr = WakeupMessageCodec.Decode(MultiSegment(bytes, 3), out var seqRec);
+            var seqErr = ReminderMessageCodec.Decode(MultiSegment(bytes, 3), out var seqRec);
             Assert.Null(seqErr);
             Assert.Equal(spanRec, seqRec);
-            Assert.Equal(bytes, WakeupMessageCodec.Encode(spanRec));
+            Assert.Equal(bytes, ReminderMessageCodec.Encode(spanRec));
             lines.Add(string.Create(CultureInfo.InvariantCulture, $"{vector.GetProperty("name").GetString()} => {spanRec.Target} | {spanRec.JobName} | {spanRec.DueTimeUtcTicks?.ToString(CultureInfo.InvariantCulture) ?? "clear"}"));
         }
 
@@ -50,18 +50,18 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public Task WakeupCompanionRejectionVectorsMatchOnSpanAndSequence()
+    public Task ReminderMessageRejectionVectorsMatchOnSpanAndSequence()
     {
         var lines = new List<string>();
-        foreach (var vector in Cases("orleans", "wakeup-companion-rejections.json"))
+        foreach (var vector in Cases("orleans", "reminder-message-rejections.json"))
         {
             var bytes = Hex(vector);
             var expectedReason = vector.GetProperty("reason").GetString()!;
-            var spanErr = WakeupMessageCodec.Decode(bytes, out _);
+            var spanErr = ReminderMessageCodec.Decode(bytes, out _);
             Assert.NotNull(spanErr);
             Assert.Equal(expectedReason, DecodeRejection.ReasonOf(spanErr));
 
-            var seqErr = WakeupMessageCodec.Decode(MultiSegment(bytes, 2), out _);
+            var seqErr = ReminderMessageCodec.Decode(MultiSegment(bytes, 2), out _);
             Assert.NotNull(seqErr);
             Assert.Equal(expectedReason, DecodeRejection.ReasonOf(seqErr));
             lines.Add($"{vector.GetProperty("name").GetString()} => {expectedReason}");
@@ -71,13 +71,13 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public async Task WakeupLedgerSessionHandlesHeapOrderingInFlightAbaClearRescheduleBackoffRollAndStop()
+    public async Task ReminderLedgerSessionHandlesHeapOrderingInFlightAbaClearRescheduleBackoffRollAndStop()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
-        var options = new WakeupOptions
+        var options = new ReminderOptions
         {
-            MaxWakeupBytesPerLedger = 500,
-            MaxConcurrentWakeupDispatches = 4,
+            MaxReminderBytesPerLedger = 500,
+            MaxConcurrentReminderDispatches = 4,
             InitialRetryDelay = TimeSpan.FromSeconds(1),
             MaxRetryDelay = TimeSpan.FromSeconds(4),
         };
@@ -131,9 +131,9 @@ public sealed class WakeupEngineTests
             return DurableJobRunResult.Completed;
         });
 
-        var handler = new WakeupMessageHandler(options, dispatcher, time);
+        var handler = new ReminderMessageHandler(options, dispatcher, time);
         var ledger = new LedgerId(7);
-        var session = (WakeupMessageHandler.WakeupLedgerSession)handler.OpenLedger(ledger);
+        var session = (ReminderMessageHandler.ReminderLedgerSession)handler.OpenLedger(ledger);
         var now = time.GetUtcNow();
 
         // Schedule g1 at +5s, g2 at +20s, g3 at +2s (earlier than g1), and then clear a 4th grain immediately.
@@ -178,10 +178,10 @@ public sealed class WakeupEngineTests
         await g2Completed.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
         await WaitUntilAsync(() => session.EntryCount == 0, Token);
 
-        // Every dispatched context carries IsEphemeralWakeup == true.
-        Assert.All(dispatchedContexts, static ctx => Assert.True(ctx.IsEphemeralWakeup));
+        // Every dispatched context carries IsEphemeralReminder == true.
+        Assert.All(dispatchedContexts, static ctx => Assert.True(ctx.IsEphemeralReminder));
 
-        // Exceed MaxWakeupBytesPerLedger (500 bytes) -> CollectLedgersNeedingRoll flags ledger 7.
+        // Exceed MaxReminderBytesPerLedger (500 bytes) -> CollectLedgersNeedingRoll flags ledger 7.
         var many = new MessageRecord[10];
         for (var i = 0; i < many.Length; i++)
         {
@@ -199,7 +199,7 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public async Task WakeupLedgerSessionInFlightNewerSetWakeupReEnqueuesWithoutAba()
+    public async Task ReminderLedgerSessionInFlightNewerSetWakeupReEnqueuesWithoutAba()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
         var g = GrainId.Create("aba", "1");
@@ -222,8 +222,8 @@ public sealed class WakeupEngineTests
             return DurableJobRunResult.Completed;
         });
 
-        var handler = new WakeupMessageHandler(new WakeupOptions(), dispatcher, time);
-        var session = (WakeupMessageHandler.WakeupLedgerSession)handler.OpenLedger(new LedgerId(9));
+        var handler = new ReminderMessageHandler(new ReminderOptions(), dispatcher, time);
+        var session = (ReminderMessageHandler.ReminderLedgerSession)handler.OpenLedger(new LedgerId(9));
         var now = time.GetUtcNow();
 
         session.OnBatchDurable(Slot.Zero, [EncodeRecord(g, job, now + TimeSpan.FromSeconds(1))]);
@@ -242,13 +242,13 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public async Task WakeupMessageProcessorPublishesDeterministicTimeBucketedSealedShardsAndSkipsSucceededOnRetry()
+    public async Task ReminderMessageProcessorPublishesDeterministicTimeBucketedSealedShardsAndSkipsSucceededOnRetry()
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(now);
-        var options = new WakeupOptions
+        var options = new ReminderOptions
         {
-            MaxConcurrentWakeupSchedules = 2,
+            MaxConcurrentReminderPublishes = 2,
             OverdueJitterWindow = TimeSpan.FromSeconds(5),
         };
 
@@ -286,16 +286,16 @@ public sealed class WakeupEngineTests
                 }
             });
 
-        using var processor = new WakeupMessageProcessor(publisher, options, time);
+        using var processor = new ReminderMessageProcessor(publisher, options, time);
         var ledgerMeta = new LedgerMetadata(new LedgerId(3), KeyRange.Root, new LedgerLocation.Nodes([NodeId.New()]), 4, new PrimaryClaim(NodeId.New(), SequencerInstanceId.New()), new LedgerStatus.Closed(new Slot(5)));
         var segment = new LedgerSegmentId(ledgerMeta.Id, Slot.Zero);
 
         // 0 surviving entries -> 0 PublishSealedShardAsync calls.
         using (var emptyFold = processor.BeginSegmentFold(ledgerMeta, segment))
         {
-            emptyFold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gCleared, job, now.UtcTicks + TimeSpan.TicksPerMinute))));
+            emptyFold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(ReminderMessageCodec.Encode(new ReminderRecord(gCleared, job, now.UtcTicks + TimeSpan.TicksPerMinute))));
             Assert.True(emptyFold.MemoryBytes > 0);
-            emptyFold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gCleared, job, null))));
+            emptyFold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(ReminderMessageCodec.Encode(new ReminderRecord(gCleared, job, null))));
             Assert.Equal(0, emptyFold.MemoryBytes);
             await emptyFold.CommitAsync(Token);
             Assert.Empty(published);
@@ -313,9 +313,9 @@ public sealed class WakeupEngineTests
         var futureDue = now + TimeSpan.FromHours(2);
         var overdueDue = now - TimeSpan.FromMinutes(2);
         using var fold = processor.BeginSegmentFold(ledgerMeta, segment);
-        fold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gFutureB, job, futureDue.UtcTicks))));
-        fold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gOverdue, job, overdueDue.UtcTicks))));
-        fold.Add(new Slot(2), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gFutureA, job, futureDue.UtcTicks))));
+        fold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(ReminderMessageCodec.Encode(new ReminderRecord(gFutureB, job, futureDue.UtcTicks))));
+        fold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(ReminderMessageCodec.Encode(new ReminderRecord(gOverdue, job, overdueDue.UtcTicks))));
+        fold.Add(new Slot(2), 0, new ReadOnlySequence<byte>(ReminderMessageCodec.Encode(new ReminderRecord(gFutureA, job, futureDue.UtcTicks))));
 
         // First commit: current-hour bucket succeeds and removes its entry, +2h bucket throws IOException.
         _ = await Assert.ThrowsAsync<IOException>(() => fold.CommitAsync(Token));
@@ -326,7 +326,7 @@ public sealed class WakeupEngineTests
         await fold.CommitAsync(Token);
         Assert.Equal(0, fold.MemoryBytes);
         Assert.Equal(2, published.Count);
-        Assert.True(maxInFlight <= options.MaxConcurrentWakeupSchedules);
+        Assert.True(maxInFlight <= options.MaxConcurrentReminderPublishes);
 
         var shards = published.ToArray();
         var overdueShard = shards.Single(s => s.Jobs.Length == 1);
@@ -355,7 +355,7 @@ public sealed class WakeupEngineTests
         {
             ["format"] = "json",
             ["max-body-bytes"] = "4194304",
-            [JournalStore.MessageChannelsParameter] = "orleans.wakeup",
+            [JournalStore.MessageChannelsParameter] = "orleans.reminder",
         };
         var identity = await siloArchive.FirstRecordAsync(storedParams, Token);
 
@@ -385,11 +385,38 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
+    public async Task ReminderLedgerSessionRearmsTimerAfterCappedWait()
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
+        var g = GrainId.Create("longwait", "1");
+        var job = "orleans.messaging.pump";
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dispatcher = new FakeDispatcher((_, _, _) =>
+        {
+            dispatched.TrySetResult();
+            return ValueTask.FromResult(DurableJobRunResult.Completed);
+        });
+
+        var handler = new ReminderMessageHandler(new ReminderOptions(), dispatcher, time);
+        var session = (ReminderMessageHandler.ReminderLedgerSession)handler.OpenLedger(new LedgerId(11));
+
+        // 30 hours exceeds the 1-day per-arming timer cap, so OnTimerTick fires at +24h with minDue > now
+        // and must re-arm the one-shot timer for the remaining 6 hours.
+        session.OnBatchDurable(Slot.Zero, [EncodeRecord(g, job, time.GetUtcNow() + TimeSpan.FromHours(30))]);
+        time.Advance(TimeSpan.FromHours(24));
+        Assert.False(dispatched.Task.IsCompleted);
+
+        time.Advance(TimeSpan.FromHours(6));
+        await dispatched.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
+        await handler.StopAsync();
+    }
+
+    [Fact]
     public void NodeRuntimeValidateMessageChannelParityRejectsMismatchedSets()
     {
         var time = new FakeTimeProvider();
-        var handler = new WakeupMessageHandler(new WakeupOptions(), new FakeDispatcher((_, _, _) => ValueTask.FromResult(DurableJobRunResult.Completed)), time);
-        using var processor = new WakeupMessageProcessor(new FakeSealedShardPublisher(TimeSpan.FromHours(1), (_, _, _, _, _) => Task.FromResult(true)), new WakeupOptions(), time);
+        var handler = new ReminderMessageHandler(new ReminderOptions(), new FakeDispatcher((_, _, _) => ValueTask.FromResult(DurableJobRunResult.Completed)), time);
+        using var processor = new ReminderMessageProcessor(new FakeSealedShardPublisher(TimeSpan.FromHours(1), (_, _, _, _, _) => Task.FromResult(true)), new ReminderOptions(), time);
 
         // Matching sets pass.
         NodeRuntime.ValidateMessageChannelParity([], []);
@@ -403,7 +430,7 @@ public sealed class WakeupEngineTests
     }
 
     private static MessageRecord EncodeRecord(GrainId target, string jobName, DateTimeOffset? dueTime) =>
-        new(WakeupMessageHandler.WakeupChannel, WakeupMessageCodec.Encode(new WakeupRecord(target, jobName, dueTime?.UtcTicks)));
+        new(ReminderMessageHandler.ReminderChannel, ReminderMessageCodec.Encode(new ReminderRecord(target, jobName, dueTime?.UtcTicks)));
 
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken ct)
     {
@@ -464,7 +491,7 @@ public sealed class WakeupEngineTests
         }
     }
 
-    private sealed class FakeDispatcher(Func<GrainId, IJobRunContext, CancellationToken, ValueTask<DurableJobRunResult>> dispatch) : IGrainWakeupDispatcher
+    private sealed class FakeDispatcher(Func<GrainId, IJobRunContext, CancellationToken, ValueTask<DurableJobRunResult>> dispatch) : IGrainReminderDispatcher
     {
         public ValueTask<DurableJobRunResult> DispatchAsync(GrainId target, IJobRunContext context, CancellationToken cancellationToken) =>
             dispatch(target, context, cancellationToken);

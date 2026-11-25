@@ -1,4 +1,4 @@
-﻿A marker: the start flag and no rows.
+A marker: the start flag and no rows.
   length 16, start True, offset 0, ordinal base 0, row count 0
 One Append row which defines a one-byte key, with an empty version base and token, count 0, and an empty body.
   length 23, start True, offset 0, ordinal base 0, row count 1
@@ -29,7 +29,7 @@ An empty Delete, with an empty body, followed by an Append of the same key, whos
   length 39, start True, offset 0, ordinal base 0, row count 2
   row 0: Delete, defines ordinal 0, key 6a6f75726e616c2f39 (length 9), version before (empty, 4), token empty, body empty
   row 1: Append, references ordinal 0, body 6166746572 (length 5)
-Two unversioned Message rows for the orleans.wakeup channel.
-  length 58, start True, offset 0, ordinal base 0, row count 2
-  row 0: Message, channel 'orleans.wakeup', body 776b3031 (length 4)
-  row 1: Message, channel 'orleans.wakeup', body 776b3032 (length 4)
+Two unversioned Message rows for the app.events channel.
+  length 50, start True, offset 0, ordinal base 0, row count 2
+  row 0: Message, channel 'app.events', body 65763031 (length 4)
+  row 1: Message, channel 'app.events', body 65763032 (length 4)

@@ -39,12 +39,12 @@ internal sealed class DurableJobQueueShared
 
 /// <summary>
 /// Grain-scoped outbox-style durable job queue implemented as an <see cref="IStateMachine"/> and
-/// <see cref="IGrainWakeupSource"/> on <see cref="IJournaledStateManager"/> and <see cref="GrainWakeupCoordinator"/>.
+/// <see cref="IGrainReminderSource"/> on <see cref="IJournaledStateManager"/> and <see cref="GrainReminderCoordinator"/>.
 /// </summary>
 internal sealed partial class DurableJobQueue :
     IDurableJobQueue,
     IStateMachine,
-    IGrainWakeupSource,
+    IGrainReminderSource,
     IDurableJobFeatureHandler,
     IDurableValueCommandHandler<DurableJobQueueCommand>,
     ILifecycleObserver,
@@ -53,8 +53,8 @@ internal sealed partial class DurableJobQueue :
     /// <summary>The reserved journal state name for the grain-local durable job queue.</summary>
     internal const string StateName = "$orleans.durable-job-queue";
 
-    /// <summary>The reserved wakeup job name registered with <see cref="GrainWakeupCoordinator"/> and <see cref="IDurableJobHandlerRegistry"/>.</summary>
-    internal const string WakeupJobName = "orleans.durable.jobqueue";
+    /// <summary>The reserved reminder job name registered with <see cref="GrainReminderCoordinator"/> and <see cref="IDurableJobHandlerRegistry"/>.</summary>
+    internal const string ReminderJobName = "orleans.durable.jobqueue";
 
     /// <summary>The sentinel shard ID reported on <see cref="DurableJob.ShardId"/> for grain-local queued jobs.</summary>
     internal const string LocalShardId = "$local";
@@ -63,7 +63,7 @@ internal sealed partial class DurableJobQueue :
 
     private readonly IGrainContext _grainContext;
     private readonly IJournaledStateManager _stateManager;
-    private readonly GrainWakeupCoordinator _wakeupCoordinator;
+    private readonly GrainReminderCoordinator _reminderCoordinator;
     private readonly DurableJobQueueShared _shared;
     private readonly Dictionary<string, JobEntry> _jobs = new(StringComparer.Ordinal);
     private readonly SortedSet<DueOrderKey> _dueOrder = new(DueOrderKeyComparer.Instance);
@@ -83,23 +83,23 @@ internal sealed partial class DurableJobQueue :
     public DurableJobQueue(
         IGrainContext grainContext,
         IJournaledStateManager stateManager,
-        GrainWakeupCoordinator wakeupCoordinator,
+        GrainReminderCoordinator reminderCoordinator,
         IDurableJobHandlerRegistry jobHandlers,
         DurableJobQueueShared shared)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(stateManager);
-        ArgumentNullException.ThrowIfNull(wakeupCoordinator);
+        ArgumentNullException.ThrowIfNull(reminderCoordinator);
         ArgumentNullException.ThrowIfNull(jobHandlers);
         ArgumentNullException.ThrowIfNull(shared);
 
         _grainContext = grainContext;
         _stateManager = stateManager;
-        _wakeupCoordinator = wakeupCoordinator;
+        _reminderCoordinator = reminderCoordinator;
         _shared = shared;
 
         _stateManager.RegisterStateMachine(StateName, this);
-        _wakeupCoordinator.RegisterSource(this, RecheckDelay);
+        _reminderCoordinator.RegisterSource(this, RecheckDelay);
         jobHandlers.Register(this);
 
         _grainContext.ObservableLifecycle.Subscribe(nameof(DurableJobQueue), GrainLifecycleStage.Activate, this);
@@ -110,7 +110,7 @@ internal sealed partial class DurableJobQueue :
         }, static _ => Task.CompletedTask);
     }
 
-    string IGrainWakeupSource.JobName => WakeupJobName;
+    string IGrainReminderSource.JobName => ReminderJobName;
 
     public IReadOnlyCollection<PendingGrainJob> PendingJobs => _jobs.Count == 0
         ? Array.Empty<PendingGrainJob>()
@@ -118,7 +118,7 @@ internal sealed partial class DurableJobQueue :
 
     public int Count => _jobs.Count;
 
-    internal string? TrackedBackingJobId => _wakeupCoordinator.GetTrackedBackingJobId(this);
+    internal string? TrackedBackingJobId => _reminderCoordinator.GetTrackedBackingJobId(this);
 
     internal bool IsFailed => _failed;
 
@@ -216,7 +216,7 @@ internal sealed partial class DurableJobQueue :
         return true;
     }
 
-    DateTimeOffset? IGrainWakeupSource.GetNextDueTime(DateTimeOffset now)
+    DateTimeOffset? IGrainReminderSource.GetNextDueTime(DateTimeOffset now)
     {
         if (_dueOrder.Count == 0)
         {
@@ -247,7 +247,7 @@ internal sealed partial class DurableJobQueue :
         if (_lastSequence != _capturedSequence && _dueOrder.Count > 0)
         {
             var minDue = _jobs[_dueOrder.Min.Id].Job.DueTime;
-            return _wakeupCoordinator.EnsureFallbackWakeupAsync(this, minDue, _shutdown.Token, cancellationToken);
+            return _reminderCoordinator.EnsureFallbackReminderAsync(this, minDue, _shutdown.Token, cancellationToken);
         }
 
         return ValueTask.CompletedTask;
@@ -299,17 +299,17 @@ internal sealed partial class DurableJobQueue :
 
     void IDurableValueCommandHandler<DurableJobQueueCommand>.ApplySet(DurableJobQueueCommand command) => Apply(command);
 
-    public bool CanHandle(string jobName) => string.Equals(jobName, WakeupJobName, StringComparison.Ordinal);
+    public bool CanHandle(string jobName) => string.Equals(jobName, ReminderJobName, StringComparison.Ordinal);
 
     public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken) =>
-        _wakeupCoordinator.ExecuteJobAsync(this, context, RunPassForJobAsync, attemptCancellationToken);
+        _reminderCoordinator.ExecuteJobAsync(this, context, RunPassForJobAsync, attemptCancellationToken);
 
     async Task ILifecycleObserver.OnStart(CancellationToken cancellationToken)
     {
-        if (!_wakeupCoordinator.SupportsMessageWrites && _dueOrder.Count > 0)
+        if (!_reminderCoordinator.SupportsMessageWrites && _dueOrder.Count > 0)
         {
             var minDue = _jobs[_dueOrder.Min.Id].Job.DueTime;
-            await _wakeupCoordinator.EnsureFallbackWakeupAsync(this, minDue, _shutdown.Token, cancellationToken).ConfigureAwait(true);
+            await _reminderCoordinator.EnsureFallbackReminderAsync(this, minDue, _shutdown.Token, cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -369,7 +369,7 @@ internal sealed partial class DurableJobQueue :
                 job.ToDurableJob(_grainContext.GrainId),
                 Guid.NewGuid().ToString("N"),
                 job.DequeueCount + 1,
-                isEphemeralWakeup: false);
+                isEphemeralReminder: false);
 
             DurableJobRunResult result;
             try
@@ -679,7 +679,7 @@ internal sealed partial class DurableJobQueue :
         }
     }
 
-    internal static DateTimeOffset GetWakeupRetryTime(IJobRunContext context, DateTimeOffset now, TimeSpan initialInterval)
+    internal static DateTimeOffset GetReminderRetryTime(IJobRunContext context, DateTimeOffset now, TimeSpan initialInterval)
     {
         var shift = Math.Min(Math.Max(context.DequeueCount - 1, 0), 8);
         var delay = TimeSpan.FromTicks(Math.Min(initialInterval.Ticks * (1L << shift), TimeSpan.FromMinutes(1).Ticks));

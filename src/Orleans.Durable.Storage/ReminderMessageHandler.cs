@@ -14,34 +14,34 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Storage;
 
 /// <summary>
-/// Data-plane <see cref="IMessageHandler"/> for <c>orleans.wakeup</c> (orleans.md §5.15): validates wakeup
-/// message payloads before admission and maintains one isolated <see cref="WakeupLedgerSession"/> per open ledger
+/// Data-plane <see cref="IMessageHandler"/> for <c>orleans.reminder</c> (orleans.md §5.15): validates reminder
+/// message payloads before admission and maintains one isolated <see cref="ReminderLedgerSession"/> per open ledger
 /// primary.
 /// </summary>
-internal sealed partial class WakeupMessageHandler : IMessageHandler
+internal sealed partial class ReminderMessageHandler : IMessageHandler
 {
-    /// <summary>The canonical <see cref="MessageChannel"/> for grain wakeups (<c>orleans.wakeup</c>).</summary>
-    public static readonly MessageChannel WakeupChannel = MessageChannel.Parse(WakeupMessageCodec.ChannelName);
+    /// <summary>The canonical <see cref="MessageChannel"/> for grain reminders (<c>orleans.reminder</c>).</summary>
+    public static readonly MessageChannel ReminderChannel = MessageChannel.Parse(ReminderMessageCodec.ChannelName);
 
     private static readonly string[] WellKnownJobNames =
     [
         MessagingPump.JobName,
-        DurableJobQueue.WakeupJobName,
+        DurableJobQueue.ReminderJobName,
     ];
 
-    private readonly WakeupOptions _options;
-    private readonly IGrainWakeupDispatcher _dispatcher;
+    private readonly ReminderOptions _options;
+    private readonly IGrainReminderDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly AdmissionGate _dispatchGate = new();
-    private readonly ConcurrentDictionary<LedgerId, WakeupLedgerSession> _sessions = new();
+    private readonly ConcurrentDictionary<LedgerId, ReminderLedgerSession> _sessions = new();
     private readonly ConcurrentDictionary<LedgerId, byte> _ledgersNeedingRoll = new();
     private int _stopped;
 
-    /// <summary>Initializes a new instance of the <see cref="WakeupMessageHandler"/> class.</summary>
-    public WakeupMessageHandler(
-        WakeupOptions options,
-        IGrainWakeupDispatcher dispatcher,
+    /// <summary>Initializes a new instance of the <see cref="ReminderMessageHandler"/> class.</summary>
+    public ReminderMessageHandler(
+        ReminderOptions options,
+        IGrainReminderDispatcher dispatcher,
         TimeProvider timeProvider,
         ILogger? logger = null)
     {
@@ -56,22 +56,22 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
     }
 
     /// <inheritdoc />
-    public MessageChannel Channel => WakeupChannel;
+    public MessageChannel Channel => ReminderChannel;
 
     /// <inheritdoc />
     public InvalidDataException? Validate(ReadOnlySpan<byte> payload) =>
-        WakeupMessageCodec.Decode(payload, TryInternJobName, out _);
+        ReminderMessageCodec.Decode(payload, TryInternJobName, out _);
 
     /// <inheritdoc />
     public IMessageSession OpenLedger(LedgerId ledger)
     {
-        var session = new WakeupLedgerSession(this, ledger);
+        var session = new ReminderLedgerSession(this, ledger);
         _sessions[ledger] = session;
         return session;
     }
 
     /// <summary>
-    /// Collects the ledgers whose open wakeup sessions exceeded <see cref="WakeupOptions.MaxWakeupBytesPerLedger"/>
+    /// Collects the ledgers whose open reminder sessions exceeded <see cref="ReminderOptions.MaxReminderBytesPerLedger"/>
     /// and should be proactively rolled (orleans.md §5.15).
     /// </summary>
     public ImmutableArray<LedgerId> CollectLedgersNeedingRoll()
@@ -94,10 +94,10 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
     }
 
     /// <summary>
-    /// Cancels all active wakeup timer loops and awaits every in-flight dispatch to drain cleanly during silo stop
+    /// Cancels all active reminder timer loops and awaits every in-flight dispatch to drain cleanly during silo stop
     /// (called inside <c>NodeRuntime.StopJournalsAsync</c> before <c>Journals.DisposeAsync</c>; orleans.md §5.15).
     /// </summary>
-    public async Task StopAsync()
+    public async ValueTask StopAsync()
     {
         if (Interlocked.Exchange(ref _stopped, 1) != 0)
         {
@@ -142,29 +142,29 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
 
     private void MarkNeedsRoll(LedgerId ledger) => _ledgersNeedingRoll[ledger] = 1;
 
-    private void RemoveSession(LedgerId ledger, WakeupLedgerSession session)
+    private void RemoveSession(LedgerId ledger, ReminderLedgerSession session)
     {
-        _ = _sessions.TryRemove(new KeyValuePair<LedgerId, WakeupLedgerSession>(ledger, session));
+        _ = _sessions.TryRemove(new KeyValuePair<LedgerId, ReminderLedgerSession>(ledger, session));
         _ = _ledgersNeedingRoll.TryRemove(ledger, out _);
     }
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Ephemeral wakeup dispatch for ({Target}, {JobName}) on ledger {Ledger} failed; retrying after backoff.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ephemeral reminder dispatch for ({Target}, {JobName}) on ledger {Ledger} failed; retrying after backoff.")]
     private static partial void LogDispatchFailed(ILogger logger, GrainId target, string jobName, LedgerId ledger, Exception exception);
 
     /// <summary>
-    /// Per-open-ledger primary wakeup session (orleans.md §5.15): indexed binary min-heap with zero dead entries,
+    /// Per-open-ledger primary reminder session (orleans.md §5.15): indexed binary min-heap with zero dead entries,
     /// session-monotonic generation counters, safe <c>InFlight</c> clearing/updating, and a <see cref="TimeProvider"/>
-    /// timer loop bounded by <see cref="WakeupOptions.MaxConcurrentWakeupDispatches"/>.
+    /// timer loop bounded by <see cref="ReminderOptions.MaxConcurrentReminderDispatches"/>.
     /// </summary>
-    internal sealed class WakeupLedgerSession : IMessageSession
+    internal sealed class ReminderLedgerSession : IMessageSession
     {
         private const long EntryOverheadBytes = 128;
 
-        private readonly WakeupMessageHandler _owner;
+        private readonly ReminderMessageHandler _owner;
         private readonly LedgerId _ledger;
         private readonly Lock _lock = new();
-        private readonly Dictionary<(GrainId Target, string JobName), WakeupEntry> _entries = [];
-        private readonly List<WakeupEntry> _heap = [];
+        private readonly Dictionary<(GrainId Target, string JobName), ReminderEntry> _entries = [];
+        private readonly List<ReminderEntry> _heap = [];
         private readonly CancellationTokenSource _cts = new();
         private readonly ITimer _timer;
         private ulong _nextGeneration;
@@ -174,14 +174,14 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
         private bool _rollRequested;
         private bool _disposed;
 
-        internal WakeupLedgerSession(WakeupMessageHandler owner, LedgerId ledger)
+        internal ReminderLedgerSession(ReminderMessageHandler owner, LedgerId ledger)
         {
             _owner = owner;
             _ledger = ledger;
-            _timer = owner._timeProvider.CreateTimer(static state => ((WakeupLedgerSession)state!).OnTimerTick(), this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _timer = owner._timeProvider.CreateTimer(static state => ((ReminderLedgerSession)state!).OnTimerTick(), this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
-        /// <summary>Gets the current count of tracked wakeup entries; for tests.</summary>
+        /// <summary>Gets the current count of tracked reminder entries; for tests.</summary>
         internal int EntryCount
         {
             get
@@ -209,14 +209,14 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
         public void OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records)
         {
             // Decode and intern outside _lock so the critical section only updates the map and heap.
-            var decoded = new WakeupRecord[records.Length];
+            var decoded = new ReminderRecord[records.Length];
             for (var i = 0; i < records.Length; i++)
             {
-                var rejection = WakeupMessageCodec.Decode(records[i].Payload.Span, TryInternJobName, out decoded[i]);
+                var rejection = ReminderMessageCodec.Decode(records[i].Payload.Span, TryInternJobName, out decoded[i]);
                 if (rejection is not null)
                 {
                     throw new InvalidDataException(
-                        string.Create(CultureInfo.InvariantCulture, $"Invalid wakeup message at ledger {_ledger} slot {slot}: {rejection.Message}"),
+                        string.Create(CultureInfo.InvariantCulture, $"Invalid reminder message at ledger {_ledger} slot {slot}: {rejection.Message}"),
                         rejection);
                 }
             }
@@ -250,7 +250,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
                         }
                         else
                         {
-                            var entry = new WakeupEntry(rec.Target, rec.JobName, dueTicks, gen, EstimateEntryBytes(rec.Target, rec.JobName));
+                            var entry = new ReminderEntry(rec.Target, rec.JobName, dueTicks, gen, EstimateEntryBytes(rec.Target, rec.JobName));
                             _entries.Add(key, entry);
                             _estimatedBytes += entry.EstimatedBytes;
                             HeapInsertOrUpdateLocked(entry);
@@ -261,7 +261,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
                         existing.Generation = ++_nextGeneration;
                         if (existing.InFlight)
                         {
-                            // Keep in _entries until dispatch finishes so a subsequent SetWakeup(t2) advances Generation safely.
+                            // Keep in _entries until dispatch finishes so a subsequent reminder update advances Generation safely.
                             existing.Cleared = true;
                         }
                         else
@@ -271,7 +271,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
                     }
                 }
 
-                if (!_rollRequested && _estimatedBytes > _owner._options.MaxWakeupBytesPerLedger)
+                if (!_rollRequested && _estimatedBytes > _owner._options.MaxReminderBytesPerLedger)
                 {
                     _rollRequested = true;
                     triggerRoll = true;
@@ -319,18 +319,27 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
             _owner.RemoveSession(_ledger, this);
         }
 
-        private void OnTimerTick() => DispatchDue();
+        private void OnTimerTick() => DispatchDue(fromTimer: true);
 
-        private void DispatchDue()
+        private void DispatchDue(bool fromTimer = false)
         {
+            var clearScheduled = fromTimer;
             while (true)
             {
-                WakeupEntry? entry;
+                ReminderEntry? entry;
                 ulong dispatchedGen;
                 long dispatchedDue;
                 lock (_lock)
                 {
-                    if (_disposed || _inFlightDispatches >= _owner._options.MaxConcurrentWakeupDispatches || _heap.Count == 0)
+                    if (clearScheduled)
+                    {
+                        // One-shot timer has fired; clear the cached arming target so an early OS wake-up or
+                        // capped >1-day wait re-arms the timer instead of stranding the entry.
+                        _scheduledDueTicks = long.MaxValue;
+                        clearScheduled = false;
+                    }
+
+                    if (_disposed || _inFlightDispatches >= _owner._options.MaxConcurrentReminderDispatches || _heap.Count == 0)
                     {
                         _ = ArmTimerOrNeedImmediateDispatchLocked();
                         return;
@@ -376,19 +385,19 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
             }
         }
 
-        private async Task DispatchOneAsync(WakeupEntry entry, ulong dispatchedGen, long dispatchedDueTicks, AdmissionGate.Admission gate)
+        private async Task DispatchOneAsync(ReminderEntry entry, ulong dispatchedGen, long dispatchedDueTicks, AdmissionGate.Admission gate)
         {
             try
             {
                 var job = new DurableJob
                 {
-                    Id = string.Create(CultureInfo.InvariantCulture, $"wakeup:{_ledger.Value}:{dispatchedGen}"),
+                    Id = string.Create(CultureInfo.InvariantCulture, $"reminder:{_ledger.Value}:{dispatchedGen}"),
                     Name = entry.JobName,
                     DueTime = new DateTimeOffset(dispatchedDueTicks, TimeSpan.Zero),
                     TargetGrainId = entry.Target,
                     ShardId = string.Create(CultureInfo.InvariantCulture, $"ledger:{_ledger.Value}"),
                 };
-                var context = new JobRunContext(job, Guid.NewGuid().ToString("N"), entry.RetryCount + 1, isEphemeralWakeup: true);
+                var context = new JobRunContext(job, Guid.NewGuid().ToString("N"), entry.RetryCount + 1, isEphemeralReminder: true);
 
                 DurableJobRunResult result;
                 try
@@ -414,7 +423,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
             }
         }
 
-        private void FinishDispatch(WakeupEntry entry, ulong dispatchedGen, DurableJobRunResult result, bool failed, Exception? exception)
+        private void FinishDispatch(ReminderEntry entry, ulong dispatchedGen, DurableJobRunResult result, bool failed, Exception? exception)
         {
             if (failed && exception is not null)
             {
@@ -434,7 +443,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
 
                 if (entry.Generation != dispatchedGen)
                 {
-                    // A newer SetWakeup arrived while this dispatch was in flight.
+                    // A newer reminder arrived while this dispatch was in flight.
                     if (entry.Cleared)
                     {
                         RemoveEntryLocked(entry);
@@ -469,7 +478,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
                 }
                 else
                 {
-                    // Completed cleanly and no newer SetWakeup arrived: remove from map.
+                    // Completed cleanly and no newer reminder arrived: remove from map.
                     RemoveEntryLocked(entry);
                 }
 
@@ -484,7 +493,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
 
         private bool ArmTimerOrNeedImmediateDispatchLocked()
         {
-            if (_disposed || _heap.Count == 0 || _inFlightDispatches >= _owner._options.MaxConcurrentWakeupDispatches)
+            if (_disposed || _heap.Count == 0 || _inFlightDispatches >= _owner._options.MaxConcurrentReminderDispatches)
             {
                 if (_scheduledDueTicks != long.MaxValue && !_disposed)
                 {
@@ -514,7 +523,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
             return false;
         }
 
-        private void RemoveEntryLocked(WakeupEntry entry)
+        private void RemoveEntryLocked(ReminderEntry entry)
         {
             if (entry.HeapIndex >= 0)
             {
@@ -524,11 +533,11 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
             if (_entries.Remove((entry.Target, entry.JobName)))
             {
                 _estimatedBytes -= entry.EstimatedBytes;
-                Debug.Assert(_estimatedBytes >= 0, "Estimated wakeup bytes never go negative.");
+                Debug.Assert(_estimatedBytes >= 0, "Estimated reminder bytes never go negative.");
             }
         }
 
-        private void HeapInsertOrUpdateLocked(WakeupEntry entry)
+        private void HeapInsertOrUpdateLocked(ReminderEntry entry)
         {
             if (entry.HeapIndex >= 0)
             {
@@ -637,7 +646,7 @@ internal sealed partial class WakeupMessageHandler : IMessageHandler
         private static long EstimateEntryBytes(GrainId target, string jobName) =>
             EntryOverheadBytes + target.Type.Value.AsSpan().Length + target.Key.Value.Length + jobName.Length * sizeof(char);
 
-        private sealed class WakeupEntry(GrainId target, string jobName, long dueTimeUtcTicks, ulong generation, long estimatedBytes)
+        private sealed class ReminderEntry(GrainId target, string jobName, long dueTimeUtcTicks, ulong generation, long estimatedBytes)
         {
             public GrainId Target { get; } = target;
             public string JobName { get; } = jobName;

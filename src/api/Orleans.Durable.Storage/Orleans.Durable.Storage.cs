@@ -76,9 +76,9 @@ namespace Orleans.Durable.Storage
 
         public bool PreallocateWalFiles { get { throw null; } set { } }
 
-        public string Root { get { throw null; } set { } }
+        public ReminderOptions Reminders { get { throw null; } set { } }
 
-        public WakeupOptions Wakeup { get { throw null; } set { } }
+        public string Root { get { throw null; } set { } }
 
         public long WalFileSize { get { throw null; } set { } }
 
@@ -109,17 +109,17 @@ namespace Orleans.Durable.Storage
         public string? Journal { get { throw null; } }
     }
 
-    public sealed partial class WakeupOptions
+    public sealed partial class ReminderOptions
     {
         public System.TimeSpan InitialRetryDelay { get { throw null; } set { } }
 
-        public int MaxConcurrentWakeupDispatches { get { throw null; } set { } }
+        public int MaxConcurrentReminderDispatches { get { throw null; } set { } }
 
-        public int MaxConcurrentWakeupSchedules { get { throw null; } set { } }
+        public int MaxConcurrentReminderPublishes { get { throw null; } set { } }
+
+        public long MaxReminderBytesPerLedger { get { throw null; } set { } }
 
         public System.TimeSpan MaxRetryDelay { get { throw null; } set { } }
-
-        public long MaxWakeupBytesPerLedger { get { throw null; } set { } }
 
         public System.TimeSpan OverdueJitterWindow { get { throw null; } set { } }
     }

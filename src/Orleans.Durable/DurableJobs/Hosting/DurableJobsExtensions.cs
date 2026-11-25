@@ -51,7 +51,7 @@ public static class DurableJobsExtensions
         services.AddFromExisting<ISealedJobShardPublisher, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
         services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
-        services.TryAddScoped<GrainWakeupCoordinator>();
+        services.TryAddScoped<GrainReminderCoordinator>();
         services.AddOptions<DurableJobQueueOptions>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<DurableJobQueueOptions>, DurableJobQueueOptionsValidation>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigurationValidator, DurableJobQueueOptionsValidator>());
@@ -60,8 +60,8 @@ public static class DurableJobsExtensions
             var shouldRetry = options.ShouldRetry;
             var clock = sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs) ?? TimeProvider.System;
             var queueOptions = sp.GetRequiredService<IOptions<DurableJobQueueOptions>>();
-            options.ShouldRetry = (context, exception) => string.Equals(context.Job.Name, DurableJobQueue.WakeupJobName, StringComparison.Ordinal)
-                ? DurableJobQueue.GetWakeupRetryTime(context, clock.GetUtcNow(), queueOptions.Value.RetryInitialInterval)
+            options.ShouldRetry = (context, exception) => string.Equals(context.Job.Name, DurableJobQueue.ReminderJobName, StringComparison.Ordinal)
+                ? DurableJobQueue.GetReminderRetryTime(context, clock.GetUtcNow(), queueOptions.Value.RetryInitialInterval)
                 : shouldRetry(context, exception);
         });
         services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobQueueJsonContext.Default));

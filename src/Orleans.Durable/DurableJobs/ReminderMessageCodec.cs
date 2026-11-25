@@ -10,17 +10,17 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Jobs;
 
 /// <summary>
-/// A decoded wakeup message record (<see cref="WakeupMessageCodec"/>): schedules a wakeup for
-/// (<see cref="Target"/>, <see cref="JobName"/>) at <see cref="DueTimeUtcTicks"/>, or clears any pending wakeup when
+/// A decoded reminder message record (<see cref="ReminderMessageCodec"/>): schedules a reminder for
+/// (<see cref="Target"/>, <see cref="JobName"/>) at <see cref="DueTimeUtcTicks"/>, or clears any pending reminder when
 /// <see cref="DueTimeUtcTicks"/> is <see langword="null"/>.
 /// </summary>
 /// <param name="Target">The target grain identifier.</param>
 /// <param name="JobName">The non-blank durable job name.</param>
-/// <param name="DueTimeUtcTicks">The UTC ticks when the wakeup is due, or <see langword="null"/> to clear.</param>
-public readonly record struct WakeupRecord(GrainId Target, string JobName, long? DueTimeUtcTicks);
+/// <param name="DueTimeUtcTicks">The UTC ticks when the reminder is due, or <see langword="null"/> to clear.</param>
+public readonly record struct ReminderRecord(GrainId Target, string JobName, long? DueTimeUtcTicks);
 
 /// <summary>
-/// Canonical binary codec for <c>orleans.wakeup</c> message records (wire version 1, little-endian).
+/// Canonical binary codec for <c>orleans.reminder</c> message records (wire version 1, little-endian).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -29,10 +29,10 @@ public readonly record struct WakeupRecord(GrainId Target, string JobName, long?
 /// TargetGrainIdUtf8 | JobNameLen (varint 1..256) | JobNameUtf8 | [DueTimeUtcTicks (i64 LE, 0..DateTimeOffset.MaxValue.UtcTicks)]</c>.
 /// </para>
 /// </remarks>
-public static class WakeupMessageCodec
+public static class ReminderMessageCodec
 {
-    /// <summary>The canonical message channel name for grain wakeups.</summary>
-    public const string ChannelName = "orleans.wakeup";
+    /// <summary>The canonical message channel name for grain reminders.</summary>
+    public const string ChannelName = "orleans.reminder";
 
     /// <summary>Wire format version 1.</summary>
     public const byte Version = 1;
@@ -46,7 +46,7 @@ public static class WakeupMessageCodec
     /// <summary>The maximum encoded UTF-8 byte length of <c>JobName</c>.</summary>
     public const int MaxJobNameUtf8Length = 256;
 
-    /// <summary>The maximum valid wire length of a version 1 wakeup message record.</summary>
+    /// <summary>The maximum valid wire length of a version 1 reminder message record.</summary>
     public const int MaxEncodedLength = 1 + 1 + 2 + MaxGrainIdUtf8Length + 2 + MaxJobNameUtf8Length + sizeof(long);
 
     internal const string ReasonKey = "orleans.durable.storage.decode.reason";
@@ -68,27 +68,27 @@ public static class WakeupMessageCodec
     private static readonly long MaxDueTimeTicks = DateTimeOffset.MaxValue.UtcTicks;
 
     /// <summary>Encodes <paramref name="record"/> into a newly allocated canonical byte array.</summary>
-    public static byte[] Encode(in WakeupRecord record)
+    public static byte[] Encode(in ReminderRecord record)
     {
         var length = GetEncodedLength(record, out var grainIdUtf8, out var jobNameUtf8);
         var buffer = new byte[length];
         var written = WriteValidated(buffer, grainIdUtf8, jobNameUtf8, record.DueTimeUtcTicks);
         if (written != length)
         {
-            throw new InvalidOperationException("Encoded wakeup message length did not match computed length.");
+            throw new InvalidOperationException("Encoded reminder message length did not match computed length.");
         }
 
         return buffer;
     }
 
     /// <summary>Encodes <paramref name="record"/> into <paramref name="destination"/> and returns the bytes written.</summary>
-    public static int Encode(in WakeupRecord record, Span<byte> destination)
+    public static int Encode(in ReminderRecord record, Span<byte> destination)
     {
         var length = GetEncodedLength(record, out var grainIdUtf8, out var jobNameUtf8);
         if (destination.Length < length)
         {
             throw new ArgumentException(
-                string.Create(CultureInfo.InvariantCulture, $"Destination span ({destination.Length} bytes) is shorter than the encoded wakeup record ({length} bytes)."),
+                string.Create(CultureInfo.InvariantCulture, $"Destination span ({destination.Length} bytes) is shorter than the encoded reminder record ({length} bytes)."),
                 nameof(destination));
         }
 
@@ -96,19 +96,19 @@ public static class WakeupMessageCodec
     }
 
     /// <summary>
-    /// Validates and decodes a wakeup message record from a contiguous byte span, checking rules in procedural order.
+    /// Validates and decodes a reminder message record from a contiguous byte span, checking rules in procedural order.
     /// </summary>
-    public static InvalidDataException? Decode(ReadOnlySpan<byte> payload, out WakeupRecord record) =>
+    public static InvalidDataException? Decode(ReadOnlySpan<byte> payload, out ReminderRecord record) =>
         Decode(payload, internJobName: null, out record);
 
     /// <summary>
-    /// Validates and decodes a wakeup message record from a contiguous byte span, optionally interning <c>JobName</c>
+    /// Validates and decodes a reminder message record from a contiguous byte span, optionally interning <c>JobName</c>
     /// via <paramref name="internJobName"/>.
     /// </summary>
     internal static InvalidDataException? Decode(
         ReadOnlySpan<byte> payload,
         Func<ReadOnlySpan<byte>, string?>? internJobName,
-        out WakeupRecord record)
+        out ReminderRecord record)
     {
         record = default;
         if (payload.Length < 1)
@@ -225,20 +225,20 @@ public static class WakeupMessageCodec
             return Reject(ReasonTrailingBytes, string.Create(CultureInfo.InvariantCulture, $"Wakeup message has {payload.Length - offset} trailing bytes."));
         }
 
-        record = new WakeupRecord(target, jobName, dueTimeTicks);
+        record = new ReminderRecord(target, jobName, dueTimeTicks);
         return null;
     }
 
     /// <summary>
-    /// Validates and decodes a wakeup message record from a potentially multi-segment <see cref="ReadOnlySequence{T}"/>.
+    /// Validates and decodes a reminder message record from a potentially multi-segment <see cref="ReadOnlySequence{T}"/>.
     /// </summary>
-    public static InvalidDataException? Decode(ReadOnlySequence<byte> payload, out WakeupRecord record) =>
+    public static InvalidDataException? Decode(ReadOnlySequence<byte> payload, out ReminderRecord record) =>
         Decode(payload, internJobName: null, out record);
 
     internal static InvalidDataException? Decode(
         ReadOnlySequence<byte> payload,
         Func<ReadOnlySpan<byte>, string?>? internJobName,
-        out WakeupRecord record)
+        out ReminderRecord record)
     {
         if (payload.IsSingleSegment)
         {
@@ -259,16 +259,16 @@ public static class WakeupMessageCodec
         return Decode(prefix, internJobName, out record);
     }
 
-    private static int GetEncodedLength(in WakeupRecord record, out byte[] grainIdUtf8, out byte[] jobNameUtf8)
+    private static int GetEncodedLength(in ReminderRecord record, out byte[] grainIdUtf8, out byte[] jobNameUtf8)
     {
         if (record.Target.IsDefault)
         {
-            throw new ArgumentException("Wakeup Target GrainId must not be default.", nameof(record));
+            throw new ArgumentException("Reminder Target GrainId must not be default.", nameof(record));
         }
 
         if (string.IsNullOrWhiteSpace(record.JobName))
         {
-            throw new ArgumentException("Wakeup JobName must not be null or whitespace.", nameof(record));
+            throw new ArgumentException("Reminder JobName must not be null or whitespace.", nameof(record));
         }
 
         if (record.DueTimeUtcTicks is { } ticks && (ticks < 0 || ticks > MaxDueTimeTicks))
@@ -276,7 +276,7 @@ public static class WakeupMessageCodec
             throw new ArgumentOutOfRangeException(
                 nameof(record),
                 ticks,
-                string.Create(CultureInfo.InvariantCulture, $"Wakeup DueTimeUtcTicks {ticks} must be within [0, {MaxDueTimeTicks}]."));
+                string.Create(CultureInfo.InvariantCulture, $"Reminder DueTimeUtcTicks {ticks} must be within [0, {MaxDueTimeTicks}]."));
         }
 
         var grainText = record.Target.ToString();

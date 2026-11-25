@@ -221,7 +221,7 @@
       "rowBody": ""
     },
     {
-      "name": "An Append with one attached local append.",
+      "name": "An Append with one attached message.",
       "rowKey": "19f68fb16f72646572732f3432",
       "kind": "Append",
       "expectedVersion": {
@@ -230,12 +230,12 @@
       },
       "localAppends": [
         {
-          "stream": "orleans.wakeup",
-          "payload": "776b3031"
+          "stream": "app.events",
+          "payload": "65763031"
         }
       ],
       "payload": "68656c6c6f",
-      "hex": "1ba2c752800000010e6f726c65616e732e77616b65757004776b303168656c6c6f",
+      "hex": "dda23b86800000010a6170702e6576656e7473046576303168656c6c6f",
       "rowKind": "Append",
       "versionBefore": {
         "base": "",
@@ -244,7 +244,7 @@
       "rowBody": "68656c6c6f"
     },
     {
-      "name": "An empty Replace with two attached local appends (one empty payload, one non-empty).",
+      "name": "An empty Replace with two attached messages (one empty payload, one non-empty).",
       "rowKey": "19f68fb16f72646572732f3432",
       "kind": "Replace",
       "expectedVersion": {
@@ -271,7 +271,7 @@
       "rowBody": ""
     },
     {
-      "name": "A Delete with one attached local append.",
+      "name": "A Delete with one attached message.",
       "rowKey": "19f68fb16f72646572732f3432",
       "kind": "Delete",
       "expectedVersion": {
@@ -281,11 +281,11 @@
       "deletedAt": "639301248000000000",
       "localAppends": [
         {
-          "stream": "orleans.wakeup",
-          "payload": "776b3031"
+          "stream": "app.events",
+          "payload": "65763031"
         }
       ],
-      "hex": "a05b9f0c8200080000810f1941df08010e6f726c65616e732e77616b65757004776b3031",
+      "hex": "b6b834b38200080000810f1941df08010a6170702e6576656e74730465763031",
       "rowKind": "Delete",
       "versionBefore": {
         "base": "",

@@ -25,10 +25,10 @@ public interface IJobRunContext
     int DequeueCount { get; }
 
     /// <summary>
-    /// Gets a value indicating whether this invocation was dispatched from an ephemeral primary-side ledger wakeup
+    /// Gets a value indicating whether this invocation was dispatched from an ephemeral primary-side ledger reminder
     /// session rather than a durable backing job shard.
     /// </summary>
-    bool IsEphemeralWakeup => false;
+    bool IsEphemeralReminder => false;
 }
 
 /// <summary>
@@ -59,7 +59,7 @@ internal class JobRunContext : IJobRunContext
 
     /// <inheritdoc />
     [Id(3)]
-    public bool IsEphemeralWakeup { get; }
+    public bool IsEphemeralReminder { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobRunContext"/> class.
@@ -67,13 +67,13 @@ internal class JobRunContext : IJobRunContext
     /// <param name="job">The durable job to execute.</param>
     /// <param name="runId">The unique identifier for this execution run.</param>
     /// <param name="retryCount">The number of times this job has been dequeued, including retries.</param>
-    /// <param name="isEphemeralWakeup">Whether this invocation was dispatched from an ephemeral primary-side ledger wakeup session.</param>
-    public JobRunContext(DurableJob job, string runId, int retryCount, bool isEphemeralWakeup = false)
+    /// <param name="isEphemeralReminder">Whether this invocation was dispatched from an ephemeral primary-side ledger reminder session.</param>
+    public JobRunContext(DurableJob job, string runId, int retryCount, bool isEphemeralReminder = false)
     {
         Job = job;
         RunId = runId;
         DequeueCount = retryCount;
-        IsEphemeralWakeup = isEphemeralWakeup;
+        IsEphemeralReminder = isEphemeralReminder;
     }
 }
 

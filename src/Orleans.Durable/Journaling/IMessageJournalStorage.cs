@@ -104,7 +104,7 @@ public interface IMessageJournalStorage : IJournalStorage
 }
 
 /// <summary>
-/// Internal grain-scoped participant (such as <see cref="Jobs.GrainWakeupCoordinator"/>) notified by
+/// Internal grain-scoped participant (such as <see cref="Jobs.GrainReminderCoordinator"/>) notified by
 /// <see cref="JournaledStateManager"/> during recovery, write capture, write completion, and reset/failure.
 /// </summary>
 internal interface IMessageWriteParticipant

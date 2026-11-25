@@ -60,7 +60,7 @@ public readonly struct GrainJobRequest
             throw new ArgumentException($"Job name length ({JobName.Length}) exceeds the maximum of {MaxJobNameLength} characters.", paramName);
         }
 
-        if (string.Equals(JobName, DurableJobQueue.WakeupJobName, StringComparison.Ordinal))
+        if (string.Equals(JobName, DurableJobQueue.ReminderJobName, StringComparison.Ordinal))
         {
             throw new ArgumentException($"Job name '{JobName}' is reserved by the durable job queue.", paramName);
         }

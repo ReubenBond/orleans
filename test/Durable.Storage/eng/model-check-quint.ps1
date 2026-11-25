@@ -1956,22 +1956,22 @@ try {
         Invoke-Case 'archive-logs-drainers-3-sweeping' 'ArchiveLogs' (With $logsDrainers @{ Sweeping = 'true' }) $logsInvariants
     }
 
-    # MessageDrain: unified single-pass DrainScan message draining + deterministic sealed JobShard publishing
+    # MessageDrain: unified single-pass DrainScan message draining + idempotent per-segment durable-sink commit
     # (LG-I15, LG-I16, JS-I11, JS-I12) across LSM (DrainWorker) and Archive Logs (ArchiveLogDrainWorker),
-    # covering same-segment clear, cross-segment set-then-clear, message-only segments, racing drainers, and crashes.
-    $messageDrainInvariants = @('TypeOK', 'WakeupPreserved', 'NoDropBeforeMessagesCommitted', 'ClearedInSegmentWritesNothing', 'IdempotentShardPublish')
-    $messageDrainLiveness = @('EventuallyDrainedAndDropped', 'EventuallyWakeupDelivered')
+    # covering same-segment retract, cross-segment emit-then-retract, message-only segments, racing drainers, and crashes.
+    $messageDrainInvariants = @('TypeOK', 'MessagesPreserved', 'NoDropBeforeMessagesCommitted', 'EmptyFoldWritesNothing', 'IdempotentCommit')
+    $messageDrainLiveness = @('EventuallyDrainedAndDropped', 'EventuallyMessagesDelivered')
 
     $messageDrainLsm = [ordered]@{
         Mode = '"lsm"'
-        Seg0 = '["S", "K"]'
+        Seg0 = '["E", "K"]'
         Seg1 = '[]'
         Drainers = 2
         MaxCrashes = 1
         Mutation = '"none"'
     }
     $messageDrainLsmCleared = With $messageDrainLsm @{
-        Seg0 = '["S", "C"]'
+        Seg0 = '["E", "R"]'
         Drainers = 1
     }
     $messageDrainLsmMessageOnly = With $messageDrainLsm @{
@@ -1979,8 +1979,8 @@ try {
         Drainers = 1
     }
     $messageDrainLsmMulti = With $messageDrainLsm @{
-        Seg0 = '["S"]'
-        Seg1 = '["C"]'
+        Seg0 = '["E"]'
+        Seg1 = '["R"]'
         Drainers = 1
     }
     $messageDrainLogs = With $messageDrainLsm @{
@@ -2011,20 +2011,20 @@ try {
     Invoke-Case 'message-drain-liveness-logs' 'MessageDrain' $messageDrainLivenessLogs -Temporal $messageDrainLiveness
 
     # Non-vacuity witnesses (each must produce a counterexample in the unmutated model).
-    Invoke-Case 'message-drain-witness-NeverSurvivingCrashWakeup' 'MessageDrain' $messageDrainLsm -ExpectedInvariant 'NeverSurvivingCrashWakeup'
+    Invoke-Case 'message-drain-witness-NeverSurvivingCrashMessage' 'MessageDrain' $messageDrainLsm -ExpectedInvariant 'NeverSurvivingCrashMessage'
     Invoke-Case 'message-drain-witness-NeverClearedInSegment' 'MessageDrain' $messageDrainLsmCleared -ExpectedInvariant 'NeverClearedInSegment'
     Invoke-Case 'message-drain-witness-NeverMessageOnlySegment' 'MessageDrain' $messageDrainLsmMessageOnly -ExpectedInvariant 'NeverMessageOnlySegment'
-    Invoke-Case 'message-drain-witness-NeverCrossSegmentSetThenClear' 'MessageDrain' $messageDrainLsmMulti -ExpectedInvariant 'NeverCrossSegmentSetThenClear'
+    Invoke-Case 'message-drain-witness-NeverCrossSegmentEmitThenRetract' 'MessageDrain' $messageDrainLsmMulti -ExpectedInvariant 'NeverCrossSegmentEmitThenRetract'
     Invoke-Case 'message-drain-witness-NeverRacingDrainers' 'MessageDrain' $messageDrainLsm -ExpectedInvariant 'NeverRacingDrainers'
 
     # Guard-disabling safety mutants (one per invariant + volatile-answer mutant).
     foreach ($case in @(
         @('drop-before-messages-committed', $messageDrainLsm, 'NoDropBeforeMessagesCommitted'),
         @('drop-before-messages-committed', $messageDrainLogs, 'NoDropBeforeMessagesCommitted'),
-        @('skip-unknown-channel', $messageDrainLsm, 'WakeupPreserved'),
-        @('volatile-answer', $messageDrainLsm, 'WakeupPreserved'),
-        @('non-deterministic-shard-id', $messageDrainLsm, 'IdempotentShardPublish'),
-        @('write-on-empty-fold', $messageDrainLsmCleared, 'ClearedInSegmentWritesNothing'))) {
+        @('skip-unknown-channel', $messageDrainLsm, 'MessagesPreserved'),
+        @('volatile-answer', $messageDrainLsm, 'MessagesPreserved'),
+        @('non-idempotent-commit', $messageDrainLsm, 'IdempotentCommit'),
+        @('write-on-empty-fold', $messageDrainLsmCleared, 'EmptyFoldWritesNothing'))) {
         Invoke-Case "message-drain-mutant-$($case[0])-$($case[2])" 'MessageDrain' (Mutant $case[1] $case[0]) `
             -ExpectedInvariant $case[2]
     }

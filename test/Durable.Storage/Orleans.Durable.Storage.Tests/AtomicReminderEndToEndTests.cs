@@ -34,9 +34,9 @@ namespace Orleans.Durable.Storage.Tests;
 /// </summary>
 [Collection(TestingHostCollection.Name)]
 [TestCategory("EndToEnd")]
-public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
+public sealed class AtomicReminderEndToEndTests : IAsyncLifetime
 {
-    private const string StateKey = "AtomicWakeupE2EState";
+    private const string StateKey = "AtomicReminderE2EState";
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
     private static readonly ConcurrentDictionary<string, E2EState> States = new(StringComparer.Ordinal);
 
@@ -86,14 +86,14 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
     /// <list type="number">
     /// <item>Warm local-primary cold <c>Outbox</c> send + fast deliver + retire = 0 <c>ScheduleJobAsync</c> calls, 0 sealed shard publishes, and 0 after ledger close &amp; drain (<c>SetWakeup(null)</c>).</item>
     /// <item>Remote (non-primary) silo forwarded message write succeeds with 0 <c>ScheduleJobAsync</c> / sealed shard calls, and invalid unregistered channel returns <see cref="ArgumentException"/> (<see cref="JournalRefusal.Argument"/>).</item>
-    /// <item>Idle grain deactivation while ledger stays open with delayed message: <see cref="WakeupMessageHandler.WakeupLedgerSession"/> wakes the grain at <c>DueTime</c> with 0 <c>ScheduleJobAsync</c> / sealed shard calls.</item>
-    /// <item>Primary crash while delivery is blocked: surviving silo drains closed ledger through single-pass <c>DrainScan</c> + <see cref="WakeupMessageProcessor"/>, publishes 1 deterministic sealed <c>JobShard</c> via <see cref="ISealedJobShardPublisher"/> (0 <c>ScheduleJobAsync</c> calls, retrying past an injected transient publish failure), and wakes the grain on a surviving silo to complete delivery.</item>
+    /// <item>Idle grain deactivation while ledger stays open with delayed message: <see cref="ReminderMessageHandler.ReminderLedgerSession"/> wakes the grain at <c>DueTime</c> with 0 <c>ScheduleJobAsync</c> / sealed shard calls.</item>
+    /// <item>Primary crash while delivery is blocked: surviving silo drains closed ledger through single-pass <c>DrainScan</c> + <see cref="ReminderMessageProcessor"/>, publishes 1 deterministic sealed <c>JobShard</c> via <see cref="ISealedJobShardPublisher"/> (0 <c>ScheduleJobAsync</c> calls, retrying past an injected transient publish failure), and wakes the grain on a surviving silo to complete delivery.</item>
     /// </list>
     /// </summary>
     [Theory(Timeout = 180_000)]
     [InlineData(ArchiveStoreKind.Lsm)]
     [InlineData(ArchiveStoreKind.Logs)]
-    public async Task AtomicMessagingWakeupsWorkEndToEndAcrossLsmAndArchiveLogs(ArchiveStoreKind archiveKind)
+    public async Task AtomicMessagingRemindersWorkEndToEndAcrossLsmAndArchiveLogs(ArchiveStoreKind archiveKind)
     {
         var ct = TestContext.Current.CancellationToken;
         _state.ArchiveKind = archiveKind;
@@ -118,8 +118,8 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
 
         // 1. Warm local-primary Outbox send + fast deliver + retire -> 0 ScheduleJobAsync, 0 sealed shards, 0 object-store writes!
         var objectWritesBeforeFast = _state.TotalObjectWrites;
-        var receiver = cluster.GrainFactory.GetGrain<IWakeupReceiverGrain>("rx-fast");
-        var sender = cluster.GrainFactory.GetGrain<IWakeupSenderGrain>("tx-fast");
+        var receiver = cluster.GrainFactory.GetGrain<IReminderReceiverGrain>("rx-fast");
+        var sender = cluster.GrainFactory.GetGrain<IReminderSenderGrain>("tx-fast");
         var senderRowKey = JournalRowKey.Encode(JournalId.FromGrainId(sender.GetGrainId()).Value);
         await sender.SendAsync(receiver.GetGrainId(), "hello-1rtt", deliverDelay: null);
         await WaitUntilAsync(async () => (await receiver.ReceivedAsync()).Contains("hello-1rtt"), "fast 1-RTT message delivery");
@@ -150,16 +150,16 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
         var remoteStorage = new DurableJournalStorage(new JournalId("remote/companion"), remoteRouter, remoteRouting, remoteOptions.Journals.MaxBodyBytes, "json", TimeProvider.System);
         await remoteStorage.ReadAsync(new NoOpConsumer(), Token);
 
-        var validWakeup = WakeupMessageCodec.Encode(new WakeupRecord(GrainId.Create("remote", "1"), "orleans.messaging.pump", (DateTimeOffset.UtcNow + TimeSpan.FromHours(1)).UtcTicks));
+        var validReminder = ReminderMessageCodec.Encode(new ReminderRecord(GrainId.Create("remote", "1"), "orleans.messaging.pump", (DateTimeOffset.UtcNow + TimeSpan.FromHours(1)).UtcTicks));
         await remoteStorage.AppendWithMessagesAsync(
             new ReadOnlySequence<byte>("{\"ok\":1}\n"u8.ToArray()),
-            new[] { new JournalMessageRecord(WakeupMessageCodec.ChannelName, validWakeup) },
+            new[] { new JournalMessageRecord(ReminderMessageCodec.ChannelName, validReminder) },
             Token);
         // Clear it so we keep sealed shard count at 0 for the next check.
-        var clearWakeup = WakeupMessageCodec.Encode(new WakeupRecord(GrainId.Create("remote", "1"), "orleans.messaging.pump", null));
+        var clearReminder = ReminderMessageCodec.Encode(new ReminderRecord(GrainId.Create("remote", "1"), "orleans.messaging.pump", null));
         await remoteStorage.AppendWithMessagesAsync(
             new ReadOnlySequence<byte>("{\"ok\":2}\n"u8.ToArray()),
-            new[] { new JournalMessageRecord(WakeupMessageCodec.ChannelName, clearWakeup) },
+            new[] { new JournalMessageRecord(ReminderMessageCodec.ChannelName, clearReminder) },
             Token);
         Assert.Equal(0, _state.TotalScheduleJobCalls);
         Assert.Equal(0, _state.TotalSealedShardPublishes);
@@ -172,62 +172,77 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
             ct).AsTask());
         Assert.Contains("unregistered.channel", badEx.Message, StringComparison.Ordinal);
 
-        // 3. Idle grain deactivation while ledger stays open -> WakeupLedgerSession wakes grain at DueTime (0 sealed shards, 0 object writes)!
+        // 3. Idle grain deactivation while ledger stays open -> ReminderLedgerSession wakes the truly deactivated
+        //    receiver grain at DeliverAt (0 sealed shards, 0 object writes; poll E2EState without calling the grain)!
         var objectWritesBeforeDelayed = _state.TotalObjectWrites;
-        var delayedReceiver = cluster.GrainFactory.GetGrain<IWakeupReceiverGrain>("rx-delayed");
-        var delayedSender = cluster.GrainFactory.GetGrain<IWakeupSenderGrain>("tx-delayed");
+        var delayedReceiver = cluster.GrainFactory.GetGrain<IReminderReceiverGrain>("rx-delayed");
+        var delayedSender = cluster.GrainFactory.GetGrain<IReminderSenderGrain>("tx-delayed");
         await delayedSender.SendAsync(delayedReceiver.GetGrainId(), "wake-while-open", deliverDelay: TimeSpan.FromSeconds(2));
+        await WaitUntilAsync(async () => await delayedSender.OutboxCountAsync() == 0, "delayed message acceptance by receiver inbox");
         await delayedReceiver.DeactivateNowAsync();
         await delayedSender.DeactivateNowAsync();
 
-        await WaitUntilAsync(async () => (await delayedReceiver.ReceivedAsync()).Contains("wake-while-open"), "WakeupLedgerSession to wake deactivated grain");
-        await WaitUntilAsync(async () => await delayedSender.OutboxCountAsync() == 0, "delayed sender outbox retirement");
+        await WaitUntilAsync(() => _state.HasDelivered("wake-while-open"), "ReminderLedgerSession to wake deactivated receiver grain");
+        Assert.Contains("wake-while-open", await delayedReceiver.ReceivedAsync());
         Assert.Equal(0, _state.TotalScheduleJobCalls);
         Assert.Equal(0, _state.TotalSealedShardPublishes);
         Assert.Equal(objectWritesBeforeDelayed, _state.TotalObjectWrites);
 
-        // 4. Primary crash after Accepted while delivery is blocked -> single-pass DrainScan publishes 1 deterministic
-        //    sealed JobShard (retrying past 1 injected transient publish failure!) and delivers on surviving silo!
-        _state.AllowDelivery = false;
-        var crashReceiver = cluster.GrainFactory.GetGrain<IWakeupReceiverGrain>("rx-crash");
-        var crashSender = cluster.GrainFactory.GetGrain<IWakeupSenderGrain>("tx-crash");
-        await crashSender.SendAsync(crashReceiver.GetGrainId(), "survive-primary-crash", deliverDelay: null);
+        // 4. Primary crash after delayed message is durably accepted in crashReceiver's Inbox -> single-pass DrainScan
+        //    publishes 1 deterministic sealed JobShard (retrying past 1 injected transient publish failure!) and wakes
+        //    crashReceiver on a surviving silo without any external grain call!
+        var crashReceiver = cluster.GrainFactory.GetGrain<IReminderReceiverGrain>("rx-crash");
+        var crashSender = cluster.GrainFactory.GetGrain<IReminderSenderGrain>("tx-crash");
+        await crashSender.SendAsync(crashReceiver.GetGrainId(), "survive-primary-crash", deliverDelay: TimeSpan.FromSeconds(4));
+        await WaitUntilAsync(async () => await crashSender.OutboxCountAsync() == 0, "crash message acceptance by crashReceiver inbox");
+        Assert.False(_state.HasDelivered("survive-primary-crash"));
         Assert.Equal(0, _state.TotalScheduleJobCalls);
         Assert.Equal(0, _state.TotalSealedShardPublishes);
 
         var crashMap = await ReadMapAsync();
-        var crashRowKey = JournalRowKey.Encode(JournalId.FromGrainId(crashSender.GetGrainId()).Value);
+        var crashRowKey = JournalRowKey.Encode(JournalId.FromGrainId(crashReceiver.GetGrainId()).Value);
         var crashLedger = crashMap.FindOpen(crashRowKey.Span)!.Value;
         var doomedSiloName = _state.SiloByNode(crashLedger.Primary.Node);
         var doomedSilo = cluster.Silos.Single(s => s.Name == doomedSiloName);
 
-        // Inject 1 transient PublishSealedShardAsync failure so WakeupMessageProcessor's retry path is exercised end-to-end!
+        // Inject 1 transient PublishSealedShardAsync failure so ReminderMessageProcessor's retry path is exercised end-to-end!
         _state.ArmTransientPublishFailures(1);
 
-        // Kill the primary silo (ungraceful crash) so its volatile WakeupLedgerSession heap is lost!
+        // Kill crashReceiver's primary silo (ungraceful crash) so its activation and volatile ReminderLedgerSession heap are lost!
         await cluster.KillSiloAsync(doomedSilo, TestContext.Current.CancellationToken).WaitAsync(Patience, TestContext.Current.CancellationToken);
 
-        // Allow delivery again; surviving silo takes over, closes crashLedger, folds wakeup in single-pass DrainScan,
-        // publishes deterministic sealed JobShard (retrying past injected failure), claims it, and delivers!
-        _state.AllowDelivery = true;
+        // Surviving silo takes over, closes crashLedger, folds reminder in single-pass DrainScan, publishes deterministic
+        // sealed JobShard (retrying past injected failure), claims it, and wakes crashReceiver (no external grain calls)!
         await WaitUntilAsync(
-            async () => (await crashReceiver.ReceivedAsync()).Contains("survive-primary-crash"),
-            "surviving silo to drain closed ledger wakeup into sealed JobShard and deliver message");
+            () => _state.HasDelivered("survive-primary-crash"),
+            "surviving silo to drain closed ledger reminder into sealed JobShard and wake crashReceiver");
+        Assert.Contains("survive-primary-crash", await crashReceiver.ReceivedAsync());
         Assert.Equal(0, _state.TotalScheduleJobCalls);
-        Assert.True(_state.TotalSealedShardPublishes >= 2, "Expected injected transient failure + retry to invoke PublishSealedShardAsync at least twice.");
+        Assert.True(
+            _state.TotalSealedShardPublishes >= 2,
+            $"Expected injected transient failure + retry to invoke PublishSealedShardAsync at least twice, got TotalSealedShardPublishes={_state.TotalSealedShardPublishes}, CreatedSealedShards={_state.CreatedSealedShards}, TotalScheduleJobCalls={_state.TotalScheduleJobCalls}, crashLedger={crashLedger.Id}, doomedSilo={doomedSiloName}.");
         Assert.True(_state.CreatedSealedShards >= 1, "Expected at least 1 deterministic sealed JobShard created.");
 
-        // 5. Verify racing-drainer idempotency: re-publishing an already-published deterministic shard ID returns false!
-        var survivingSilo = cluster.Silos.First(s => s.Name != doomedSiloName);
-        var publisher = ((InProcessSiloHandle)survivingSilo).SiloHost.Services.GetRequiredService<ISealedJobShardPublisher>();
+        // 5. Verify racing-drainer idempotency across two surviving silos: publishing the same deterministic sealed
+        //    shard ID twice returns true on the first write and false on the racing duplicate!
+        var survivingSilos = cluster.Silos.Where(s => s.Name != doomedSiloName).ToArray();
+        var publisherA = ((InProcessSiloHandle)survivingSilos[0]).SiloHost.Services.GetRequiredService<ISealedJobShardPublisher>();
+        var publisherB = ((InProcessSiloHandle)survivingSilos[^1]).SiloHost.Services.GetRequiredService<ISealedJobShardPublisher>();
         var firstPublished = _state.PublishedShards.First();
-        var duplicateCreated = await publisher.PublishSealedShardAsync(
-            firstPublished.DeterministicId,
-            firstPublished.MinDueTime,
-            firstPublished.MaxDueTime,
-            firstPublished.Jobs,
-            ct);
-        Assert.False(duplicateCreated);
+        var raceShardId = $"{firstPublished.DeterministicId}-race";
+        var raceMinDue = DateTimeOffset.UtcNow.AddHours(2);
+        var raceMaxDue = raceMinDue.AddHours(1);
+        var raceJobs = new[]
+        {
+            new ScheduleJobRequest
+            {
+                Target = crashReceiver.GetGrainId(),
+                JobName = MessagingPump.JobName,
+                DueTime = raceMinDue.AddMinutes(5),
+            },
+        };
+        Assert.True(await publisherA.PublishSealedShardAsync(raceShardId, raceMinDue, raceMaxDue, raceJobs, ct));
+        Assert.False(await publisherB.PublishSealedShardAsync(raceShardId, raceMinDue, raceMaxDue, raceJobs, ct));
     }
 
     private async Task<TestCluster> DeployAsync(int silos, CancellationToken cancellationToken)
@@ -273,7 +288,7 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
     {
         public string Id { get; } = Guid.NewGuid().ToString("N");
         public Guid ClusterId { get; } = Guid.NewGuid();
-        public string Roots { get; } = Path.Combine(Path.GetTempPath(), $"orleans-e2e-wakeup-{Guid.NewGuid():N}");
+        public string Roots { get; } = Path.Combine(Path.GetTempPath(), $"orleans-e2e-reminder-{Guid.NewGuid():N}");
         public ArchiveStoreKind ArchiveKind { get; set; } = ArchiveStoreKind.Lsm;
         public InMemoryMetaStore MetaStore { get; } = new();
         public CountingObjectStore LsmObjects { get; } = new(new InMemoryObjectStore());
@@ -283,6 +298,7 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
         internal ConcurrentDictionary<string, LocalNode> Nodes { get; } = new(StringComparer.Ordinal);
         internal ConcurrentDictionary<string, LocalJournals> Journals { get; } = new(StringComparer.Ordinal);
         public ConcurrentBag<(string DeterministicId, DateTimeOffset MinDueTime, DateTimeOffset MaxDueTime, ScheduleJobRequest[] Jobs)> PublishedShards { get; } = [];
+        public ConcurrentDictionary<string, byte> Delivered { get; } = new(StringComparer.Ordinal);
         public volatile bool AllowDelivery = true;
         private int _scheduleJobCalls;
         private int _sealedShardPublishes;
@@ -290,6 +306,10 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
         private int _remainingPublishFailures;
 
         public E2EState() => LogsContainer = new MemoryArchiveLogContainer(LogObjects);
+
+        public void RecordDelivered(string text) => Delivered[text] = 1;
+
+        public bool HasDelivered(string text) => Delivered.ContainsKey(text);
 
         public int TotalScheduleJobCalls => Volatile.Read(ref _scheduleJobCalls);
 
@@ -422,7 +442,7 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
                 silo.Node.Cluster = state.ClusterId;
                 silo.Node.Root = root;
                 silo.Node.ArchiveStore = state.ArchiveKind;
-                silo.Node.ArchiveStorePrefix = "wakeupe2e";
+                silo.Node.ArchiveStorePrefix = "remindere2e";
                 silo.Node.WalFileSize = 4L << 20;
                 silo.Node.PreallocateWalFiles = false;
                 silo.Control.Replicas = 3;
@@ -514,28 +534,28 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
         }
     }
 
-    public interface IWakeupSenderGrain : IGrainWithStringKey
+    public interface IReminderSenderGrain : IGrainWithStringKey
     {
         Task SendAsync(GrainId target, string text, TimeSpan? deliverDelay);
         Task<int> OutboxCountAsync();
         Task DeactivateNowAsync();
     }
 
-    public interface IWakeupReceiverGrain : IGrainWithStringKey
+    public interface IReminderReceiverGrain : IGrainWithStringKey
     {
         Task<string[]> ReceivedAsync();
         Task DeactivateNowAsync();
     }
 
     [JournalPlacement]
-    public sealed class WakeupSenderGrain(IOutbox outbox, IDurableStateManager state) : Grain, IWakeupSenderGrain
+    public sealed class ReminderSenderGrain(IOutbox outbox, IDurableStateManager state) : Grain, IReminderSenderGrain
     {
         public async Task SendAsync(GrainId target, string text, TimeSpan? deliverDelay)
         {
             var envelope = new Envelope
             {
                 MessageId = MessageId.Parse(Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture),
-                Subject = "wakeup-e2e",
+                Subject = "reminder-e2e",
                 Payload = Encoding.UTF8.GetBytes(text),
                 DeliverAt = deliverDelay is { } d ? DateTimeOffset.UtcNow + d : null,
             };
@@ -553,11 +573,11 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
     }
 
     [JournalPlacement]
-    public sealed class WakeupReceiverGrain : Grain, IWakeupReceiverGrain
+    public sealed class ReminderReceiverGrain : Grain, IReminderReceiverGrain
     {
         private readonly IDurableList<string> _received;
 
-        public WakeupReceiverGrain(
+        public ReminderReceiverGrain(
             IInbox inbox,
             [FromKeyedServices("received")] IDurableList<string> received,
             E2EState e2e)
@@ -577,7 +597,7 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
 
         private sealed class ReceiverHandler(IDurableList<string> received, E2EState e2e) : IInboxHandler
         {
-            public bool CanHandle(InboxMessage message) => string.Equals(message.Envelope.Subject, "wakeup-e2e", StringComparison.Ordinal);
+            public bool CanHandle(InboxMessage message) => string.Equals(message.Envelope.Subject, "reminder-e2e", StringComparison.Ordinal);
 
             public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
             {
@@ -586,8 +606,10 @@ public sealed class AtomicWakeupEndToEndTests : IAsyncLifetime
                     throw new InvalidOperationException("Delivery temporarily blocked by E2E test.");
                 }
 
-                received.Add(Encoding.UTF8.GetString(context.Message.Envelope.Payload));
+                var text = Encoding.UTF8.GetString(context.Message.Envelope.Payload);
+                received.Add(text);
                 context.Complete();
+                e2e.RecordDelivered(text);
                 return ValueTask.CompletedTask;
             }
         }

@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) {
 $env:DURABLE_STORAGE_MESSAGE_DRAIN_TRACES = $traces
 $env:DURABLE_STORAGE_SIM_SEEDS = if ($Seeds) { $Seeds } else { '1..5' }
 
-& dotnet test --project $project -c SimulationRelease --no-build -- --filter-class Orleans.Durable.Storage.Simulation.Tests.LocalDrainTraceTests
+& dotnet test --project $project -c SimulationRelease --no-build -- --filter-class Orleans.Durable.Storage.Simulation.Tests.MessageDrainTraceTests
 if ($LASTEXITCODE -ne 0) {
     throw "The simulation which writes message-drain traces failed with exit code $LASTEXITCODE."
 }

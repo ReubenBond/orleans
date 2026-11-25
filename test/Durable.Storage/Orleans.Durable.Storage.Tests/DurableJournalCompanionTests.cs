@@ -17,7 +17,7 @@ namespace Orleans.Durable.Storage.Tests;
 /// <summary>
 /// Unit tests for <see cref="DurableJournalStorage"/> implementing <see cref="IMessageJournalStorage"/>:
 /// argument validation, rebase-retry preserving message payloads verbatim across ledger drops, and atomic
-/// delivery to <see cref="WakeupMessageHandler"/> (orleans.md §5.5, §5.15).
+/// delivery to <see cref="ReminderMessageHandler"/> (orleans.md §5.5, §5.15).
 /// </summary>
 public sealed class DurableJournalCompanionTests : IDisposable
 {
@@ -32,8 +32,8 @@ public sealed class DurableJournalCompanionTests : IDisposable
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
         var dispatched = new TaskCompletionSource<IJobRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var handler = new WakeupMessageHandler(
-            new WakeupOptions(),
+        var handler = new ReminderMessageHandler(
+            new ReminderOptions(),
             new CallbackDispatcher((_, ctx, _) =>
             {
                 dispatched.TrySetResult(ctx);
@@ -89,8 +89,8 @@ public sealed class DurableJournalCompanionTests : IDisposable
         Assert.Empty(consumer.Bytes);
 
         // Validation: empty Append throws ArgumentOutOfRangeException; default(JournalMessageRecord) throws ArgumentException.
-        var wakeupPayload = WakeupMessageCodec.Encode(new WakeupRecord(GrainId.Create("g", "1"), "orleans.messaging.pump", (time.GetUtcNow() + TimeSpan.FromSeconds(5)).UtcTicks));
-        var message = new JournalMessageRecord(WakeupMessageCodec.ChannelName, wakeupPayload);
+        var reminderPayload = ReminderMessageCodec.Encode(new ReminderRecord(GrainId.Create("g", "1"), "orleans.messaging.pump", (time.GetUtcNow() + TimeSpan.FromSeconds(5)).UtcTicks));
+        var message = new JournalMessageRecord(ReminderMessageCodec.ChannelName, reminderPayload);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => storage.AppendWithMessagesAsync(ReadOnlySequence<byte>.Empty, new[] { message }, Token).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(() => storage.AppendWithMessagesAsync(new ReadOnlySequence<byte>("a"u8.ToArray()), new[] { default(JournalMessageRecord) }, Token).AsTask());
@@ -158,10 +158,10 @@ public sealed class DurableJournalCompanionTests : IDisposable
         // and resends with the EXACT message payload preserved!
         await storage.AppendWithMessagesAsync(new ReadOnlySequence<byte>("world"u8.ToArray()), new[] { message }, Token);
 
-        // Advance FakeTimeProvider by 5s -> WakeupLedgerSession on the new open ledger MUST fire with IsEphemeralWakeup = true!
+        // Advance FakeTimeProvider by 5s -> ReminderLedgerSession on the new open ledger MUST fire with IsEphemeralReminder = true!
         time.Advance(TimeSpan.FromSeconds(5));
         var fired = await dispatched.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
-        Assert.True(fired.IsEphemeralWakeup);
+        Assert.True(fired.IsEphemeralReminder);
         Assert.Equal(GrainId.Create("g", "1"), fired.Job.TargetGrainId);
         Assert.Equal("orleans.messaging.pump", fired.Job.Name);
 
@@ -174,7 +174,7 @@ public sealed class DurableJournalCompanionTests : IDisposable
         await handler.StopAsync();
     }
 
-    private sealed class CallbackDispatcher(Func<GrainId, IJobRunContext, CancellationToken, ValueTask<DurableJobRunResult>> callback) : IGrainWakeupDispatcher
+    private sealed class CallbackDispatcher(Func<GrainId, IJobRunContext, CancellationToken, ValueTask<DurableJobRunResult>> callback) : IGrainReminderDispatcher
     {
         public ValueTask<DurableJobRunResult> DispatchAsync(GrainId target, IJobRunContext context, CancellationToken cancellationToken) =>
             callback(target, context, cancellationToken);

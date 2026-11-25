@@ -195,23 +195,23 @@
       "hex": "434c4c42010000000100000206096a6f75726e616c2f390004000000000561667465728e08d965"
     },
     {
-      "name": "Two unversioned Message rows for the orleans.wakeup channel.",
+      "name": "Two unversioned Message rows for the app.events channel.",
       "segmentStart": true,
       "segmentOffset": "0",
       "ordinalBase": "0",
       "rows": [
         {
           "kind": "Message",
-          "channel": "orleans.wakeup",
-          "body": "776b3031"
+          "channel": "app.events",
+          "body": "65763031"
         },
         {
           "kind": "Message",
-          "channel": "orleans.wakeup",
-          "body": "776b3032"
+          "channel": "app.events",
+          "body": "65763032"
         }
       ],
-      "hex": "434c4c420100000001000002030e6f726c65616e732e77616b65757004776b3031030e6f726c65616e732e77616b65757004776b30327f9175c1"
+      "hex": "434c4c420100000001000002030a6170702e6576656e74730465763031030a6170702e6576656e74730465763032f9697946"
     }
   ]
 }

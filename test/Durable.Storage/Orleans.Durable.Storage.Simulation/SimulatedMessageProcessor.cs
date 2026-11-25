@@ -10,28 +10,28 @@ namespace Orleans.Durable.Storage.Simulation;
 /// <summary>
 /// Orleans-free simulated <see cref="IMessageProcessor"/> for Clockwork simulation and Quint trace validation of
 /// single-pass <c>DrainScan</c> message draining across <c>DrainWorker</c> and <c>ArchiveLogDrainWorker</c>
-/// (verification.md §5.1, §7.1). Models deterministic per-(ledger, segmentStart) sealed-shard publishing so racing
-/// drainers and crash-retries produce at most one published shard per segment.
+/// (verification.md §5.1, §7.1). Models idempotent per-(ledger, segmentStart) durable-sink commits so racing
+/// drainers and crash-retries write at most once per segment.
 /// </summary>
-public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
+public sealed class SimulatedMessageProcessor : IMessageProcessor
 {
-    /// <summary>The canonical channel name for simulated wakeup records.</summary>
-    public static readonly MessageChannel DefaultChannel = MessageChannel.Parse("sim.wakeup");
+    /// <summary>The canonical channel name for simulated atomic-message records.</summary>
+    public static readonly MessageChannel DefaultChannel = MessageChannel.Parse("sim.messages");
 
     private readonly long _bytesPerEntry;
     private readonly Func<LedgerId, LedgerSegmentId, IReadOnlyCollection<byte>, CancellationToken, Task>? _onCommitAsync;
-    private readonly ConcurrentDictionary<(LedgerId Ledger, Slot Start), byte[]> _publishedShards = new();
+    private readonly ConcurrentDictionary<(LedgerId Ledger, Slot Start), byte[]> _committedBatches = new();
     private readonly ConcurrentDictionary<byte, int> _committedCounts = new();
     private int _commitCalls;
-    private int _createdShards;
-    private int _duplicateShards;
+    private int _createdBatches;
+    private int _duplicateBatches;
     private int _zeroEntryCommits;
 
-    /// <summary>Initializes a new instance of the <see cref="SimulatedWakeupMessageProcessor"/> class.</summary>
+    /// <summary>Initializes a new instance of the <see cref="SimulatedMessageProcessor"/> class.</summary>
     /// <param name="channel">Channel name (defaults to <see cref="DefaultChannel"/>).</param>
     /// <param name="bytesPerEntry">Approximate memory weight charged per live entry in the fold.</param>
     /// <param name="onCommitAsync">Optional asynchronous hook invoked on non-empty commits (for fault/crash/race injection).</param>
-    public SimulatedWakeupMessageProcessor(
+    public SimulatedMessageProcessor(
         MessageChannel? channel = null,
         long bytesPerEntry = 64,
         Func<LedgerId, LedgerSegmentId, IReadOnlyCollection<byte>, CancellationToken, Task>? onCommitAsync = null)
@@ -45,29 +45,29 @@ public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
     /// <inheritdoc />
     public MessageChannel Channel { get; }
 
-    /// <summary>Gets the number of non-empty backing commit calls executed.</summary>
+    /// <summary>Gets the number of non-empty durable-sink commit calls executed.</summary>
     public int CommitCalls => Volatile.Read(ref _commitCalls);
 
-    /// <summary>Gets the number of deterministic sealed shards newly created (unique (ledger, segmentStart) keys).</summary>
-    public int CreatedShards => Volatile.Read(ref _createdShards);
+    /// <summary>Gets the number of distinct per-segment durable batches created (unique (ledger, segmentStart) keys).</summary>
+    public int CreatedBatches => Volatile.Read(ref _createdBatches);
 
-    /// <summary>Gets the number of idempotent duplicate publishes (racing drainer / crash retry hitting existing shard).</summary>
-    public int DuplicateShards => Volatile.Read(ref _duplicateShards);
+    /// <summary>Gets the number of idempotent duplicate commits (racing drainer / crash retry hitting existing batch).</summary>
+    public int DuplicateBatches => Volatile.Read(ref _duplicateBatches);
 
-    /// <summary>Gets the number of empty commits (0 surviving entries, 0 backing writes).</summary>
+    /// <summary>Gets the number of empty commits (0 surviving entries, 0 sink writes).</summary>
     public int ZeroEntryCommits => Volatile.Read(ref _zeroEntryCommits);
 
-    /// <summary>Gets the set of wakeup keys durably published in at least one sealed shard.</summary>
+    /// <summary>Gets the set of message keys durably committed at least once.</summary>
     public IReadOnlyCollection<byte> CommittedKeys => [.. _committedCounts.Keys];
 
-    /// <summary>Encodes a simulated SetWakeup record (2 bytes: key, 1 = set or 0 = clear).</summary>
-    public static byte[] Encode(byte key, bool set) => [key, set ? (byte)1 : (byte)0];
+    /// <summary>Encodes a simulated atomic-message record (2 bytes: key, 1 = emit or 0 = retract).</summary>
+    public static byte[] Encode(byte key, bool emit) => [key, emit ? (byte)1 : (byte)0];
 
     /// <inheritdoc />
     public IMessageFold BeginSegmentFold(LedgerMetadata ledger, LedgerSegmentId segment) =>
         new Fold(this, ledger.Id, segment);
 
-    private sealed class Fold(SimulatedWakeupMessageProcessor owner, LedgerId ledger, LedgerSegmentId segment) : IMessageFold
+    private sealed class Fold(SimulatedMessageProcessor owner, LedgerId ledger, LedgerSegmentId segment) : IMessageFold
     {
         private readonly Dictionary<byte, bool> _entries = [];
 
@@ -78,7 +78,7 @@ public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
             if (payload.Length != 2)
             {
                 throw new ArchiveCorruptException(
-                    string.Create(CultureInfo.InvariantCulture, $"Simulated wakeup payload at ledger {ledger} slot {slot} row {rowIndex} has invalid length {payload.Length}."));
+                    string.Create(CultureInfo.InvariantCulture, $"Simulated message payload at ledger {ledger} slot {slot} row {rowIndex} has invalid length {payload.Length}."));
             }
 
             Span<byte> buf = stackalloc byte[2];
@@ -88,7 +88,7 @@ public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
             if (flag is not (0 or 1))
             {
                 throw new ArchiveCorruptException(
-                    string.Create(CultureInfo.InvariantCulture, $"Simulated wakeup payload at ledger {ledger} slot {slot} row {rowIndex} has invalid flag {flag}."));
+                    string.Create(CultureInfo.InvariantCulture, $"Simulated message payload at ledger {ledger} slot {slot} row {rowIndex} has invalid flag {flag}."));
             }
 
             if (flag == 1)
@@ -117,9 +117,9 @@ public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
                 await owner._onCommitAsync(ledger, segment, keys, cancellationToken).ConfigureAwait(false);
             }
 
-            if (owner._publishedShards.TryAdd((ledger, segment.Start), keys))
+            if (owner._committedBatches.TryAdd((ledger, segment.Start), keys))
             {
-                _ = Interlocked.Increment(ref owner._createdShards);
+                _ = Interlocked.Increment(ref owner._createdBatches);
                 foreach (var key in keys)
                 {
                     _ = owner._committedCounts.AddOrUpdate(key, 1, static (_, c) => c + 1);
@@ -127,7 +127,7 @@ public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
             }
             else
             {
-                _ = Interlocked.Increment(ref owner._duplicateShards);
+                _ = Interlocked.Increment(ref owner._duplicateBatches);
             }
 
             _entries.Clear();

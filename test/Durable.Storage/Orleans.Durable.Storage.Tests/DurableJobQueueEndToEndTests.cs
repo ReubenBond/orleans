@@ -30,9 +30,9 @@ namespace Orleans.Durable.Storage.Tests;
 /// <summary>
 /// End-to-end <see cref="TestCluster"/> tests for <see cref="IDurableJobQueue"/> over real Durable Storage (both LSM
 /// and Archive Logs): 1-RTT atomic grain-state + job scheduling, zero Azure/backing writes when completed or cancelled
-/// before ledger drain, idle deactivation wakeup via <see cref="WakeupMessageHandler.WakeupLedgerSession"/>, primary-crash recovery via
+/// before ledger drain, idle deactivation reminder via <see cref="ReminderMessageHandler.ReminderLedgerSession"/>, primary-crash recovery via
 /// single-pass <c>DrainScan</c> + deterministic sealed <c>JobShard</c> publishing, and sharing
-/// <see cref="GrainWakeupCoordinator"/> alongside <see cref="IOutbox"/>/<see cref="IInbox"/> on the same grain.
+/// <see cref="GrainReminderCoordinator"/> alongside <see cref="IOutbox"/>/<see cref="IInbox"/> on the same grain.
 /// </summary>
 [TestCategory("EndToEnd")]
 public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
@@ -207,8 +207,8 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
         public string Roots { get; } = Path.Combine(Path.GetTempPath(), $"orleans-e2e-jobqueue-{Guid.NewGuid():N}");
         public ArchiveStoreKind ArchiveKind { get; set; } = ArchiveStoreKind.Lsm;
         public InMemoryMetaStore MetaStore { get; } = new();
-        public AtomicWakeupEndToEndTests.CountingObjectStore LsmObjects { get; } = new(new InMemoryObjectStore());
-        public AtomicWakeupEndToEndTests.CountingObjectStore LogObjects { get; } = new(new InMemoryObjectStore());
+        public AtomicReminderEndToEndTests.CountingObjectStore LsmObjects { get; } = new(new InMemoryObjectStore());
+        public AtomicReminderEndToEndTests.CountingObjectStore LogObjects { get; } = new(new InMemoryObjectStore());
         public MemoryArchiveLogContainer LogsContainer { get; }
         public VolatileJournalStorageProvider SharedJobsStorage { get; } = new();
         internal ConcurrentDictionary<string, LocalNode> Nodes { get; } = new(StringComparer.Ordinal);

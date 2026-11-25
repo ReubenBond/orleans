@@ -86,7 +86,7 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
     }
 
     /// <summary>
-    /// Verifies that a closed ledger mixing journal rows and <see cref="RowKind.Message"/> wakeup rows drains
+    /// Verifies that a closed ledger mixing journal rows and <see cref="RowKind.Message"/> rows drains
     /// cleanly to Azure Archive Logs via <see cref="ArchiveLogDrainWorker"/> (with an
     /// <see cref="Engine.Archive.Control.IMessageProcessor"/>) and replays identically through plain
     /// <c>AzureBlobJournalStorage</c> with zero message rows leaking into the archive log (LG-I15, LG-I16).
@@ -147,7 +147,7 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
         var open = map.Current.Ledgers.Single(static l => l.IsOpen);
         var ledgerId = open.Id;
         var rowKey = Orleans.Durable.Storage.Engine.Journals.JournalRowKey.Encode("replay/mixed-local").Span.ToArray();
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("orleans.reminder");
         var writerHandle = registry.TryGet(ledgerId)!;
 
         // Propose Replace + Append journal rows interleaved with RowKind.Message rows in the same batch.

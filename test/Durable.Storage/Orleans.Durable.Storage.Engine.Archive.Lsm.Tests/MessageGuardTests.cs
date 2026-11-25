@@ -13,7 +13,7 @@ namespace Orleans.Durable.Storage.Engine.Archive.Lsm.Tests;
 /// unregistered <see cref="RowKind.Message"/> channels, and <see cref="RunObjectFormat.Decode"/> rejects
 /// any run object row carrying <see cref="RowKind.Message"/> (<c>3</c>) as <c>unknown-kind</c>.
 /// </summary>
-public sealed class LocalAppendGuardTests : IDisposable
+public sealed class MessageGuardTests : IDisposable
 {
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
 
@@ -26,11 +26,11 @@ public sealed class LocalAppendGuardTests : IDisposable
     {
         await using var world = await ArchiveWorld.StartAsync(Token);
         var ledger = world.Ledgers.OpenContaining([0]).Id;
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var writer = world.Ledgers.Registry.TryGet(ledger)!;
         using (var batch = await writer.CreateBatchAsync(1, 1024, Token))
         {
-            batch.BeginMessage(channel, 2, "wk"u8);
+            batch.BeginMessage(channel, 2, "ev"u8);
             Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, Token)).Value);
         }
 
@@ -40,7 +40,7 @@ public sealed class LocalAppendGuardTests : IDisposable
         var tail = await world.Ledgers.ConfirmOpenAsync(ledger, Token);
         var ex = await Assert.ThrowsAsync<ArchiveCorruptException>(() =>
             world.DrainOnceAsync(worker, world.Ledgers.Ledger(ledger), tail, Token));
-        Assert.Contains("orleans.wakeup", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("app.events", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -46,9 +46,9 @@ public sealed class DurableJobQueueTests
 
         var due1 = time.GetUtcNow() + TimeSpan.FromSeconds(10);
 
-        // Validation: invalid JobName, reserved WakeupJobName, invalid JobId, oversized UTF-8 metadata.
+        // Validation: invalid JobName, reserved ReminderJobName, invalid JobId, oversized UTF-8 metadata.
         Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobName = " ", DueTime = due1 }));
-        Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobName = DurableJobQueue.WakeupJobName, DueTime = due1 }));
+        Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobName = DurableJobQueue.ReminderJobName, DueTime = due1 }));
         Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobId = "   ", JobName = "work", DueTime = due1 }));
         Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobId = new string('a', GrainJobRequest.MaxJobIdLength + 1), JobName = "work", DueTime = due1 }));
         Assert.Throws<ArgumentException>(() => harness.Queue.Schedule(new GrainJobRequest { JobName = new string('n', GrainJobRequest.MaxJobNameLength + 1), DueTime = due1 }));
@@ -275,7 +275,7 @@ public sealed class DurableJobQueueTests
     }
 
     [Fact]
-    public void DurableJobQueueModelCsCheckOraclePreservesPendingJobsDueOrderAndWakeups()
+    public void DurableJobQueueModelCsCheckOraclePreservesPendingJobsDueOrderAndReminders()
     {
         var opGen = Gen.Select(
             Gen.Int[0, 5],   // op kind: 0=Schedule, 1=Cancel, 2=AdvanceTimeAndRun, 3=Reactivate, 4=ScheduleIdempotentOrConflict, 5=SnapshotAndReactivate
@@ -374,7 +374,7 @@ public sealed class DurableJobQueueTests
                             harness.Counter.Value = ++modelCounter;
                             await harness.StateManager.WriteStateAsync(Token);
                             model[jobId] = new ModelJob(jobId, req.JobName, due, DequeueCount: 0);
-                            AssertWakeupInvariants(harness, model, now);
+                            AssertReminderInvariants(harness, model, now);
                         }
 
                         break;
@@ -388,7 +388,7 @@ public sealed class DurableJobQueueTests
                         {
                             _ = model.Remove(jobId);
                             await harness.StateManager.WriteStateAsync(Token);
-                            AssertWakeupInvariants(harness, model, now);
+                            AssertReminderInvariants(harness, model, now);
                         }
 
                         break;
@@ -463,7 +463,7 @@ public sealed class DurableJobQueueTests
 
                             if (dueJobs.Count > 0)
                             {
-                                AssertWakeupInvariants(harness, model, runNow);
+                                AssertReminderInvariants(harness, model, runNow);
                             }
                         }
 
@@ -530,13 +530,13 @@ public sealed class DurableJobQueueTests
         }
     }
 
-    private static void AssertWakeupInvariants(QueueHarness harness, Dictionary<string, ModelJob> model, DateTimeOffset now)
+    private static void AssertReminderInvariants(QueueHarness harness, Dictionary<string, ModelJob> model, DateTimeOffset now)
     {
         // Zero backing ScheduleJobAsync calls whenever companion writes are supported!
         Assert.Empty(harness.ScheduledBackingJobs);
 
         // Decode last emitted wakeup companion record (if any) and verify its invariant against the model!
-        var lastWakeup = harness.Storage.TryGetLastWakeup();
+        var lastWakeup = harness.Storage.TryGetLastReminder();
         if (model.Count == 0)
         {
             // Whenever all pending jobs clear, either no wakeup was ever emitted or the latest wakeup cleared it (DueTimeUtcTicks == null).
@@ -549,7 +549,7 @@ public sealed class DurableJobQueueTests
         {
             Assert.NotNull(lastWakeup);
             Assert.Equal(harness.GrainId, lastWakeup.Value.Target);
-            Assert.Equal(DurableJobQueue.WakeupJobName, lastWakeup.Value.JobName);
+            Assert.Equal(DurableJobQueue.ReminderJobName, lastWakeup.Value.JobName);
             Assert.NotNull(lastWakeup.Value.DueTimeUtcTicks);
 
             // Clamped wakeup must cover the minimum due time in the queue (<= max(minDue, now + RecheckDelay)).
@@ -681,7 +681,7 @@ public sealed class DurableJobQueueTests
                 time,
                 provider);
             var stateManager = new JournaledStateManager(shared, storage, grainContext);
-            var coordinator = new GrainWakeupCoordinator(grainContext, stateManager, jobManager, time);
+            var coordinator = new GrainReminderCoordinator(grainContext, stateManager, jobManager, time);
             var registry = new DurableJobHandlerRegistry();
             var queueShared = provider.GetRequiredService<DurableJobQueueShared>();
 
@@ -707,11 +707,11 @@ public sealed class DurableJobQueueTests
     {
         private byte[] _content = [];
 
-        public List<(string Kind, WakeupRecord[] Wakeups)> Writes { get; } = [];
+        public List<(string Kind, ReminderRecord[] Wakeups)> Writes { get; } = [];
         public bool CompactionRequested { get; set; }
         public bool IsCompactionRequested => CompactionRequested;
 
-        public WakeupRecord? TryGetLastWakeup()
+        public ReminderRecord? TryGetLastReminder()
         {
             for (var i = Writes.Count - 1; i >= 0; i--)
             {
@@ -769,12 +769,12 @@ public sealed class DurableJobQueueTests
 
         private void RecordWrite(string kind, ReadOnlyMemory<JournalMessageRecord> messages)
         {
-            var wakeups = new List<WakeupRecord>(messages.Length);
+            var wakeups = new List<ReminderRecord>(messages.Length);
             foreach (var c in messages.Span)
             {
-                if (string.Equals(c.Channel, WakeupMessageCodec.ChannelName, StringComparison.Ordinal))
+                if (string.Equals(c.Channel, ReminderMessageCodec.ChannelName, StringComparison.Ordinal))
                 {
-                    var err = WakeupMessageCodec.Decode(c.Payload.Span, out var decoded);
+                    var err = ReminderMessageCodec.Decode(c.Payload.Span, out var decoded);
                     Assert.Null(err);
                     wakeups.Add(decoded);
                 }

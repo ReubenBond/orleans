@@ -14,7 +14,7 @@ using Orleans.Durable.Storage.Testing;
 namespace Orleans.Durable.Storage.Engine.Journals.Tests;
 
 /// <summary>
-/// Comprehensive tests for Phase J1 ledger-local append journals (journals.md §2.2, §4.2, §7, §8.1, §8.3, §8.4,
+/// Comprehensive tests for atomic journal + RowKind.Message writes (journals.md §2.2, §4.2, §7, §8.1, §8.3, §8.4,
 /// JS-I11, JS-I12):
 /// <list type="bullet">
 /// <item>Entry record encoding/decoding, <c>default(MessageRecord)</c> refusal, detached payloads, and <c>WithoutPayload()</c>.</item>
@@ -24,10 +24,10 @@ namespace Orleans.Durable.Storage.Engine.Journals.Tests;
 /// <item>Real RocksDB integration verifying <see cref="RowKind.Message"/> produces zero <c>key_index</c> and zero <c>tombstones</c> writes.</item>
 /// </list>
 /// </summary>
-public sealed class JournalLocalAppendTests : IDisposable
+public sealed class JournalMessageTests : IDisposable
 {
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
-    private readonly string _rocksRoot = Path.Combine(Path.GetTempPath(), "durable-storage-local-append-rocks", Guid.NewGuid().ToString("N"));
+    private readonly string _rocksRoot = Path.Combine(Path.GetTempPath(), "durable-storage-message-rocks", Guid.NewGuid().ToString("N"));
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -56,7 +56,7 @@ public sealed class JournalLocalAppendTests : IDisposable
     public void EntryRecordRejectsDefaultMessageAndPreservesDetachedPayloadsAcrossWithoutPayload()
     {
         var key = JournalRowKey.Encode("grain/1");
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
 
         using (var payload = ArcBuffer.Wrap("body"u8.ToArray()))
         {
@@ -134,8 +134,8 @@ public sealed class JournalLocalAppendTests : IDisposable
     [Fact]
     public async Task AtomicWriteCommitsMessageInSameSlotAndRejectionsLeaveZeroMessageRows()
     {
-        var channelA = MessageChannel.Parse("orleans.wakeup");
-        var channelB = MessageChannel.Parse("orleans.audit");
+        var channelA = MessageChannel.Parse("app.events");
+        var channelB = MessageChannel.Parse("app.audit");
         var handlerA = new RecordingMessageHandler(channelA, payload => payload.Length == 1 && payload[0] == 0xFF ? new InvalidDataException("bad payload") : null);
         var handlerB = new RecordingMessageHandler(channelB);
 
@@ -239,10 +239,10 @@ public sealed class JournalLocalAppendTests : IDisposable
         Assert.Equal(1UL, view.DefinedKeys);
         Assert.Equal(
             [
-                (new Slot(0), false, "orleans.wakeup", "wk1"),
-                (new Slot(0), false, "orleans.audit", "au1"),
-                (new Slot(1), false, "orleans.wakeup", "wk2"),
-                (new Slot(2), false, "orleans.wakeup", "wk3"),
+                (new Slot(0), false, "app.events", "wk1"),
+                (new Slot(0), false, "app.audit", "au1"),
+                (new Slot(1), false, "app.events", "wk2"),
+                (new Slot(2), false, "app.events", "wk3"),
             ],
             messageRowsBySlot);
 
@@ -263,7 +263,7 @@ public sealed class JournalLocalAppendTests : IDisposable
     [Fact]
     public async Task MessageSessionOracleVerifiesJsI12OrderingDisposalAndPrepareReleaseCancelDrain()
     {
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var oracle = new MessageSessionOracle(channel);
 
         using var archive = new InMemoryArchiveStore();
@@ -333,7 +333,7 @@ public sealed class JournalLocalAppendTests : IDisposable
     [InlineData("DisposeBeforeLastOnDurable")]
     public async Task MessageSessionOracleCatchesJsI12RaceMutants(string mutant)
     {
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var oracle = new MessageSessionOracle(channel);
 
         using var archive = new InMemoryArchiveStore();
@@ -392,7 +392,7 @@ public sealed class JournalLocalAppendTests : IDisposable
     [Fact]
     public async Task OnBatchDurableDefectReportsFatalErrorFailsBatchAndLeavesWarmStateUntouched()
     {
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var handler = new ThrowingMessageHandler(channel, new InvalidOperationException("simulated handler bug"));
 
         var since = FatalErrors.ReportedCount;
@@ -425,7 +425,7 @@ public sealed class JournalLocalAppendTests : IDisposable
     public async Task RocksDbJournalIndexSkipsMessageRowsCompletely()
     {
         var indexDir = Path.Combine(_rocksRoot, "index");
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var handler = new RecordingMessageHandler(channel);
 
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);

@@ -1,29 +1,29 @@
 {
-  "description": "Wakeup companion records (orleans.wakeup, version 1; orleans.md §5.15): decoding hex yields the record, and encoding the record yields hex.",
+  "description": "Reminder message records (orleans.reminder, version 1; orleans.md §5.15): decoding hex yields the record, and encoding the record yields hex.",
   "cases": [
     {
-      "name": "Scheduled wakeup with dueTime ticks for an outbox pump.",
+      "name": "Scheduled reminder with dueTime ticks for an outbox pump.",
       "target": "mygrain/order-42",
       "jobName": "orleans.messaging.outbox",
       "dueTimeUtcTicks": "639029088000000000",
       "hex": "0101106d79677261696e2f6f726465722d3432186f726c65616e732e6d6573736167696e672e6f7574626f7800c061df9149de08"
     },
     {
-      "name": "Clear wakeup (HasDueTime = 0, DueTimeUtcTicks omitted).",
+      "name": "Clear reminder (HasDueTime = 0, DueTimeUtcTicks omitted).",
       "target": "mygrain/order-42",
       "jobName": "orleans.messaging.outbox",
       "dueTimeUtcTicks": null,
       "hex": "0100106d79677261696e2f6f726465722d3432186f726c65616e732e6d6573736167696e672e6f7574626f78"
     },
     {
-      "name": "Scheduled wakeup at DateTimeOffset.MinValue (ticks = 0) with empty grain key.",
+      "name": "Scheduled reminder at DateTimeOffset.MinValue (ticks = 0) with empty grain key.",
       "target": "singleton/",
       "jobName": "pump",
       "dueTimeUtcTicks": "0",
       "hex": "01010a73696e676c65746f6e2f0470756d700000000000000000"
     },
     {
-      "name": "Scheduled wakeup at DateTimeOffset.MaxValue with UTF-8 grain key and job name.",
+      "name": "Scheduled reminder at DateTimeOffset.MaxValue with UTF-8 grain key and job name.",
       "target": "g/caf\u00e9",
       "jobName": "j\u00f6b",
       "dueTimeUtcTicks": "3155378975999999999",

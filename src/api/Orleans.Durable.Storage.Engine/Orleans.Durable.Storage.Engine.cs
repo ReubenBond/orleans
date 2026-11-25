@@ -2593,7 +2593,9 @@ namespace Orleans.Durable.Storage.Engine.Journals
     {
         Ledgers.MessageChannel Channel { get; }
 
+        System.Collections.Immutable.ImmutableArray<Ledgers.LedgerId> CollectLedgersNeedingRoll();
         IMessageSession OpenLedger(Ledgers.LedgerId ledger);
+        System.Threading.Tasks.ValueTask StopAsync();
         System.IO.InvalidDataException? Validate(System.ReadOnlySpan<byte> payload);
     }
 

@@ -494,9 +494,9 @@ through the controller grain.
 adapter (`DurableJournalStorage`, implementing `IMessageJournalStorage`), the router, the placement strategies
 and directors, the node grain (`JournalStoreGrain`) and the pressure state it consults before admission
 ([§5.9](#59-resource-governance)), the replica transport, the node registry's values, codec, and resolver, and the
-primary-side wakeup handler (`WakeupMessageHandler` / `WakeupLedgerSession`). Its `.Control`
+primary-side reminder handler (`ReminderMessageHandler` / `ReminderLedgerSession`). Its `.Control`
 namespace holds the control plane: the controller grain, the node control grain (`NodeControlGrain`), the node
-registry's committer (`NodeRegistryCommitter`), and the segment wakeup processor (`WakeupMessageProcessor`). Its
+registry's committer (`NodeRegistryCommitter`), and the segment reminder processor (`ReminderMessageProcessor`). Its
 `.Hosting` namespace wires both: service registration and the silo lifecycle. Orleans types stay in this assembly,
 `Orleans.Durable.Storage`. The controllers' decisions and their policies, `ClusterController`, `NodeController`,
 `Placement`, and `ControlOptions`, are a component of their own, `Orleans.Durable.Storage.Engine.Cluster.Control`, in
@@ -1679,9 +1679,10 @@ The policies below are defaults; the core accepts any transition which meets its
      segment completes or any closed ledger drops (LG-I16).
   3. `NodeRuntime.StartAsync` validates exact set equality between registered `IMessageHandler`s and
      `IMessageProcessor`s (`ValidateMessageChannelParity`). `NodeLedgers.GovernAsync` polls
-     `WakeupMessageHandler.CollectLedgersNeedingRoll()` unconditionally (before the `runtime.Disk is null` branch) so
-     both diskful and diskless silos roll wakeup-heavy ledgers. `NodeRuntime.StopJournalsAsync()` calls
-     `await WakeupMessageHandler.StopAsync()` immediately before `Journals.DisposeAsync()`.
+     `IMessageHandler.CollectLedgersNeedingRoll()` across all registered handlers unconditionally (before the
+     `runtime.Disk is null` branch) so both diskful and diskless silos roll memory-heavy ledgers.
+     `NodeRuntime.StopJournalsAsync()` calls `await handler.StopAsync()` for every registered `IMessageHandler`
+     immediately before `Journals.DisposeAsync()`.
 - **Drops** ([LSM §2.6](../components/archive-lsm.md#26-dropping-ledgers)). On the LSM, when a drain which
   completes a ledger applies, and on each pass, the controller grain submits, through its `LedgerDropper`, `Drop(S)` for
   every closed ledger which its manifest view shows complete (`IsComplete`) and which no listed ledger with a lower ID
@@ -2734,12 +2735,12 @@ yet in code*: `MaxSegmentAge` rolling for object-store ledgers and provider qual
   Because Phase 2 resets `drain_all_revision = 0` automatically, no manual `CancelDrainAllAsync()` is needed before
   starting replacement diskful silos in a mixed cluster or restarting a cluster over empty roots.
 
-### 5.15 Ledger-local wakeups, 1-RTT messaging, and grain-local durable jobs
+### 5.15 Ledger-local reminders, 1-RTT messaging, and grain-local durable jobs
 
-Atomic `RowKind.Message` records eliminate the second foreground durable I/O for grain self-wakeups while preserving
+Atomic `RowKind.Message` records eliminate the second foreground durable I/O for grain self-reminders while preserving
 crash recovery through deterministic, time-bucketed sealed `JobShard`s published via `ISealedJobShardPublisher`:
 
-- **Canonical codec (`WakeupMessageCodec`, `Orleans.Durable.Jobs`).** Channel name `"orleans.wakeup"`. Wire format
+- **Canonical codec (`ReminderMessageCodec`, `Orleans.Durable.Jobs`).** Channel name `"orleans.reminder"`. Wire format
   v1 (little-endian, canonical, ~35–60 bytes): byte 0 `Version = 1`, byte 1 `Flags` (`0x01` = `HasDueTime`, bits 1..7
   must be 0), `TargetGrainId` (varint length `1..1024` + strict UTF-8 validated by `GrainId.TryParse`), `JobName`
   (varint length `1..256` + strict UTF-8 non-blank string rejecting empty or ASCII-whitespace-only), and optional
@@ -2748,29 +2749,29 @@ crash recovery through deterministic, time-bucketed sealed `JobShard`s published
   inputs in procedural order: `truncated` → `bad-version` → `bad-flags` → `bad-varint` → `empty-grain-id` →
   `grain-id-too-long` → `truncated` → `invalid-utf8` → `bad-grain-id` → `bad-varint` → `empty-job-name` →
   `job-name-too-long` → `truncated` → `invalid-utf8` → `blank-job-name` → `truncated` → `bad-ticks` → `trailing-bytes`.
-- **Primary-side wakeup handler (`WakeupMessageHandler` and `WakeupLedgerSession`, `Orleans.Durable.Storage`, data
-  plane).** Implements `IMessageHandler` for `"orleans.wakeup"`, configured by `WakeupOptions` (nested on
-  `DurableStorageOptions` with `TimeProvider`). Each open ledger `L` owns an isolated `WakeupLedgerSession` backed by
-  an indexed binary min-heap (`Dictionary<(GrainId Target, string JobName), Entry>` holding `DueTimeUtcTicks`,
+- **Primary-side reminder handler (`ReminderMessageHandler` and `ReminderLedgerSession`, `Orleans.Durable.Storage`, data
+  plane).** Implements `IMessageHandler` for `"orleans.reminder"`, configured by `ReminderOptions` (nested on
+  `DurableStorageOptions.Reminders` with `TimeProvider`). Each open ledger `L` owns an isolated `ReminderLedgerSession`
+  backed by an indexed binary min-heap (`Dictionary<(GrainId Target, string JobName), Entry>` holding `DueTimeUtcTicks`,
   session-monotonic `ulong Generation`, `HeapIndex`, `InFlight`, and `Attempt`):
   - `OnBatchDurable` decodes payloads and interns well-known job names outside the per-ledger lock, then under lock
     updates the heap: a present `DueTime` advances `Generation`, resets `Attempt`, and upserts in place when
     `!InFlight`; a `null` clear removes a non-`InFlight` entry immediately, or clears `DueTimeUtcTicks` and advances
     `Generation` while retaining an `InFlight` entry until dispatch completes so ABA collisions and duplicate
     dispatches are prevented.
-  - When live `MemoryBytes` exceeds `WakeupOptions.MaxWakeupBytesPerLedger` (default 4 MiB), the session flags `L` in
-    `WakeupMessageHandler.CollectLedgersNeedingRoll()`, polled unconditionally in `NodeLedgers.GovernAsync` so both
-    diskful and diskless silos trigger a routine ledger roll.
-  - The per-ledger timer loop dispatches due wakeups with bounded concurrency
-    (`WakeupOptions.MaxConcurrentWakeupDispatches`, default 32) via `IDurableJobReceiverExtension.ExecuteJobAsync`
-    with `IJobRunContext.IsEphemeralWakeup = true`, handling `Completed`, `RescheduleAt`, transient retry backoff
-    (capped at `WakeupOptions.MaxRetryDelay`), and mid-dispatch `Generation` / `null` updates safely under lock.
-  - `WakeupMessageHandler.StopAsync()` cancels timer loops and awaits in-flight dispatches via `AdmissionGate` inside
+  - When live `MemoryBytes` exceeds `ReminderOptions.MaxReminderBytesPerLedger` (default 4 MiB), the session flags `L`
+    in `IMessageHandler.CollectLedgersNeedingRoll()`, polled generically across all handlers in `NodeLedgers.GovernAsync`
+    so both diskful and diskless silos trigger a routine ledger roll.
+  - The per-ledger timer loop dispatches due reminders with bounded concurrency
+    (`ReminderOptions.MaxConcurrentReminderDispatches`, default 32) via `IDurableJobReceiverExtension.HandleDurableJobAsync`
+    with `IJobRunContext.IsEphemeralReminder = true`, handling `Completed`, `RescheduleAt`, transient retry backoff
+    (capped at `ReminderOptions.MaxRetryDelay`), and mid-dispatch `Generation` / `null` updates safely under lock.
+  - `IMessageHandler.StopAsync()` cancels timer loops and awaits in-flight dispatches via `AdmissionGate` inside
     `NodeRuntime.StopJournalsAsync()` immediately before `Journals.DisposeAsync()`.
-- **Segment wakeup processor (`WakeupMessageProcessor`, `Orleans.Durable.Storage.Control`, control plane).**
-  Implements `IMessageProcessor` for `"orleans.wakeup"`. Its per-segment fold stores
+- **Segment reminder processor (`ReminderMessageProcessor`, `Orleans.Durable.Storage.Control`, control plane).**
+  Implements `IMessageProcessor` for `"orleans.reminder"`. Its per-segment fold stores
   `Dictionary<(GrainId Target, string JobName), long>` with accurate `MemoryBytes` accounting (charged to `DrainScan`'s
-  `ByteBudget`), validating every record with `WakeupMessageCodec.Decode` (throwing `ArchiveCorruptException` on
+  `ByteBudget`), validating every record with `ReminderMessageCodec.Decode` (throwing `ArchiveCorruptException` on
   malformed payload or invalid `GrainId`) and applying last-write-wins in slot order (`null` removes the entry and
   reclaims memory). On `CommitAsync`:
   - Zero surviving entries returns immediately with zero `ISealedJobShardPublisher` calls and zero backing writes.
@@ -2783,28 +2784,28 @@ crash recovery through deterministic, time-bucketed sealed `JobShard`s published
     bucket removes its entries from the fold and reclaims `MemoryBytes` immediately so retries skip already-published
     buckets. `LocalDurableJobManager` implements `ISealedJobShardPublisher` and signals `_shardCheckSignal` immediately
     whenever a newly created shard is due within `ShardLoadLookaheadPeriod`.
-- **Message journal storage and `GrainWakeupCoordinator` (`Orleans.Durable`).**
+- **Message journal storage and `GrainReminderCoordinator` (`Orleans.Durable`).**
   - `Orleans.Durable.Journaling` defines `JournalMessageRecord` (`MaxPayloadLength = 65_536`, validated `[a-z0-9._-]`
     channel name `1..64`) and `IMessageJournalStorage : IJournalStorage` (`AppendWithMessagesAsync`,
     `ReplaceWithMessagesAsync`). `DurableJournalStorage` implements `IMessageJournalStorage`, caching
-    `FrozenDictionary<string, MessageChannel>`, copying message payloads once outside its rebase-retry loop, and
-    encoding `JournalEntryRecord` with `HasMessagesFlag`.
-  - `JournaledStateManager` keeps `SupportsMessageWrites` and `StageMessage` internal to `Orleans.Durable`,
+    `FrozenDictionary<string, MessageChannel>` dynamically from `MessageChannelRegistration.KnownChannels`, copying
+    message payloads once outside its rebase-retry loop, and encoding `JournalEntryRecord` with `HasMessagesFlag`.
+  - `JournaledStateManager` keeps `SupportsMessageWrites` and `StageMessageWrite` internal to `Orleans.Durable`,
     double-buffering `_stagedMessages` into `_inFlightMessages` synchronously across the storage write (`Append`
     requires a non-empty delta; empty `Replace` with messages is allowed; both buffers clear on `Reset`/fence and
     `DeleteStateAsync`).
-  - `Orleans.Durable.Jobs` defines `IGrainWakeupSource` (`JobName`, `GetNextDueTime(DateTimeOffset now)`) and
-    `GrainWakeupCoordinator`, which emits at most one self-only `SetWakeup(GrainId, JobName, clampedDueTime?)` per
+  - `Orleans.Durable.Jobs` defines `IGrainReminderSource` (`JobName`, `GetNextDueTime(DateTimeOffset now)`) and
+    `GrainReminderCoordinator`, which emits at most one self-only reminder `(GrainId, JobName, clampedDueTime?)` per
     source per journal write (clamping `dueTime < now + RecheckDelay` to `now + RecheckDelay`, coalescing redundant
-    later emissions while `_lastEmittedDueTime` is still ahead of `now`, emitting `SetWakeup(..., null)` when pending
-    work clears, seeding `_hadPendingWork` in `OnRecoveryCompleted`, deduplicating `IsEphemeralWakeup` vs backing jobs
+    later emissions while `_lastEmittedDueTime` is still ahead of `now`, emitting a `null` clear when pending work
+    clears, seeding `_hadPendingWork` in `OnRecoveryCompleted`, deduplicating `IsEphemeralReminder` vs backing jobs
     while adopting earlier post-roll backing jobs, and delegating directly to `ILocalDurableJobManager.ScheduleJobAsync`
     when message writes are not supported).
-  - `Orleans.Durable.Messaging` (`Outbox`, `Inbox`, `MessagingPump`) wires through `GrainWakeupCoordinator`, giving
+  - `Orleans.Durable.Messaging` (`Outbox`, `Inbox`, `MessagingPump`) wires through `GrainReminderCoordinator`, giving
     1-RTT local-primary writes with zero backing writes when messages deliver and retire before segment drain.
 - **Outbox-style grain-local durable jobs (`IDurableJobQueue`, `Orleans.Durable.Jobs`).** Layered directly on
-  `GrainWakeupCoordinator` as an `IStateMachine` + `IGrainWakeupSource` on `IJournaledStateManager`: synchronous atomic
-  `Schedule(GrainJobRequest)`, `Cancel(string)`, `TryGetJob`, and `PendingJobs` (`PendingGrainJob`), bounded by
+  `GrainReminderCoordinator` as an `IStateMachine` + `IGrainReminderSource` on `IJournaledStateManager`: synchronous
+  atomic `Schedule(GrainJobRequest)`, `Cancel(string)`, `TryGetJob`, and `PendingJobs` (`PendingGrainJob`), bounded by
   `DurableJobQueueOptions.MaxPendingJobs` and `MaxMetadataBytesPerJob` well below `MaxBodyBytes`, O(1) min-due via
   `SortedSet` + `Dictionary`, explicit `JobId` equivalence vs conflict (`InvalidOperationException`), post-`await`
   `(jobId, ExecutionGeneration)` cancel/reschedule guard with monotonic journaled generation, activation fence and
@@ -2882,7 +2883,7 @@ section. The MetaStore and the archive store's stores are the silo's services, c
 | Object-store ledger store | Provider, container or bucket, layout (per-slot, or append on Azure), append extent size, append count, and batch size limits, redundancy, and derived local cache (bytes and optional volatile directory, cleared on startup); the store's objects lie under `ledgers/` below the cluster's store prefix, fixed for the cluster's life by the store's record, whose ID the node registry records | None; `PerSlot`, 128 MiB extent target, 40,000 appends per extent, 100 MiB − 49 B max batch (`MaxAppendLength − 49 B`), `SingleZone`, 1 GiB cache, no directory (`DurableStorageOptions.ObjectLedgers`: `ObjectLedgerStoreOptions`) | [§5.14](#514-object-store-ledgers), [object-store ledgers §4](../components/object-ledgers.md#4-data-types) | `Node:ObjectLedgers:Layout`, `Node:ObjectLedgers:ExtentTargetBytes`, `Node:ObjectLedgers:ExtentMaxAppends`, `Node:ObjectLedgers:MaxBatchBytes`, `Node:ObjectLedgers:CacheBytes`, `Node:ObjectLedgers:CacheDirectory`, `Node:ObjectLedgers:Redundancy` |
 | Object-store ledger window | `K` of the object-store ledgers a transition opens | 2 per-slot, 4 append (`ControlOptions.ObjectLedgerWindow`) | [object-store ledgers §8.6](../components/object-ledgers.md#86-policy-and-cost) | `Control:ObjectLedgerWindow` |
 | Object-store request budget | Requests per second per storage account which the controller grain shares among the nodes, agreeing on every silo | 10,000 (`ControlOptions.ObjectStoreRequestsPerSecond`) | [§5.14](#514-object-store-ledgers) | `Control:ObjectStoreRequestsPerSecond` |
-| Wakeup engine | Primary-side wakeup heap roll threshold per open ledger, per-ledger concurrent ephemeral dispatch cap, node-level concurrent backing shard publish cap, ephemeral retry delay bounds, and overdue backing-job jitter window | 4 MiB, 32, 16, 250 ms, 30 s, 5 s (`DurableStorageOptions.Wakeup`: `WakeupOptions`) | [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs) | `Node:Wakeup:MaxWakeupBytesPerLedger`, `Node:Wakeup:MaxConcurrentWakeupDispatches`, `Node:Wakeup:MaxConcurrentWakeupSchedules`, `Node:Wakeup:InitialRetryDelay`, `Node:Wakeup:MaxRetryDelay`, `Node:Wakeup:OverdueJitterWindow` |
+| Reminder engine | Primary-side reminder heap roll threshold per open ledger, per-ledger concurrent ephemeral dispatch cap, node-level concurrent sealed shard publish cap, ephemeral retry delay bounds, and overdue reminder jitter window | 4 MiB, 32, 16, 250 ms, 30 s, 5 s (`DurableStorageOptions.Reminders`: `ReminderOptions`) | [§5.15](#515-ledger-local-reminders-1-rtt-messaging-and-grain-local-durable-jobs) | `Node:Reminders:MaxReminderBytesPerLedger`, `Node:Reminders:MaxConcurrentReminderDispatches`, `Node:Reminders:MaxConcurrentReminderPublishes`, `Node:Reminders:InitialRetryDelay`, `Node:Reminders:MaxRetryDelay`, `Node:Reminders:OverdueJitterWindow` |
 
 **Durable Jobs.** Durable Jobs lists its shards through its provider's `IJournalStorageCatalog` and claims them through
 conditional journal metadata updates, neither of which the durable storage provider implements
@@ -2897,14 +2898,14 @@ siloBuilder
 ```
 
 Grain journals, among them Messaging's and Durable Tasks' state, use durable storage under the default provider name;
-the backing durable jobs they schedule (including surviving `SetWakeup` records drained into deterministic sealed
-`JobShard`s via `ISealedJobShardPublisher`, [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs))
+the backing durable jobs they schedule (including surviving reminder records drained into deterministic sealed
+`JobShard`s via `ISealedJobShardPublisher`, [§5.15](#515-ledger-local-reminders-1-rtt-messaging-and-grain-local-durable-jobs))
 live in the Azure shards, which keep Durable Jobs' creation, discovery, metadata-ETag ownership, retries, cancellation,
 and recovery there. A silo whose Jobs provider has no catalog, durable storage among them, does not start: its
 configuration validation fails with an `OrleansConfigurationException` naming the provider and `IJournalStorageCatalog`,
 before the node starts.
 
-**Message channels and wakeups.** Cluster agreement on `message-channels` is derived directly from the registered
+**Message channels and reminders.** Cluster agreement on `message-channels` is derived directly from the registered
 `IMessageHandler`s rather than configured as a separate option, and `NodeRuntime.StartAsync` checks parity with
 registered `IMessageProcessor`s (`ValidateMessageChannelParity`).
 `MixedProviderDurableJobsTests` in `Orleans.DurableJobs.AzureStorage.Tests` deploys this configuration on four silos
@@ -3379,24 +3380,26 @@ has a surrogate whose encoding of every case a Verify snapshot pins, and a test 
 checks against an independent reading of this section's rules. `OrleansCorpusTests` replays each target's committed
 corpus.
 
-**Message drain and wakeup verification.** `WakeupCompanionRules`, golden vectors (`orleans/wakeup-companions.json`,
-`wakeup-companion-rejections.json`), Verify snapshots, and the `wakeup-companion` fuzz target (in
+**Message drain and reminder verification.** `ReminderMessageRules`, golden vectors (`orleans/reminder-messages.json`,
+`reminder-message-rejections.json`), Verify snapshots, and the `reminder-message` fuzz target (in
 `Orleans.Durable.Storage.Fuzz.Orleans`, instrumenting `Orleans.Durable.dll` scoped to `Orleans.Durable.Jobs`) pin the
-canonical `"orleans.wakeup"` codec across `ReadOnlySpan<byte>` and multi-segment `ReadOnlySequence<byte>`. Orleans-free
-Clockwork simulations (`LocalDrainSimulationTests`) verify unified single-pass `DrainScan` message draining across both
-LSM (`DrainWorker`) and Archive Logs (`ArchiveLogDrainWorker`), covering message-only segments, same-segment clear,
-cross-segment set-then-clear, `LedgerLocation.ObjectStore`, tight `DrainMemoryBytes` `OverBudget` → `Alone` resets,
-racing drainers hitting idempotent deterministic shard IDs, transient commit failure retry, unknown-channel fail-closed
-checks, and all race/safety mutants, exporting `DURABLE_STORAGE_MESSAGE_DRAIN_TRACES` for Quint trace replay
-(`just message-drain-traces`). Unit tests over `FakeTimeProvider` cover `WakeupLedgerSession`, `WakeupMessageProcessor`,
-`JournaledStateManager` message staging, `DurableJournalStorage` rebase-retry, `GrainWakeupCoordinator`, and
-`SiloArchive.Lsm` pre-gate `message-channels` checks. `Orleans.TestingHost` end-to-end tests (LSM + Archive Logs) verify
-1-RTT local-primary writes, remote forwarded message writes, zero sealed shards and zero `ScheduleJobAsync` calls when
-retired before segment drain, crash recovery publishing deterministic sealed `JobShard`s via `ISealedJobShardPublisher`,
-racing-drainer idempotency, idle deactivation wakeup, and clean `NodeRuntime.StopJournalsAsync()` teardown;
-`Orleans.Durable.Storage.Interop.Tests` verifies plain `AzureBlobJournalStorage` reads mixed journal + `Message` ledgers
-cleanly; `DurableJobQueueTests` and `DurableJobQueueEndToEndTests` verify `IDurableJobQueue` with `DurableJobQueueModel`
-CsCheck oracle and 3-silo E2E tests.
+canonical `"orleans.reminder"` codec across `ReadOnlySpan<byte>` and multi-segment `ReadOnlySequence<byte>`. Orleans-free
+Clockwork simulations (`MessageDrainSimulationTests`) verify unified single-pass `DrainScan` message draining across
+both LSM (`DrainWorker`) and Archive Logs (`ArchiveLogDrainWorker`), covering message-only segments, same-segment
+retract, cross-segment emit-then-retract, `LedgerLocation.ObjectStore`, tight `DrainMemoryBytes` `OverBudget` → `Alone`
+resets, racing drainers hitting idempotent commits, transient commit failure retry, unknown-channel fail-closed checks,
+and all race/safety mutants, exporting `DURABLE_STORAGE_MESSAGE_DRAIN_TRACES` for Quint trace replay
+(`just message-drain-traces`, `MessageDrainTraceTests`). Unit tests over `FakeTimeProvider` cover
+`ReminderLedgerSession`, `ReminderMessageProcessor`, `JournaledStateManager` message staging, `DurableJournalStorage`
+rebase-retry, `GrainReminderCoordinator`, and `SiloArchive.Lsm` pre-gate `message-channels` checks (`ReminderEngineTests`,
+`GrainReminderCoordinatorTests`). `Orleans.TestingHost` end-to-end tests (`AtomicReminderEndToEndTests`, LSM + Archive
+Logs) verify 1-RTT local-primary writes, remote forwarded message writes, zero sealed shards and zero `ScheduleJobAsync`
+calls when retired before segment drain, crash recovery publishing deterministic sealed `JobShard`s via
+`ISealedJobShardPublisher`, racing-drainer idempotency, idle deactivation reminder delivery, and clean
+`NodeRuntime.StopJournalsAsync()` teardown; `Orleans.Durable.Storage.Interop.Tests` verifies plain
+`AzureBlobJournalStorage` reads mixed journal + `Message` ledgers cleanly; `DurableJobQueueTests` and
+`DurableJobQueueEndToEndTests` verify `IDurableJobQueue` with `DurableJobQueueModel` CsCheck oracle and 3-silo E2E
+tests.
 
 | Invariant | Planned evidence |
 | --- | --- |

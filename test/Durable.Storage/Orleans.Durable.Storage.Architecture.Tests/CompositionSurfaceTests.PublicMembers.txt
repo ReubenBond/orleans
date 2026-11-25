@@ -34,8 +34,8 @@ Orleans.Durable.Storage.DurableStorageOptions.ObjectLedgers: Orleans.Durable.Sto
 Orleans.Durable.Storage.DurableStorageOptions.ObjectLedgersStoreServiceKey: const System.String = "Orleans.Durable.Storage.ObjectLedgers"
 Orleans.Durable.Storage.DurableStorageOptions.Ordinal: System.Int32? { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.PreallocateWalFiles: System.Boolean { get; set; }
+Orleans.Durable.Storage.DurableStorageOptions.Reminders: Orleans.Durable.Storage.ReminderOptions { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.Root: System.String { get; set; }
-Orleans.Durable.Storage.DurableStorageOptions.Wakeup: Orleans.Durable.Storage.WakeupOptions { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.WalFileSize: System.Int64 { get; set; }
 Orleans.Durable.Storage.DurableStorageOptions.WalRetentionBytes: System.Int64? { get; set; }
 Orleans.Durable.Storage.Engine.Archive.ArchiveStoreKind (enum : System.Int32)
@@ -176,11 +176,11 @@ Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor()
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message)
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException..ctor(System.String message, System.Exception innerException)
 Orleans.Durable.Storage.JournalWriteOutcomeUnknownException.Journal: System.String? { get; }
-Orleans.Durable.Storage.WakeupOptions (sealed class)
-Orleans.Durable.Storage.WakeupOptions..ctor()
-Orleans.Durable.Storage.WakeupOptions.InitialRetryDelay: System.TimeSpan { get; set; }
-Orleans.Durable.Storage.WakeupOptions.MaxConcurrentWakeupDispatches: System.Int32 { get; set; }
-Orleans.Durable.Storage.WakeupOptions.MaxConcurrentWakeupSchedules: System.Int32 { get; set; }
-Orleans.Durable.Storage.WakeupOptions.MaxRetryDelay: System.TimeSpan { get; set; }
-Orleans.Durable.Storage.WakeupOptions.MaxWakeupBytesPerLedger: System.Int64 { get; set; }
-Orleans.Durable.Storage.WakeupOptions.OverdueJitterWindow: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.ReminderOptions (sealed class)
+Orleans.Durable.Storage.ReminderOptions..ctor()
+Orleans.Durable.Storage.ReminderOptions.InitialRetryDelay: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.ReminderOptions.MaxConcurrentReminderDispatches: System.Int32 { get; set; }
+Orleans.Durable.Storage.ReminderOptions.MaxConcurrentReminderPublishes: System.Int32 { get; set; }
+Orleans.Durable.Storage.ReminderOptions.MaxReminderBytesPerLedger: System.Int64 { get; set; }
+Orleans.Durable.Storage.ReminderOptions.MaxRetryDelay: System.TimeSpan { get; set; }
+Orleans.Durable.Storage.ReminderOptions.OverdueJitterWindow: System.TimeSpan { get; set; }

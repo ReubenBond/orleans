@@ -451,7 +451,7 @@ content, `DeletedAt` its `Tombstone`, and its `Content`.
 | `JournalMoved` | `Moved` of a write, a read, and a load: `Owner`, the primary the map names, or none (§8.5). |
 | `JournalStoreLimitException` | An `ArgumentException` from `JournalStore`'s constructor naming the startup bound which fails (`JournalStoreLimit`: the payload limit, `MaxAppendBytes`, `MaxQueuedBytes`, or `MaxProposalBytes`, §8.4). |
 | `MessageRecord` | Readonly struct `(Channel: MessageChannel, Payload: ReadOnlyMemory<byte>)` carrying one validated passthrough ledger message attached to an `Append`, `Replace`, or `Delete` write; `MaxPayloadLength = 65_536`; construction rejects a null `Channel` or payload above `MaxPayloadLength`, and `JournalEntryRecord` encoders reject `default(MessageRecord)` (§7, JS-I11). |
-| `IMessageHandler` | Registered once per `MessageChannel` on `JournalStore`: exposes `Channel`, pure pre-admission `InvalidDataException? Validate(ReadOnlySpan<byte> payload)` (zero I/O, checked via CA1806), and `IMessageSession OpenLedger(LedgerId ledger)` opening isolated per-ledger primary state for a fresh primary writer lifetime starting at slot 0 (LP-I1, LG-I2). |
+| `IMessageHandler` | Registered once per `MessageChannel` on `JournalStore`: exposes `Channel`, pure pre-admission `InvalidDataException? Validate(ReadOnlySpan<byte> payload)` (zero I/O, checked via CA1806), `IMessageSession OpenLedger(LedgerId ledger)` opening isolated per-ledger primary state for a fresh primary writer lifetime starting at slot 0 (LP-I1, LG-I2), optional `CollectLedgersNeedingRoll()` (default empty) for proactive ledger roll hints, and optional `StopAsync()` (default completed) called before `JournalStore` disposal. |
 | `IMessageSession` | `IDisposable` owning per-ledger runtime state for one message channel on its primary: `OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records)` runs in strict slot order outside `LedgerAdmission`'s lock after `ProposalOutcome.Durable`, before warm-state `Apply` and before callers receive `Accepted`, always with non-empty `records` and performing no blocking I/O; `Dispose()` runs once strictly after the last possible `OnBatchDurable` (JS-I12). |
 
 ### 4.3 Versions
@@ -1288,5 +1288,5 @@ before its registry (§8.1); a call which meets the disposed store fails with `O
   `CancelDrain`, multi-channel batching, `OnBatchDurable` defect → `FatalErrors`, and 1-preemption race mutants
   `OnDurableBeforeQuorumMutant`, `CompleteCallerBeforeOnDurableMutant`, and `DisposeBeforeLastOnDurableMutant`).
   `EntryRules`, `journals/entries.json`, `journals/entry-rejections.json`, and `journals-entry` cover `HasMessagesFlag`
-  (`0x80`) contiguous and multi-segment decoding, allocation bounds, and page leak checks. `JournalLocalAppendTests`
+  (`0x80`) contiguous and multi-segment decoding, allocation bounds, and page leak checks. `JournalMessageTests`
   verifies zero `RocksDbJournalIndex` `key_index` and `tombstones` writes for `RowKind.Message` rows.

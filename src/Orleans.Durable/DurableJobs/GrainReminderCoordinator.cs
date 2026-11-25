@@ -9,11 +9,11 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Jobs;
 
 /// <summary>
-/// Grain-scoped coordinator that binds <see cref="IGrainWakeupSource"/> instances to atomic ledger-local
-/// <c>orleans.wakeup</c> companion writes when supported by <see cref="JournaledStateManager"/>, or falls back to
+/// Grain-scoped coordinator that binds <see cref="IGrainReminderSource"/> instances to atomic ledger-local
+/// <c>orleans.reminder</c> message writes when supported by <see cref="JournaledStateManager"/>, or falls back to
 /// <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> otherwise (orleans.md §5.15).
 /// </summary>
-internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
+internal sealed class GrainReminderCoordinator : IMessageWriteParticipant
 {
     internal static readonly TimeSpan DefaultRecheckDelay = TimeSpan.FromSeconds(1);
 
@@ -24,8 +24,8 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
     private readonly List<SourceState> _sources = [];
     private readonly Dictionary<string, SourceState> _byJobName = new(StringComparer.Ordinal);
 
-    /// <summary>Initializes a new instance of the <see cref="GrainWakeupCoordinator"/> class.</summary>
-    public GrainWakeupCoordinator(
+    /// <summary>Initializes a new instance of the <see cref="GrainReminderCoordinator"/> class.</summary>
+    public GrainReminderCoordinator(
         IGrainContext grainContext,
         IJournaledStateManager stateManager,
         ILocalDurableJobManager jobManager,
@@ -50,11 +50,11 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
     /// </summary>
     public bool SupportsMessageWrites => _stateManager is JournaledStateManager { SupportsMessageWrites: true };
 
-    /// <summary>Registers a wakeup source on this grain activation.</summary>
-    /// <param name="source">The wakeup source.</param>
+    /// <summary>Registers a reminder source on this grain activation.</summary>
+    /// <param name="source">The reminder source.</param>
     /// <param name="recheckDelay">Optional minimum recheck clamp for immediate/past due work (defaults to 1 second).</param>
-    /// <exception cref="ArgumentException">A source with the same <see cref="IGrainWakeupSource.JobName"/> is already registered.</exception>
-    public void RegisterSource(IGrainWakeupSource source, TimeSpan? recheckDelay = null)
+    /// <exception cref="ArgumentException">A source with the same <see cref="IGrainReminderSource.JobName"/> is already registered.</exception>
+    public void RegisterSource(IGrainReminderSource source, TimeSpan? recheckDelay = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(source.JobName, nameof(source));
@@ -63,7 +63,7 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
 
         if (_byJobName.ContainsKey(source.JobName))
         {
-            throw new ArgumentException($"A wakeup source for job '{source.JobName}' is already registered on this grain.", nameof(source));
+            throw new ArgumentException($"A reminder source for job '{source.JobName}' is already registered on this grain.", nameof(source));
         }
 
         var state = new SourceState(source, delay);
@@ -72,12 +72,12 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
     }
 
     /// <summary>
-    /// Ensures a wakeup is covered during <c>PrepareWriteAsync</c>: when companion writes are supported, returns
+    /// Ensures a reminder is covered during <c>PrepareWriteAsync</c>: when message writes are supported, returns
     /// synchronously with zero <c>ScheduleJobAsync</c> calls (emission happens atomically in write capture); otherwise
-    /// delegates directly to <see cref="EnsureBackingWakeupAsync"/>.
+    /// delegates directly to <see cref="EnsureBackingReminderAsync"/>.
     /// </summary>
-    public ValueTask EnsureFallbackWakeupAsync(
-        IGrainWakeupSource source,
+    public ValueTask EnsureFallbackReminderAsync(
+        IGrainReminderSource source,
         DateTimeOffset dueTime,
         CancellationToken shutdownToken,
         CancellationToken cancellationToken)
@@ -87,15 +87,15 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
             return ValueTask.CompletedTask;
         }
 
-        return EnsureBackingWakeupAsync(source, dueTime, shutdownToken, cancellationToken);
+        return EnsureBackingReminderAsync(source, dueTime, shutdownToken, cancellationToken);
     }
 
     /// <summary>
     /// Ensures a backing durable job via <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> will wake this grain
     /// for <paramref name="source"/> no later than <paramref name="dueTime"/> (clamped to at least <c>now + RecheckDelay</c>).
     /// </summary>
-    public async ValueTask EnsureBackingWakeupAsync(
-        IGrainWakeupSource source,
+    public async ValueTask EnsureBackingReminderAsync(
+        IGrainReminderSource source,
         DateTimeOffset dueTime,
         CancellationToken shutdownToken,
         CancellationToken cancellationToken)
@@ -104,14 +104,14 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         var now = _timeProvider.GetUtcNow();
         dueTime = ClampDueTime(now, dueTime, entry.RecheckDelay);
 
-        if (entry.WakeupJobId is not null && entry.WakeupDueTime <= dueTime)
+        if (entry.ReminderJobId is not null && entry.ReminderDueTime <= dueTime)
         {
             return;
         }
 
-        if (entry.Scheduling is null || entry.SchedulingEpoch != entry.WakeupEpoch || entry.SchedulingDueTime > dueTime)
+        if (entry.Scheduling is null || entry.SchedulingEpoch != entry.ReminderEpoch || entry.SchedulingDueTime > dueTime)
         {
-            entry.SchedulingEpoch = entry.WakeupEpoch;
+            entry.SchedulingEpoch = entry.ReminderEpoch;
             entry.SchedulingDueTime = dueTime;
             entry.Scheduling = _jobManager.ScheduleJobAsync(
                 new ScheduleJobRequest
@@ -128,10 +128,10 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         try
         {
             var job = await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
-            if (epoch == entry.WakeupEpoch && (entry.WakeupJobId is null || job.DueTime < entry.WakeupDueTime))
+            if (epoch == entry.ReminderEpoch && (entry.ReminderJobId is null || job.DueTime < entry.ReminderDueTime))
             {
-                entry.WakeupJobId = job.Id;
-                entry.WakeupDueTime = job.DueTime;
+                entry.ReminderJobId = job.Id;
+                entry.ReminderDueTime = job.DueTime;
             }
         }
         finally
@@ -145,13 +145,13 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
 
     /// <summary>
     /// Executes due work for <paramref name="source"/> and decides the resulting <see cref="DurableJobRunResult"/>.
-    /// Tracks <c>(WakeupJobId, WakeupDueTime)</c> exclusively for backing durable jobs
-    /// (<c>!context.IsEphemeralWakeup</c>), adopting an arriving backing job whenever it is the only tracked job,
-    /// matches the tracked job, or wakes earlier than the tracked job, while returning <c>Completed</c> for redundant
+    /// Tracks <c>(ReminderJobId, ReminderDueTime)</c> exclusively for backing durable jobs
+    /// (<c>!context.IsEphemeralReminder</c>), adopting an arriving backing job whenever it is the only tracked job,
+    /// matches the tracked job, or fires earlier than the tracked job, while returning <c>Completed</c> for redundant
     /// later backing jobs.
     /// </summary>
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(
-        IGrainWakeupSource source,
+        IGrainReminderSource source,
         IJobRunContext context,
         Func<CancellationToken, ValueTask> runWorkAsync,
         CancellationToken cancellationToken)
@@ -160,12 +160,12 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         ArgumentNullException.ThrowIfNull(runWorkAsync);
 
         var entry = GetRequiredState(source);
-        var isEphemeral = context.IsEphemeralWakeup;
+        var isEphemeral = context.IsEphemeralReminder;
         var jobId = context.Job.Id;
-        if (!isEphemeral && entry.WakeupJobId is null)
+        if (!isEphemeral && entry.ReminderJobId is null)
         {
-            entry.WakeupJobId = jobId;
-            entry.WakeupDueTime = context.Job.DueTime;
+            entry.ReminderJobId = jobId;
+            entry.ReminderDueTime = context.Job.DueTime;
         }
 
         try
@@ -176,7 +176,7 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         {
             if (!isEphemeral)
             {
-                CompleteBackingWakeup(entry, jobId);
+                CompleteBackingReminder(entry, jobId);
             }
 
             throw;
@@ -187,7 +187,7 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         {
             if (!isEphemeral)
             {
-                CompleteBackingWakeup(entry, jobId);
+                CompleteBackingReminder(entry, jobId);
             }
 
             return DurableJobRunResult.Completed;
@@ -196,25 +196,25 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         var next = rawDue > now ? rawDue : AddClamped(now, entry.RecheckDelay);
         if (isEphemeral)
         {
-            // Ephemeral open-ledger wakeups never mutate backing-job tracking.
+            // Ephemeral open-ledger reminders never mutate backing-job tracking.
             return DurableJobRunResult.RescheduleAt(next);
         }
 
-        // Backing job: adopt if untracked, same job, or wakes strictly earlier than the currently tracked backing job.
-        if (entry.WakeupJobId is null || entry.WakeupJobId == jobId || next < entry.WakeupDueTime)
+        // Backing job: adopt if untracked, same job, or fires strictly earlier than the currently tracked backing job.
+        if (entry.ReminderJobId is null || entry.ReminderJobId == jobId || next < entry.ReminderDueTime)
         {
-            entry.WakeupJobId = jobId;
-            entry.WakeupDueTime = next;
+            entry.ReminderJobId = jobId;
+            entry.ReminderDueTime = next;
             return DurableJobRunResult.RescheduleAt(next);
         }
 
         // Redundant later backing job: leave the earlier tracked backing job intact and complete this one.
-        entry.WakeupEpoch++;
+        entry.ReminderEpoch++;
         return DurableJobRunResult.Completed;
     }
 
     /// <summary>Gets the currently tracked backing durable job ID for <paramref name="source"/>, if any; for tests.</summary>
-    internal string? GetTrackedBackingJobId(IGrainWakeupSource source) => GetRequiredState(source).WakeupJobId;
+    internal string? GetTrackedBackingJobId(IGrainReminderSource source) => GetRequiredState(source).ReminderJobId;
 
     /// <summary>Awaits any in-flight backing <c>ScheduleJobAsync</c> calls on deactivation.</summary>
     public async Task WaitForPendingSchedulingAsync()
@@ -251,20 +251,20 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
                 var clamped = ClampDueTime(now, rawDue, entry.RecheckDelay);
                 if (entry.LastEmittedDueTime is { } prev && now < prev && clamped >= prev)
                 {
-                    // Existing earlier wakeup already covers this write on the current ledger.
+                    // Existing earlier reminder already covers this write on the current ledger.
                     continue;
                 }
 
-                var payload = WakeupMessageCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, clamped.UtcTicks));
-                stateManager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, payload));
+                var payload = ReminderMessageCodec.Encode(new ReminderRecord(_grainContext.GrainId, entry.Source.JobName, clamped.UtcTicks));
+                stateManager.StageMessageWrite(new JournalMessageRecord(ReminderMessageCodec.ChannelName, payload));
                 entry.PendingHadPendingWork = true;
                 entry.PendingEmittedDueTime = clamped;
                 entry.HasPendingCapture = true;
             }
             else if (entry.HadPendingWork)
             {
-                var payload = WakeupMessageCodec.Encode(new WakeupRecord(_grainContext.GrainId, entry.Source.JobName, DueTimeUtcTicks: null));
-                stateManager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, payload));
+                var payload = ReminderMessageCodec.Encode(new ReminderRecord(_grainContext.GrainId, entry.Source.JobName, DueTimeUtcTicks: null));
+                stateManager.StageMessageWrite(new JournalMessageRecord(ReminderMessageCodec.ChannelName, payload));
                 entry.PendingHadPendingWork = false;
                 entry.PendingEmittedDueTime = null;
                 entry.HasPendingCapture = true;
@@ -300,7 +300,7 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         }
     }
 
-    private SourceState GetRequiredState(IGrainWakeupSource source)
+    private SourceState GetRequiredState(IGrainReminderSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (_byJobName.TryGetValue(source.JobName, out var state))
@@ -308,17 +308,17 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
             return state;
         }
 
-        throw new InvalidOperationException($"Wakeup source '{source.JobName}' is not registered with GrainWakeupCoordinator.");
+        throw new InvalidOperationException($"Reminder source '{source.JobName}' is not registered with GrainReminderCoordinator.");
     }
 
-    private static void CompleteBackingWakeup(SourceState entry, string jobId)
+    private static void CompleteBackingReminder(SourceState entry, string jobId)
     {
-        if (entry.WakeupJobId == jobId)
+        if (entry.ReminderJobId == jobId)
         {
-            entry.WakeupJobId = null;
+            entry.ReminderJobId = null;
         }
 
-        entry.WakeupEpoch++;
+        entry.ReminderEpoch++;
     }
 
     private static DateTimeOffset ClampDueTime(DateTimeOffset now, DateTimeOffset dueTime, TimeSpan recheckDelay)
@@ -338,23 +338,23 @@ internal sealed class GrainWakeupCoordinator : IMessageWriteParticipant
         return delay >= remaining ? DateTimeOffset.MaxValue : time + delay;
     }
 
-    private sealed class SourceState(IGrainWakeupSource source, TimeSpan recheckDelay)
+    private sealed class SourceState(IGrainReminderSource source, TimeSpan recheckDelay)
     {
-        public IGrainWakeupSource Source { get; } = source;
+        public IGrainReminderSource Source { get; } = source;
 
         public TimeSpan RecheckDelay { get; } = recheckDelay;
 
-        // Companion-write emission tracking.
+        // Atomic message emission tracking.
         public bool HadPendingWork;
         public DateTimeOffset? LastEmittedDueTime;
         public bool HasPendingCapture;
         public bool PendingHadPendingWork;
         public DateTimeOffset? PendingEmittedDueTime;
 
-        // Backing durable job tracking (!IsEphemeralWakeup).
-        public string? WakeupJobId;
-        public DateTimeOffset WakeupDueTime;
-        public int WakeupEpoch;
+        // Backing durable job tracking (!IsEphemeralReminder).
+        public string? ReminderJobId;
+        public DateTimeOffset ReminderDueTime;
+        public int ReminderEpoch;
         public Task<DurableJob>? Scheduling;
         public DateTimeOffset SchedulingDueTime;
         public int SchedulingEpoch;

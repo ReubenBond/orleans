@@ -1,5 +1,5 @@
 {
-  "description": "Wakeup companion records (orleans.wakeup, version 1; orleans.md §5.15) a decoder rejects in procedural check order.",
+  "description": "Reminder message records (orleans.reminder, version 1; orleans.md §5.15) a decoder rejects in procedural check order.",
   "cases": [
     {
       "name": "Empty input.",

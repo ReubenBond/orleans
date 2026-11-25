@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Engine.Archive.Tests;
 /// three <see cref="ArchiveReader"/> read paths (<c>Collect</c>, <c>FetchSingleSlotIndexedAsync</c>, and
 /// <c>ProcessSlot</c>) skip <see cref="RowKind.Message"/> rows cleanly.
 /// </summary>
-public sealed class ArchiveLocalAppendGuardTests : IDisposable
+public sealed class ArchiveMessageGuardTests : IDisposable
 {
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
 
@@ -33,7 +33,7 @@ public sealed class ArchiveLocalAppendGuardTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         await using var cluster = await ArchiveCluster.StartAsync();
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("app.events");
         var open = cluster.OpenLedger(1);
         var ledgerId = open.Id;
         var writer = cluster.Primary.Registry!.TryGet(ledgerId)!;
@@ -43,7 +43,7 @@ public sealed class ArchiveLocalAppendGuardTests : IDisposable
         using (var batch0 = await writer.CreateBatchAsync(2, 4096, ct))
         {
             _ = batch0.BeginRow(journalKey, RowKind.Append, default, default, 3, "v0-"u8);
-            batch0.BeginMessage(channel, 3, "wk0"u8);
+            batch0.BeginMessage(channel, 3, "ev0"u8);
             Assert.True((await writer.ProposeAsync(batch0, ct)).TryGetValue(out ProposalOutcome.Durable d0));
             slot0 = d0.Slot;
         }
@@ -52,7 +52,7 @@ public sealed class ArchiveLocalAppendGuardTests : IDisposable
         using (var batch1 = await writer.CreateBatchAsync(2, 4096, ct))
         {
             _ = batch1.BeginRow(journalKey, RowKind.Append, batch1.HeldVersion(journalKey), default, 2, "v1"u8);
-            batch1.BeginMessage(channel, 3, "wk1"u8);
+            batch1.BeginMessage(channel, 3, "ev1"u8);
             Assert.True((await writer.ProposeAsync(batch1, ct)).TryGetValue(out ProposalOutcome.Durable d1));
             slot1 = d1.Slot;
         }

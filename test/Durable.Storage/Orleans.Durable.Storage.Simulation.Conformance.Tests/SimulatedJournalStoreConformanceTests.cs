@@ -136,7 +136,7 @@ public sealed class SimulatedJournalStoreConformanceTests
     [Fact]
     public async Task AtomicMessagesConformUnderSimulatedSchedulesAndExploredWindows()
     {
-        var channel = MessageChannel.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("sim.messages");
         var exploredConformance = new SimulatedConformance(ScheduleBound.Current);
         var exploredKit = Kit(
             exploredConformance,

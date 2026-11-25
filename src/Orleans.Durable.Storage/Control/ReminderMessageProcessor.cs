@@ -13,25 +13,25 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Storage.Control;
 
 /// <summary>
-/// Control-plane <see cref="IMessageProcessor"/> for <c>orleans.wakeup</c> (orleans.md §5.15): folds each segment's
-/// wakeup records by <c>(GrainId Target, string JobName)</c> during <c>DrainScan</c> and publishes surviving entries
+/// Control-plane <see cref="IMessageProcessor"/> for <c>orleans.reminder</c> (orleans.md §5.15): folds each segment's
+/// reminder records by <c>(GrainId Target, string JobName)</c> during <c>DrainScan</c> and publishes surviving entries
 /// as deterministic, time-bucketed sealed <c>JobShard</c>s (1 atomic blob per non-empty bucket; 0 writes when 0
 /// entries survive in the segment).
 /// </summary>
-internal sealed class WakeupMessageProcessor : IMessageProcessor, IDisposable
+internal sealed class ReminderMessageProcessor : IMessageProcessor, IDisposable
 {
     private const long EntryOverheadBytes = 128;
 
     private readonly ISealedJobShardPublisher _publisher;
-    private readonly WakeupOptions _options;
+    private readonly ReminderOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _publishGate;
 
-    /// <summary>Initializes a new instance of the <see cref="WakeupMessageProcessor"/> class.</summary>
-    public WakeupMessageProcessor(
+    /// <summary>Initializes a new instance of the <see cref="ReminderMessageProcessor"/> class.</summary>
+    public ReminderMessageProcessor(
         ISealedJobShardPublisher publisher,
-        WakeupOptions options,
+        ReminderOptions options,
         TimeProvider timeProvider,
         ILogger? logger = null)
     {
@@ -43,11 +43,11 @@ internal sealed class WakeupMessageProcessor : IMessageProcessor, IDisposable
         _options = options;
         _timeProvider = timeProvider;
         _logger = logger ?? NullLogger.Instance;
-        _publishGate = new SemaphoreSlim(options.MaxConcurrentWakeupSchedules, options.MaxConcurrentWakeupSchedules);
+        _publishGate = new SemaphoreSlim(options.MaxConcurrentReminderPublishes, options.MaxConcurrentReminderPublishes);
     }
 
     /// <inheritdoc />
-    public MessageChannel Channel => WakeupMessageHandler.WakeupChannel;
+    public MessageChannel Channel => ReminderMessageHandler.ReminderChannel;
 
     /// <inheritdoc />
     public IMessageFold BeginSegmentFold(LedgerMetadata ledger, LedgerSegmentId segment) =>
@@ -84,7 +84,7 @@ internal sealed class WakeupMessageProcessor : IMessageProcessor, IDisposable
     internal static string DeterministicShardId(LedgerId ledger, Slot segmentStart, long bucketUtcTicks) =>
         string.Create(CultureInfo.InvariantCulture, $"drain-{ledger.Value:D20}-{segmentStart.Value:D20}-{bucketUtcTicks:D19}");
 
-    private sealed class MessageFold(WakeupMessageProcessor owner, LedgerMetadata ledger, LedgerSegmentId segment) : IMessageFold
+    private sealed class MessageFold(ReminderMessageProcessor owner, LedgerMetadata ledger, LedgerSegmentId segment) : IMessageFold
     {
         private readonly Dictionary<(GrainId Target, string JobName), long> _entries = [];
         private readonly HashSet<long> _publishedBuckets = [];
@@ -94,13 +94,13 @@ internal sealed class WakeupMessageProcessor : IMessageProcessor, IDisposable
 
         public void Add(Slot slot, int rowIndex, ReadOnlySequence<byte> payload)
         {
-            var rejection = WakeupMessageCodec.Decode(payload, WakeupMessageHandler.TryInternJobName, out var record);
+            var rejection = ReminderMessageCodec.Decode(payload, ReminderMessageHandler.TryInternJobName, out var record);
             if (rejection is not null)
             {
                 throw new ArchiveCorruptException(
                     string.Create(
                         CultureInfo.InvariantCulture,
-                        $"Corrupt orleans.wakeup message in ledger {ledger.Id} segment {segment.Start} slot {slot} row {rowIndex}: {rejection.Message}"),
+                        $"Corrupt orleans.reminder message in ledger {ledger.Id} segment {segment.Start} slot {slot} row {rowIndex}: {rejection.Message}"),
                     rejection);
             }
 

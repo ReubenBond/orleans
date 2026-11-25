@@ -20,11 +20,11 @@ namespace Orleans.Durable.Storage.Simulation.Tests;
 /// mutant traces, to <c>DURABLE_STORAGE_MESSAGE_DRAIN_TRACES</c> for replay against
 /// <c>test/Durable.Storage/specs/message-drain/MessageDrain.qnt</c> (verification.md §5.1, §8.1).
 /// </summary>
-public sealed class LocalDrainTraceTests
+public sealed class MessageDrainTraceTests
 {
     private const int FirstSeed = 1;
     private const int SeedCount = 3;
-    private static readonly MessageChannel Channel = SimulatedWakeupMessageProcessor.DefaultChannel;
+    private static readonly MessageChannel Channel = SimulatedMessageProcessor.DefaultChannel;
 
     public static TheoryData<int> Seeds => SeededSimulation.Corpus(FirstSeed, SeedCount);
 
@@ -75,7 +75,7 @@ public sealed class LocalDrainTraceTests
     [Fact]
     public void DropBeforeCommitMutantRecordsATraceTheModelRefuses()
     {
-        var trace = new Trace(Mode: "lsm", Seg0: ["S", "K"]);
+        var trace = new Trace(Mode: "lsm", Seg0: ["E", "K"]);
         trace.Actions.Add("primaryWrite");
         trace.Actions.Add("primaryWrite");
         trace.Actions.Add("closeLedger");
@@ -87,7 +87,7 @@ public sealed class LocalDrainTraceTests
     /// <summary>
     /// Negative-control mutant trace <c>skip-unknown-channel</c>: runs <see cref="DrainWorker.SkipUnknownChannelMutant"/>
     /// over a ledger containing an unregistered channel and emits a trace claiming <c>commitSegment</c> without
-    /// publishing a sealed shard, which <c>MessageDrain.qnt</c> must reject.
+    /// committing to the durable sink, which <c>MessageDrain.qnt</c> must reject.
     /// </summary>
     [Fact]
     public void SkipUnknownChannelMutantRecordsATraceTheModelRefuses()
@@ -103,12 +103,12 @@ public sealed class LocalDrainTraceTests
             await ledgers.BootstrapAsync(CancellationToken.None);
 
             var ledger = ledgers.OpenContaining([1]).Id;
-            await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), MessageChannel.Parse("sim.unregistered"), SimulatedWakeupMessageProcessor.Encode(1, set: true));
+            await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), MessageChannel.Parse("sim.unregistered"), SimulatedMessageProcessor.Encode(1, emit: true));
             await ledgers.ReplaceAsync(ledger, CancellationToken.None);
             var meta = ledgers.Ledger(ledger);
             var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
 
-            var processor = new SimulatedWakeupMessageProcessor();
+            var processor = new SimulatedMessageProcessor();
             var mutantWorker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
             {
                 SkipUnknownChannelMutant = true,
@@ -117,8 +117,8 @@ public sealed class LocalDrainTraceTests
             Assert.IsType<DrainOutcome.Drained>(outcome.Value);
             Assert.Empty(processor.CommittedKeys);
 
-            // Trace reflects what the mutant did: wrote S, closed, scanned, skipped publishShard, committed & dropped!
-            trace = new Trace(Mode: "lsm", Seg0: ["S"]);
+            // Trace reflects what the mutant did: wrote E, closed, scanned, skipped commitMessages, committed & dropped!
+            trace = new Trace(Mode: "lsm", Seg0: ["E"]);
             trace.Actions.Add("primaryWrite");
             trace.Actions.Add("closeLedger");
             trace.Actions.Add("scanSegment(1, 0)");
@@ -154,9 +154,9 @@ public sealed class LocalDrainTraceTests
 
         var meta = ledgers.Ledger(ledger);
         var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-        var hasSurviving = HasSurvivingWakeup(slots);
+        var hasSurviving = HasSurvivingMessage(slots);
 
-        var processor = new SimulatedWakeupMessageProcessor();
+        var processor = new SimulatedMessageProcessor();
         var worker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
         {
             DropBeforeMessagesCommittedMutant = dropBeforeMessagesCommittedMutant,
@@ -169,7 +169,7 @@ public sealed class LocalDrainTraceTests
         trace.Actions.Add("scanSegment(1, 0)");
         if (!dropBeforeMessagesCommittedMutant)
         {
-            trace.Actions.Add("publishShard(1)");
+            trace.Actions.Add("commitMessages(1)");
         }
 
         trace.Actions.Add("commitSegment(1)");
@@ -181,13 +181,13 @@ public sealed class LocalDrainTraceTests
         if (hasSurviving && !dropBeforeMessagesCommittedMutant)
         {
             Assert.Contains((byte)1, processor.CommittedKeys);
-            Assert.Equal(1, processor.CreatedShards);
-            trace.Actions.Add("shardFireWakeup(0)");
+            Assert.Equal(1, processor.CreatedBatches);
+            trace.Actions.Add("sinkDeliver(0)");
         }
         else if (!hasSurviving)
         {
             Assert.Empty(processor.CommittedKeys);
-            Assert.Equal(0, processor.CreatedShards);
+            Assert.Equal(0, processor.CreatedBatches);
         }
 
         return trace;
@@ -220,16 +220,16 @@ public sealed class LocalDrainTraceTests
 
         var meta = ledgers.Ledger(ledger);
         var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-        var hasSurviving = HasSurvivingWakeup(slots);
+        var hasSurviving = HasSurvivingMessage(slots);
 
-        var processor = new SimulatedWakeupMessageProcessor();
+        var processor = new SimulatedMessageProcessor();
         var worker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
 
         var outcome = await worker.DrainAsync(meta, tail, CancellationToken.None);
         Assert.IsType<ArchiveLogDrainOutcome.Complete>(outcome.Value);
 
         trace.Actions.Add("scanSegment(1, 0)");
-        trace.Actions.Add("publishShard(1)");
+        trace.Actions.Add("commitMessages(1)");
         trace.Actions.Add("commitSegment(1)");
 
         var dropped = await worker.SubmitDropAsync(ledger, ledgers.Committer.CommitAsync, CancellationToken.None);
@@ -239,13 +239,13 @@ public sealed class LocalDrainTraceTests
         if (hasSurviving)
         {
             Assert.Contains((byte)1, processor.CommittedKeys);
-            Assert.Equal(1, processor.CreatedShards);
-            trace.Actions.Add("shardFireWakeup(0)");
+            Assert.Equal(1, processor.CreatedBatches);
+            trace.Actions.Add("sinkDeliver(0)");
         }
         else
         {
             Assert.Empty(processor.CommittedKeys);
-            Assert.Equal(0, processor.CreatedShards);
+            Assert.Equal(0, processor.CreatedBatches);
         }
 
         return trace;
@@ -253,28 +253,28 @@ public sealed class LocalDrainTraceTests
 
     private static string[] BuildSlots(int seed) => (seed % 4) switch
     {
-        1 => ["S", "K"],
-        2 => ["S", "C", "K"],
+        1 => ["E", "K"],
+        2 => ["E", "R", "K"],
         3 => ["M"],
-        _ => ["K", "S", "C", "S"],
+        _ => ["K", "E", "R", "E"],
     };
 
-    private static bool HasSurvivingWakeup(string[] slots)
+    private static bool HasSurvivingMessage(string[] slots)
     {
-        var armed = false;
+        var pending = false;
         foreach (var op in slots)
         {
-            if (op is "S" or "M")
+            if (op is "E" or "M")
             {
-                armed = true;
+                pending = true;
             }
-            else if (op == "C")
+            else if (op == "R")
             {
-                armed = false;
+                pending = false;
             }
         }
 
-        return armed;
+        return pending;
     }
 
     private static async Task WriteSlotOpAsync(LiveLedgers ledgers, LedgerId ledger, string op)
@@ -289,12 +289,12 @@ public sealed class LocalDrainTraceTests
         {
             var writer = ledgers.Registry.TryGet(ledger)!;
             using var batch = await writer.CreateBatchAsync(1, 4096, CancellationToken.None);
-            batch.BeginMessage(Channel, 2, SimulatedWakeupMessageProcessor.Encode(1, set: true));
+            batch.BeginMessage(Channel, 2, SimulatedMessageProcessor.Encode(1, emit: true));
             Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, CancellationToken.None)).Value);
             return;
         }
 
-        await ProposeMixedAsync(ledgers, ledger, [1], "bbbbbbbb"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(1, set: op == "S"));
+        await ProposeMixedAsync(ledgers, ledger, [1], "bbbbbbbb"u8.ToArray(), Channel, SimulatedMessageProcessor.Encode(1, emit: op == "E"));
     }
 
     private static async Task ProposeMixedAsync(LiveLedgers ledgers, LedgerId ledger, byte[] journalKey, byte[] journalBody, MessageChannel channel, byte[] messagePayload)
@@ -334,7 +334,7 @@ public sealed class LocalDrainTraceTests
             _ = sb.AppendLine("    Mutation = \"none\"");
             _ = sb.AppendLine("  ).* from \"../../specs/message-drain/MessageDrain\"");
             _ = sb.AppendLine();
-            _ = sb.AppendLine("  val invariantCheck: bool = TypeOK and WakeupPreserved and NoDropBeforeMessagesCommitted and ClearedInSegmentWritesNothing and IdempotentShardPublish");
+            _ = sb.AppendLine("  val invariantCheck: bool = TypeOK and MessagesPreserved and NoDropBeforeMessagesCommitted and EmptyFoldWritesNothing and IdempotentCommit");
             _ = sb.AppendLine();
             _ = sb.AppendLine("  run traceReplay =");
             _ = sb.AppendLine("    init.expect(invariantCheck)");

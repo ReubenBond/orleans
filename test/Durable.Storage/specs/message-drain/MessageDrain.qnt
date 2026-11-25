@@ -1,17 +1,17 @@
 // -*- mode: Bluespec; -*-
-// Unified single-pass DrainScan message draining + deterministic sealed JobShard publishing
-// (ledgers.md §3.1, archive.md §2.3, archive-lsm.md §3.1, archive-logs.md §3.2, orleans.md §5.15).
+// Unified single-pass DrainScan message draining and idempotent per-segment durable sink commit
+// (ledgers.md §3.1, archive.md §2.3, archive-lsm.md §3.1, archive-logs.md §3.2).
 //
 // Models both LSM (DrainWorker: DrainScan -> CommitMessagesAsync -> ManifestChange.Drain -> Drop) and
 // Archive Logs (ArchiveLogDrainWorker: DrainScan -> WriteAsync + CommitMessagesAsync -> DrainMarker -> Drop)
-// across single- and multi-segment ledgers, message-only segments (0 archive rows), same-segment clear
-// (0 sealed shards), cross-segment set-then-clear, concurrent racing drainers colliding on deterministic
-// sealed JobShard IDs, primary volatile wakeup heap vs crash recovery, and drainer crashes at every step.
+// across single- and multi-segment ledgers, message-only segments (0 archive rows), same-segment retract
+// (0 durable sink commits), cross-segment emit-then-retract, concurrent racing drainers colliding on deterministic
+// per-segment commit keys, primary volatile session consumption vs crash recovery, and drainer crashes at every step.
 module MessageDrain {
   // Archive backend mode: "lsm" or "logs".
   const Mode: str
-  // Slot operations per segment: "S" = journal + SetWakeup, "C" = journal + ClearWakeup,
-  // "K" = journal-only, "M" = message-only SetWakeup (0 archive rows).
+  // Slot operations per segment: "E" = archive row + Emit message, "R" = archive row + Retract message,
+  // "K" = archive-only row, "M" = message-only Emit (0 archive rows).
   const Seg0: List[str]
   const Seg1: List[str]
   // Number of concurrent drainers (1 or 2).
@@ -19,7 +19,7 @@ module MessageDrain {
   // Maximum total primary + drainer crashes.
   const MaxCrashes: int
   // Mutation selector ("none", "drop-before-messages-committed", "skip-unknown-channel",
-  // "non-deterministic-shard-id", "write-on-empty-fold", "volatile-answer").
+  // "non-idempotent-commit", "write-on-empty-fold", "volatile-answer").
   const Mutation: str
 
   pure val NumSegments: int = if (Seg1.length() > 0) 2 else 1
@@ -31,8 +31,8 @@ module MessageDrain {
   pure def foldSurviving(slots: List[str], count: int): bool =
     0.to(count - 1).fold(false, (acc, i) =>
       val op = slots[i]
-      if (op == "S" or op == "M") true
-      else if (op == "C") false
+      if (op == "E" or op == "M") true
+      else if (op == "R") false
       else acc)
 
   pure def hasArchive(slots: List[str], count: int): bool =
@@ -41,28 +41,28 @@ module MessageDrain {
   pure def hasMessages(slots: List[str], count: int): bool =
     0.to(count - 1).exists(i => slots[i] != "K")
 
-  // Ledger & primary volatile state.
+  // Ledger & primary volatile session state.
   var ledgerState: str         // "open" | "closed" | "dropped"
   var writtenSeg: int          // 0..NumSegments
   var writtenSlot: int         // 0..segSlots(writtenSeg).length()
   var primaryAlive: bool
-  var primaryArmed: bool
-  var logicalArmed: bool
+  var primaryPending: bool
+  var logicalPending: bool
   var delivered: bool
   var crashes: int
 
-  // Archive drain & deterministic sealed-shard state.
+  // Archive drain & idempotent durable-sink state.
   var lsmWatermark: int        // number of consecutive segments 0..lsmWatermark-1 committed in manifest
   var lsmComplete: bool        // ManifestChange.Drain(..., complete: true) committed
   var logsMarked: Set[int]     // segments with durable drain marker d/{S}/{start}
-  var sealedShards: Set[int]   // deterministic sealed JobShard IDs (keyed by segment index)
-  var createdShards: int       // total shard-creation writes (equals size(sealedShards) under deterministic IDs)
+  var durableSink: Set[int]    // deterministic per-segment durable commits (keyed by segment index)
+  var sinkWrites: int          // total distinct durable sink writes (equals size(durableSink) under idempotent commits)
 
   // Per-drainer state.
-  var drainerPhase: int -> str     // "idle" | "scanned" | "published"
+  var drainerPhase: int -> str     // "idle" | "scanned" | "committed"
   var drainerSeg: int -> int       // -1 when idle, else segment index
   var drainerSurviving: int -> bool
-  var racedOnSameSegment: bool     // witness flag: 2 drainers published the same segment
+  var racedOnSameSegment: bool     // witness flag: 2 drainers committed the same segment
 
   def segWrittenLen(s: int): int =
     if (s < writtenSeg) segSlots(s).length()
@@ -76,8 +76,6 @@ module MessageDrain {
   def writtenSegments: Set[int] = AllSegments.filter(s => segWrittenLen(s) > 0)
 
   def segDrainable(s: int): bool =
-    // Either sealed while open (all slots of s written and ledger moved to next segment),
-    // or the ledger is closed and s has at least one written slot.
     (s < writtenSeg) or (ledgerState == "closed" and s < NumSegments and segWrittenLen(s) > 0)
 
   def allCoveredByWatermark(nextWatermark: int): bool =
@@ -88,22 +86,22 @@ module MessageDrain {
     writtenSeg' = 0,
     writtenSlot' = 0,
     primaryAlive' = true,
-    primaryArmed' = false,
-    logicalArmed' = false,
+    primaryPending' = false,
+    logicalPending' = false,
     delivered' = false,
     crashes' = 0,
     lsmWatermark' = 0,
     lsmComplete' = false,
     logsMarked' = Set(),
-    sealedShards' = Set(),
-    createdShards' = 0,
+    durableSink' = Set(),
+    sinkWrites' = 0,
     drainerPhase' = AllDrainers.mapBy(_ => "idle"),
     drainerSeg' = AllDrainers.mapBy(_ => -1),
     drainerSurviving' = AllDrainers.mapBy(_ => false),
     racedOnSameSegment' = false,
   }
 
-  // Primary durably writes the next slot (atomic journal row + optional RowKind.Message).
+  // Primary durably writes the next slot (atomic archive row + optional RowKind.Message).
   action primaryWrite = {
     val slots = segSlots(writtenSeg)
     val op = slots[writtenSlot]
@@ -115,8 +113,8 @@ module MessageDrain {
       writtenSeg < NumSegments,
       writtenSeg' = if (advanceSeg) writtenSeg + 1 else writtenSeg,
       writtenSlot' = if (advanceSeg) 0 else nextSlot,
-      primaryArmed' = if (op == "S" or op == "M") true else if (op == "C") false else primaryArmed,
-      logicalArmed' = if (op == "S" or op == "M") true else if (op == "C") false else logicalArmed,
+      primaryPending' = if (op == "E" or op == "M") true else if (op == "R") false else primaryPending,
+      logicalPending' = if (op == "E" or op == "M") true else if (op == "R") false else logicalPending,
       ledgerState' = ledgerState,
       primaryAlive' = primaryAlive,
       delivered' = delivered,
@@ -124,8 +122,8 @@ module MessageDrain {
       lsmWatermark' = lsmWatermark,
       lsmComplete' = lsmComplete,
       logsMarked' = logsMarked,
-      sealedShards' = sealedShards,
-      createdShards' = createdShards,
+      durableSink' = durableSink,
+      sinkWrites' = sinkWrites,
       drainerPhase' = drainerPhase,
       drainerSeg' = drainerSeg,
       drainerSurviving' = drainerSurviving,
@@ -133,13 +131,13 @@ module MessageDrain {
     }
   }
 
-  // Primary's volatile WakeupLedgerSession fires while the ledger is open.
-  action primaryFireWakeup = all {
+  // Primary's volatile IMessageSession consumes a pending message while the ledger is open.
+  action primaryConsume = all {
     ledgerState == "open",
     primaryAlive,
-    primaryArmed,
-    primaryArmed' = false,
-    logicalArmed' = false,
+    primaryPending,
+    primaryPending' = false,
+    logicalPending' = false,
     delivered' = true,
     ledgerState' = ledgerState,
     writtenSeg' = writtenSeg,
@@ -149,56 +147,56 @@ module MessageDrain {
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
     racedOnSameSegment' = racedOnSameSegment,
   }
 
-  // Primary crashes: volatile WakeupLedgerSession heap is lost and ledger is closed at the current tail.
+  // Primary crashes: volatile IMessageSession state is lost and ledger is closed at the current tail.
   action primaryCrash = all {
     ledgerState == "open",
     primaryAlive,
     crashes < MaxCrashes,
     writtenSegments.size() > 0,
     primaryAlive' = false,
-    primaryArmed' = false,
+    primaryPending' = false,
     ledgerState' = "closed",
     crashes' = crashes + 1,
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
-    logicalArmed' = logicalArmed,
+    logicalPending' = logicalPending,
     delivered' = delivered,
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
     racedOnSameSegment' = racedOnSameSegment,
   }
 
-  // Graceful roll / close of the ledger once all scripted slots (or at least one) are written.
+  // Graceful roll / close of the ledger once all scripted slots are written.
   action closeLedger = all {
     ledgerState == "open",
     writtenSeg == NumSegments,
     ledgerState' = "closed",
-    primaryArmed' = false,
+    primaryPending' = false,
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
     primaryAlive' = primaryAlive,
-    logicalArmed' = logicalArmed,
+    logicalPending' = logicalPending,
     delivered' = delivered,
     crashes' = crashes,
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
@@ -220,43 +218,43 @@ module MessageDrain {
       writtenSeg' = writtenSeg,
       writtenSlot' = writtenSlot,
       primaryAlive' = primaryAlive,
-      primaryArmed' = primaryArmed,
-      logicalArmed' = logicalArmed,
+      primaryPending' = primaryPending,
+      logicalPending' = logicalPending,
       delivered' = delivered,
       crashes' = crashes,
       lsmWatermark' = lsmWatermark,
       lsmComplete' = lsmComplete,
       logsMarked' = logsMarked,
-      sealedShards' = sealedShards,
-      createdShards' = createdShards,
+      durableSink' = durableSink,
+      sinkWrites' = sinkWrites,
       racedOnSameSegment' = racedOnSameSegment,
     }
   }
 
-  // CommitMessagesAsync: publishes 1 deterministic sealed JobShard if surviving entries > 0 (0 writes if 0).
-  action publishShard(d: int): bool = {
+  // IMessageFold.CommitAsync: idempotently commits surviving messages to the durable sink (0 writes if fold is empty).
+  action commitMessages(d: int): bool = {
     val s = drainerSeg.get(d)
     val shouldWrite = drainerSurviving.get(d) or Mutation == "write-on-empty-fold"
-    val alreadyExists = s.in(sealedShards)
+    val alreadyCommitted = s.in(durableSink)
     all {
       ledgerState != "dropped",
       drainerPhase.get(d) == "scanned",
-      drainerPhase' = drainerPhase.set(d, "published"),
-      sealedShards' =
-        if (shouldWrite and Mutation != "volatile-answer") sealedShards.union(Set(s))
-        else sealedShards,
-      createdShards' =
+      drainerPhase' = drainerPhase.set(d, "committed"),
+      durableSink' =
+        if (shouldWrite and Mutation != "volatile-answer") durableSink.union(Set(s))
+        else durableSink,
+      sinkWrites' =
         if (shouldWrite and Mutation != "volatile-answer") (
-          if (Mutation == "non-deterministic-shard-id" or not(alreadyExists)) createdShards + 1
-          else createdShards
-        ) else createdShards,
-      racedOnSameSegment' = (racedOnSameSegment or (shouldWrite and alreadyExists)),
+          if (Mutation == "non-idempotent-commit" or not(alreadyCommitted)) sinkWrites + 1
+          else sinkWrites
+        ) else sinkWrites,
+      racedOnSameSegment' = (racedOnSameSegment or (shouldWrite and alreadyCommitted)),
       ledgerState' = ledgerState,
       writtenSeg' = writtenSeg,
       writtenSlot' = writtenSlot,
       primaryAlive' = primaryAlive,
-      primaryArmed' = primaryArmed,
-      logicalArmed' = logicalArmed,
+      primaryPending' = primaryPending,
+      logicalPending' = logicalPending,
       delivered' = delivered,
       crashes' = crashes,
       lsmWatermark' = lsmWatermark,
@@ -271,7 +269,7 @@ module MessageDrain {
   action commitSegment(d: int): bool = {
     val s = drainerSeg.get(d)
     val allowedPhase =
-      drainerPhase.get(d) == "published"
+      drainerPhase.get(d) == "committed"
       or (Mutation == "drop-before-messages-committed" and drainerPhase.get(d) == "scanned")
     all {
       ledgerState != "dropped",
@@ -289,12 +287,12 @@ module MessageDrain {
       writtenSeg' = writtenSeg,
       writtenSlot' = writtenSlot,
       primaryAlive' = primaryAlive,
-      primaryArmed' = primaryArmed,
-      logicalArmed' = logicalArmed,
+      primaryPending' = primaryPending,
+      logicalPending' = logicalPending,
       delivered' = delivered,
       crashes' = crashes,
-      sealedShards' = sealedShards,
-      createdShards' = createdShards,
+      durableSink' = durableSink,
+      sinkWrites' = sinkWrites,
       racedOnSameSegment' = racedOnSameSegment,
     }
   }
@@ -310,21 +308,21 @@ module MessageDrain {
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
     primaryAlive' = primaryAlive,
-    primaryArmed' = primaryArmed,
-    logicalArmed' = logicalArmed,
+    primaryPending' = primaryPending,
+    logicalPending' = logicalPending,
     delivered' = delivered,
     crashes' = crashes,
     lsmWatermark' = lsmWatermark,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
     racedOnSameSegment' = racedOnSameSegment,
   }
 
-  // Drainer crashes mid-scan or mid-publish; already-published sealed shards survive durably.
+  // Drainer crashes mid-scan or mid-commit; already-committed sink entries survive durably.
   action drainerCrash(d: int): bool = all {
     drainerPhase.get(d) != "idle",
     crashes < MaxCrashes,
@@ -336,14 +334,14 @@ module MessageDrain {
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
     primaryAlive' = primaryAlive,
-    primaryArmed' = primaryArmed,
-    logicalArmed' = logicalArmed,
+    primaryPending' = primaryPending,
+    logicalPending' = logicalPending,
     delivered' = delivered,
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     racedOnSameSegment' = racedOnSameSegment,
   }
 
@@ -355,37 +353,37 @@ module MessageDrain {
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
     primaryAlive' = primaryAlive,
-    primaryArmed' = primaryArmed,
-    logicalArmed' = logicalArmed,
+    primaryPending' = primaryPending,
+    logicalPending' = logicalPending,
     delivered' = delivered,
     crashes' = crashes,
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
     racedOnSameSegment' = racedOnSameSegment,
   }
 
-  // A durable sealed JobShard is adopted and executes the wakeup.
-  action shardFireWakeup(s: int): bool = all {
-    s.in(sealedShards),
-    logicalArmed' = false,
+  // A durable-sink batch for segment s is delivered to its downstream consumer.
+  action sinkDeliver(s: int): bool = all {
+    s.in(durableSink),
+    logicalPending' = false,
     delivered' = true,
     ledgerState' = ledgerState,
     writtenSeg' = writtenSeg,
     writtenSlot' = writtenSlot,
     primaryAlive' = primaryAlive,
-    primaryArmed' = primaryArmed,
+    primaryPending' = primaryPending,
     crashes' = crashes,
     lsmWatermark' = lsmWatermark,
     lsmComplete' = lsmComplete,
     logsMarked' = logsMarked,
-    sealedShards' = sealedShards,
-    createdShards' = createdShards,
+    durableSink' = durableSink,
+    sinkWrites' = sinkWrites,
     drainerPhase' = drainerPhase,
     drainerSeg' = drainerSeg,
     drainerSurviving' = drainerSurviving,
@@ -394,7 +392,7 @@ module MessageDrain {
 
   action step = any {
     primaryWrite,
-    primaryFireWakeup,
+    primaryConsume,
     primaryCrash,
     closeLedger,
     lsmMarkClosedComplete,
@@ -403,12 +401,12 @@ module MessageDrain {
     any {
       nondet s = AllSegments.oneOf()
       scanSegment(d, s),
-      publishShard(d),
+      commitMessages(d),
       commitSegment(d),
       drainerCrash(d),
     },
     nondet s = AllSegments.oneOf()
-    shardFireWakeup(s),
+    sinkDeliver(s),
   }
 
   // --- Safety invariants ---
@@ -420,54 +418,54 @@ module MessageDrain {
     crashes >= 0 and crashes <= MaxCrashes,
     lsmWatermark >= 0 and lsmWatermark <= NumSegments,
     logsMarked.subseteq(AllSegments),
-    sealedShards.subseteq(AllSegments),
-    createdShards >= 0,
-    AllDrainers.forall(d => drainerPhase.get(d).in(Set("idle", "scanned", "published"))),
+    durableSink.subseteq(AllSegments),
+    sinkWrites >= 0,
+    AllDrainers.forall(d => drainerPhase.get(d).in(Set("idle", "scanned", "committed"))),
   }
 
-  // Every durably accepted wakeup is preserved by either the live primary, the undropped ledger, or a sealed JobShard.
-  val WakeupPreserved: bool =
-    logicalArmed implies (
-      (primaryAlive and primaryArmed)
+  // Every durably accepted message is preserved by the live primary session, the undropped ledger, or the durable sink.
+  val MessagesPreserved: bool =
+    logicalPending implies (
+      (primaryAlive and primaryPending)
       or (ledgerState != "dropped")
-      or (sealedShards.size() > 0)
+      or (durableSink.size() > 0)
     )
 
-  // A closed ledger is never dropped until every written segment with a surviving wakeup has published its sealed shard.
+  // A closed ledger is never dropped until every written segment with surviving messages has committed to the sink.
   val NoDropBeforeMessagesCommitted: bool =
     (ledgerState == "dropped") implies writtenSegments.forall(s =>
-      segSurviving(s) implies s.in(sealedShards))
+      segSurviving(s) implies s.in(durableSink))
 
-  // A segment whose messages fold to empty (e.g. SetWakeup followed by ClearWakeup) publishes zero sealed shards.
-  val ClearedInSegmentWritesNothing: bool =
-    AllSegments.forall(s => (not(segSurviving(s))) implies not(s.in(sealedShards)))
+  // A segment whose message fold is empty (e.g. Emit followed by Retract) writes nothing to the durable sink.
+  val EmptyFoldWritesNothing: bool =
+    AllSegments.forall(s => (not(segSurviving(s))) implies not(s.in(durableSink)))
 
-  // Deterministic sealed JobShard IDs guarantee racing drainers and crash retries create at most 1 shard per segment.
-  val IdempotentShardPublish: bool = createdShards == sealedShards.size()
+  // Idempotent per-segment commits guarantee racing drainers and crash retries write at most once per segment.
+  val IdempotentCommit: bool = sinkWrites == durableSink.size()
 
   // --- Non-vacuity witnesses (each negated so Apalache produces a concrete counterexample) ---
 
-  val NeverSurvivingCrashWakeup: bool =
-    not(not(primaryAlive) and ledgerState == "dropped" and delivered and sealedShards.size() > 0)
+  val NeverSurvivingCrashMessage: bool =
+    not(not(primaryAlive) and ledgerState == "dropped" and delivered and durableSink.size() > 0)
 
   val NeverClearedInSegment: bool =
-    not(ledgerState == "dropped" and sealedShards.size() == 0 and createdShards == 0)
+    not(ledgerState == "dropped" and durableSink.size() == 0 and sinkWrites == 0)
 
   val NeverMessageOnlySegment: bool =
-    not(ledgerState == "dropped" and writtenSegments.exists(s => not(segHasArchive(s)) and segHasMessages(s)) and sealedShards.size() > 0)
+    not(ledgerState == "dropped" and writtenSegments.exists(s => not(segHasArchive(s)) and segHasMessages(s)) and durableSink.size() > 0)
 
-  val NeverCrossSegmentSetThenClear: bool =
-    not(NumSegments == 2 and ledgerState == "dropped" and 0.in(sealedShards) and not(1.in(sealedShards)))
+  val NeverCrossSegmentEmitThenRetract: bool =
+    not(NumSegments == 2 and ledgerState == "dropped" and 0.in(durableSink) and not(1.in(durableSink)))
 
   val NeverRacingDrainers: bool =
-    not(racedOnSameSegment and createdShards == sealedShards.size())
+    not(racedOnSameSegment and sinkWrites == durableSink.size())
 
   // --- Weak-fairness liveness properties ---
 
   val stateVars = (
-    ledgerState, writtenSeg, writtenSlot, primaryAlive, primaryArmed,
-    logicalArmed, delivered, crashes, lsmWatermark, lsmComplete,
-    logsMarked, sealedShards, createdShards, drainerPhase, drainerSeg,
+    ledgerState, writtenSeg, writtenSlot, primaryAlive, primaryPending,
+    logicalPending, delivered, crashes, lsmWatermark, lsmComplete,
+    logsMarked, durableSink, sinkWrites, drainerPhase, drainerSeg,
     drainerSurviving, racedOnSameSegment
   )
 
@@ -477,11 +475,11 @@ module MessageDrain {
     lsmMarkClosedComplete.weakFair(stateVars),
     dropLedger.weakFair(stateVars),
     AllDrainers.forall(d => AllSegments.forall(s => scanSegment(d, s).weakFair(stateVars))),
-    AllDrainers.forall(d => publishShard(d).weakFair(stateVars)),
+    AllDrainers.forall(d => commitMessages(d).weakFair(stateVars)),
     AllDrainers.forall(d => commitSegment(d).weakFair(stateVars)),
-    AllSegments.forall(s => shardFireWakeup(s).weakFair(stateVars)),
+    AllSegments.forall(s => sinkDeliver(s).weakFair(stateVars)),
   }
 
   temporal EventuallyDrainedAndDropped = Fairness implies always(eventually(ledgerState == "dropped"))
-  temporal EventuallyWakeupDelivered = Fairness implies always(logicalArmed implies eventually(not(logicalArmed)))
+  temporal EventuallyMessagesDelivered = Fairness implies always(logicalPending implies eventually(not(logicalPending)))
 }

@@ -74,7 +74,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     internal bool SupportsMessageWrites => _storage is IMessageJournalStorage;
 
     /// <summary>
-    /// Registers an internal message-write participant (such as <see cref="Jobs.GrainWakeupCoordinator"/>) to receive
+    /// Registers an internal message-write participant (such as <see cref="Jobs.GrainReminderCoordinator"/>) to receive
     /// recovery, write-capture, completion, and reset notifications.
     /// </summary>
     internal void RegisterMessageParticipant(IMessageWriteParticipant participant)

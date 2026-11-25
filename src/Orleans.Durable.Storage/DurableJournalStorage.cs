@@ -57,12 +57,6 @@ namespace Orleans.Durable.Storage;
 /// </remarks>
 internal sealed class DurableJournalStorage : IMessageJournalStorage
 {
-    private static readonly FrozenDictionary<string, MessageChannel> KnownChannels =
-        new Dictionary<string, MessageChannel>(StringComparer.Ordinal)
-        {
-            [WakeupMessageHandler.WakeupChannel.Value] = WakeupMessageHandler.WakeupChannel,
-        }.ToFrozenDictionary(StringComparer.Ordinal);
-
     private readonly string _key;
     private readonly JournalRowKey _rowKey;
     private readonly JournalRouter _router;
@@ -70,6 +64,7 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
     private readonly int _maxBodyBytes;
     private readonly string _format;
     private readonly TimeProvider _timeProvider;
+    private readonly FrozenDictionary<string, MessageChannel> _knownChannels;
     private JournalVersion? _version;
     private ContentDigest _content;
     private XxHash128 _hash = new();
@@ -77,12 +72,20 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
 
     /// <summary>Initializes a new instance of the <see cref="DurableJournalStorage"/> class for the journal <paramref name="journal"/>.</summary>
     /// <exception cref="ArgumentException">The journal's key is no journal key: empty, malformed UTF-16, or too long.</exception>
-    public DurableJournalStorage(JournalId journal, JournalRouter router, LocalRouting routing, int maxBodyBytes, string format, TimeProvider timeProvider)
+    public DurableJournalStorage(
+        JournalId journal,
+        JournalRouter router,
+        LocalRouting routing,
+        int maxBodyBytes,
+        string format,
+        TimeProvider timeProvider,
+        FrozenDictionary<string, MessageChannel>? knownChannels = null)
     {
         ArgumentNullException.ThrowIfNull(router);
         ArgumentNullException.ThrowIfNull(routing);
         ArgumentNullException.ThrowIfNull(format);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        _knownChannels = knownChannels ?? [];
         _key = journal.Value;
         _rowKey = JournalRowKey.Encode(_key);
         _router = router;
@@ -314,7 +317,7 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static ImmutableArray<MessageRecord> CopyMessages(ReadOnlyMemory<JournalMessageRecord> messages)
+    private ImmutableArray<MessageRecord> CopyMessages(ReadOnlyMemory<JournalMessageRecord> messages)
     {
         if (messages.IsEmpty)
         {
@@ -331,7 +334,7 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
                 throw new ArgumentException("A message record must not be the default value.", nameof(messages));
             }
 
-            if (!KnownChannels.TryGetValue(message.Channel, out var channel))
+            if (!_knownChannels.TryGetValue(message.Channel, out var channel))
             {
                 channel = MessageChannel.Parse(message.Channel);
             }
@@ -348,7 +351,14 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
 /// <see cref="JournalId"/>, each journal keyed by its ID's value, over the silo's <see cref="JournalRouter"/>; the silo's
 /// <see cref="JournalReplacement"/> tracks the activation each is created for.
 /// </summary>
-internal sealed class DurableJournalStorageProvider(JournalRouter router, LocalRouting routing, JournalReplacement replacement, DurableStorageOptions options, IOptions<JournaledStateManagerOptions> journaling, TimeProvider timeProvider) : IJournalStorageProvider
+internal sealed class DurableJournalStorageProvider(
+    JournalRouter router,
+    LocalRouting routing,
+    JournalReplacement replacement,
+    DurableStorageOptions options,
+    IOptions<JournaledStateManagerOptions> journaling,
+    TimeProvider timeProvider,
+    FrozenDictionary<string, MessageChannel>? knownChannels = null) : IJournalStorageProvider
 {
     /// <inheritdoc/>
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -358,7 +368,14 @@ internal sealed class DurableJournalStorageProvider(JournalRouter router, LocalR
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        var storage = new DurableJournalStorage(journalId, router, routing, options.Journals.MaxBodyBytes, journaling.Value.JournalFormatKey, timeProvider);
+        var storage = new DurableJournalStorage(
+            journalId,
+            router,
+            routing,
+            options.Journals.MaxBodyBytes,
+            journaling.Value.JournalFormatKey,
+            timeProvider,
+            knownChannels);
         replacement.Track(journalId);
         return storage;
     }

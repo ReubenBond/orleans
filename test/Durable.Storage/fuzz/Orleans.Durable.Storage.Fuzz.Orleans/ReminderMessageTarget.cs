@@ -6,53 +6,53 @@ using Orleans.Durable.Storage.Engine;
 namespace Orleans.Durable.Storage.Fuzz.Orleans;
 
 /// <summary>
-/// The <c>orleans.wakeup</c> companion record format, version 1 (orleans.md §5.15): a canonical format rejected with
-/// the reason <see cref="WakeupCompanionRules"/> gives, one of the shared wakeup rejection vectors' reasons, or
+/// The <c>orleans.reminder</c> message record format, version 1 (orleans.md §5.15): a canonical format rejected with
+/// the reason <see cref="ReminderMessageRules"/> gives, one of the shared reminder rejection vectors' reasons, or
 /// accepted as the value the rules give, which encodes back to its exact bytes. Exercises both the contiguous
 /// <see cref="ReadOnlySpan{T}"/> overload and multi-segment <see cref="ReadOnlySequence{T}"/> overload with
 /// allocation bounds.
 /// </summary>
-public sealed class WakeupCompanionTarget : FuzzTarget
+public sealed class ReminderMessageTarget : FuzzTarget
 {
-    private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("orleans", "wakeup-companion-rejections.json"));
+    private static readonly Lazy<HashSet<string>> Reasons = new(static () => GoldenVectors.Find().Reasons("orleans", "reminder-message-rejections.json"));
 
-    public override string Name => "wakeup-companion";
+    public override string Name => "reminder-message";
 
-    public override int MaxLength => WakeupMessageCodec.MaxEncodedLength + 16;
+    public override int MaxLength => ReminderMessageCodec.MaxEncodedLength + 16;
 
     public override IEnumerable<byte[]> Seeds(GoldenVectors vectors)
     {
         ArgumentNullException.ThrowIfNull(vectors);
-        return new[] { "wakeup-companions.json", "wakeup-companion-rejections.json" }
+        return new[] { "reminder-messages.json", "reminder-message-rejections.json" }
             .SelectMany(file => vectors.Cases("orleans", file))
             .Select(static vector => GoldenVectors.Hex(vector));
     }
 
     protected override FuzzOutcome Decode(ReadOnlySpan<byte> input)
     {
-        var expected = WakeupCompanionRules.Read(input);
+        var expected = ReminderMessageRules.Read(input);
 
         var spanBound = MeasureAllocations(input.Length);
-        var spanRejection = WakeupMessageCodec.Decode(input, out var spanRecord);
-        spanBound.Check("WakeupMessageCodec.Decode(ReadOnlySpan<byte>)");
+        var spanRejection = ReminderMessageCodec.Decode(input, out var spanRecord);
+        spanBound.Check("ReminderMessageCodec.Decode(ReadOnlySpan<byte>)");
         var outcome = Check(input, spanRejection, spanRecord, expected, "contiguous bytes");
 
         var sequence = Segments(input.ToArray(), 3 + input.Length % 11);
         var seqBound = MeasureAllocations(input.Length);
-        var seqRejection = WakeupMessageCodec.Decode(sequence, out var seqRecord);
-        seqBound.Check("WakeupMessageCodec.Decode(ReadOnlySequence<byte>)");
+        var seqRejection = ReminderMessageCodec.Decode(sequence, out var seqRecord);
+        seqBound.Check("ReminderMessageCodec.Decode(ReadOnlySequence<byte>)");
         _ = Check(input, seqRejection, seqRecord, expected, "segments");
 
         return outcome;
     }
 
-    private FuzzOutcome Check(ReadOnlySpan<byte> input, InvalidDataException? rejection, WakeupRecord record, WakeupCompanionRules.Reading expected, string layout)
+    private FuzzOutcome Check(ReadOnlySpan<byte> input, InvalidDataException? rejection, ReminderRecord record, ReminderMessageRules.Reading expected, string layout)
     {
         if (rejection is not null)
         {
             var reason = DecodeRejection.ReasonOf(rejection);
             Require(reason == expected.Reason, $"rejected {layout} as '{reason}' where the rules give '{expected.Reason ?? "valid"}': {rejection.Message}");
-            Require(reason is not null && Reasons.Value.Contains(reason), $"rejected {layout} as '{reason}', which no wakeup rejection vector names.");
+            Require(reason is not null && Reasons.Value.Contains(reason), $"rejected {layout} as '{reason}', which no reminder rejection vector names.");
             return FuzzOutcome.Rejected;
         }
 
@@ -62,7 +62,7 @@ public sealed class WakeupCompanionTarget : FuzzTarget
         Require(actualGrain == parsed.TargetGrainId, $"decoded {layout} target '{actualGrain}' != expected '{parsed.TargetGrainId}'.");
         Require(record.JobName == parsed.JobName, $"decoded {layout} job '{record.JobName}' != expected '{parsed.JobName}'.");
         Require(record.DueTimeUtcTicks == parsed.DueTimeUtcTicks, $"decoded {layout} due time {record.DueTimeUtcTicks} != expected {parsed.DueTimeUtcTicks}.");
-        Require(input.SequenceEqual(WakeupMessageCodec.Encode(record)), $"accepted {layout}, whose value does not encode back to its exact bytes.");
+        Require(input.SequenceEqual(ReminderMessageCodec.Encode(record)), $"accepted {layout}, whose value does not encode back to its exact bytes.");
         return FuzzOutcome.Accepted;
     }
 

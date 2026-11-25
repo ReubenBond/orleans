@@ -168,7 +168,14 @@ public static class DurableStorageSiloBuilderExtensions
                 provider.GetRequiredService<ILoggerFactory>());
         });
         _ = services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(static provider => provider.GetRequiredService<JournalReplacement>());
-        _ = services.AddSingleton<DurableJournalStorageProvider>();
+        _ = services.AddSingleton(static provider => new DurableJournalStorageProvider(
+            provider.GetRequiredService<JournalRouter>(),
+            provider.GetRequiredService<LocalRouting>(),
+            provider.GetRequiredService<JournalReplacement>(),
+            provider.GetRequiredService<DurableStorageOptions>(),
+            provider.GetRequiredService<IOptions<JournaledStateManagerOptions>>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<MessageChannelRegistration>().KnownChannels));
         _ = builder.AddJournalStorage(providerName, static provider => provider.GetRequiredService<DurableJournalStorageProvider>());
         _ = services.AddSingleton(static provider => new NodePressure(
             provider.GetRequiredService<ControlOptions>().ControlInterval,
@@ -178,25 +185,23 @@ public static class DurableStorageSiloBuilderExtensions
         {
             var handlers = provider.GetServices<IMessageHandler>().ToList();
             var processors = provider.GetServices<IMessageProcessor>().ToList();
-            WakeupMessageHandler? wakeupHandler = handlers.OfType<WakeupMessageHandler>().SingleOrDefault();
             IDisposable? ownedDisposable = null;
-            if (wakeupHandler is null
-                && !handlers.Any(static h => h.Channel == WakeupMessageHandler.WakeupChannel)
-                && !processors.Any(static p => p.Channel == WakeupMessageHandler.WakeupChannel)
+            if (!handlers.Any(static h => h.Channel == ReminderMessageHandler.ReminderChannel)
+                && !processors.Any(static p => p.Channel == ReminderMessageHandler.ReminderChannel)
                 && provider.GetService<ISealedJobShardPublisher>() is { } publisher)
             {
                 var nodeOptions = provider.GetRequiredService<DurableStorageOptions>();
                 var time = provider.GetRequiredService<TimeProvider>();
                 var loggers = provider.GetRequiredService<ILoggerFactory>();
-                var dispatcher = new GrainFactoryWakeupDispatcher(provider.GetRequiredService<IGrainFactory>());
-                wakeupHandler = new WakeupMessageHandler(nodeOptions.Wakeup, dispatcher, time, loggers.CreateLogger<WakeupMessageHandler>());
-                var wakeupProcessor = new WakeupMessageProcessor(publisher, nodeOptions.Wakeup, time, loggers.CreateLogger<WakeupMessageProcessor>());
-                handlers.Add(wakeupHandler);
-                processors.Add(wakeupProcessor);
-                ownedDisposable = wakeupProcessor;
+                var dispatcher = new GrainFactoryReminderDispatcher(provider.GetRequiredService<IGrainFactory>());
+                var reminderHandler = new ReminderMessageHandler(nodeOptions.Reminders, dispatcher, time, loggers.CreateLogger<ReminderMessageHandler>());
+                var reminderProcessor = new ReminderMessageProcessor(publisher, nodeOptions.Reminders, time, loggers.CreateLogger<ReminderMessageProcessor>());
+                handlers.Add(reminderHandler);
+                processors.Add(reminderProcessor);
+                ownedDisposable = reminderProcessor;
             }
 
-            return new MessageChannelRegistration([.. handlers], [.. processors], wakeupHandler, ownedDisposable);
+            return new MessageChannelRegistration([.. handlers], [.. processors], ownedDisposable);
         });
         _ = services.AddSingleton<NodeLedgers>();
         _ = services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(static provider => provider.GetRequiredService<NodeLedgers>());

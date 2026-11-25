@@ -1053,7 +1053,7 @@ internal sealed partial class NodeLedgers(
         var node = local.Node;
         var reports = Task.CompletedTask;
         var rolls = Task.CompletedTask;
-        var wakeupRolls = Task.CompletedTask;
+        var messageChannelRolls = Task.CompletedTask;
         NodeResources? resources = null;
         try
         {
@@ -1061,14 +1061,14 @@ internal sealed partial class NodeLedgers(
             {
                 await Task.Delay(control.ControlInterval, timeProvider, cancellationToken).ConfigureAwait(false);
 
-                // Poll wakeup heap roll hints unconditionally (before runtime.Disk is null) so both diskful and
-                // diskless silos bound primary-side wakeup memory via routine ledger rolls (orleans.md §5.15).
-                if (wakeupRolls.IsCompleted && runtime.WakeupHandler is { } wakeupHandler)
+                // Poll message-handler roll hints unconditionally (before runtime.Disk is null) so both diskful and
+                // diskless silos bound per-ledger handler memory via routine ledger rolls (orleans.md §5.15).
+                if (messageChannelRolls.IsCompleted && !runtime.MessageHandlers.IsDefaultOrEmpty)
                 {
-                    var wakeupLedgers = wakeupHandler.CollectLedgersNeedingRoll();
-                    if (!wakeupLedgers.IsEmpty)
+                    var ledgersToRoll = CollectMessageHandlerRollHints(runtime.MessageHandlers);
+                    if (!ledgersToRoll.IsEmpty)
                     {
-                        wakeupRolls = RequestWakeupRollsAsync(wakeupLedgers, cancellationToken);
+                        messageChannelRolls = RequestMessageChannelRollsAsync(ledgersToRoll, cancellationToken);
                     }
                 }
 
@@ -1129,10 +1129,41 @@ internal sealed partial class NodeLedgers(
         {
         }
 
-        await Task.WhenAll(reports, rolls, wakeupRolls).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await Task.WhenAll(reports, rolls, messageChannelRolls).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 
-    private async Task RequestWakeupRollsAsync(ImmutableArray<LedgerId> ledgers, CancellationToken cancellationToken)
+    private static ImmutableArray<LedgerId> CollectMessageHandlerRollHints(ImmutableArray<IMessageHandler> handlers)
+    {
+        if (handlers.Length == 1)
+        {
+            return handlers[0].CollectLedgersNeedingRoll();
+        }
+
+        HashSet<LedgerId>? seen = null;
+        ImmutableArray<LedgerId>.Builder? builder = null;
+        foreach (var handler in handlers)
+        {
+            var hinted = handler.CollectLedgersNeedingRoll();
+            if (hinted.IsDefaultOrEmpty)
+            {
+                continue;
+            }
+
+            seen ??= [];
+            builder ??= ImmutableArray.CreateBuilder<LedgerId>();
+            foreach (var ledger in hinted)
+            {
+                if (seen.Add(ledger))
+                {
+                    builder.Add(ledger);
+                }
+            }
+        }
+
+        return builder is null ? [] : builder.ToImmutable();
+    }
+
+    private async Task RequestMessageChannelRollsAsync(ImmutableArray<LedgerId> ledgers, CancellationToken cancellationToken)
     {
         var node = local.Node;
         var clusterController = ClusterController;
@@ -1144,7 +1175,7 @@ internal sealed partial class NodeLedgers(
             }
             catch (Exception failure) when (failure is not OutOfMemoryException && !cancellationToken.IsCancellationRequested)
             {
-                LogWakeupRollRequestFailed(_logger, node, ledger, failure);
+                LogMessageChannelRollRequestFailed(_logger, node, ledger, failure);
             }
         })).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
@@ -1336,8 +1367,8 @@ internal sealed partial class NodeLedgers(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Node {Node}'s WAL-release roll request for ledger {Ledger} failed; the next interval asks again while its replica needs it.")]
     private static partial void LogReleaseRollRequestFailed(ILogger logger, NodeId node, LedgerId ledger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Node {Node}'s wakeup-memory roll request for ledger {Ledger} failed.")]
-    private static partial void LogWakeupRollRequestFailed(ILogger logger, NodeId node, LedgerId ledger, Exception exception);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Node {Node}'s message-channel roll request for ledger {Ledger} failed.")]
+    private static partial void LogMessageChannelRollRequestFailed(ILogger logger, NodeId node, LedgerId ledger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Node {Node}'s report to the controller grain failed; it reports again at the next interval.")]
     private static partial void LogReportFailed(ILogger logger, NodeId node, Exception exception);
@@ -1472,7 +1503,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
         JournalStateDatabase? stateDatabase,
         LedgerApplyLoop? applyLoop,
         JournalStore journals,
-        WakeupMessageHandler? wakeupHandler,
+        ImmutableArray<IMessageHandler> messageHandlers,
         IReadOnlyDictionary<string, string> recordParameters)
     {
         Disk = disk;
@@ -1488,7 +1519,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
         Archive = archiveStore;
         LsmStore = lsmStore;
         Journals = journals;
-        WakeupHandler = wakeupHandler;
+        MessageHandlers = messageHandlers;
         RecordParameters = recordParameters;
         var executor = new TransitionExecutor(Writers, loggers.CreateLogger<TransitionExecutor>());
         LogDrains = nodeArchive.Value as NodeArchive.Logs is { } logs ? logs.Drains : null;
@@ -1530,8 +1561,8 @@ internal sealed class NodeRuntime : IAsyncDisposable
     /// <summary>Gets the node's Journals, which serve once the archive store's record holds <see cref="RecordParameters"/> (OR-I8).</summary>
     public JournalStore Journals { get; }
 
-    /// <summary>Gets the node's wakeup message handler when registered, or <see langword="null"/>.</summary>
-    internal WakeupMessageHandler? WakeupHandler { get; }
+    /// <summary>Gets the node's registered data-plane message handlers.</summary>
+    internal ImmutableArray<IMessageHandler> MessageHandlers { get; }
 
     /// <summary>Gets the node's journal state database when configured with local state storage, or <see langword="null"/>; for tests.</summary>
     internal JournalStateDatabase? StateDatabase => _stateDatabase;
@@ -1692,7 +1723,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
             }
 
             journalStore = new JournalStore(registry, archiveStore, journals, timeProvider, stateDatabase, channels.Handlers);
-            return new NodeRuntime(node, generation, disk, releaseDistance, view, store, isActive, deadNodes, objectStoreShare, () => objectLedgers.IsConfigured && objectLedgers.Gate.IsPassed, clearObjectStorePacing, control, timeProvider, loggers, metrics, reader, registry, nodeArchive, archiveStore, lsmStore, blockCache, stateDatabase, applyLoop, journalStore, channels.WakeupHandler, parameters);
+            return new NodeRuntime(node, generation, disk, releaseDistance, view, store, isActive, deadNodes, objectStoreShare, () => objectLedgers.IsConfigured && objectLedgers.Gate.IsPassed, clearObjectStorePacing, control, timeProvider, loggers, metrics, reader, registry, nodeArchive, archiveStore, lsmStore, blockCache, stateDatabase, applyLoop, journalStore, channels.Handlers, parameters);
         }
         catch
         {
@@ -1799,26 +1830,34 @@ internal sealed class NodeRuntime : IAsyncDisposable
     public Task CancelAsync() => _stopping.CancelAsync();
 
     /// <summary>
-    /// Stops any registered <see cref="WakeupMessageHandler"/> timer loops and in-flight dispatches, then disposes the
-    /// node's Journals, which retires every admission and waits for the outcomes of their proposals while the registry
-    /// lives (journals.md §9, orleans.md §5.15). Every call returns the one disposal.
+    /// Stops every registered <see cref="IMessageHandler"/>, then disposes the node's Journals, which retires every
+    /// admission and waits for the outcomes of their proposals while the registry lives (journals.md §9,
+    /// orleans.md §5.15). Every call returns the one disposal.
     /// </summary>
     public Task StopJournalsAsync()
     {
         lock (_lock)
         {
-            return _journalsStopped ??= StopWakeupAndJournalsAsync();
+            return _journalsStopped ??= StopMessageHandlersAndJournalsAsync();
         }
     }
 
-    private async Task StopWakeupAndJournalsAsync()
+    private async Task StopMessageHandlersAndJournalsAsync()
     {
-        if (WakeupHandler is { } wakeup)
+        try
         {
-            await wakeup.StopAsync().ConfigureAwait(false);
+            if (!MessageHandlers.IsDefaultOrEmpty)
+            {
+                foreach (var handler in MessageHandlers)
+                {
+                    await handler.StopAsync().ConfigureAwait(false);
+                }
+            }
         }
-
-        await Journals.DisposeAsync().ConfigureAwait(false);
+        finally
+        {
+            await Journals.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <summary>
