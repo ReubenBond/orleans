@@ -57,7 +57,7 @@ public readonly struct ArchiveCommand
         RowKind.Append => Append(body.Length),
         RowKind.Replace => Replace(body.Length),
         RowKind.Delete => Delete(body),
-        RowKind.LocalAppend => throw new ArgumentException("RowKind.LocalAppend is excluded from archive commands (LG-I15).", nameof(kind)),
+        RowKind.Message => throw new ArgumentException("RowKind.Message is excluded from archive commands (LG-I15).", nameof(kind)),
         _ => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Row kind {(byte)kind} is not defined."), nameof(kind)),
     };
 

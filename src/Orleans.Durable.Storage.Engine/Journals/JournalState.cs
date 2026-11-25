@@ -264,8 +264,8 @@ public sealed class JournalState
             case RowKind.Delete:
                 Delete(ReadTombstone(row));
                 break;
-            case RowKind.LocalAppend:
-                throw new UnreachableException("RowKind.LocalAppend is excluded from journal folds (LG-I15).");
+            case RowKind.Message:
+                throw new UnreachableException("RowKind.Message is excluded from journal folds (LG-I15).");
             default:
                 throw new UnreachableException("A history read's rows are of defined kinds.");
         }

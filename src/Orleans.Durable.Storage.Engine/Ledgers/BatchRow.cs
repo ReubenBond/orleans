@@ -18,6 +18,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers;
 public readonly ref struct BatchRow
 {
 
+    private readonly ReadOnlySpan<byte> _keyOrChannel;
+
     // The body, when it lies in one page; otherwise empty, and lent from _page.
     private readonly ReadOnlyMemory<byte> _contiguousBody;
 
@@ -30,7 +32,7 @@ public readonly ref struct BatchRow
         RowKind kind,
         bool isDefining,
         ulong ordinal,
-        ReadOnlySpan<byte> key,
+        ReadOnlySpan<byte> keyOrChannel,
         RowVersion versionBefore,
         RowToken token,
         ReadOnlyMemory<byte> contiguousBody,
@@ -43,7 +45,7 @@ public readonly ref struct BatchRow
         Kind = kind;
         IsDefining = isDefining;
         Ordinal = ordinal;
-        Key = key;
+        _keyOrChannel = keyOrChannel;
         VersionBefore = versionBefore;
         Token = token;
         _contiguousBody = contiguousBody;
@@ -64,20 +66,24 @@ public readonly ref struct BatchRow
 
     /// <summary>
     /// Gets the ordinal of the row's key in its segment: stored on a referencing row, and implied on a defining one, the
-    /// batch's ordinal base plus the defining rows before it.
+    /// batch's ordinal base plus the defining rows before it; 0 for a <see cref="RowKind.Message"/> row.
     /// </summary>
     public ulong Ordinal { get; }
 
     /// <summary>Gets a defining row's key.</summary>
-    /// <exception cref="InvalidOperationException">The row references its key.</exception>
-    public ReadOnlySpan<byte> Key => IsDefining ? field : throw Referencing(nameof(Key));
+    /// <exception cref="InvalidOperationException">The row references its key or is a <see cref="RowKind.Message"/> row.</exception>
+    public ReadOnlySpan<byte> Key => IsDefining ? _keyOrChannel : throw Referencing(nameof(Key));
+
+    /// <summary>Gets a <see cref="RowKind.Message"/> row's validated ASCII channel bytes.</summary>
+    /// <exception cref="InvalidOperationException">The row is not a <see cref="RowKind.Message"/> row.</exception>
+    public ReadOnlySpan<byte> Channel => Kind == RowKind.Message ? _keyOrChannel : throw NotMessage(nameof(Channel));
 
     /// <summary>Gets a defining row's version of its key before the row, which its writer's caller supplied.</summary>
-    /// <exception cref="InvalidOperationException">The row references its key.</exception>
+    /// <exception cref="InvalidOperationException">The row references its key or is a <see cref="RowKind.Message"/> row.</exception>
     public RowVersion VersionBefore => IsDefining ? field : throw Referencing(nameof(VersionBefore));
 
     /// <summary>Gets a defining row's token of its key for the segment, which its writer's caller supplied.</summary>
-    /// <exception cref="InvalidOperationException">The row references its key.</exception>
+    /// <exception cref="InvalidOperationException">The row references its key or is a <see cref="RowKind.Message"/> row.</exception>
     public RowToken Token => IsDefining ? field : throw Referencing(nameof(Token));
 
     /// <summary>Gets the length of the row's body, in bytes.</summary>
@@ -102,5 +108,8 @@ public readonly ref struct BatchRow
     public ArcBuffer RetainBody() => BodyLength == 0 ? default : _page.Slice(_bodyOffset, BodyLength);
 
     private static InvalidOperationException Referencing(string member) =>
-        new($"A referencing row carries no {member}: its defining row in the segment does (ledgers.md §2.2).");
+        new($"A referencing or message row carries no {member}: only a defining archive row in the segment does (ledgers.md §2.2).");
+
+    private static InvalidOperationException NotMessage(string member) =>
+        new($"An archive row carries no {member}: only a Message row carries a channel (ledgers.md §2.2).");
 }

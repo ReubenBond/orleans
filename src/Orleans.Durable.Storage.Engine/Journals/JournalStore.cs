@@ -46,7 +46,7 @@ public sealed class JournalStore : IAsyncDisposable
     private readonly ArchiveReader _archiveReader;
     private readonly IArchiveStore _store;
     private readonly JournalStoreOptions _options;
-    private readonly FrozenDictionary<LocalStreamName, ILocalStreamHandler> _localHandlers;
+    private readonly FrozenDictionary<MessageChannel, IMessageHandler> _messageHandlers;
     private readonly TimeProvider _timeProvider;
     private readonly JournalStateDatabase? _stateDatabase;
     private readonly Lock _lock = new();
@@ -83,7 +83,7 @@ public sealed class JournalStore : IAsyncDisposable
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">A setting of <paramref name="options"/> is out of its range.</exception>
     public JournalStore(LedgerWriterRegistry writers, IArchiveStore store, JournalStoreOptions options, TimeProvider timeProvider)
-        : this(writers, store, options, timeProvider, stateDatabase: null, localStreamHandlers: null, beforeFollowing: null)
+        : this(writers, store, options, timeProvider, stateDatabase: null, messageHandlers: null, beforeFollowing: null)
     {
     }
 
@@ -98,13 +98,13 @@ public sealed class JournalStore : IAsyncDisposable
     /// <param name="timeProvider">Stamps each <c>Delete</c> and judges each <c>Expired</c>'s retention.</param>
     /// <param name="stateDatabase">The node's key-index database, or <see langword="null"/> to scan live ledgers.</param>
     public JournalStore(LedgerWriterRegistry writers, IArchiveStore store, JournalStoreOptions options, TimeProvider timeProvider, JournalStateDatabase? stateDatabase)
-        : this(writers, store, options, timeProvider, stateDatabase, localStreamHandlers: null, beforeFollowing: null)
+        : this(writers, store, options, timeProvider, stateDatabase, messageHandlers: null, beforeFollowing: null)
     {
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JournalStore"/> class with registered
-    /// <paramref name="localStreamHandlers"/> for ledger-local append streams (journals.md §4.2, §8.4).
+    /// <paramref name="messageHandlers"/> for atomic journal message channels (journals.md §4.2, §8.4).
     /// </summary>
     public JournalStore(
         LedgerWriterRegistry writers,
@@ -112,8 +112,8 @@ public sealed class JournalStore : IAsyncDisposable
         JournalStoreOptions options,
         TimeProvider timeProvider,
         JournalStateDatabase? stateDatabase,
-        IEnumerable<ILocalStreamHandler>? localStreamHandlers)
-        : this(writers, store, options, timeProvider, stateDatabase, localStreamHandlers, beforeFollowing: null)
+        IEnumerable<IMessageHandler>? messageHandlers)
+        : this(writers, store, options, timeProvider, stateDatabase, messageHandlers, beforeFollowing: null)
     {
     }
 
@@ -128,7 +128,7 @@ public sealed class JournalStore : IAsyncDisposable
     /// <param name="timeProvider">Stamps each <c>Delete</c> and judges each <c>Expired</c>'s retention.</param>
     /// <param name="beforeFollowing">A step the follower awaits as it starts, or none.</param>
     internal JournalStore(LedgerWriterRegistry writers, IArchiveStore store, JournalStoreOptions options, TimeProvider timeProvider, Func<Task>? beforeFollowing)
-        : this(writers, store, options, timeProvider, stateDatabase: null, localStreamHandlers: null, beforeFollowing)
+        : this(writers, store, options, timeProvider, stateDatabase: null, messageHandlers: null, beforeFollowing)
     {
     }
 
@@ -138,16 +138,16 @@ public sealed class JournalStore : IAsyncDisposable
         JournalStoreOptions options,
         TimeProvider timeProvider,
         JournalStateDatabase? stateDatabase,
-        IEnumerable<ILocalStreamHandler>? localStreamHandlers,
+        IEnumerable<IMessageHandler>? messageHandlers,
         Func<Task>? beforeFollowing)
     {
         ArgumentNullException.ThrowIfNull(writers);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        _localHandlers = NormalizeHandlers(localStreamHandlers);
+        _messageHandlers = NormalizeHandlers(messageHandlers);
         _options = options.Clone();
-        CheckStartup(_options, store, writers.MaxBatchLength, writers.Options.MaxProposalBytes, writers.Options.MaxSegmentKeys, hasLocalStreams: _localHandlers.Count > 0);
+        CheckStartup(_options, store, writers.MaxBatchLength, writers.Options.MaxProposalBytes, hasMessageChannels: _messageHandlers.Count > 0);
         _writers = writers;
         _map = writers.Reader.Map;
         _stateDatabase = stateDatabase;
@@ -155,7 +155,7 @@ public sealed class JournalStore : IAsyncDisposable
         _store = store;
         _timeProvider = timeProvider;
         _historyReads = CallBudget.ForCalls(_options.MaxConcurrentHistoryReads, timeProvider, static waited => new UnreachableException("A history read waits for its slot with no deadline."));
-        StoreParameters = StoreParametersOf(_options, _localHandlers.Values);
+        StoreParameters = StoreParametersOf(_options, _messageHandlers.Values);
 
         // The follower's baseline is the view and the unserved ledgers as the store is constructed, before any admission
         // exists, so every later change which unserves an admission's writer wakes the follower, however late it starts.
@@ -169,8 +169,8 @@ public sealed class JournalStore : IAsyncDisposable
         }
     }
 
-    /// <summary>The caller parameter key holding the comma-separated ordinal-sorted list of registered local stream names.</summary>
-    public const string LocalStreamsParameter = "local-streams";
+    /// <summary>The caller parameter key holding the comma-separated ordinal-sorted list of registered message channel names.</summary>
+    public const string MessageChannelsParameter = "message-channels";
 
     /// <summary>
     /// Gets the caller parameters the composition records in the archive store's record (archive.md §2.4), and compares
@@ -181,54 +181,54 @@ public sealed class JournalStore : IAsyncDisposable
 
     /// <summary>
     /// Returns the caller parameters a store over <paramref name="options"/> and optional
-    /// <paramref name="localStreamHandlers"/> records (<see cref="StoreParameters"/>): <c>max-body-bytes</c>,
-    /// <c>local-streams</c> (comma-separated ordinal-sorted stream names, <c>""</c> when empty),
-    /// <c>max-local-appends</c>, and <c>max-local-append-bytes</c>.
+    /// <paramref name="messageHandlers"/> records (<see cref="StoreParameters"/>): <c>max-body-bytes</c>,
+    /// <c>message-channels</c> (comma-separated ordinal-sorted channel names, <c>""</c> when empty),
+    /// <c>max-messages</c>, and <c>max-message-bytes</c>.
     /// </summary>
     /// <param name="options">The Journals policy.</param>
-    /// <param name="localStreamHandlers">Optional registered local-stream handlers.</param>
+    /// <param name="messageHandlers">Optional registered message handlers.</param>
     /// <exception cref="ArgumentOutOfRangeException">A setting is out of its range: a store never records one.</exception>
     public static IReadOnlyDictionary<string, string> StoreParametersOf(
         JournalStoreOptions options,
-        IEnumerable<ILocalStreamHandler>? localStreamHandlers = null)
+        IEnumerable<IMessageHandler>? messageHandlers = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
-        var handlers = NormalizeHandlers(localStreamHandlers);
-        var localStreams = handlers.Count == 0
+        var handlers = NormalizeHandlers(messageHandlers);
+        var messageChannels = handlers.Count == 0
             ? string.Empty
-            : string.Join(',', handlers.Keys.Order(Comparer<LocalStreamName>.Default).Select(static stream => stream.Value));
+            : string.Join(',', handlers.Keys.Order(Comparer<MessageChannel>.Default).Select(static channel => channel.Value));
         return new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["max-body-bytes"] = options.MaxBodyBytes.ToString(CultureInfo.InvariantCulture),
-            ["local-streams"] = localStreams,
-            ["max-local-appends"] = options.MaxLocalAppendsPerWrite.ToString(CultureInfo.InvariantCulture),
-            ["max-local-append-bytes"] = options.MaxLocalAppendBytesPerWrite.ToString(CultureInfo.InvariantCulture),
+            [MessageChannelsParameter] = messageChannels,
+            ["max-messages"] = options.MaxMessagesPerWrite.ToString(CultureInfo.InvariantCulture),
+            ["max-message-bytes"] = options.MaxMessageBytesPerWrite.ToString(CultureInfo.InvariantCulture),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private static FrozenDictionary<LocalStreamName, ILocalStreamHandler> NormalizeHandlers(IEnumerable<ILocalStreamHandler>? localStreamHandlers)
+    private static FrozenDictionary<MessageChannel, IMessageHandler> NormalizeHandlers(IEnumerable<IMessageHandler>? messageHandlers)
     {
-        if (localStreamHandlers is null)
+        if (messageHandlers is null)
         {
             return [];
         }
 
-        Dictionary<LocalStreamName, ILocalStreamHandler>? map = null;
-        foreach (var handler in localStreamHandlers)
+        Dictionary<MessageChannel, IMessageHandler>? map = null;
+        foreach (var handler in messageHandlers)
         {
-            ArgumentNullException.ThrowIfNull(handler, nameof(localStreamHandlers));
-            if (handler.Stream is null)
+            ArgumentNullException.ThrowIfNull(handler, nameof(messageHandlers));
+            if (handler.Channel is null)
             {
-                throw new ArgumentException("A local stream handler must provide a non-null Stream.", nameof(localStreamHandlers));
+                throw new ArgumentException("A message handler must provide a non-null Channel.", nameof(messageHandlers));
             }
 
             map ??= [];
-            if (!map.TryAdd(handler.Stream, handler))
+            if (!map.TryAdd(handler.Channel, handler))
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Duplicate ILocalStreamHandler registered for stream '{handler.Stream}'."),
-                    nameof(localStreamHandlers));
+                    string.Create(CultureInfo.InvariantCulture, $"Duplicate IMessageHandler registered for channel '{handler.Channel}'."),
+                    nameof(messageHandlers));
             }
         }
 
@@ -414,12 +414,12 @@ public sealed class JournalStore : IAsyncDisposable
         return JournalEntryRecord.Append(key, expectedVersion, payload);
     }
 
-    /// <summary>Encodes an <c>Append</c> with attached <paramref name="localAppends"/> (JS-I5, JS-I11).</summary>
-    public JournalEntryRecord EncodeAppend(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer payload, ReadOnlySpan<LocalAppendRecord> localAppends)
+    /// <summary>Encodes an <c>Append</c> with attached <paramref name="messages"/> (JS-I5, JS-I11).</summary>
+    public JournalEntryRecord EncodeAppend(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer payload, ReadOnlySpan<MessageRecord> messages)
     {
         Check(key, payload);
-        LedgerAdmission.CheckLocalAppends(localAppends, _options.MaxLocalAppendsPerWrite, _options.MaxLocalAppendBytesPerWrite, _localHandlers, nameof(localAppends));
-        return JournalEntryRecord.Append(key, expectedVersion, payload, localAppends);
+        LedgerAdmission.CheckMessages(messages, _options.MaxMessagesPerWrite, _options.MaxMessageBytesPerWrite, _messageHandlers, nameof(messages));
+        return JournalEntryRecord.Append(key, expectedVersion, payload, messages);
     }
 
     /// <summary>
@@ -437,12 +437,12 @@ public sealed class JournalStore : IAsyncDisposable
         return JournalEntryRecord.Replace(key, expectedVersion, snapshot);
     }
 
-    /// <summary>Encodes a <c>Replace</c> with attached <paramref name="localAppends"/> (JS-I5, JS-I11).</summary>
-    public JournalEntryRecord EncodeReplace(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer snapshot, ReadOnlySpan<LocalAppendRecord> localAppends)
+    /// <summary>Encodes a <c>Replace</c> with attached <paramref name="messages"/> (JS-I5, JS-I11).</summary>
+    public JournalEntryRecord EncodeReplace(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer snapshot, ReadOnlySpan<MessageRecord> messages)
     {
         Check(key, snapshot);
-        LedgerAdmission.CheckLocalAppends(localAppends, _options.MaxLocalAppendsPerWrite, _options.MaxLocalAppendBytesPerWrite, _localHandlers, nameof(localAppends));
-        return JournalEntryRecord.Replace(key, expectedVersion, snapshot, localAppends);
+        LedgerAdmission.CheckMessages(messages, _options.MaxMessagesPerWrite, _options.MaxMessageBytesPerWrite, _messageHandlers, nameof(messages));
+        return JournalEntryRecord.Replace(key, expectedVersion, snapshot, messages);
     }
 
     /// <summary>
@@ -460,13 +460,13 @@ public sealed class JournalStore : IAsyncDisposable
         return JournalEntryRecord.Delete(key, expectedVersion, _timeProvider.GetUtcNow());
     }
 
-    /// <summary>Encodes a <c>Delete</c> with attached <paramref name="localAppends"/> (JS-I5, JS-I11).</summary>
-    public JournalEntryRecord EncodeDelete(JournalRowKey key, JournalVersion expectedVersion, ReadOnlySpan<LocalAppendRecord> localAppends)
+    /// <summary>Encodes a <c>Delete</c> with attached <paramref name="messages"/> (JS-I5, JS-I11).</summary>
+    public JournalEntryRecord EncodeDelete(JournalRowKey key, JournalVersion expectedVersion, ReadOnlySpan<MessageRecord> messages)
     {
         ArgumentNullException.ThrowIfNull(key);
         LedgerAdmission.CheckKey(key, _store, nameof(key));
-        LedgerAdmission.CheckLocalAppends(localAppends, _options.MaxLocalAppendsPerWrite, _options.MaxLocalAppendBytesPerWrite, _localHandlers, nameof(localAppends));
-        return JournalEntryRecord.Delete(key, expectedVersion, _timeProvider.GetUtcNow(), localAppends);
+        LedgerAdmission.CheckMessages(messages, _options.MaxMessagesPerWrite, _options.MaxMessageBytesPerWrite, _messageHandlers, nameof(messages));
+        return JournalEntryRecord.Delete(key, expectedVersion, _timeProvider.GetUtcNow(), messages);
     }
 
     /// <summary>
@@ -492,7 +492,7 @@ public sealed class JournalStore : IAsyncDisposable
     /// <exception cref="JournalStoreCorruptException">The key's history, which its state loads from, contradicts itself.</exception>
     public Task<JournalWriteOutcome> WriteAsync(JournalEntryRecord record, CancellationToken cancellationToken = default)
     {
-        LedgerAdmission.CheckRecord(record, _store, _options, _localHandlers);
+        LedgerAdmission.CheckRecord(record, _store, _options, _messageHandlers);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed), this);
         if (Route(record.Key) is { } served)
         {
@@ -877,26 +877,17 @@ public sealed class JournalStore : IAsyncDisposable
     /// <exception cref="JournalStoreLimitException">A check fails, naming its bound.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A setting is out of its range.</exception>
     internal static void CheckStartup(JournalStoreOptions options, IArchiveStore store, int maxBatchLength, long maxProposalBytes) =>
-        CheckStartup(options, store, maxBatchLength, maxProposalBytes, maxSegmentKeys: int.MaxValue, hasLocalStreams: false);
+        CheckStartup(options, store, maxBatchLength, maxProposalBytes, hasMessageChannels: false);
 
     internal static void CheckStartup(
         JournalStoreOptions options,
         IArchiveStore store,
         int maxBatchLength,
         long maxProposalBytes,
-        int maxSegmentKeys,
-        bool hasLocalStreams)
+        bool hasMessageChannels)
     {
         LedgerAdmission.CheckRanges(options);
-        if (hasLocalStreams && 1L + options.MaxLocalAppendsPerWrite > maxSegmentKeys)
-        {
-            throw new JournalStoreLimitException(
-                JournalStoreLimit.MaxSegmentKeys,
-                string.Create(CultureInfo.InvariantCulture, $"1 + MaxLocalAppendsPerWrite ({1 + options.MaxLocalAppendsPerWrite}) exceeds the writers' MaxSegmentKeys ({maxSegmentKeys})."),
-                nameof(options));
-        }
-
-        var largest = LedgerAdmission.LargestBatch(options, hasLocalStreams);
+        var largest = LedgerAdmission.LargestBatch(options, hasMessageChannels);
         if (largest > maxBatchLength)
         {
             throw new JournalStoreLimitException(
@@ -1343,9 +1334,8 @@ public sealed class JournalStore : IAsyncDisposable
                 (key, disposal) => store.LoadAsync(this, key, disposal),
                 (batch, cancellationToken) => store.ProposeAsync(writer, batch, cancellationToken),
                 runInline: false,
-                localHandlers: store._localHandlers,
-                maxProposalBytes: store._writers.Options.MaxProposalBytes,
-                maxSegmentKeys: store._writers.Options.MaxSegmentKeys);
+                messageHandlers: store._messageHandlers,
+                maxProposalBytes: store._writers.Options.MaxProposalBytes);
             Admission.ReloadMutation = store.ReloadMutation;
             Admission.ReplaceRequiredMutation = store.ReplaceRequiredMutation;
             Admission.ChainMutation = store.ChainMutation;

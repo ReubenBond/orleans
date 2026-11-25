@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
@@ -60,7 +61,7 @@ public sealed class ArchiveLogDrainWorker
     private readonly IObjectStore _objects;
     private readonly LedgerMapView _map;
     private readonly LedgerReader _reader;
-    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
+    private readonly ImmutableArray<MessageFolds.RegisteredProcessor> _messageProcessors;
     private readonly TimeProvider _time;
     private readonly ArchiveLogNames _names;
     private readonly ByteBudget _memory;
@@ -92,7 +93,7 @@ public sealed class ArchiveLogDrainWorker
     /// <param name="options">The drain concurrency and memory, and the request rate; the logs' names are the gate's.</param>
     /// <param name="timeProvider">The clock of the request rate, the scans' backoff, and the writer's retries.</param>
     /// <param name="writerOptions">The writer's retries; by default <see cref="ArchiveLogWriterOptions"/>'s.</param>
-    /// <param name="localDrainBarrier">Optional barrier validating skipped <see cref="RowKind.LocalAppend"/> keys and draining ledger-local streams before marking a closed ledger complete (LG-I15, LG-I16).</param>
+    /// <param name="messageProcessors">Optional control-plane message processors validating and folding <see cref="RowKind.Message"/> rows during segment drains (LG-I15, LG-I16).</param>
     /// <exception cref="ArgumentOutOfRangeException">The options are invalid.</exception>
     public ArchiveLogDrainWorker(
         ArchiveLogGate gate,
@@ -101,7 +102,7 @@ public sealed class ArchiveLogDrainWorker
         ArchiveLogOptions options,
         TimeProvider timeProvider,
         ArchiveLogWriterOptions? writerOptions = null,
-        ILedgerLocalDrainBarrier? localDrainBarrier = null)
+        IEnumerable<IMessageProcessor>? messageProcessors = null)
     {
         ArgumentNullException.ThrowIfNull(gate);
         ArgumentNullException.ThrowIfNull(map);
@@ -114,7 +115,7 @@ public sealed class ArchiveLogDrainWorker
         _objects = gate.Objects;
         _map = map;
         _reader = reader;
-        _localDrainBarrier = localDrainBarrier;
+        _messageProcessors = MessageFolds.ValidateProcessors(messageProcessors);
         _time = timeProvider;
         _names = gate.Names;
         _memory = new ByteBudget(options.DrainMemoryBytes);
@@ -193,10 +194,16 @@ public sealed class ArchiveLogDrainWorker
     internal bool MarksUnheldMutant { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the worker skips <see cref="ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync"/>
-    /// before marking a closed ledger complete (LG-I16 mutant for tests).
+    /// Gets a value indicating whether the worker skips committing segment message folds before creating the drain
+    /// marker (LG-I16 mutant for tests).
     /// </summary>
-    internal bool DropBeforeLocalDrainedMutant { get; init; }
+    internal bool DropBeforeMessagesCommittedMutant { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the worker skips <see cref="RowKind.Message"/> rows for unregistered channels
+    /// instead of failing closed with <see cref="ArchiveLogDrainBlockedException"/> (LG-I15 mutant for tests).
+    /// </summary>
+    internal bool SkipUnknownChannelMutant { get; init; }
 
     /// <summary>
     /// Gets the observer of each segment the worker scanned to its end and starts writing, which maps a simulated drain onto
@@ -274,35 +281,8 @@ public sealed class ArchiveLogDrainWorker
         while (true)
         {
             Debug.Assert(t is not { } end || start <= end, "A start past T is a corrupt marker, which the resume refused.");
-            if (t is { } closedEnd && start == closedEnd)
+            if (start == t)
             {
-                if (closedEnd > Slot.Zero && _localDrainBarrier is not null && !DropBeforeLocalDrainedMutant)
-                {
-                    LocalDrainBarrierOutcome barrier;
-                    try
-                    {
-                        barrier = await _localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, closedEnd, cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (ArchiveCorruptException exception)
-                    {
-                        throw ArchiveLogDrainBlockedException.ForCorruptSegment(new LedgerSegmentId(ledger.Id, Slot.Zero), exception);
-                    }
-
-                    switch (barrier.Value)
-                    {
-                        case LocalDrainBarrierOutcome.Drained:
-                            break;
-                        case LocalDrainBarrierOutcome.Dropped:
-                            Forget(ledger.Id);
-                            return ArchiveLogDrainOutcome.Dropped.Instance;
-                        case LocalDrainBarrierOutcome.Backpressure:
-                            return new ArchiveLogDrainOutcome.Drained(closedEnd);
-                        case null:
-                        default:
-                            throw new UnreachableException("conventions.md §15: a barrier answers a union which holds a case.");
-                    }
-                }
-
                 lock (_sync)
                 {
                     _ = _complete.Add(ledger.Id);
@@ -504,7 +484,7 @@ public sealed class ArchiveLogDrainWorker
     private async Task<DrainStep> DrainSegmentAsync(LedgerMetadata ledger, Slot start, Slot below, bool boundIsEnd, Dictionary<byte[], RowToken>? chain, LedgerSegmentId? marker, CancellationToken cancellationToken)
     {
         var id = new LedgerSegmentId(ledger.Id, start);
-        using var segment = new Segment(id, ledger, _localDrainBarrier);
+        using var segment = new Segment(id, ledger, _messageProcessors, SkipUnknownChannelMutant);
         DrainScanOutcome scanned;
         try
         {
@@ -542,15 +522,31 @@ public sealed class ArchiveLogDrainWorker
             OnSegmentScanned?.Invoke(new LedgerSegmentKeys(id, writes.Length));
         }
 
-        if (writes.Length == 0)
+        if (writes.Length == 0 && !segment.HasMessages)
         {
-            // A segment with no rows, a marker batch alone, holds no write.
+            // A segment with no archive rows and no messages (a marker batch alone) holds no write.
             _ = Interlocked.Increment(ref _segmentsWithoutRows);
             CompletedSegment?.Invoke(id, segment.End);
             return new DrainedSegment(segment.End, chain);
         }
 
-        await WriteAsync(id, writes, cancellationToken).ConfigureAwait(false);
+        if (writes.Length > 0)
+        {
+            await WriteAsync(id, writes, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (segment.HasMessages && !DropBeforeMessagesCommittedMutant)
+        {
+            try
+            {
+                await segment.CommitMessagesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (ArchiveCorruptException exception)
+            {
+                throw ArchiveLogDrainBlockedException.ForCorruptSegment(id, exception);
+            }
+        }
+
         await _pacer.WaitAsync(1, cancellationToken).ConfigureAwait(false);
         using var content = ArcBuffer.Wrap(ArchiveLogNames.DrainMarkerContent(segment.End));
         var created = await _objects.CreateAsync(new ObjectName(ArchiveLogNames.DrainMarker(ledger.Id, start)), content, null, cancellationToken).ConfigureAwait(false);
@@ -895,12 +891,21 @@ public sealed class ArchiveLogDrainWorker
         }
     }
 
-    /// <summary>A segment's key writes, in the order their keys first appear.</summary>
-    private sealed class Segment(LedgerSegmentId id, LedgerMetadata ledger, ILedgerLocalDrainBarrier? localDrainBarrier) : DrainRows(id)
+    /// <summary>A segment's key writes and folded messages, in the order their keys first appear.</summary>
+    private sealed class Segment(
+        LedgerSegmentId id,
+        LedgerMetadata ledger,
+        ImmutableArray<MessageFolds.RegisteredProcessor> messageProcessors,
+        bool skipUnknownChannelMutant) : DrainRows(id)
     {
+        private readonly MessageFolds _messages = new(ledger, id, messageProcessors, skipUnknownChannelMutant);
         private readonly Dictionary<byte[], KeyWrite> _byKey = [with(LedgerSegmentDictionary.KeyComparer.Instance)];
 
         public List<KeyWrite> Writes { get; } = [];
+
+        public bool HasMessages => _messages.HasMessages;
+
+        public Task CommitMessagesAsync(CancellationToken cancellationToken) => _messages.CommitAsync(cancellationToken);
 
         protected internal override long Add(LedgerScanItem item)
         {
@@ -908,15 +913,9 @@ public sealed class ArchiveLogDrainWorker
             long charge = 0;
             foreach (var row in item.Rows)
             {
-                if (row.Kind == RowKind.LocalAppend)
+                if (row.Kind == RowKind.Message)
                 {
-                    if (localDrainBarrier is null)
-                    {
-                        throw new ArchiveCorruptException(
-                            string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
-                    }
-
-                    localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key);
+                    charge += _messages.Add(row.Tag.Slot, row.Tag.Index, row.Channel, row.Body);
                     continue;
                 }
 
@@ -936,7 +935,7 @@ public sealed class ArchiveLogDrainWorker
                     RowKind.Append => ArchiveCommand.Append(row.BodyLength),
                     RowKind.Replace => ArchiveCommand.Replace(row.BodyLength),
                     RowKind.Delete => ArchiveCommand.Delete(row.Body.ToArray()),
-                    RowKind.LocalAppend => throw new UnreachableException("RowKind.LocalAppend is handled before command conversion."),
+                    RowKind.Message => throw new UnreachableException("RowKind.Message is handled before command conversion."),
                     _ => throw new UnreachableException("A row's kind is defined."),
                 };
                 charge += taken - write.Add(command, row.Kind == RowKind.Delete ? default : row.RetainBody(), taken);
@@ -947,6 +946,7 @@ public sealed class ArchiveLogDrainWorker
 
         protected internal override void Clear()
         {
+            _messages.Clear();
             foreach (var write in Writes)
             {
                 write.Dispose();

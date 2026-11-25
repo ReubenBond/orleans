@@ -48,7 +48,7 @@ public sealed class DrainWorker
     private readonly ManifestView _manifest;
     private readonly LedgerReader _reader;
     private readonly BlockCache? _blocks;
-    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
+    private readonly ImmutableArray<MessageFolds.RegisteredProcessor> _messageProcessors;
     private readonly TimeProvider _time;
     private readonly RunSectionSettings _settings;
     private readonly int _gridBits;
@@ -66,7 +66,7 @@ public sealed class DrainWorker
     /// <param name="options">The sections' settings and size, the grid step, and the drain memory.</param>
     /// <param name="timeProvider">The clock of the scans' backoff after backpressure.</param>
     /// <param name="blocks">The process's volatile-disk block cache, through which drain outputs are written, or <see langword="null"/> when none is configured.</param>
-    /// <param name="localDrainBarrier">Optional barrier validating skipped <see cref="RowKind.LocalAppend"/> keys and draining ledger-local streams before completing a closed ledger (LG-I15, LG-I16).</param>
+    /// <param name="messageProcessors">Optional control-plane message processors validating and folding <see cref="RowKind.Message"/> rows during segment drains (LG-I15, LG-I16).</param>
     /// <exception cref="ArgumentOutOfRangeException">The options are invalid.</exception>
     public DrainWorker(
         IObjectStore store,
@@ -75,7 +75,7 @@ public sealed class DrainWorker
         ArchiveOptions options,
         TimeProvider timeProvider,
         BlockCache? blocks = null,
-        ILedgerLocalDrainBarrier? localDrainBarrier = null)
+        IEnumerable<IMessageProcessor>? messageProcessors = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(manifest);
@@ -88,7 +88,7 @@ public sealed class DrainWorker
         _manifest = manifest;
         _reader = reader;
         _blocks = blocks;
-        _localDrainBarrier = localDrainBarrier;
+        _messageProcessors = MessageFolds.ValidateProcessors(messageProcessors);
         _time = timeProvider;
         _settings = options.SectionSettings;
         _gridBits = options.GridBits;
@@ -103,10 +103,16 @@ public sealed class DrainWorker
     internal bool DrainsInsideSegmentsMutant { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the worker skips <see cref="ILedgerLocalDrainBarrier.EnsureLocalStreamsDrainedAsync"/>
-    /// before completing a closed ledger (LG-I16 mutant for tests).
+    /// Gets a value indicating whether the worker skips committing segment message folds before
+    /// <see cref="ManifestChange.Drain"/> (LG-I16 mutant for tests).
     /// </summary>
-    internal bool DropBeforeLocalDrainedMutant { get; init; }
+    internal bool DropBeforeMessagesCommittedMutant { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the worker skips <see cref="RowKind.Message"/> rows for unregistered channels
+    /// instead of failing closed with <see cref="ArchiveCorruptException"/> (LG-I15 mutant for tests).
+    /// </summary>
+    internal bool SkipUnknownChannelMutant { get; init; }
 
     /// <summary>Gets how many times a scan resumes after backpressure before the drain answers it; at least 1.</summary>
     internal int BackpressureRetries { get; init; } = 8;
@@ -189,26 +195,6 @@ public sealed class DrainWorker
                 return DrainOutcome.Covered.Instance;
             }
 
-            // LG-I16: run the local-stream drain barrier up front for a closed ledger with T > 0
-            // before holding any segment memory or committing complete: true (covers both a < T and a == T).
-            if (t is { } closedEnd && closedEnd > Slot.Zero && _localDrainBarrier is not null && !DropBeforeLocalDrainedMutant)
-            {
-                var barrier = await _localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, closedEnd, cancellationToken).ConfigureAwait(false);
-                switch (barrier.Value)
-                {
-                    case LocalDrainBarrierOutcome.Drained:
-                        break;
-                    case LocalDrainBarrierOutcome.Dropped:
-                        Forget(ledger.Id);
-                        return ReplicaWriteOutcome.Dropped.Instance;
-                    case LocalDrainBarrierOutcome.Backpressure:
-                        return ReplicaWriteOutcome.Backpressure.Instance;
-                    case null:
-                    default:
-                        throw new UnreachableException("conventions.md §15: a barrier answers a union which holds a case.");
-                }
-            }
-
             if (a == below)
             {
                 // A drain of no slots only completes its ledger, uploading nothing.
@@ -227,6 +213,11 @@ public sealed class DrainWorker
                         {
                             // The view learned of another drain of the segment while this one scanned it: start again from there.
                             continue;
+                        }
+
+                        if (segment.HasMessages && !DropBeforeMessagesCommittedMutant)
+                        {
+                            await segment.CommitMessagesAsync(cancellationToken).ConfigureAwait(false);
                         }
 
                         var sections = await UploadAsync(ledger, a, segment, cancellationToken).ConfigureAwait(false);
@@ -273,7 +264,7 @@ public sealed class DrainWorker
     /// <exception cref="DrainMemoryExceededException">The segment's rows pass the drain memory alone.</exception>
     private async Task<Scanned> ScanAsync(LedgerMetadata ledger, Start start, Slot below, bool boundIsEnd, CancellationToken cancellationToken)
     {
-        Segment? segment = new(new LedgerSegmentId(ledger.Id, start.Slot), ledger, _settings.BloomBitsPerKey, _localDrainBarrier);
+        Segment? segment = new(new LedgerSegmentId(ledger.Id, start.Slot), ledger, _settings.BloomBitsPerKey, _messageProcessors, SkipUnknownChannelMutant);
         try
         {
             var scanned = await Scan.ScanAsync(
@@ -564,8 +555,14 @@ public sealed class DrainWorker
     /// A segment's rows, held in pooled arrays over one retained <see cref="ArcBuffer"/> per batch with non-empty bodies
     /// and a pooled key-byte arena, releasing each batch once all of its rows have been written.
     /// </summary>
-    private sealed class Segment(LedgerSegmentId id, LedgerMetadata ledger, int bloomBitsPerKey, ILedgerLocalDrainBarrier? localDrainBarrier) : DrainRows(id)
+    private sealed class Segment(
+        LedgerSegmentId id,
+        LedgerMetadata ledger,
+        int bloomBitsPerKey,
+        ImmutableArray<MessageFolds.RegisteredProcessor> messageProcessors,
+        bool skipUnknownChannelMutant) : DrainRows(id)
     {
+        private readonly MessageFolds _messages = new(ledger, id, messageProcessors, skipUnknownChannelMutant);
         private DrainedRow[] _rows = [];
         private ArcBuffer[] _batches = [];
         private int[] _batchRemaining = [];
@@ -576,8 +573,14 @@ public sealed class DrainWorker
         private int _keyBytesUsed;
         private int _released;
 
-        /// <summary>Gets the number of the segment's rows.</summary>
+        /// <summary>Gets the number of the segment's archive rows.</summary>
         public int Count { get; private set; }
+
+        /// <summary>Gets a value indicating whether at least one <see cref="RowKind.Message"/> row was folded in this segment.</summary>
+        public bool HasMessages => _messages.HasMessages;
+
+        /// <summary>Commits all folded message channels for this segment before manifest publication.</summary>
+        public Task CommitMessagesAsync(CancellationToken cancellationToken) => _messages.CommitAsync(cancellationToken);
 
         public ref readonly DrainedRow RowAt(int index) => ref _rows[index];
 
@@ -602,8 +605,8 @@ public sealed class DrainWorker
         /// <summary>
         /// Adds the batch's resolved rows, retaining the batch's buffer at most once for all non-empty bodies in the batch
         /// and storing each distinct key's bytes once in a pooled arena, and returns their charge: each row's entry, body,
-        /// and projected length in a drain output, and each key's bytes once. A defining row stores the LSM's plan of every
-        /// write, the empty token (HI-I4).
+        /// and projected length in a drain output, each key's bytes once, and any folded message bytes. A defining row
+        /// stores the LSM's plan of every write, the empty token (HI-I4).
         /// </summary>
         protected internal override long Add(LedgerScanItem item)
         {
@@ -620,15 +623,9 @@ public sealed class DrainWorker
             var cursorOffset = 0;
             foreach (var row in item.Rows)
             {
-                if (row.Kind == RowKind.LocalAppend)
+                if (row.Kind == RowKind.Message)
                 {
-                    if (localDrainBarrier is null)
-                    {
-                        throw new ArchiveCorruptException(
-                            string.Create(CultureInfo.InvariantCulture, $"Ledger {Id.Ledger} contains a RowKind.LocalAppend row at {row.Tag} without an ILedgerLocalDrainBarrier."));
-                    }
-
-                    localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key);
+                    charge += _messages.Add(row.Tag.Slot, row.Tag.Index, row.Channel, row.Body);
                     continue;
                 }
 
@@ -681,6 +678,7 @@ public sealed class DrainWorker
 
         protected internal override void Clear()
         {
+            _messages.Clear();
             Release(Count);
             for (var index = 0; index < _batchCount; index++)
             {

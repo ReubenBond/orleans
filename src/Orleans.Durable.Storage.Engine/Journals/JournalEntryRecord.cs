@@ -43,10 +43,10 @@ public readonly struct JournalEntryRecord : IDisposable
     /// <summary>Gets the payload, whose lease the record owns; the default for every entry without one.</summary>
     public ArcBuffer Payload { get; }
 
-    /// <summary>Gets the attached ledger-local append records, empty when none are attached.</summary>
-    public ImmutableArray<LocalAppendRecord> LocalAppends => Entry.LocalAppends;
+    /// <summary>Gets the attached message records, empty when none are attached.</summary>
+    public ImmutableArray<MessageRecord> Messages => Entry.Messages;
 
-    /// <summary>Gets the record's length in bytes: its head (including any local appends) and its payload; 0 for the default record.</summary>
+    /// <summary>Gets the record's length in bytes: its head (including any messages) and its payload; 0 for the default record.</summary>
     public long Length => Entry.HeadLength + (long)Payload.Length;
 
     /// <summary>Gets the record's CRC-32C, its first four bytes.</summary>
@@ -55,7 +55,7 @@ public readonly struct JournalEntryRecord : IDisposable
 
     /// <summary>
     /// Writes the record's head bytes (the CRC-32C, the kind/flags byte, the expected version, a <c>Delete</c>'s deletion
-    /// time, and any attached local appends) into <paramref name="destination"/> and returns the number of bytes written.
+    /// time, and any attached messages) into <paramref name="destination"/> and returns the number of bytes written.
     /// </summary>
     /// <exception cref="InvalidOperationException">The record is the default, which no encoding made.</exception>
     internal int WriteHeadTo(Span<byte> destination)
@@ -69,12 +69,12 @@ public readonly struct JournalEntryRecord : IDisposable
         var length = WriteFixedHeadAfterCrc(
             destination,
             Entry.Kind,
-            Entry.HasLocalAppends,
+            Entry.HasMessages,
             Entry.ExpectedVersion,
             Entry.Kind == JournalEntryKind.Delete ? Entry.DeletionTicks : null);
-        if (Entry.HasLocalAppends)
+        if (Entry.HasMessages)
         {
-            length += WriteLocalAppends(destination[length..], Entry.LocalAppends.AsSpan());
+            length += WriteMessages(destination[length..], Entry.Messages.AsSpan());
         }
 
         Debug.Assert(length == Entry.HeadLength, "Written head length matches Entry.HeadLength.");
@@ -110,12 +110,12 @@ public readonly struct JournalEntryRecord : IDisposable
 
     /// <summary>
     /// Encodes an <c>Append</c> of <paramref name="payload"/> at <paramref name="expectedVersion"/> with attached
-    /// <paramref name="localAppends"/>, retaining its own lease on <paramref name="payload"/> (JS-I5, JS-I11).
+    /// <paramref name="messages"/>, retaining its own lease on <paramref name="payload"/> (JS-I5, JS-I11).
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="payload"/> is empty, or a local append is default or exceeds wire limits.</exception>
+    /// <exception cref="ArgumentException"><paramref name="payload"/> is empty, or a message is default or exceeds wire limits.</exception>
     /// <exception cref="InvalidOperationException"><paramref name="payload"/> has been released.</exception>
-    public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer payload, ReadOnlySpan<LocalAppendRecord> localAppends)
+    public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer payload, ReadOnlySpan<MessageRecord> messages)
     {
         ArgumentNullException.ThrowIfNull(key);
         if (payload.Length == 0)
@@ -123,7 +123,7 @@ public readonly struct JournalEntryRecord : IDisposable
             throw new ArgumentException("An Append adds a non-empty payload.", nameof(payload));
         }
 
-        var validated = DetachLocalAppends(localAppends);
+        var validated = DetachMessages(messages);
         return Encode(key, JournalEntryKind.Append, expectedVersion, deletionTicks: null, payload.Retain(), validated);
     }
 
@@ -135,12 +135,12 @@ public readonly struct JournalEntryRecord : IDisposable
 
     /// <summary>
     /// Encodes a <c>Replace</c> with <paramref name="snapshot"/> at <paramref name="expectedVersion"/> with attached
-    /// <paramref name="localAppends"/>, retaining its own lease on <paramref name="snapshot"/> (JS-I5, JS-I11).
+    /// <paramref name="messages"/>, retaining its own lease on <paramref name="snapshot"/> (JS-I5, JS-I11).
     /// </summary>
-    public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer snapshot, ReadOnlySpan<LocalAppendRecord> localAppends)
+    public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, ArcBuffer snapshot, ReadOnlySpan<MessageRecord> messages)
     {
         ArgumentNullException.ThrowIfNull(key);
-        var validated = DetachLocalAppends(localAppends);
+        var validated = DetachMessages(messages);
         return Encode(key, JournalEntryKind.Replace, expectedVersion, deletionTicks: null, snapshot.Retain(), validated);
     }
 
@@ -151,12 +151,12 @@ public readonly struct JournalEntryRecord : IDisposable
 
     /// <summary>
     /// Encodes a <c>Delete</c> at <paramref name="expectedVersion"/>, stamped with <paramref name="deletedAt"/> in UTC,
-    /// with attached <paramref name="localAppends"/> (JS-I5, JS-I11).
+    /// with attached <paramref name="messages"/> (JS-I5, JS-I11).
     /// </summary>
-    public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, DateTimeOffset deletedAt, ReadOnlySpan<LocalAppendRecord> localAppends)
+    public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, DateTimeOffset deletedAt, ReadOnlySpan<MessageRecord> messages)
     {
         ArgumentNullException.ThrowIfNull(key);
-        var validated = DetachLocalAppends(localAppends);
+        var validated = DetachMessages(messages);
         return Encode(key, JournalEntryKind.Delete, expectedVersion, deletedAt.UtcTicks, payload: default, validated);
     }
 
@@ -227,13 +227,13 @@ public readonly struct JournalEntryRecord : IDisposable
         var fixedLength = WriteFixedHeadAfterCrc(
             fixedHead,
             Entry.Kind,
-            Entry.HasLocalAppends,
+            Entry.HasMessages,
             Entry.ExpectedVersion,
             Entry.Kind == JournalEntryKind.Delete ? Entry.DeletionTicks : null);
         writer.Write(fixedHead[..fixedLength]);
-        if (Entry.HasLocalAppends)
+        if (Entry.HasMessages)
         {
-            WriteLocalAppendsToWriter(writer, Entry.LocalAppends.AsSpan());
+            WriteMessagesToWriter(writer, Entry.Messages.AsSpan());
         }
 
         Payload.CopyTo(writer);
@@ -259,42 +259,42 @@ public readonly struct JournalEntryRecord : IDisposable
     internal JournalEntryRecord Retain() => new(Key, _crc32C, Payload.Retain(), Entry);
 
     /// <summary>
-    /// Returns this record's key, CRC-32C, and fields (preserving <see cref="LocalAppends"/>) without its payload,
+    /// Returns this record's key, CRC-32C, and fields (preserving <see cref="Messages"/>) without its payload,
     /// which the caller still owns.
     /// </summary>
     internal JournalEntryRecord WithoutPayload() => new(Key, _crc32C, default, Entry);
 
-    /// <summary>Validates and copies caller-supplied local appends into one detached immutable buffer.</summary>
-    private static ImmutableArray<LocalAppendRecord> DetachLocalAppends(ReadOnlySpan<LocalAppendRecord> localAppends)
+    /// <summary>Validates and copies caller-supplied messages into one detached immutable buffer.</summary>
+    private static ImmutableArray<MessageRecord> DetachMessages(ReadOnlySpan<MessageRecord> messages)
     {
-        if (localAppends.IsEmpty)
+        if (messages.IsEmpty)
         {
             return [];
         }
 
-        if (localAppends.Length > byte.MaxValue)
+        if (messages.Length > byte.MaxValue)
         {
             throw new ArgumentException(
-                string.Create(CultureInfo.InvariantCulture, $"An entry record carries at most {byte.MaxValue} local appends, not {localAppends.Length}."),
-                nameof(localAppends));
+                string.Create(CultureInfo.InvariantCulture, $"An entry record carries at most {byte.MaxValue} messages, not {messages.Length}."),
+                nameof(messages));
         }
 
         var totalPayloadBytes = 0;
-        for (var i = 0; i < localAppends.Length; i++)
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
-            if (item.Stream is null)
+            ref readonly var item = ref messages[i];
+            if (item.Channel is null)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"localAppends[{i}] is default(LocalAppendRecord) with a null Stream."),
-                    nameof(localAppends));
+                    string.Create(CultureInfo.InvariantCulture, $"messages[{i}] is default(MessageRecord) with a null Channel."),
+                    nameof(messages));
             }
 
-            if (item.Payload.Length > LocalAppendRecord.MaxPayloadLength)
+            if (item.Payload.Length > MessageRecord.MaxPayloadLength)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"localAppends[{i}] payload of {item.Payload.Length} bytes exceeds {LocalAppendRecord.MaxPayloadLength}."),
-                    nameof(localAppends));
+                    string.Create(CultureInfo.InvariantCulture, $"messages[{i}] payload of {item.Payload.Length} bytes exceeds {MessageRecord.MaxPayloadLength}."),
+                    nameof(messages));
             }
 
             totalPayloadBytes = checked(totalPayloadBytes + item.Payload.Length);
@@ -302,10 +302,10 @@ public readonly struct JournalEntryRecord : IDisposable
 
         var detached = totalPayloadBytes == 0 ? [] : new byte[totalPayloadBytes];
         var offset = 0;
-        var builder = ImmutableArray.CreateBuilder<LocalAppendRecord>(localAppends.Length);
-        for (var i = 0; i < localAppends.Length; i++)
+        var builder = ImmutableArray.CreateBuilder<MessageRecord>(messages.Length);
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
+            ref readonly var item = ref messages[i];
             ReadOnlyMemory<byte> copied;
             if (item.Payload.IsEmpty)
             {
@@ -318,7 +318,7 @@ public readonly struct JournalEntryRecord : IDisposable
                 offset += item.Payload.Length;
             }
 
-            builder.Add(new LocalAppendRecord(item.Stream, copied));
+            builder.Add(new MessageRecord(item.Channel, copied));
         }
 
         return builder.MoveToImmutable();
@@ -331,23 +331,23 @@ public readonly struct JournalEntryRecord : IDisposable
         JournalVersion expectedVersion,
         long? deletionTicks,
         ArcBuffer payload,
-        ImmutableArray<LocalAppendRecord> localAppends)
+        ImmutableArray<MessageRecord> messages)
     {
         Debug.Assert(deletionTicks is null != (kind == JournalEntryKind.Delete), "A record carries a deletion time exactly when it is a Delete.");
-        var hasLocalAppends = !localAppends.IsDefaultOrEmpty;
+        var hasMessages = !messages.IsDefaultOrEmpty;
         Span<byte> fixedHead = stackalloc byte[FixedMaxHeadLength];
-        var fixedHeadLength = WriteFixedHeadAfterCrc(fixedHead, kind, hasLocalAppends, expectedVersion, deletionTicks);
-        var localAppendsWireLength = hasLocalAppends ? LocalAppendsWireLength(localAppends.AsSpan()) : 0;
-        var headLength = checked(fixedHeadLength + localAppendsWireLength);
-        var crc32C = ComputeCrc(key, fixedHead[JournalEntry.CrcLength..fixedHeadLength], hasLocalAppends ? localAppends.AsSpan() : default, payload);
-        var entry = new JournalEntry(kind, expectedVersion, deletionTicks ?? 0, headLength: headLength, payloadLength: payload.Length, localAppends);
+        var fixedHeadLength = WriteFixedHeadAfterCrc(fixedHead, kind, hasMessages, expectedVersion, deletionTicks);
+        var messagesWireLength = hasMessages ? MessagesWireLength(messages.AsSpan()) : 0;
+        var headLength = checked(fixedHeadLength + messagesWireLength);
+        var crc32C = ComputeCrc(key, fixedHead[JournalEntry.CrcLength..fixedHeadLength], hasMessages ? messages.AsSpan() : default, payload);
+        var entry = new JournalEntry(kind, expectedVersion, deletionTicks ?? 0, headLength: headLength, payloadLength: payload.Length, messages);
         return new JournalEntryRecord(key, crc32C, payload, entry);
     }
 
     /// <summary>Writes the kind/flags byte, expected version, and a <c>Delete</c>'s deletion time starting at <see cref="JournalEntry.KindOffset"/> and returns the fixed head length.</summary>
-    private static int WriteFixedHeadAfterCrc(Span<byte> head, JournalEntryKind kind, bool hasLocalAppends, JournalVersion expectedVersion, long? deletionTicks)
+    private static int WriteFixedHeadAfterCrc(Span<byte> head, JournalEntryKind kind, bool hasMessages, JournalVersion expectedVersion, long? deletionTicks)
     {
-        head[JournalEntry.KindOffset] = (byte)((byte)kind | (hasLocalAppends ? JournalEntry.HasLocalAppendsFlag : 0));
+        head[JournalEntry.KindOffset] = (byte)((byte)kind | (hasMessages ? JournalEntry.HasMessagesFlag : 0));
         var offset = JournalEntry.VersionOffset + expectedVersion.Write(head[JournalEntry.VersionOffset..]);
         if (deletionTicks is { } ticks)
         {
@@ -358,29 +358,29 @@ public readonly struct JournalEntryRecord : IDisposable
         return offset;
     }
 
-    private static int LocalAppendsWireLength(ReadOnlySpan<LocalAppendRecord> localAppends)
+    private static int MessagesWireLength(ReadOnlySpan<MessageRecord> messages)
     {
-        var length = 1; // localCount: u8
-        for (var i = 0; i < localAppends.Length; i++)
+        var length = 1; // messageCount: u8
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
-            length = checked(length + 1 + item.Stream.Span.Length + Varint.Length((ulong)item.Payload.Length) + item.Payload.Length);
+            ref readonly var item = ref messages[i];
+            length = checked(length + 1 + item.Channel.Span.Length + Varint.Length((ulong)item.Payload.Length) + item.Payload.Length);
         }
 
         return length;
     }
 
-    private static int WriteLocalAppends(Span<byte> destination, ReadOnlySpan<LocalAppendRecord> localAppends)
+    private static int WriteMessages(Span<byte> destination, ReadOnlySpan<MessageRecord> messages)
     {
         var offset = 0;
-        destination[offset++] = (byte)localAppends.Length;
-        for (var i = 0; i < localAppends.Length; i++)
+        destination[offset++] = (byte)messages.Length;
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
-            var stream = item.Stream.Span;
-            destination[offset++] = (byte)stream.Length;
-            stream.CopyTo(destination[offset..]);
-            offset += stream.Length;
+            ref readonly var item = ref messages[i];
+            var channel = item.Channel.Span;
+            destination[offset++] = (byte)channel.Length;
+            channel.CopyTo(destination[offset..]);
+            offset += channel.Length;
             offset += Varint.Write(destination[offset..], (ulong)item.Payload.Length);
             item.Payload.Span.CopyTo(destination[offset..]);
             offset += item.Payload.Length;
@@ -389,18 +389,18 @@ public readonly struct JournalEntryRecord : IDisposable
         return offset;
     }
 
-    private static void WriteLocalAppendsToWriter(ArcBufferWriter writer, ReadOnlySpan<LocalAppendRecord> localAppends)
+    private static void WriteMessagesToWriter(ArcBufferWriter writer, ReadOnlySpan<MessageRecord> messages)
     {
         Span<byte> small = stackalloc byte[Varint.MaxLength];
-        small[0] = (byte)localAppends.Length;
+        small[0] = (byte)messages.Length;
         writer.Write(small[..1]);
-        for (var i = 0; i < localAppends.Length; i++)
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
-            var stream = item.Stream.Span;
-            small[0] = (byte)stream.Length;
+            ref readonly var item = ref messages[i];
+            var channel = item.Channel.Span;
+            small[0] = (byte)channel.Length;
             writer.Write(small[..1]);
-            writer.Write(stream);
+            writer.Write(channel);
             var varintLength = Varint.Write(small, (ulong)item.Payload.Length);
             writer.Write(small[..varintLength]);
             if (!item.Payload.IsEmpty)
@@ -410,28 +410,28 @@ public readonly struct JournalEntryRecord : IDisposable
         }
     }
 
-    /// <summary>Computes the CRC-32C of the row key, fixed head after CRC, any local appends (streamed), and then the payload.</summary>
+    /// <summary>Computes the CRC-32C of the row key, fixed head after CRC, any messages (streamed), and then the payload.</summary>
     private static uint ComputeCrc(
         JournalRowKey key,
         ReadOnlySpan<byte> fixedHeadAfterCrc,
-        ReadOnlySpan<LocalAppendRecord> localAppends,
+        ReadOnlySpan<MessageRecord> messages,
         ArcBuffer payload)
     {
         using var crc = JournalCrc.Start();
         crc.Append(key.Span);
         crc.Append(fixedHeadAfterCrc);
-        if (!localAppends.IsEmpty)
+        if (!messages.IsEmpty)
         {
             Span<byte> small = stackalloc byte[Varint.MaxLength];
-            small[0] = (byte)localAppends.Length;
+            small[0] = (byte)messages.Length;
             crc.Append(small[..1]);
-            for (var i = 0; i < localAppends.Length; i++)
+            for (var i = 0; i < messages.Length; i++)
             {
-                ref readonly var item = ref localAppends[i];
-                var stream = item.Stream.Span;
-                small[0] = (byte)stream.Length;
+                ref readonly var item = ref messages[i];
+                var channel = item.Channel.Span;
+                small[0] = (byte)channel.Length;
                 crc.Append(small[..1]);
-                crc.Append(stream);
+                crc.Append(channel);
                 var varintLength = Varint.Write(small, (ulong)item.Payload.Length);
                 crc.Append(small[..varintLength]);
                 if (!item.Payload.IsEmpty)

@@ -58,7 +58,7 @@ internal sealed partial class ArchiveLogNodeDrains
     private readonly NodeId _node;
     private readonly int _maxSegmentKeys;
     private readonly ArchiveLogOptions _options;
-    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
+    private readonly IEnumerable<IMessageProcessor>? _messageProcessors;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly ArchiveLogNodeShare _share;
@@ -88,7 +88,7 @@ internal sealed partial class ArchiveLogNodeDrains
     /// <param name="timeProvider">The clock of the replies and the blocked drains' retries.</param>
     /// <param name="meter">The runtime's meter, on which the blocked drains' gauge is published.</param>
     /// <param name="logger">Logs each drain which starts to block.</param>
-    /// <param name="localDrainBarrier">Optional ledger-local stream drain barrier (LG-I15, LG-I16).</param>
+    /// <param name="messageProcessors">Optional control-plane message processors for segment drains (LG-I15, LG-I16).</param>
     public ArchiveLogNodeDrains(
         NodeId node,
         double budget,
@@ -99,7 +99,7 @@ internal sealed partial class ArchiveLogNodeDrains
         TimeProvider timeProvider,
         Meter meter,
         ILogger logger,
-        ILedgerLocalDrainBarrier? localDrainBarrier = null)
+        IEnumerable<IMessageProcessor>? messageProcessors = null)
     {
         ArchiveLogRequestShare.CheckBudget(budget, nameof(budget));
         ArgumentNullException.ThrowIfNull(nodes);
@@ -112,7 +112,7 @@ internal sealed partial class ArchiveLogNodeDrains
         _node = node;
         _maxSegmentKeys = maxSegmentKeys;
         _options = options;
-        _localDrainBarrier = localDrainBarrier;
+        _messageProcessors = messageProcessors;
         _time = timeProvider;
         _logger = logger;
         // A node whose registry lists no active node, its own retired, still divides the budget by itself.
@@ -169,7 +169,7 @@ internal sealed partial class ArchiveLogNodeDrains
 
         // The pacer reads the share before each request, so its deadline applies whether or not a report is in flight;
         // no drain runs before the first share (Drains).
-        var worker = new ArchiveLogDrainWorker(gate, map, reader, _options, _time, localDrainBarrier: _localDrainBarrier)
+        var worker = new ArchiveLogDrainWorker(gate, map, reader, _options, _time, messageProcessors: _messageProcessors)
         {
             OnSegmentScanned = _learned.Enqueue,
             RequestsPerSecondSource = () => RequestsPerSecond ?? throw new UnreachableException("A node drains only once a reply gave it a share, which it never loses."),

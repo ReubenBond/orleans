@@ -14,7 +14,4 @@ public enum JournalStoreLimit
 
     /// <summary>The writers' <c>MaxProposalBytes</c> holds less than the largest batch.</summary>
     MaxProposalBytes,
-
-    /// <summary>The writers' <c>MaxSegmentKeys</c> is less than <c>1 + MaxLocalAppendsPerWrite</c>.</summary>
-    MaxSegmentKeys,
 }

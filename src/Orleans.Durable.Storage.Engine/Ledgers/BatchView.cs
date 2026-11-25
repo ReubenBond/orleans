@@ -41,6 +41,7 @@ public readonly ref struct BatchView
     internal const string ReasonNoRows = "no-rows";
     internal const string ReasonRowTruncated = "row-truncated";
     internal const string ReasonBadRowFlags = "bad-row-flags";
+    internal const string ReasonBadChannel = "bad-channel";
     internal const string ReasonEmptyKey = "empty-key";
     internal const string ReasonKeyTooLong = "key-too-long";
     internal const string ReasonBaseTooLong = "base-too-long";
@@ -362,6 +363,49 @@ public readonly ref struct BatchView
                 string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex} has flags 0x{flags:x2}: a bit other than the kind and defining is set."));
         }
 
+        var kind = (RowKind)(flags & KindMask);
+        if (kind == RowKind.Message)
+        {
+            if ((flags & DefiningFlag) != 0)
+            {
+                return DecodeRejection.Create(
+                    ReasonBadRowFlags,
+                    string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex} has flags 0x{flags:x2}: a Message row must not set the defining bit."));
+            }
+
+            if (!reader.TryRead(out byte channelLength))
+            {
+                return RowTruncation(rowIndex, "channel length");
+            }
+
+            if (channelLength is 0 or > MessageChannel.MaxLength)
+            {
+                return DecodeRejection.Create(
+                    ReasonBadChannel,
+                    string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex}'s channel length is {channelLength}; a message channel is 1 to {MessageChannel.MaxLength} bytes."));
+            }
+
+            Span<byte> channel = stackalloc byte[channelLength];
+            if (!reader.TryCopyTo(channel))
+            {
+                return RowTruncation(rowIndex, "channel");
+            }
+
+            if (!MessageChannel.IsValid(channel))
+            {
+                return DecodeRejection.Create(
+                    ReasonBadChannel,
+                    string.Create(CultureInfo.InvariantCulture, $"Row {rowIndex}'s channel contains an invalid byte: only ASCII [a-z0-9._-] is allowed."));
+            }
+
+            if (RowVarint(ref reader, rowIndex, "body length", out var messageBodyLength) is { } badMessageBodyLength)
+            {
+                return badMessageBodyLength;
+            }
+
+            return reader.TrySkip(messageBodyLength) ? null : RowTruncation(rowIndex, "body");
+        }
+
         if ((flags & DefiningFlag) == 0)
         {
             if (RowVarint(ref reader, rowIndex, "ordinal", out var ordinal) is { } badOrdinal)
@@ -512,14 +556,20 @@ public readonly ref struct BatchView
             var complete = _reader.TryRead(out byte flags);
             var kind = (RowKind)(flags & KindMask);
             var isDefining = (flags & DefiningFlag) != 0;
-            ReadOnlySpan<byte> key = default;
+            ReadOnlySpan<byte> keyOrChannel = default;
             RowVersion versionBefore = default;
             RowToken token = default;
             ulong ordinal;
-            if (isDefining)
+            if (kind == RowKind.Message)
+            {
+                complete &= _reader.TryRead(out byte channelLength);
+                keyOrChannel = Take(ref _reader, channelLength, ref _keyScratch);
+                ordinal = 0;
+            }
+            else if (isDefining)
             {
                 complete &= _reader.TryReadVarint(out var keyLength) == Varint.Status.Valid;
-                key = Take(ref _reader, (int)keyLength, ref _keyScratch);
+                keyOrChannel = Take(ref _reader, (int)keyLength, ref _keyScratch);
                 var versionBase = ReadToken(ref _reader, ref complete);
                 complete &= _reader.TryReadVarint(out var count) == Varint.Status.Valid;
                 versionBefore = new RowVersion(versionBase, count);
@@ -553,7 +603,7 @@ public readonly ref struct BatchView
 
             Debug.Assert(complete, "Decode verified that each row ends at or before the CRC-32C.");
             Debug.Assert(RowKinds.IsDefined(kind), "Decode verified each row's kind.");
-            Current = new BatchRow(_index, kind, isDefining, ordinal, key, versionBefore, token, body, _page, bodyOffset, batchBodyOffset, (int)bodyLength);
+            Current = new BatchRow(_index, kind, isDefining, ordinal, keyOrChannel, versionBefore, token, body, _page, bodyOffset, batchBodyOffset, (int)bodyLength);
             return true;
         }
 

@@ -72,7 +72,6 @@ internal sealed partial class NodeController
 
     private readonly Func<bool>? _objectLedgersReady;
     private readonly Func<LedgerId, KeyRange, TimeSpan, CancellationToken, Task<LedgerPrepareReleaseOutcome>>? _prepareRelease;
-    private readonly ILedgerLocalDrainBarrier? _localDrainBarrier;
     private readonly Dictionary<LedgerId, Slot> _releasedLedgers = [];
     private readonly Dictionary<LedgerId, Task<PrepareReleaseReply>> _prepareInFlight = [];
 
@@ -80,9 +79,6 @@ internal sealed partial class NodeController
     // resumes on; the wait for the last of them to end; and when each ledger's drain last started, by number.
     private readonly Lock _drainSync = new();
     private readonly HashSet<LedgerId> _draining = [];
-    private readonly HashSet<LedgerId> _eagerLocalDraining = [];
-    private readonly HashSet<LedgerId> _eagerLocalDrained = [];
-    private readonly Dictionary<LedgerId, Retry> _eagerLocalRetries = [];
     private readonly Dictionary<LedgerId, long> _drainStarts = [];
     private TaskCompletionSource? _drainsEnded;
     private long _drainsStarted;
@@ -113,10 +109,6 @@ internal sealed partial class NodeController
     /// staged and in-flight journal writes before stopping the ledger's writer; when <see langword="null"/>,
     /// <see cref="PrepareReleaseAsync"/> drains the writer directly.
     /// </param>
-    /// <param name="localDrainBarrier">
-    /// Optional ledger-local stream drain barrier used on archive logs to eagerly drain closed ledgers waiting on an
-    /// older overlapping ledger (LG-I10, LG-I16) in a dedicated bounded slot.
-    /// </param>
     public NodeController(
         NodeId node,
         int generation,
@@ -134,8 +126,7 @@ internal sealed partial class NodeController
         Meter? meter = null,
         ArchiveLogNodeShare? objectStoreShare = null,
         Func<bool>? objectLedgersReady = null,
-        Func<LedgerId, KeyRange, TimeSpan, CancellationToken, Task<LedgerPrepareReleaseOutcome>>? prepareRelease = null,
-        ILedgerLocalDrainBarrier? localDrainBarrier = null)
+        Func<LedgerId, KeyRange, TimeSpan, CancellationToken, Task<LedgerPrepareReleaseOutcome>>? prepareRelease = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(registry);
@@ -175,7 +166,6 @@ internal sealed partial class NodeController
         _objectStoreShare = objectStoreShare;
         _objectLedgersReady = objectLedgersReady;
         _prepareRelease = prepareRelease;
-        _localDrainBarrier = localDrainBarrier;
     }
 
     /// <summary>
@@ -551,7 +541,7 @@ internal sealed partial class NodeController
         {
             lock (_drainSync)
             {
-                return _draining.Count == 0 && _eagerLocalDraining.Count == 0
+                return _draining.Count == 0
                     ? Task.CompletedTask
                     : (_drainsEnded ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
             }
@@ -627,126 +617,7 @@ internal sealed partial class NodeController
             },
             failed,
             cancellationToken);
-        MaybeStartEagerLocalDrain(drainToo, logs, failed, cancellationToken);
         return started;
-    }
-
-    /// <summary>
-    /// Starts at most one dedicated eager local-stream drain for a closed archive-log ledger currently <c>Waiting</c>
-    /// behind an older overlapping ledger (LG-I10, LG-I16), using a separate slot from <see cref="_draining"/> so it
-    /// never starves the older ledger or perturbs <c>_drainConcurrency + 1</c>, and retries transient failures with
-    /// bounded exponential backoff.
-    /// </summary>
-    private void MaybeStartEagerLocalDrain(
-        ImmutableArray<LedgerId> drainToo,
-        ArchiveLogNodeDrains logs,
-        Action<LedgerId, Exception> failed,
-        CancellationToken cancellationToken)
-    {
-        if (_localDrainBarrier is null)
-        {
-            return;
-        }
-
-        var map = _map.Current;
-        foreach (var id in _eagerLocalDrained.Where(id => map.Get(id) is null).ToList())
-        {
-            _ = _eagerLocalDrained.Remove(id);
-        }
-
-        foreach (var id in _eagerLocalRetries.Keys.Where(id => map.Get(id) is null).ToList())
-        {
-            _ = _eagerLocalRetries.Remove(id);
-        }
-
-        lock (_drainSync)
-        {
-            if (_eagerLocalDraining.Count > 0)
-            {
-                return;
-            }
-        }
-
-        var now = _time.GetUtcNow();
-        foreach (var (ledger, _) in Due(drainToo))
-        {
-            if (ledger.IsOpen
-                || ledger.Status.Value is not LedgerStatus.Closed { T: var tail }
-                || tail == Slot.Zero
-                || logs.WaitingFor(ledger.Id) is null
-                || _eagerLocalDrained.Contains(ledger.Id))
-            {
-                continue;
-            }
-
-            if (_eagerLocalRetries.TryGetValue(ledger.Id, out var retry) && now < retry.At)
-            {
-                continue;
-            }
-
-            lock (_drainSync)
-            {
-                if (_eagerLocalDraining.Count > 0 || !_eagerLocalDraining.Add(ledger.Id))
-                {
-                    return;
-                }
-
-                Debug.Assert(_eagerLocalDraining.Count <= 1, "At most one eager local-stream drain runs at a time.");
-            }
-
-            _ = EagerLocalDrainOneAsync(ledger, tail, failed, cancellationToken);
-            return;
-        }
-    }
-
-    private async Task EagerLocalDrainOneAsync(LedgerMetadata ledger, Slot tail, Action<LedgerId, Exception> failed, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var outcome = await _localDrainBarrier!.EnsureLocalStreamsDrainedAsync(ledger, tail, cancellationToken).ConfigureAwait(true);
-            switch (outcome.Value)
-            {
-                case LocalDrainBarrierOutcome.Drained or LocalDrainBarrierOutcome.Dropped:
-                    _ = _eagerLocalDrained.Add(ledger.Id);
-                    _ = _eagerLocalRetries.Remove(ledger.Id);
-                    break;
-                case LocalDrainBarrierOutcome.Backpressure:
-                    RecordEagerLocalRetry(ledger.Id);
-                    break;
-                case null:
-                default:
-                    throw new UnreachableException("conventions.md §15: a barrier answers a union which holds a case.");
-            }
-        }
-        catch (Exception failure) when (failure is not OutOfMemoryException)
-        {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                RecordEagerLocalRetry(ledger.Id);
-                failed(ledger.Id, failure);
-            }
-        }
-        finally
-        {
-            TaskCompletionSource? ended = null;
-            lock (_drainSync)
-            {
-                _ = _eagerLocalDraining.Remove(ledger.Id);
-                if (_draining.Count == 0 && _eagerLocalDraining.Count == 0)
-                {
-                    (ended, _drainsEnded) = (_drainsEnded, null);
-                }
-            }
-
-            _ = ended?.TrySetResult();
-        }
-    }
-
-    private void RecordEagerLocalRetry(LedgerId ledger)
-    {
-        var starts = (_eagerLocalRetries.TryGetValue(ledger, out var retry) ? retry.Starts : 0) + 1;
-        var backoff = TimeSpan.FromTicks(Math.Min(LongestExposedBackoff.Ticks, FirstExposedBackoff.Ticks << Math.Min(starts - 1, 30)));
-        _eagerLocalRetries[ledger] = new Retry(starts, _time.GetUtcNow() + backoff);
     }
 
     /// <summary>Gets the ledgers whose drains' last starts the node remembers, until its reports find them dropped.</summary>
@@ -1086,7 +957,7 @@ internal sealed partial class NodeController
             lock (_drainSync)
             {
                 _ = _draining.Remove(ledger.Id);
-                if (_draining.Count == 0 && _eagerLocalDraining.Count == 0)
+                if (_draining.Count == 0)
                 {
                     (ended, _drainsEnded) = (_drainsEnded, null);
                 }

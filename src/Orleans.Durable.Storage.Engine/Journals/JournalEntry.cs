@@ -10,7 +10,7 @@ namespace Orleans.Durable.Storage.Engine.Journals;
 
 /// <summary>
 /// The fields of a decoded entry record (journals.md §7): its kind, its expected version, a <c>Delete</c>'s deletion
-/// time, optional attached <see cref="LocalAppendRecord"/>s, and the length of an <c>Append</c>'s or a <c>Replace</c>'s
+/// time, optional attached <see cref="MessageRecord"/>s, and the length of an <c>Append</c>'s or a <c>Replace</c>'s
 /// payload, the rest of the record.
 /// </summary>
 /// <remarks>
@@ -32,14 +32,14 @@ namespace Orleans.Durable.Storage.Engine.Journals;
 /// </remarks>
 public readonly struct JournalEntry
 {
-    /// <summary>The most bytes before a record's payload when <see cref="HasLocalAppendsFlag"/> is clear: the CRC, kind, a longest expected version, and a deletion time.</summary>
+    /// <summary>The most bytes before a record's payload when <see cref="HasMessagesFlag"/> is clear: the CRC, kind, a longest expected version, and a deletion time.</summary>
     internal const int FixedMaxHeadLength = VersionOffset + RowVersionCodec.MaxLength + TombstoneLength;
 
     /// <summary>Alias for <see cref="FixedMaxHeadLength"/>.</summary>
     internal const int MaxHeadLength = FixedMaxHeadLength;
 
-    /// <summary>Flag in bit 7 of the kind byte indicating that local appends follow the fixed head fields (journals.md §7).</summary>
-    internal const byte HasLocalAppendsFlag = 0x80;
+    /// <summary>Flag in bit 7 of the kind byte indicating that messages follow the fixed head fields (journals.md §7).</summary>
+    internal const byte HasMessagesFlag = 0x80;
 
     /// <summary>The ticks of <see cref="DateTime.MaxValue"/>, the latest deletion time.</summary>
     internal const long MaxTicks = 3_155_378_975_999_999_999;
@@ -54,23 +54,23 @@ public readonly struct JournalEntry
     internal const string ReasonTruncated = "truncated";
     internal const string ReasonCrcMismatch = "crc-mismatch";
     internal const string ReasonUnknownKind = "unknown-kind";
-    internal const string ReasonExpiredLocalAppends = "expired-local-appends";
+    internal const string ReasonExpiredMessages = "expired-messages";
     internal const string ReasonBaseTooLong = "base-too-long";
     internal const string ReasonFieldTruncated = "field-truncated";
     internal const string ReasonBadVarint = "bad-varint";
     internal const string ReasonBadDeletionTime = "bad-deletion-time";
-    internal const string ReasonEmptyLocalAppends = "empty-local-appends";
-    internal const string ReasonEmptyLocalStream = "empty-local-stream";
-    internal const string ReasonLocalStreamTooLong = "local-stream-too-long";
-    internal const string ReasonBadLocalStream = "bad-local-stream";
-    internal const string ReasonLocalPayloadTooLong = "local-payload-too-long";
+    internal const string ReasonEmptyMessages = "empty-messages";
+    internal const string ReasonEmptyMessageChannel = "empty-message-channel";
+    internal const string ReasonMessageChannelTooLong = "message-channel-too-long";
+    internal const string ReasonBadMessageChannel = "bad-message-channel";
+    internal const string ReasonMessagePayloadTooLong = "message-payload-too-long";
     internal const string ReasonEmptyAppend = "empty-append";
     internal const string ReasonTrailingBytes = "trailing-bytes";
 
     /// <summary>The fewest bytes a record holds: its CRC, its kind, and its base's length.</summary>
     private const int MinLength = VersionOffset + 1;
 
-    private readonly ImmutableArray<LocalAppendRecord> _localAppends;
+    private readonly ImmutableArray<MessageRecord> _messages;
 
     /// <summary>Initializes a new instance of the <see cref="JournalEntry"/> struct with an entry's fields, as its encoding writes them.</summary>
     internal JournalEntry(
@@ -79,14 +79,14 @@ public readonly struct JournalEntry
         long deletionTicks,
         int headLength,
         long payloadLength,
-        ImmutableArray<LocalAppendRecord> localAppends = default)
+        ImmutableArray<MessageRecord> messages = default)
     {
         Kind = kind;
         ExpectedVersion = expectedVersion;
         DeletionTicks = deletionTicks;
         HeadLength = headLength;
         PayloadLength = payloadLength;
-        _localAppends = localAppends;
+        _messages = messages;
     }
 
     /// <summary>Gets the entry's kind.</summary>
@@ -101,11 +101,11 @@ public readonly struct JournalEntry
     /// <summary>Gets the length of the payload after the head: 0 for a <c>Delete</c> and an <c>Expired</c>.</summary>
     public long PayloadLength { get; }
 
-    /// <summary>Gets the attached ledger-local append records, empty when none are attached.</summary>
-    public ImmutableArray<LocalAppendRecord> LocalAppends => _localAppends.IsDefault ? [] : _localAppends;
+    /// <summary>Gets the attached message records, empty when none are attached.</summary>
+    public ImmutableArray<MessageRecord> Messages => _messages.IsDefault ? [] : _messages;
 
-    /// <summary>Gets a value indicating whether one or more ledger-local append records are attached.</summary>
-    internal bool HasLocalAppends => !_localAppends.IsDefaultOrEmpty;
+    /// <summary>Gets a value indicating whether one or more message records are attached.</summary>
+    internal bool HasMessages => !_messages.IsDefaultOrEmpty;
 
     /// <summary>Gets the length of the record's bytes before its payload (fixed head plus any local-append section).</summary>
     internal int HeadLength { get; }
@@ -125,7 +125,7 @@ public readonly struct JournalEntry
     /// <summary>
     /// Verifies the whole entry record in <paramref name="record"/>, written for the row key <paramref name="rowKey"/>,
     /// which the caller keeps and which are read only during the call, and gives its fields (journals.md §7). When
-    /// <see cref="HasLocalAppendsFlag"/> is clear, it allocates nothing once its thread has decoded or encoded one
+    /// <see cref="HasMessagesFlag"/> is clear, it allocates nothing once its thread has decoded or encoded one
     /// record, which allocates the thread's CRC-32C.
     /// </summary>
     /// <returns>
@@ -153,18 +153,18 @@ public readonly struct JournalEntry
         }
 
         var kindByte = head[KindOffset];
-        var hasLocalAppends = (kindByte & HasLocalAppendsFlag) != 0;
-        var kind = (JournalEntryKind)(kindByte & ~HasLocalAppendsFlag);
+        var hasMessages = (kindByte & HasMessagesFlag) != 0;
+        var kind = (JournalEntryKind)(kindByte & ~HasMessagesFlag);
         if (!JournalEntryKinds.IsDefined(kind))
         {
             return DecodeRejection.Create(
                 ReasonUnknownKind,
-                string.Create(CultureInfo.InvariantCulture, $"The entry record has kind {kindByte & ~HasLocalAppendsFlag}, which is not 0 to 3."));
+                string.Create(CultureInfo.InvariantCulture, $"The entry record has kind {kindByte & ~HasMessagesFlag}, which is not 0 to 3."));
         }
 
-        if (hasLocalAppends && kind == JournalEntryKind.Expired)
+        if (hasMessages && kind == JournalEntryKind.Expired)
         {
-            return DecodeRejection.Create(ReasonExpiredLocalAppends, "An Expired entry record cannot carry local appends.");
+            return DecodeRejection.Create(ReasonExpiredMessages, "An Expired entry record cannot carry messages.");
         }
 
         if (ReadVersion(head[VersionOffset..], out var expected, out var versionLength) is { } versionRejection)
@@ -194,14 +194,14 @@ public readonly struct JournalEntry
             offset += TombstoneLength;
         }
 
-        var localStartOffset = offset;
-        var localCount = 0;
-        var totalLocalPayloadBytes = 0;
-        if (hasLocalAppends)
+        var messageStartOffset = offset;
+        var messageCount = 0;
+        var totalMessagePayloadBytes = 0;
+        if (hasMessages)
         {
-            if (ValidateLocalAppends(record, localStartOffset, out offset, out localCount, out totalLocalPayloadBytes) is { } localRejection)
+            if (ValidateMessages(record, messageStartOffset, out offset, out messageCount, out totalMessagePayloadBytes) is { } messageRejection)
             {
-                return localRejection;
+                return messageRejection;
             }
         }
 
@@ -218,10 +218,10 @@ public readonly struct JournalEntry
                 string.Create(CultureInfo.InvariantCulture, $"The {kind} entry record has {bodyLength} bytes after its last field."));
         }
 
-        var localAppends = hasLocalAppends
-            ? MaterializeLocalAppends(record, localStartOffset, localCount, totalLocalPayloadBytes)
+        var messages = hasMessages
+            ? MaterializeMessages(record, messageStartOffset, messageCount, totalMessagePayloadBytes)
             : [];
-        entry = new JournalEntry(kind, expected, ticks, offset, bodyLength, localAppends);
+        entry = new JournalEntry(kind, expected, ticks, offset, bodyLength, messages);
         return null;
     }
 
@@ -260,99 +260,99 @@ public readonly struct JournalEntry
     }
 
     /// <summary>
-    /// Validates the local-append section starting at <paramref name="startOffset"/> without heap allocations, checking
+    /// Validates the message section starting at <paramref name="startOffset"/> without heap allocations, checking
     /// every wire rule in procedural order (journals.md §7, rule 7).
     /// </summary>
-    private static InvalidDataException? ValidateLocalAppends(
+    private static InvalidDataException? ValidateMessages(
         ReadOnlySequence<byte> record,
         int startOffset,
         out int endOffset,
-        out int localCount,
+        out int messageCount,
         out int totalPayloadBytes)
     {
         endOffset = startOffset;
-        localCount = 0;
+        messageCount = 0;
         totalPayloadBytes = 0;
         var reader = new SequenceReader<byte>(record.Slice(startOffset));
         if (!reader.TryRead(out var countByte))
         {
-            return DecodeRejection.Create(ReasonTruncated, "The entry record ends before its local-append count byte.");
+            return DecodeRejection.Create(ReasonTruncated, "The entry record ends before its message count byte.");
         }
 
         if (countByte == 0)
         {
-            return DecodeRejection.Create(ReasonEmptyLocalAppends, "The entry record sets HasLocalAppendsFlag with localCount 0.");
+            return DecodeRejection.Create(ReasonEmptyMessages, "The entry record sets HasMessagesFlag with messageCount 0.");
         }
 
-        Span<byte> streamBuffer = stackalloc byte[LocalStreamName.MaxLength];
+        Span<byte> channelBuffer = stackalloc byte[MessageChannel.MaxLength];
         var payloadSum = 0;
         for (var i = 0; i < countByte; i++)
         {
-            if (!reader.TryRead(out var streamLength))
+            if (!reader.TryRead(out var channelLength))
             {
                 return DecodeRejection.Create(
                     ReasonTruncated,
-                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends before local append {i}'s stream length."));
+                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends before message {i}'s channel length."));
             }
 
-            if (streamLength == 0)
+            if (channelLength == 0)
             {
                 return DecodeRejection.Create(
-                    ReasonEmptyLocalStream,
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has an empty stream name."));
+                    ReasonEmptyMessageChannel,
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has an empty channel name."));
             }
 
-            if (streamLength > LocalStreamName.MaxLength)
+            if (channelLength > MessageChannel.MaxLength)
             {
                 return DecodeRejection.Create(
-                    ReasonLocalStreamTooLong,
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has stream length {streamLength}, exceeding {LocalStreamName.MaxLength}."));
+                    ReasonMessageChannelTooLong,
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has channel length {channelLength}, exceeding {MessageChannel.MaxLength}."));
             }
 
-            if (reader.Remaining < streamLength)
+            if (reader.Remaining < channelLength)
             {
                 return DecodeRejection.Create(
                     ReasonTruncated,
-                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends within local append {i}'s {streamLength}-byte stream name."));
+                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends within message {i}'s {channelLength}-byte channel name."));
             }
 
-            var streamSlice = streamBuffer[..streamLength];
-            var copied = reader.TryCopyTo(streamSlice);
-            Debug.Assert(copied, "Remaining bytes cover streamLength.");
-            reader.Advance(streamLength);
-            if (!LocalStreamName.IsValid(streamSlice))
+            var channelSlice = channelBuffer[..channelLength];
+            var copied = reader.TryCopyTo(channelSlice);
+            Debug.Assert(copied, "Remaining bytes cover channelLength.");
+            reader.Advance(channelLength);
+            if (!MessageChannel.IsValid(channelSlice))
             {
                 return DecodeRejection.Create(
-                    ReasonBadLocalStream,
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has a stream name with bytes outside ASCII [a-z0-9._-]."));
+                    ReasonBadMessageChannel,
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has a channel name with bytes outside ASCII [a-z0-9._-]."));
             }
 
             if (reader.Remaining == 0)
             {
                 return DecodeRejection.Create(
                     ReasonTruncated,
-                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends before local append {i}'s payload length."));
+                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends before message {i}'s payload length."));
             }
 
             if (ReadVarint(ref reader, out var payloadLength) != Varint.Status.Valid)
             {
                 return DecodeRejection.Create(
                     ReasonBadVarint,
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has a malformed payload-length varint."));
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has a malformed payload-length varint."));
             }
 
-            if (payloadLength > LocalAppendRecord.MaxPayloadLength)
+            if (payloadLength > MessageRecord.MaxPayloadLength)
             {
                 return DecodeRejection.Create(
-                    ReasonLocalPayloadTooLong,
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has payload length {payloadLength}, exceeding {LocalAppendRecord.MaxPayloadLength}."));
+                    ReasonMessagePayloadTooLong,
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has payload length {payloadLength}, exceeding {MessageRecord.MaxPayloadLength}."));
             }
 
             if (reader.Remaining < (long)payloadLength)
             {
                 return DecodeRejection.Create(
                     ReasonTruncated,
-                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends within local append {i}'s {payloadLength}-byte payload."));
+                    string.Create(CultureInfo.InvariantCulture, $"The entry record ends within message {i}'s {payloadLength}-byte payload."));
             }
 
             reader.Advance((long)payloadLength);
@@ -360,40 +360,40 @@ public readonly struct JournalEntry
         }
 
         endOffset = checked(startOffset + (int)reader.Consumed);
-        localCount = countByte;
+        messageCount = countByte;
         totalPayloadBytes = payloadSum;
         return null;
     }
 
     /// <summary>
-    /// Materializes validated local appends into one detached contiguous <see cref="byte"/> array sliced into an
-    /// <see cref="ImmutableArray{T}"/> so pooled <c>ArcBuffer</c> pages are not retained by local-append payloads.
+    /// Materializes validated messages into one detached contiguous <see cref="byte"/> array sliced into an
+    /// <see cref="ImmutableArray{T}"/> so pooled <c>ArcBuffer</c> pages are not retained by message payloads.
     /// </summary>
-    private static ImmutableArray<LocalAppendRecord> MaterializeLocalAppends(
+    private static ImmutableArray<MessageRecord> MaterializeMessages(
         ReadOnlySequence<byte> record,
         int startOffset,
-        int localCount,
+        int messageCount,
         int totalPayloadBytes)
     {
         var reader = new SequenceReader<byte>(record.Slice(startOffset));
         var readCount = reader.TryRead(out var countByte);
-        Debug.Assert(readCount && countByte == localCount, "ValidateLocalAppends verified localCount.");
+        Debug.Assert(readCount && countByte == messageCount, "ValidateMessages verified messageCount.");
 
         var detached = totalPayloadBytes == 0 ? [] : new byte[totalPayloadBytes];
         var detachedOffset = 0;
-        var builder = ImmutableArray.CreateBuilder<LocalAppendRecord>(localCount);
-        Span<byte> streamBuffer = stackalloc byte[LocalStreamName.MaxLength];
-        for (var i = 0; i < localCount; i++)
+        var builder = ImmutableArray.CreateBuilder<MessageRecord>(messageCount);
+        Span<byte> channelBuffer = stackalloc byte[MessageChannel.MaxLength];
+        for (var i = 0; i < messageCount; i++)
         {
-            _ = reader.TryRead(out var streamLength);
-            var streamSlice = streamBuffer[..streamLength];
-            _ = reader.TryCopyTo(streamSlice);
-            reader.Advance(streamLength);
-            var parsed = LocalStreamName.TryParse(streamSlice, out var streamName);
-            Debug.Assert(parsed && streamName is not null, "ValidateLocalAppends verified streamName.");
+            _ = reader.TryRead(out var channelLength);
+            var channelSlice = channelBuffer[..channelLength];
+            _ = reader.TryCopyTo(channelSlice);
+            reader.Advance(channelLength);
+            var parsed = MessageChannel.TryParse(channelSlice, out var channel);
+            Debug.Assert(parsed && channel is not null, "ValidateMessages verified channel.");
 
             var status = ReadVarint(ref reader, out var payloadLength);
-            Debug.Assert(status == Varint.Status.Valid && payloadLength <= LocalAppendRecord.MaxPayloadLength, "ValidateLocalAppends verified payloadLength.");
+            Debug.Assert(status == Varint.Status.Valid && payloadLength <= MessageRecord.MaxPayloadLength, "ValidateMessages verified payloadLength.");
             var len = (int)payloadLength;
             ReadOnlyMemory<byte> payloadMemory;
             if (len == 0)
@@ -409,10 +409,10 @@ public readonly struct JournalEntry
                 detachedOffset += len;
             }
 
-            builder.Add(new LocalAppendRecord(streamName, payloadMemory));
+            builder.Add(new MessageRecord(channel, payloadMemory));
         }
 
-        Debug.Assert(detachedOffset == totalPayloadBytes, "Every local-append payload byte was copied.");
+        Debug.Assert(detachedOffset == totalPayloadBytes, "Every message payload byte was copied.");
         return builder.MoveToImmutable();
     }
 

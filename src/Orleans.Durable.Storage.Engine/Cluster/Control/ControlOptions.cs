@@ -129,13 +129,6 @@ public sealed class ControlOptions
     /// </summary>
     public TimeSpan ManifestCommitInterval { get; set; } = TimeSpan.FromSeconds(1);
 
-    /// <summary>
-    /// Gets or sets the memory budget in bytes dedicated to closed-ledger local-stream drain folds
-    /// (<see cref="LocalStreamDrainCoordinator"/>), independent of archive <c>DrainMemoryBytes</c> (orleans.md §6).
-    /// Default: 32 MiB; minimum: 1 MiB.
-    /// </summary>
-    public long LocalDrainMemoryBytes { get; set; } = 32L << 20;
-
     /// <summary>Throws unless the options are in range.</summary>
     /// <exception cref="ArgumentException">An option is out of range.</exception>
     internal void Validate()
@@ -176,7 +169,6 @@ public sealed class ControlOptions
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(BalanceInterval, TimeSpan.Zero, nameof(BalanceInterval));
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(SweepInterval, TimeSpan.Zero, nameof(SweepInterval));
         ArgumentOutOfRangeException.ThrowIfLessThan(ManifestCommitInterval, TimeSpan.Zero, nameof(ManifestCommitInterval));
-        ArgumentOutOfRangeException.ThrowIfLessThan(LocalDrainMemoryBytes, 1L << 20, nameof(LocalDrainMemoryBytes));
         ArchiveLogRequestShare.CheckBudget(ArchiveLogRequestsPerSecond, nameof(ArchiveLogRequestsPerSecond));
     }
 

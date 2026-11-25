@@ -248,6 +248,16 @@ public sealed class LedgerSegmentView : IDisposable
     /// </summary>
     private InvalidDataException? Resolve(Slot slot, BatchRow row)
     {
+        if (row.Kind == RowKind.Message)
+        {
+            if (_filter is null)
+            {
+                _rows[row.Index] = new RowState(-1, 0);
+            }
+
+            return null;
+        }
+
         int entry;
         if (row.IsDefining)
         {
@@ -546,6 +556,24 @@ public sealed class LedgerSegmentView : IDisposable
             while (_rows.MoveNext())
             {
                 var row = _rows.Current;
+                if (row.Kind == RowKind.Message)
+                {
+                    if (view._filter is not null)
+                    {
+                        continue;
+                    }
+
+                    Current = new ResolvedRow(
+                        new Tag(view._ledger, view._last, row.Index),
+                        default,
+                        default,
+                        default,
+                        view._start,
+                        0,
+                        row);
+                    return true;
+                }
+
                 KeyEntry entry;
                 ReadOnlySpan<byte> key;
                 ulong count;
@@ -611,8 +639,12 @@ public readonly ref struct ResolvedRow
     /// <summary>Gets the row's tag: its ledger, its batch's slot, and its index in the batch.</summary>
     public Tag Tag { get; }
 
-    /// <summary>Gets the row's key, from its view's key table.</summary>
+    /// <summary>Gets the row's key, from its view's key table; empty for a <see cref="RowKind.Message"/> row.</summary>
     public ReadOnlySpan<byte> Key => _key;
+
+    /// <summary>Gets a <see cref="RowKind.Message"/> row's validated ASCII channel bytes.</summary>
+    /// <exception cref="InvalidOperationException">The row is not a <see cref="RowKind.Message"/> row.</exception>
+    public ReadOnlySpan<byte> Channel => _row.Channel;
 
     /// <summary>Gets the byte offset of the row's body from the start of its batch's buffer.</summary>
     public int BatchBodyOffset => _row.BatchBodyOffset;

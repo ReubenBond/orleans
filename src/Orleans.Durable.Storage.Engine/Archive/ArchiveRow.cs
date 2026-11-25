@@ -123,7 +123,7 @@ public readonly struct ArchiveRow : IDisposable
         RowKind.Replace => ArchiveCommand.Replace(BodyLength),
         RowKind.Delete when IsHeld && BodyLength > 0 => throw new InvalidOperationException("A held Delete carries no tombstone."),
         RowKind.Delete => ArchiveCommand.Delete(Body.ToArray()),
-        RowKind.LocalAppend => throw new UnreachableException("RowKind.LocalAppend is excluded from ArchiveRow (LG-I15)."),
+        RowKind.Message => throw new UnreachableException("RowKind.Message is excluded from ArchiveRow (LG-I15)."),
         _ => throw new UnreachableException("A row's kind is defined."),
     };
 

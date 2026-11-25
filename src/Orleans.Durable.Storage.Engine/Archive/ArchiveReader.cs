@@ -192,9 +192,9 @@ public sealed class ArchiveReader
     {
         foreach (var row in item.Rows)
         {
-            if (row.Kind == RowKind.LocalAppend)
+            if (row.Kind == RowKind.Message)
             {
-                // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                // LG-I15: message rows are excluded from ArchiveReader journal folds.
                 continue;
             }
 
@@ -1125,9 +1125,9 @@ public sealed class ArchiveReader
                         string.Create(CultureInfo.InvariantCulture, $"Row {defRow.Index} of the batch at slot {slot} would advance its key's count past the u64 maximum."));
                 }
 
-                if (defRow.Kind == RowKind.LocalAppend)
+                if (defRow.Kind == RowKind.Message)
                 {
-                    // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                    // LG-I15: message rows are excluded from ArchiveReader journal folds.
                     return ScanPass.Reached;
                 }
 
@@ -1405,9 +1405,9 @@ public sealed class ArchiveReader
                 }
 
                 state.Count++;
-                if (row.Kind == RowKind.LocalAppend)
+                if (row.Kind == RowKind.Message)
                 {
-                    // LG-I15: ledger-local append rows are excluded from ArchiveReader journal folds.
+                    // LG-I15: message rows are excluded from ArchiveReader journal folds.
                     continue;
                 }
 

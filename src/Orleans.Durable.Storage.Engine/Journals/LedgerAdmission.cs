@@ -116,10 +116,9 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     private readonly int _maxBatchBytes;
     private readonly long _maxQueuedBytes;
     private readonly long _maxProposalBytes;
-    private readonly int _maxSegmentKeys;
     private readonly JournalStoreOptions _options;
-    private readonly FrozenDictionary<LocalStreamName, ILocalStreamHandler> _localHandlers;
-    private readonly (LocalStreamName Stream, ILocalStreamSession Session)[] _localSessions;
+    private readonly FrozenDictionary<MessageChannel, IMessageHandler> _messageHandlers;
+    private readonly (MessageChannel Channel, IMessageSession Session)[] _messageSessions;
     private readonly TimeSpan _tombstoneRetention;
     private readonly TimeProvider _timeProvider;
     private readonly IArchiveStore _store;
@@ -168,7 +167,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     // before their proposals.
     private long _batchesTaken;
     private long _batchesEnded;
-    private int _localCallbacksPending;
+    private int _messageCallbacksPending;
     private int _sessionsDisposed;
     private bool _pumping;
     private bool _acceptingRoom;
@@ -202,9 +201,8 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     /// outcome completes with synchronous continuations, the admission has applied it and proposed what follows.
     /// Otherwise they run on the thread pool.
     /// </param>
-    /// <param name="localHandlers">Registered ledger-local stream handlers keyed by stream name.</param>
-    /// <param name="maxProposalBytes">The writers' proposal byte budget used for single-entry local-append pre-admission checks.</param>
-    /// <param name="maxSegmentKeys">The writers' maximum keys per segment used to bound rows per batch.</param>
+    /// <param name="messageHandlers">Registered message handlers keyed by channel.</param>
+    /// <param name="maxProposalBytes">The writers' proposal byte budget used for single-entry message pre-admission checks.</param>
     /// <exception cref="ArgumentException">
     /// The replica's payload limit holds no batch of one row with a key of <see cref="KeyRange.MaxKeyLength"/> bytes, a
     /// 32-byte version base and token, and the longest row body, a <see cref="JournalStoreOptions.MaxBodyBytes"/> payload
@@ -223,9 +221,8 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         ProposeBatch propose,
         Action abandon,
         bool runInline = false,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler>? localHandlers = null,
-        long maxProposalBytes = long.MaxValue,
-        int maxSegmentKeys = int.MaxValue)
+        FrozenDictionary<MessageChannel, IMessageHandler>? messageHandlers = null,
+        long maxProposalBytes = long.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(store);
@@ -235,15 +232,14 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(propose);
         ArgumentNullException.ThrowIfNull(abandon);
         ArgumentOutOfRangeException.ThrowIfLessThan(window, 1);
-        var handlers = localHandlers ?? [];
+        var handlers = messageHandlers ?? [];
         CheckOptions(options, maxBatchLength, handlers.Count > 0);
         _options = options.Clone();
-        _localHandlers = handlers;
+        _messageHandlers = handlers;
         _maxBatchEntries = _options.MaxBatchEntries;
         _maxBatchBytes = _options.MaxBatchBytes;
         _maxQueuedBytes = _options.MaxQueuedBytes;
         _maxProposalBytes = maxProposalBytes;
-        _maxSegmentKeys = maxSegmentKeys;
         _tombstoneRetention = _options.TombstoneRetention;
         _timeProvider = timeProvider;
         _store = store;
@@ -258,7 +254,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         _warmState = new JournalWarmState(_options.WarmStateBytes);
         _evictWarmEntry = EvictWarmEntry;
         _inline = runInline;
-        _localSessions = OpenLocalSessions(ledger, handlers);
+        _messageSessions = OpenMessageSessions(ledger, handlers);
         _proposals = Channel.CreateUnbounded<Proposal>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true, AllowSynchronousContinuations = runInline });
         _runPump = RunPump;
         _completions = CompleteProposalsAsync();
@@ -430,9 +426,8 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         LoadJournalState load,
         ProposeBatch? propose = null,
         bool runInline = false,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler>? localHandlers = null,
-        long maxProposalBytes = long.MaxValue,
-        int maxSegmentKeys = int.MaxValue)
+        FrozenDictionary<MessageChannel, IMessageHandler>? messageHandlers = null,
+        long maxProposalBytes = long.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(writer);
         return new LedgerAdmission(
@@ -448,26 +443,25 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             propose ?? writer.ProposeAsync,
             writer.Abandon,
             runInline,
-            localHandlers,
-            maxProposalBytes,
-            maxSegmentKeys);
+            messageHandlers,
+            maxProposalBytes);
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether <see cref="ILocalStreamSession.OnBatchDurable"/> fires before quorum
+    /// Gets or sets a value indicating whether <see cref="IMessageSession.OnBatchDurable"/> fires before quorum
     /// durability (<c>OnDurableBeforeQuorumMutant</c>, JS-I12 race mutant for tests).
     /// </summary>
     internal bool OnDurableBeforeQuorumMutant { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether callers complete <c>Accepted</c> before
-    /// <see cref="ILocalStreamSession.OnBatchDurable"/> runs (<c>CompleteCallerBeforeOnDurableMutant</c>, JS-I12 race mutant for tests).
+    /// <see cref="IMessageSession.OnBatchDurable"/> runs (<c>CompleteCallerBeforeOnDurableMutant</c>, JS-I12 race mutant for tests).
     /// </summary>
     internal bool CompleteCallerBeforeOnDurableMutant { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether <see cref="IDisposable.Dispose"/> on local sessions runs before the last
-    /// possible <see cref="ILocalStreamSession.OnBatchDurable"/> (<c>DisposeBeforeLastOnDurableMutant</c>, JS-I12 race mutant for tests).
+    /// Gets or sets a value indicating whether <see cref="IDisposable.Dispose"/> on message sessions runs before the last
+    /// possible <see cref="IMessageSession.OnBatchDurable"/> (<c>DisposeBeforeLastOnDurableMutant</c>, JS-I12 race mutant for tests).
     /// </summary>
     internal bool DisposeBeforeLastOnDurableMutant { get; set; }
 
@@ -480,22 +474,20 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         LedgerBatch.MaxHeaderLength(1) + LedgerBatch.MaxRowLength(KeyRange.MaxKeyLength, RowToken.MaxLength, Pending.TokenReservation, Math.Max(maxBodyBytes, JournalEntry.TombstoneLength));
 
     /// <summary>
-    /// Returns the longest single-entry batch including up to <see cref="JournalStoreOptions.MaxLocalAppendsPerWrite"/>
-    /// defining <see cref="RowKind.LocalAppend"/> rows when <paramref name="hasLocalStreams"/> is <see langword="true"/>.
+    /// Returns the longest single-entry batch including up to <see cref="JournalStoreOptions.MaxMessagesPerWrite"/>
+    /// unversioned <see cref="RowKind.Message"/> rows when <paramref name="hasMessageChannels"/> is <see langword="true"/>.
     /// </summary>
-    internal static long LongestBatch(JournalStoreOptions options, bool hasLocalStreams)
+    internal static long LongestBatch(JournalStoreOptions options, bool hasMessageChannels)
     {
-        if (!hasLocalStreams)
+        if (!hasMessageChannels)
         {
             return LongestBatch(options.MaxBodyBytes);
         }
 
-        // Each defining LocalAppend row has at most LedgerLocalKey.MaxEncodedLength key bytes, empty base/token, and
-        // payload-length varint of at most 3 bytes (MaxPayloadLength = 65_536).
-        var perLocalRowOverhead = LedgerBatch.MaxRowLength(LedgerLocalKey.MaxEncodedLength, 0, 0, LocalAppendRecord.MaxPayloadLength) - LocalAppendRecord.MaxPayloadLength;
-        var localRowsBytes = perLocalRowOverhead * options.MaxLocalAppendsPerWrite + options.MaxLocalAppendBytesPerWrite;
+        var perMessageOverhead = LedgerBatch.MaxMessageLength(MessageChannel.MaxLength, MessageRecord.MaxPayloadLength) - MessageRecord.MaxPayloadLength;
+        var messageRowsBytes = perMessageOverhead * options.MaxMessagesPerWrite + options.MaxMessageBytesPerWrite;
         var journalRowBytes = LedgerBatch.MaxRowLength(KeyRange.MaxKeyLength, RowToken.MaxLength, Pending.TokenReservation, Math.Max(options.MaxBodyBytes, JournalEntry.TombstoneLength));
-        return LedgerBatch.MaxHeaderLength(1 + options.MaxLocalAppendsPerWrite) + journalRowBytes + localRowsBytes;
+        return LedgerBatch.MaxHeaderLength(1 + options.MaxMessagesPerWrite) + journalRowBytes + messageRowsBytes;
     }
 
     /// <summary>
@@ -503,12 +495,12 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     /// longest row's batch (<see cref="LongestBatch(JournalStoreOptions, bool)"/>), which a row past <c>MaxBatchBytes</c>
     /// takes alone, and a batch of <c>MaxBatchEntries</c> entries within <c>MaxBatchBytes</c> of rows.
     /// </summary>
-    internal static long LargestBatch(JournalStoreOptions options, bool hasLocalStreams = false)
+    internal static long LargestBatch(JournalStoreOptions options, bool hasMessageChannels = false)
     {
-        var maxRows = hasLocalStreams
-            ? (int)Math.Min(int.MaxValue, options.MaxBatchEntries * (1L + options.MaxLocalAppendsPerWrite))
+        var maxRows = hasMessageChannels
+            ? (int)Math.Min(int.MaxValue, options.MaxBatchEntries * (1L + options.MaxMessagesPerWrite))
             : options.MaxBatchEntries;
-        return Math.Max(LongestBatch(options, hasLocalStreams), LedgerBatch.MaxHeaderLength(maxRows) + options.MaxBatchBytes);
+        return Math.Max(LongestBatch(options, hasMessageChannels), LedgerBatch.MaxHeaderLength(maxRows) + options.MaxBatchBytes);
     }
 
     /// <summary>Checks that each of <paramref name="options"/>' settings is within its range (journals.md §8.8).</summary>
@@ -526,10 +518,10 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">A setting is out of its range.</exception>
     /// <exception cref="ArgumentException">The payload limit holds no batch of one longest entry, named as <c>maxBatchLength</c>.</exception>
-    internal static void CheckOptions(JournalStoreOptions options, int maxBatchLength, bool hasLocalStreams = false)
+    internal static void CheckOptions(JournalStoreOptions options, int maxBatchLength, bool hasMessageChannels = false)
     {
         CheckRanges(options);
-        var longestBatch = LongestBatch(options, hasLocalStreams);
+        var longestBatch = LongestBatch(options, hasMessageChannels);
         if (maxBatchLength < longestBatch)
         {
             throw new ArgumentException(
@@ -546,26 +538,26 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     /// </summary>
     /// <exception cref="ArgumentException">A precondition fails, named as <c>record</c>.</exception>
     internal static void CheckRecord(JournalEntryRecord record, IArchiveStore store, int maxBodyBytes) =>
-        CheckRecord(record, store, maxBodyBytes, maxLocalAppendsPerWrite: 0, maxLocalAppendBytesPerWrite: 0, []);
+        CheckRecord(record, store, maxBodyBytes, maxMessagesPerWrite: 0, maxMessageBytesPerWrite: 0, []);
 
     /// <summary>
     /// Checks the preconditions of journals.md §2.2 and §8.1 step 1, including all attached
-    /// <see cref="LocalAppendRecord"/> items against <paramref name="options"/> and <paramref name="localHandlers"/>.
+    /// <see cref="MessageRecord"/> items against <paramref name="options"/> and <paramref name="messageHandlers"/>.
     /// </summary>
     internal static void CheckRecord(
         JournalEntryRecord record,
         IArchiveStore store,
         JournalStoreOptions options,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler> localHandlers) =>
-        CheckRecord(record, store, options.MaxBodyBytes, options.MaxLocalAppendsPerWrite, options.MaxLocalAppendBytesPerWrite, localHandlers);
+        FrozenDictionary<MessageChannel, IMessageHandler> messageHandlers) =>
+        CheckRecord(record, store, options.MaxBodyBytes, options.MaxMessagesPerWrite, options.MaxMessageBytesPerWrite, messageHandlers);
 
     private static void CheckRecord(
         JournalEntryRecord record,
         IArchiveStore store,
         int maxBodyBytes,
-        int maxLocalAppendsPerWrite,
-        int maxLocalAppendBytesPerWrite,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler> localHandlers)
+        int maxMessagesPerWrite,
+        int maxMessageBytesPerWrite,
+        FrozenDictionary<MessageChannel, IMessageHandler> messageHandlers)
     {
         if (record.Key is null)
         {
@@ -579,69 +571,69 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
         CheckKey(record.Key, store, nameof(record));
         CheckPayloadLength(record.Entry.PayloadLength, maxBodyBytes, nameof(record));
-        if (record.Entry.HasLocalAppends)
+        if (record.Entry.HasMessages)
         {
-            CheckLocalAppends(record.Entry.LocalAppends.AsSpan(), maxLocalAppendsPerWrite, maxLocalAppendBytesPerWrite, localHandlers, nameof(record));
+            CheckMessages(record.Entry.Messages.AsSpan(), maxMessagesPerWrite, maxMessageBytesPerWrite, messageHandlers, nameof(record));
         }
     }
 
-    /// <summary>Validates attached <see cref="LocalAppendRecord"/> items before admission (journals.md §8.1 step 1).</summary>
-    internal static void CheckLocalAppends(
-        ReadOnlySpan<LocalAppendRecord> localAppends,
-        int maxLocalAppendsPerWrite,
-        int maxLocalAppendBytesPerWrite,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler> localHandlers,
+    /// <summary>Validates attached <see cref="MessageRecord"/> items before admission (journals.md §8.1 step 1).</summary>
+    internal static void CheckMessages(
+        ReadOnlySpan<MessageRecord> messages,
+        int maxMessagesPerWrite,
+        int maxMessageBytesPerWrite,
+        FrozenDictionary<MessageChannel, IMessageHandler> messageHandlers,
         string parameterName)
     {
-        if (localAppends.IsEmpty)
+        if (messages.IsEmpty)
         {
             return;
         }
 
-        if (localAppends.Length > maxLocalAppendsPerWrite)
+        if (messages.Length > maxMessagesPerWrite)
         {
             throw new ArgumentException(
-                string.Create(CultureInfo.InvariantCulture, $"The entry attaches {localAppends.Length} local appends, exceeding MaxLocalAppendsPerWrite ({maxLocalAppendsPerWrite})."),
+                string.Create(CultureInfo.InvariantCulture, $"The entry attaches {messages.Length} messages, exceeding MaxMessagesPerWrite ({maxMessagesPerWrite})."),
                 parameterName);
         }
 
         long totalBytes = 0;
-        for (var i = 0; i < localAppends.Length; i++)
+        for (var i = 0; i < messages.Length; i++)
         {
-            ref readonly var item = ref localAppends[i];
-            if (item.Stream is null)
+            ref readonly var item = ref messages[i];
+            if (item.Channel is null)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} has a null stream."),
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} has a null channel."),
                     parameterName);
             }
 
-            if (!localHandlers.TryGetValue(item.Stream, out var handler))
+            if (!messageHandlers.TryGetValue(item.Channel, out var handler))
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Local stream '{item.Stream}' is not registered on this JournalStore."),
+                    string.Create(CultureInfo.InvariantCulture, $"Message channel '{item.Channel}' is not registered on this JournalStore."),
                     parameterName);
             }
 
-            if (item.Payload.Length > LocalAppendRecord.MaxPayloadLength)
+            if (item.Payload.Length > MessageRecord.MaxPayloadLength)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} payload of {item.Payload.Length} bytes exceeds {LocalAppendRecord.MaxPayloadLength}."),
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} payload of {item.Payload.Length} bytes exceeds {MessageRecord.MaxPayloadLength}."),
                     parameterName);
             }
 
             totalBytes += item.Payload.Length;
-            if (totalBytes > maxLocalAppendBytesPerWrite)
+            if (totalBytes > maxMessageBytesPerWrite)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Combined local-append payload size {totalBytes} bytes exceeds MaxLocalAppendBytesPerWrite ({maxLocalAppendBytesPerWrite})."),
+                    string.Create(CultureInfo.InvariantCulture, $"Combined message payload size {totalBytes} bytes exceeds MaxMessageBytesPerWrite ({maxMessageBytesPerWrite})."),
                     parameterName);
             }
 
             if (handler.Validate(item.Payload.Span) is { } rejection)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"Local append {i} for stream '{item.Stream}' failed validation: {rejection.Message}"),
+                    string.Create(CultureInfo.InvariantCulture, $"Message {i} for channel '{item.Channel}' failed validation: {rejection.Message}"),
                     parameterName,
                     rejection);
             }
@@ -696,7 +688,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     /// </exception>
     public Task<JournalWriteOutcome> AdmitAsync(JournalEntryRecord record, CancellationToken cancellationToken = default)
     {
-        CheckRecord(record, _store, _options, _localHandlers);
+        CheckRecord(record, _store, _options, _messageHandlers);
         return Submit(record, cancellationToken, out _);
     }
 
@@ -1294,17 +1286,17 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
         Debug.Assert(entry.Kind != JournalEntryKind.Append || entry.PayloadLength > 0, "No record holds an empty Append (journals.md §7).");
 
-        // Pre-admission size guard for entries with attached local appends (journals.md §8.1 step 1).
+        // Pre-admission size guard for entries with attached messages (journals.md §8.1 step 1).
         var rowLength = ComputeEntryRowLength(record);
-        if (entry.HasLocalAppends)
+        if (entry.HasMessages)
         {
-            var rowCount = 1 + entry.LocalAppends.Length;
+            var rowCount = 1 + entry.Messages.Length;
             var minLimit = Math.Min(_maxBatchLength, Math.Min(_maxQueuedBytes, _maxProposalBytes));
             var singleBatchSize = LedgerBatch.MaxHeaderLength(rowCount) + rowLength;
-            if (rowCount > _maxSegmentKeys || singleBatchSize > minLimit)
+            if (singleBatchSize > minLimit)
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"The entry and its {entry.LocalAppends.Length} local appends require {rowCount} rows and {singleBatchSize} bytes, exceeding the admission limit ({minLimit} bytes, {_maxSegmentKeys} segment keys)."),
+                    string.Create(CultureInfo.InvariantCulture, $"The entry and its {entry.Messages.Length} messages require {rowCount} rows and {singleBatchSize} bytes, exceeding the admission limit ({minLimit} bytes)."),
                     nameof(record));
             }
         }
@@ -1346,18 +1338,17 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         return outcome;
     }
 
-    private long ComputeEntryRowLength(JournalEntryRecord record)
+    private static long ComputeEntryRowLength(JournalEntryRecord record)
     {
         var entry = record.Entry;
         var total = LedgerBatch.MaxRowLength(record.Key.Length, entry.ExpectedVersion.Base.Length, Pending.TokenReservation, entry.RowBodyLength);
-        if (entry.HasLocalAppends)
+        if (entry.HasMessages)
         {
-            var localAppends = entry.LocalAppends;
-            for (var i = 0; i < localAppends.Length; i++)
+            var messages = entry.Messages;
+            for (var i = 0; i < messages.Length; i++)
             {
-                var item = localAppends[i];
-                var keyLength = LedgerLocalKey.EncodedLength(_range, item.Stream);
-                total += LedgerBatch.MaxRowLength(keyLength, 0, 0, item.Payload.Length);
+                var item = messages[i];
+                total += LedgerBatch.MessageLength(item.Channel, item.Payload.Length);
             }
         }
 
@@ -1373,7 +1364,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         out bool mayMove)
     {
         Debug.Assert(_lock.IsHeldByCurrentThread, "SubmitLocked requires the admission lock.");
-        Debug.Assert(LedgerBatch.MaxHeaderLength(1 + record.Entry.LocalAppends.Length) + rowLength <= _maxBatchLength, "The row of any key and body admission takes fits a batch, which the constructor and pre-admission check verified.");
+        Debug.Assert(LedgerBatch.MaxHeaderLength(1 + record.Entry.Messages.Length) + rowLength <= _maxBatchLength, "The row of any key and body admission takes fits a batch, which the constructor and pre-admission check verified.");
         pending = new Pending(record, rowLength, ownsPayload: false);
         if (_failure is { } failure)
         {
@@ -2001,13 +1992,13 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             var offTheFold = ChainMutation == ChainMutant.VersionOffTheFold;
             for (var index = 0; index < entries.Count; index++)
             {
-                entries[index].WriteTo(batch, _ledger, _range, offTheFold);
+                entries[index].WriteTo(batch, offTheFold);
             }
 
-            if (OnDurableBeforeQuorumMutant && entries.HasLocalAppends && proposedSlot is { } slot)
+            if (OnDurableBeforeQuorumMutant && entries.HasMessages && proposedSlot is { } slot)
             {
                 // JS-I12 race mutant: fires OnBatchDurable before quorum durability.
-                InvokeLocalSessions(entries, slot);
+                InvokeMessageSessions(entries, slot);
             }
 
             outcome = _propose(batch, CancellationToken.None);
@@ -2029,7 +2020,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             entries.ReleasePayloads();
         }
 
-        if (outcome.IsCompletedSuccessfully && !entries.HasLocalAppends)
+        if (outcome.IsCompletedSuccessfully && !entries.HasMessages)
         {
             var completed = await outcome.ConfigureAwait(false);
             var after = default(After);
@@ -2037,7 +2028,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             var stopPumping = false;
             lock (_lock)
             {
-                if (_batchesEnded == batchNumber - 1 && _localCallbacksPending == 0)
+                if (_batchesEnded == batchNumber - 1 && _messageCallbacksPending == 0)
                 {
                     fastApplied = true;
                     ApplyOutcomeLocked(entries, completed, ref after);
@@ -2085,11 +2076,11 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
     private ProposeResult EnqueueProposal(PendingBatch entries, ValueTask<ProposalOutcome> outcome, bool singleBatchInline)
     {
-        if (entries.HasLocalAppends)
+        if (entries.HasMessages)
         {
             lock (_lock)
             {
-                _localCallbacksPending++;
+                _messageCallbacksPending++;
             }
         }
 
@@ -2222,13 +2213,12 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         var rowsBytes = 0L;
         var count = 0;
         var totalRows = 0;
-        var hasLocalAppends = false;
+        var hasMessages = false;
         foreach (var pending in _unbatched)
         {
             var nextRows = totalRows + pending.RowCount;
             if (count == _maxBatchEntries
-                || count > 0 && (nextRows > _maxSegmentKeys
-                    || rowsBytes + pending.RowLength > _maxBatchBytes
+                || count > 0 && (rowsBytes + pending.RowLength > _maxBatchBytes
                     || LedgerBatch.MaxHeaderLength(nextRows) + rowsBytes + pending.RowLength > _maxBatchLength))
             {
                 break;
@@ -2236,7 +2226,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
             rowsBytes += pending.RowLength;
             totalRows = nextRows;
-            hasLocalAppends |= pending.HasLocalAppends;
+            hasMessages |= pending.HasMessages;
             count++;
         }
 
@@ -2256,7 +2246,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             entries[index] = item;
         }
 
-        return (new PendingBatch(entries, totalRows, hasLocalAppends), (int)length);
+        return (new PendingBatch(entries, totalRows, hasMessages), (int)length);
     }
 
     /// <summary>Answers each proposal's entries in proposal order, which is slot order, as the ledger decides it.</summary>
@@ -2285,20 +2275,20 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
                 var isDurable = fault is null && outcome.Value is ProposalOutcome.Durable;
                 var durableSlot = isDurable ? ((ProposalOutcome.Durable)outcome.Value).Slot : Slot.Zero;
-                var hasLocalAppends = proposal.Entries.HasLocalAppends;
-                var invokeAfterApply = isDurable && hasLocalAppends && CompleteCallerBeforeOnDurableMutant && !OnDurableBeforeQuorumMutant;
+                var hasMessages = proposal.Entries.HasMessages;
+                var invokeAfterApply = isDurable && hasMessages && CompleteCallerBeforeOnDurableMutant && !OnDurableBeforeQuorumMutant;
 
-                // JS-I12: invoke ILocalStreamSession.OnBatchDurable strictly in slot order outside _lock AFTER
+                // JS-I12: invoke IMessageSession.OnBatchDurable strictly in slot order outside _lock AFTER
                 // ProposalOutcome.Durable, BEFORE warm-state Apply and BEFORE callers receive Accepted.
-                if (isDurable && hasLocalAppends && !invokeAfterApply && !OnDurableBeforeQuorumMutant)
+                if (isDurable && hasMessages && !invokeAfterApply && !OnDurableBeforeQuorumMutant)
                 {
                     try
                     {
-                        InvokeLocalSessions(proposal.Entries, durableSlot);
+                        InvokeMessageSessions(proposal.Entries, durableSlot);
                     }
                     catch (Exception sessionFault) when (sessionFault is not OutOfMemoryException)
                     {
-                        FatalErrorHandler.StopOnDefect("JournalsLocalStreamSession", sessionFault);
+                        FatalErrorHandler.StopOnDefect("JournalsMessageSession", sessionFault);
                         fault = sessionFault;
                         sessionDefect = true;
                         isDurable = false;
@@ -2308,10 +2298,10 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 var after = default(After);
                 lock (_lock)
                 {
-                    if (hasLocalAppends)
+                    if (hasMessages)
                     {
-                        _localCallbacksPending--;
-                        Debug.Assert(_localCallbacksPending >= 0, "Pending local callback count never goes negative.");
+                        _messageCallbacksPending--;
+                        Debug.Assert(_messageCallbacksPending >= 0, "Pending message callback count never goes negative.");
                     }
 
                     if (fault is not null)
@@ -2338,10 +2328,10 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 if (invokeAfterApply)
                 {
                     // JS-I12 race mutant: invokes OnBatchDurable after callers received Accepted.
-                    InvokeLocalSessions(proposal.Entries, durableSlot);
+                    InvokeMessageSessions(proposal.Entries, durableSlot);
                 }
 
-                if (isDurable && hasLocalAppends && DisposeBeforeLastOnDurableMutant)
+                if (isDurable && hasMessages && DisposeBeforeLastOnDurableMutant)
                 {
                     // JS-I12 race mutant: disposes sessions prematurely before subsequent batches finish.
                     DisposeSessionsOnce();
@@ -2370,33 +2360,33 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         }
     }
 
-    private static (LocalStreamName Stream, ILocalStreamSession Session)[] OpenLocalSessions(
+    private static (MessageChannel Channel, IMessageSession Session)[] OpenMessageSessions(
         LedgerId ledger,
-        FrozenDictionary<LocalStreamName, ILocalStreamHandler> handlers)
+        FrozenDictionary<MessageChannel, IMessageHandler> handlers)
     {
         if (handlers.Count == 0)
         {
             return [];
         }
 
-        var sorted = new LocalStreamName[handlers.Count];
+        var sorted = new MessageChannel[handlers.Count];
         var i = 0;
-        foreach (var stream in handlers.Keys)
+        foreach (var channel in handlers.Keys)
         {
-            sorted[i++] = stream;
+            sorted[i++] = channel;
         }
 
         Array.Sort(sorted);
-        var sessions = new (LocalStreamName Stream, ILocalStreamSession Session)[sorted.Length];
+        var sessions = new (MessageChannel Channel, IMessageSession Session)[sorted.Length];
         var opened = 0;
         try
         {
             for (var index = 0; index < sorted.Length; index++)
             {
-                var stream = sorted[index];
-                var session = handlers[stream].OpenLedger(ledger);
+                var channel = sorted[index];
+                var session = handlers[channel].OpenLedger(ledger);
                 ArgumentNullException.ThrowIfNull(session);
-                sessions[index] = (stream, session);
+                sessions[index] = (channel, session);
                 opened++;
             }
 
@@ -2413,24 +2403,24 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         }
     }
 
-    private void InvokeLocalSessions(PendingBatch entries, Slot slot)
+    private void InvokeMessageSessions(PendingBatch entries, Slot slot)
     {
         Debug.Assert(
             DisposeBeforeLastOnDurableMutant || Volatile.Read(ref _sessionsDisposed) == 0,
-            "ILocalStreamSession.OnBatchDurable never runs after Dispose (JS-I12).");
-        if (_localSessions.Length == 0)
+            "IMessageSession.OnBatchDurable never runs after Dispose (JS-I12).");
+        if (_messageSessions.Length == 0)
         {
             return;
         }
 
-        if (_localSessions.Length == 1)
+        if (_messageSessions.Length == 1)
         {
             if (entries.Count == 1)
             {
-                var singleAppends = entries[0].Entry.LocalAppends;
-                if (!singleAppends.IsEmpty)
+                var singleMessages = entries[0].Entry.Messages;
+                if (!singleMessages.IsEmpty)
                 {
-                    _localSessions[0].Session.OnBatchDurable(slot, singleAppends.AsSpan());
+                    _messageSessions[0].Session.OnBatchDurable(slot, singleMessages.AsSpan());
                 }
 
                 return;
@@ -2439,7 +2429,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             var total = 0;
             for (var index = 0; index < entries.Count; index++)
             {
-                total += entries[index].Entry.LocalAppends.Length;
+                total += entries[index].Entry.Messages.Length;
             }
 
             if (total == 0)
@@ -2447,31 +2437,31 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 return;
             }
 
-            var records = new LocalAppendRecord[total];
+            var records = new MessageRecord[total];
             var cursor = 0;
             for (var index = 0; index < entries.Count; index++)
             {
-                var appends = entries[index].Entry.LocalAppends;
-                for (var j = 0; j < appends.Length; j++)
+                var messages = entries[index].Entry.Messages;
+                for (var j = 0; j < messages.Length; j++)
                 {
-                    records[cursor++] = appends[j];
+                    records[cursor++] = messages[j];
                 }
             }
 
-            _localSessions[0].Session.OnBatchDurable(slot, records);
+            _messageSessions[0].Session.OnBatchDurable(slot, records);
             return;
         }
 
-        for (var s = 0; s < _localSessions.Length; s++)
+        for (var s = 0; s < _messageSessions.Length; s++)
         {
-            var (stream, session) = _localSessions[s];
+            var (channel, session) = _messageSessions[s];
             var count = 0;
             for (var index = 0; index < entries.Count; index++)
             {
-                var appends = entries[index].Entry.LocalAppends;
-                for (var j = 0; j < appends.Length; j++)
+                var messages = entries[index].Entry.Messages;
+                for (var j = 0; j < messages.Length; j++)
                 {
-                    if (appends[j].Stream.Equals(stream))
+                    if (messages[j].Channel.Equals(channel))
                     {
                         count++;
                     }
@@ -2483,16 +2473,16 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 continue;
             }
 
-            var records = new LocalAppendRecord[count];
+            var records = new MessageRecord[count];
             var cursor = 0;
             for (var index = 0; index < entries.Count; index++)
             {
-                var appends = entries[index].Entry.LocalAppends;
-                for (var j = 0; j < appends.Length; j++)
+                var messages = entries[index].Entry.Messages;
+                for (var j = 0; j < messages.Length; j++)
                 {
-                    if (appends[j].Stream.Equals(stream))
+                    if (messages[j].Channel.Equals(channel))
                     {
-                        records[cursor++] = appends[j];
+                        records[cursor++] = messages[j];
                     }
                 }
             }
@@ -2508,9 +2498,9 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             return;
         }
 
-        for (var index = 0; index < _localSessions.Length; index++)
+        for (var index = 0; index < _messageSessions.Length; index++)
         {
-            _localSessions[index].Session.Dispose();
+            _messageSessions[index].Session.Dispose();
         }
     }
 
@@ -3153,21 +3143,21 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         {
             _single = single;
             TotalRows = single.RowCount;
-            HasLocalAppends = single.HasLocalAppends;
+            HasMessages = single.HasMessages;
         }
 
-        public PendingBatch(Pending[] many, int totalRows, bool hasLocalAppends)
+        public PendingBatch(Pending[] many, int totalRows, bool hasMessages)
         {
             _many = many;
             TotalRows = totalRows;
-            HasLocalAppends = hasLocalAppends;
+            HasMessages = hasMessages;
         }
 
         public int Count => _many is not null ? _many.Length : _single is not null ? 1 : 0;
 
         public int TotalRows { get; }
 
-        public bool HasLocalAppends { get; }
+        public bool HasMessages { get; }
 
         public Pending this[int index] => _many is not null ? _many[index] : _single!;
 
@@ -3409,9 +3399,9 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
         public int RowLength { get; } = rowLength;
 
-        public int RowCount => 1 + _record.Entry.LocalAppends.Length;
+        public int RowCount => 1 + _record.Entry.Messages.Length;
 
-        public bool HasLocalAppends => _record.Entry.HasLocalAppends;
+        public bool HasMessages => _record.Entry.HasMessages;
 
         public KeyAdmission? Key { get; set; }
 
@@ -3462,7 +3452,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         /// entry. <paramref name="versionOffTheFold"/> is the chain mutant which stores a defining row's version before it
         /// one count past the fold's.
         /// </summary>
-        public void WriteTo(LedgerBatch batch, LedgerId ledger, KeyRange range, bool versionOffTheFold = false)
+        public void WriteTo(LedgerBatch batch, bool versionOffTheFold = false)
         {
             var entry = _record.Entry;
             Debug.Assert(
@@ -3481,22 +3471,13 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 batch.WriteBody(span);
             }
 
-            if (entry.HasLocalAppends)
+            if (entry.HasMessages)
             {
-                Span<byte> localKeyBuffer = stackalloc byte[LedgerLocalKey.MaxEncodedLength];
-                var localAppends = entry.LocalAppends;
-                for (var i = 0; i < localAppends.Length; i++)
+                var messages = entry.Messages;
+                for (var i = 0; i < messages.Length; i++)
                 {
-                    var item = localAppends[i];
-                    var keyLength = LedgerLocalKey.Write(ledger, range, item.Stream, localKeyBuffer);
-                    var localKey = localKeyBuffer[..keyLength];
-                    _ = batch.BeginRow(
-                        localKey,
-                        RowKind.LocalAppend,
-                        batch.HeldVersion(localKey),
-                        default,
-                        item.Payload.Length,
-                        item.Payload.Span);
+                    var item = messages[i];
+                    batch.BeginMessage(item.Channel, item.Payload.Length, item.Payload.Span);
                 }
             }
 

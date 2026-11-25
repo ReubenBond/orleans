@@ -97,7 +97,6 @@ internal sealed partial class ClusterController
     private readonly HashSet<NodeId> _retirements = [];
     private readonly HashSet<NodeId> _retiring = [];
     private NodeView _nodes = NodeView.Empty;
-    private readonly bool _hasLocalStreams;
     private (ulong Manifest, ulong Map, NodeView Nodes)? _assignedFor;
     private bool _compactionsChanged = true;
     private DateTimeOffset _nextCompactionExpiry = DateTimeOffset.MaxValue;
@@ -124,7 +123,6 @@ internal sealed partial class ClusterController
     /// <param name="logger">Logs defects, corruption, and the transitions sent.</param>
     /// <param name="objectLedgerLayout">The cluster's object-ledger store layout when already known, or <see langword="null"/>
     /// until the host's object-ledger gate passes and calls <see cref="AdoptObjectLedgers"/> (orleans.md §5.14).</param>
-    /// <param name="hasLocalStreams">Whether ledger-local append streams are registered, capping range splits at <see cref="LedgerLocalKey.MaxRangeDepth"/>.</param>
     public ClusterController(
         ControlOptions options,
         LedgerMapView map,
@@ -132,8 +130,7 @@ internal sealed partial class ClusterController
         ClusterArchive? archive,
         TimeProvider timeProvider,
         ILogger logger,
-        ObjectLedgerLayout? objectLedgerLayout = null,
-        bool hasLocalStreams = false)
+        ObjectLedgerLayout? objectLedgerLayout = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(map);
@@ -146,7 +143,6 @@ internal sealed partial class ClusterController
         _mapCommitter = mapCommitter;
         _time = timeProvider;
         _logger = logger;
-        _hasLocalStreams = hasLocalStreams;
         _quorumRangeCapacity = mapCommitter.RangeCapacity(options.Replicas);
         _objectStoreRangeCapacity = mapCommitter.RangeCapacity(0);
         if (archive is { } adopted)
@@ -1752,8 +1748,7 @@ internal sealed partial class ClusterController
 
             var hot = state.Load(ledger.Id) > _options.SplitBytesPerSecond;
             var needsObjectLedgers = state.HasOverlappingObjectStoreLedger(ledger.Range);
-            var maxSplitDepth = _hasLocalStreams ? LedgerLocalKey.MaxRangeDepth : KeyRange.MaxDepth;
-            if ((open < target || hot) && ledger.Range.Depth < maxSplitDepth && IsEligible(ledger)
+            if ((open < target || hot) && ledger.Range.Depth < KeyRange.MaxDepth && IsEligible(ledger)
                 && !IsReleasedByPrimary(ledger)
                 && CanExecuteFor(state, ledger.Primary.Node, TargetIsObjectStore, needsObjectLedgers)
                 && Send(state, sent, prepares, Shape.Split(ledger), TransitionPurpose.Split, ledger.Primary.Node, ledger, TargetIsObjectStore, ref room, reserve))

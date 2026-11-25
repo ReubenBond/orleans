@@ -716,48 +716,20 @@ namespace Orleans.Durable.Storage.Engine.Archive.Control
         public Ledgers.LedgerSegmentId Segment { get { throw null; } }
     }
 
-    public partial interface ILedgerLocalDrainBarrier
+    public partial interface IMessageFold : System.IDisposable
     {
-        System.Threading.Tasks.ValueTask<LocalDrainBarrierOutcome> EnsureLocalStreamsDrainedAsync(Ledgers.LedgerMetadata ledger, Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken);
-        void ValidateLocalAppendKey(Ledgers.LedgerMetadata ledger, System.ReadOnlySpan<byte> rowKey);
+        long MemoryBytes { get; }
+
+        void Add(Ledgers.Slot slot, int rowIndex, System.Buffers.ReadOnlySequence<byte> payload);
+        void Clear();
+        System.Threading.Tasks.Task CommitAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 
-    [System.Runtime.CompilerServices.Union]
-    public readonly partial struct LocalDrainBarrierOutcome : System.Runtime.CompilerServices.IUnion
+    public partial interface IMessageProcessor
     {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalDrainBarrierOutcome(Backpressure value) { }
+        Ledgers.MessageChannel Channel { get; }
 
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalDrainBarrierOutcome(Drained value) { }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalDrainBarrierOutcome(Dropped value) { }
-
-        public object? Value { get { throw null; } }
-
-        public sealed partial record Backpressure
-        {
-            internal Backpressure() { }
-
-            public static Backpressure Instance { get { throw null; } }
-        }
-
-        public sealed partial record Drained
-        {
-            internal Drained() { }
-
-            public static Drained Instance { get { throw null; } }
-        }
-
-        public sealed partial record Dropped
-        {
-            internal Dropped() { }
-
-            public static Dropped Instance { get { throw null; } }
-        }
+        IMessageFold BeginSegmentFold(Ledgers.LedgerMetadata ledger, Ledgers.LedgerSegmentId segment);
     }
 }
 
@@ -1485,7 +1457,7 @@ namespace Orleans.Durable.Storage.Engine.Archive.Logs.Control
 
     public sealed partial class ArchiveLogDrainWorker
     {
-        public ArchiveLogDrainWorker(ArchiveLogGate gate, Ledgers.LedgerMapView map, Ledgers.LedgerReader reader, ArchiveLogOptions options, System.TimeProvider timeProvider, ArchiveLogWriterOptions? writerOptions = null, Archive.Control.ILedgerLocalDrainBarrier? localDrainBarrier = null) { }
+        public ArchiveLogDrainWorker(ArchiveLogGate gate, Ledgers.LedgerMapView map, Ledgers.LedgerReader reader, ArchiveLogOptions options, System.TimeProvider timeProvider, ArchiveLogWriterOptions? writerOptions = null, System.Collections.Generic.IEnumerable<Archive.Control.IMessageProcessor>? messageProcessors = null) { }
 
         public System.Action<Ledgers.LedgerSegmentKeys>? OnSegmentScanned { get { throw null; } init { } }
 
@@ -1889,7 +1861,7 @@ namespace Orleans.Durable.Storage.Engine.Archive.Lsm.Control
 
     public sealed partial class DrainWorker
     {
-        public DrainWorker(ObjectStore.IObjectStore store, ManifestView manifest, Ledgers.LedgerReader reader, ArchiveOptions options, System.TimeProvider timeProvider, BlockCache? blocks = null, Archive.Control.ILedgerLocalDrainBarrier? localDrainBarrier = null) { }
+        public DrainWorker(ObjectStore.IObjectStore store, ManifestView manifest, Ledgers.LedgerReader reader, ArchiveOptions options, System.TimeProvider timeProvider, BlockCache? blocks = null, System.Collections.Generic.IEnumerable<Archive.Control.IMessageProcessor>? messageProcessors = null) { }
 
         public long SegmentsDrainedAlone { get { throw null; } }
 
@@ -2408,8 +2380,6 @@ namespace Orleans.Durable.Storage.Engine.Cluster.Control
 
         public System.TimeSpan LoadWindow { get { throw null; } set { } }
 
-        public long LocalDrainMemoryBytes { get { throw null; } set { } }
-
         public System.TimeSpan ManifestCommitInterval { get { throw null; } set { } }
 
         public System.TimeSpan MapRefreshInterval { get { throw null; } set { } }
@@ -2443,80 +2413,10 @@ namespace Orleans.Durable.Storage.Engine.Cluster.Control
         public System.TimeSpan TransitionTimeout { get { throw null; } set { } }
     }
 
-    public partial interface ILocalKeyPresenceLookup
-    {
-        System.Threading.Tasks.ValueTask<LocalKeyPresenceRead> TryHasKeyEntryAsync(Ledgers.LedgerMetadata ledger, System.ReadOnlyMemory<byte> localKey, Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken);
-    }
-
-    public partial interface ILocalStreamFold : System.IDisposable
-    {
-        long MemoryBytes { get; }
-
-        void Add(Ledgers.Slot slot, int rowIndex, System.Buffers.ReadOnlySequence<byte> payload);
-        void Clear();
-        System.Threading.Tasks.Task CommitAsync(System.Threading.CancellationToken cancellationToken);
-    }
-
-    public partial interface ILocalStreamProcessor
-    {
-        Ledgers.LocalStreamName Stream { get; }
-
-        ILocalStreamFold BeginClosedLedgerFold(Ledgers.LedgerMetadata ledger, Ledgers.Slot tail);
-    }
-
     public enum LedgerPlacement
     {
         Nodes = 0,
         ObjectStore = 1
-    }
-
-    [System.Runtime.CompilerServices.Union]
-    public readonly partial struct LocalKeyPresenceRead : System.Runtime.CompilerServices.IUnion
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalKeyPresenceRead(Absent value) { }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalKeyPresenceRead(Present value) { }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public LocalKeyPresenceRead(Unindexed value) { }
-
-        public object? Value { get { throw null; } }
-
-        public sealed partial record Absent
-        {
-            internal Absent() { }
-
-            public static Absent Instance { get { throw null; } }
-        }
-
-        public sealed partial record Present
-        {
-            internal Present() { }
-
-            public static Present Instance { get { throw null; } }
-        }
-
-        public sealed partial record Unindexed
-        {
-            internal Unindexed() { }
-
-            public static Unindexed Instance { get { throw null; } }
-        }
-    }
-
-    public sealed partial class LocalStreamDrainCoordinator : Archive.Control.ILedgerLocalDrainBarrier
-    {
-        public LocalStreamDrainCoordinator(Ledgers.LedgerMapView map, Ledgers.LedgerReader reader, System.Collections.Generic.IEnumerable<ILocalStreamProcessor> processors, long memoryBudgetBytes = 33554432, ILocalKeyPresenceLookup? presenceLookup = null) { }
-
-        public System.Collections.Immutable.ImmutableArray<Ledgers.LocalStreamName> RegisteredStreams { get { throw null; } }
-
-        public System.Threading.Tasks.ValueTask<Archive.Control.LocalDrainBarrierOutcome> EnsureLocalStreamsDrainedAsync(Ledgers.LedgerMetadata ledger, Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public void ValidateLocalAppendKey(Ledgers.LedgerMetadata ledger, System.ReadOnlySpan<byte> rowKey) { }
     }
 }
 
@@ -2689,17 +2589,17 @@ namespace Orleans.Durable.Storage.Engine.Journals
         System.Threading.Tasks.ValueTask<System.Collections.Generic.List<JournalIndexTombstone>> ScanTombstonesAsync(Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default);
     }
 
-    public partial interface ILocalStreamHandler
+    public partial interface IMessageHandler
     {
-        Ledgers.LocalStreamName Stream { get; }
+        Ledgers.MessageChannel Channel { get; }
 
-        ILocalStreamSession OpenLedger(Ledgers.LedgerId ledger);
+        IMessageSession OpenLedger(Ledgers.LedgerId ledger);
         System.IO.InvalidDataException? Validate(System.ReadOnlySpan<byte> payload);
     }
 
-    public partial interface ILocalStreamSession : System.IDisposable
+    public partial interface IMessageSession : System.IDisposable
     {
-        void OnBatchDurable(Ledgers.Slot slot, System.ReadOnlySpan<LocalAppendRecord> records);
+        void OnBatchDurable(Ledgers.Slot slot, System.ReadOnlySpan<MessageRecord> records);
     }
 
     public readonly partial struct JournalEntry
@@ -2712,7 +2612,7 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public JournalEntryKind Kind { get { throw null; } }
 
-        public System.Collections.Immutable.ImmutableArray<LocalAppendRecord> LocalAppends { get { throw null; } }
+        public System.Collections.Immutable.ImmutableArray<MessageRecord> Messages { get { throw null; } }
 
         public long PayloadLength { get { throw null; } }
 
@@ -2739,23 +2639,23 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public long Length { get { throw null; } }
 
-        public System.Collections.Immutable.ImmutableArray<LocalAppendRecord> LocalAppends { get { throw null; } }
+        public System.Collections.Immutable.ImmutableArray<MessageRecord> Messages { get { throw null; } }
 
         public Buffers.ArcBuffer Payload { get { throw null; } }
 
-        public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload) { throw null; }
 
         public static System.IO.InvalidDataException? Decode(JournalRowKey key, Buffers.ArcBuffer bytes, out JournalEntryRecord record) { throw null; }
 
-        public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, System.DateTimeOffset deletedAt, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, System.DateTimeOffset deletedAt, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, System.DateTimeOffset deletedAt) { throw null; }
 
         public readonly void Dispose() { }
 
-        public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot) { throw null; }
 
@@ -3126,15 +3026,13 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public static System.Threading.Tasks.ValueTask<JournalStateDatabase> OpenAsync(IJournalIndex index, Ledgers.LedgerReader reader, JournalIndexOptions? options = null, System.TimeProvider? timeProvider = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.ValueTask<bool?> TryHasKeyEntryAsync(Ledgers.LedgerMetadata ledger, System.ReadOnlyMemory<byte> key, Ledgers.Slot tail, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public Ledgers.Slot Watermark(Ledgers.LedgerId ledger) { throw null; }
     }
 
     public sealed partial class JournalStore : System.IAsyncDisposable
     {
-        public const string LocalStreamsParameter = "local-streams";
-        public JournalStore(Ledgers.LedgerWriterRegistry writers, Archive.IArchiveStore store, JournalStoreOptions options, System.TimeProvider timeProvider, JournalStateDatabase? stateDatabase, System.Collections.Generic.IEnumerable<ILocalStreamHandler>? localStreamHandlers) { }
+        public const string MessageChannelsParameter = "message-channels";
+        public JournalStore(Ledgers.LedgerWriterRegistry writers, Archive.IArchiveStore store, JournalStoreOptions options, System.TimeProvider timeProvider, JournalStateDatabase? stateDatabase, System.Collections.Generic.IEnumerable<IMessageHandler>? messageHandlers) { }
 
         public JournalStore(Ledgers.LedgerWriterRegistry writers, Archive.IArchiveStore store, JournalStoreOptions options, System.TimeProvider timeProvider, JournalStateDatabase? stateDatabase) { }
 
@@ -3146,15 +3044,15 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
-        public JournalEntryRecord EncodeAppend(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public JournalEntryRecord EncodeAppend(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public JournalEntryRecord EncodeAppend(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload) { throw null; }
 
-        public JournalEntryRecord EncodeDelete(JournalRowKey key, JournalVersion expectedVersion, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public JournalEntryRecord EncodeDelete(JournalRowKey key, JournalVersion expectedVersion, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public JournalEntryRecord EncodeDelete(JournalRowKey key, JournalVersion expectedVersion) { throw null; }
 
-        public JournalEntryRecord EncodeReplace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot, System.ReadOnlySpan<LocalAppendRecord> localAppends) { throw null; }
+        public JournalEntryRecord EncodeReplace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public JournalEntryRecord EncodeReplace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot) { throw null; }
 
@@ -3164,7 +3062,7 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public System.Threading.Tasks.Task<JournalReadOutcome> ReadAsync(JournalRowKey key, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Collections.Generic.IReadOnlyDictionary<string, string> StoreParametersOf(JournalStoreOptions options, System.Collections.Generic.IEnumerable<ILocalStreamHandler>? localStreamHandlers = null) { throw null; }
+        public static System.Collections.Generic.IReadOnlyDictionary<string, string> StoreParametersOf(JournalStoreOptions options, System.Collections.Generic.IEnumerable<IMessageHandler>? messageHandlers = null) { throw null; }
 
         public System.Threading.Tasks.Task<JournalWriteOutcome> WriteAsync(JournalEntryRecord record, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
@@ -3183,8 +3081,7 @@ namespace Orleans.Durable.Storage.Engine.Journals
         PayloadLimit = 0,
         MaxAppendBytes = 1,
         MaxQueuedBytes = 2,
-        MaxProposalBytes = 3,
-        MaxSegmentKeys = 4
+        MaxProposalBytes = 3
     }
 
     public sealed partial class JournalStoreLimitException : System.ArgumentException
@@ -3212,9 +3109,9 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public int MaxConcurrentHistoryReads { get { throw null; } set { } }
 
-        public int MaxLocalAppendBytesPerWrite { get { throw null; } set { } }
+        public int MaxMessageBytesPerWrite { get { throw null; } set { } }
 
-        public int MaxLocalAppendsPerWrite { get { throw null; } set { } }
+        public int MaxMessagesPerWrite { get { throw null; } set { } }
 
         public long MaxQueuedBytes { get { throw null; } set { } }
 
@@ -3224,7 +3121,7 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public long LargestBatch() { throw null; }
 
-        public long LargestBatch(bool hasLocalStreams) { throw null; }
+        public long LargestBatch(bool hasMessageChannels) { throw null; }
 
         public void Validate() { }
     }
@@ -3326,16 +3223,18 @@ namespace Orleans.Durable.Storage.Engine.Journals
         }
     }
 
-    public readonly partial struct LocalAppendRecord
+    public readonly partial struct MessageRecord
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
         public const int MaxPayloadLength = 65536;
-        public LocalAppendRecord(Ledgers.LocalStreamName stream, System.ReadOnlyMemory<byte> payload) { }
+        public MessageRecord(Ledgers.MessageChannel channel, System.ReadOnlyMemory<byte> payload) { }
+
+        public Ledgers.MessageChannel Channel { get { throw null; } }
+
+        public bool IsDefault { get { throw null; } }
 
         public System.ReadOnlyMemory<byte> Payload { get { throw null; } }
-
-        public Ledgers.LocalStreamName Stream { get { throw null; } }
     }
 }
 
@@ -3386,6 +3285,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         public System.Buffers.ReadOnlySequence<byte> Body { get { throw null; } }
 
         public int BodyLength { get { throw null; } }
+
+        public System.ReadOnlySpan<byte> Channel { get { throw null; } }
 
         public int Index { get { throw null; } }
 
@@ -3537,7 +3438,11 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public Slot? Slot { get { throw null; } }
 
+        public void AddMessage(MessageChannel channel, System.Buffers.ReadOnlySequence<byte> body) { }
+
         public RowVersion AddRow(System.ReadOnlySpan<byte> key, RowKind kind, RowVersion versionBefore, RowToken token, System.Buffers.ReadOnlySequence<byte> body) { throw null; }
+
+        public void BeginMessage(MessageChannel channel, int bodyLength, System.ReadOnlySpan<byte> bodyHead = default) { }
 
         public RowVersion BeginRow(System.ReadOnlySpan<byte> key, RowKind kind, RowVersion versionBefore, RowToken token, int bodyLength, System.ReadOnlySpan<byte> bodyHead = default) { throw null; }
 
@@ -3545,7 +3450,11 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public static int MaxHeaderLength(int rowCount) { throw null; }
 
+        public static long MaxMessageLength(int channelLength, long bodyLength) { throw null; }
+
         public static long MaxRowLength(int keyLength, int baseLength, int tokenLength, long bodyLength) { throw null; }
+
+        public static long MessageLength(MessageChannel channel, long bodyLength) { throw null; }
 
         public long RowLength(System.ReadOnlySpan<byte> key, RowVersion versionBefore, RowToken token, long bodyLength) { throw null; }
 
@@ -3609,25 +3518,6 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         public System.TimeSpan? LeaseGuardBand { get { throw null; } set { } }
 
         public void Validate() { }
-    }
-
-    public static partial class LedgerLocalKey
-    {
-        public const byte DisjointSentinel = 255;
-        public const int MaxEncodedLength = 105;
-        public const int MaxRangeDepth = 256;
-        public const int MinPrefixBytes = 4;
-        public static byte[] Encode(LedgerId ledger, KeyRange range, LocalStreamName stream) { throw null; }
-
-        public static int EncodedLength(KeyRange range, LocalStreamName stream) { throw null; }
-
-        public static int PrefixByteLength(int depth) { throw null; }
-
-        public static bool TryDecode(System.ReadOnlySpan<byte> key, KeyRange range, LedgerId ledger, out System.ReadOnlySpan<byte> streamName) { throw null; }
-
-        public static System.IO.InvalidDataException? Validate(System.ReadOnlySpan<byte> key, KeyRange range, LedgerId ledger, out System.ReadOnlySpan<byte> streamName) { throw null; }
-
-        public static int Write(LedgerId ledger, KeyRange range, LocalStreamName stream, System.Span<byte> destination) { throw null; }
     }
 
     [System.Runtime.CompilerServices.Union]
@@ -4308,10 +4198,10 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         public System.Threading.Tasks.Task<System.Collections.Immutable.ImmutableArray<LedgerId>> WaitForUnservedAsync(System.Collections.Generic.IReadOnlySet<LedgerId> known, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public sealed partial class LocalStreamName : System.IEquatable<LocalStreamName>, System.IComparable<LocalStreamName>
+    public sealed partial class MessageChannel : System.IEquatable<MessageChannel>, System.IComparable<MessageChannel>
     {
         public const int MaxLength = 64;
-        public LocalStreamName(string value) { }
+        public MessageChannel(string value) { }
 
         public System.ReadOnlyMemory<byte> Bytes { get { throw null; } }
 
@@ -4319,9 +4209,9 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public string Value { get { throw null; } }
 
-        public int CompareTo(LocalStreamName? other) { throw null; }
+        public int CompareTo(MessageChannel? other) { throw null; }
 
-        public bool Equals(LocalStreamName? other) { throw null; }
+        public bool Equals(MessageChannel? other) { throw null; }
 
         public override bool Equals(object? obj) { throw null; }
 
@@ -4333,17 +4223,17 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public static bool IsValidByte(byte value) { throw null; }
 
-        public static bool operator ==(LocalStreamName? left, LocalStreamName? right) { throw null; }
+        public static bool operator ==(MessageChannel? left, MessageChannel? right) { throw null; }
 
-        public static bool operator !=(LocalStreamName? left, LocalStreamName? right) { throw null; }
+        public static bool operator !=(MessageChannel? left, MessageChannel? right) { throw null; }
 
-        public static LocalStreamName Parse(string value) { throw null; }
+        public static MessageChannel Parse(string value) { throw null; }
 
         public override string ToString() { throw null; }
 
-        public static bool TryParse(System.ReadOnlySpan<byte> bytes, out LocalStreamName? name) { throw null; }
+        public static bool TryParse(System.ReadOnlySpan<byte> bytes, out MessageChannel? channel) { throw null; }
 
-        public static bool TryParse(string? value, out LocalStreamName? name) { throw null; }
+        public static bool TryParse(string? value, out MessageChannel? channel) { throw null; }
     }
 
     public static partial class NodeCallBudget
@@ -4758,6 +4648,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public int BodyLength { get { throw null; } }
 
+        public System.ReadOnlySpan<byte> Channel { get { throw null; } }
+
         public Slot DefiningSlot { get { throw null; } }
 
         public bool IsDefining { get { throw null; } }
@@ -4801,7 +4693,7 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         Append = 0,
         Replace = 1,
         Delete = 2,
-        LocalAppend = 3
+        Message = 3
     }
 
     public readonly partial struct RowToken : System.IEquatable<RowToken>

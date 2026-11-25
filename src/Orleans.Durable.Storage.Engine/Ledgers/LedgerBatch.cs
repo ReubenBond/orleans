@@ -217,6 +217,29 @@ public sealed class LedgerBatch : IDisposable
     }
 
     /// <summary>
+    /// Returns the encoded length of a <see cref="RowKind.Message"/> row with a channel of
+    /// <paramref name="channelLength"/> bytes and a body of <paramref name="bodyLength"/> bytes (ledgers.md §7).
+    /// </summary>
+    public static long MaxMessageLength(int channelLength, long bodyLength)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(channelLength, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(channelLength, MessageChannel.MaxLength);
+        ArgumentOutOfRangeException.ThrowIfNegative(bodyLength);
+        return MessageEncodedLength(channelLength, bodyLength);
+    }
+
+    /// <summary>
+    /// Returns the exact bytes a <see cref="RowKind.Message"/> row for <paramref name="channel"/> with a body of
+    /// <paramref name="bodyLength"/> bytes adds to a batch.
+    /// </summary>
+    public static long MessageLength(MessageChannel channel, long bodyLength)
+    {
+        ArgumentNullException.ThrowIfNull(channel);
+        ArgumentOutOfRangeException.ThrowIfNegative(bodyLength);
+        return MessageEncodedLength(channel.Span.Length, bodyLength);
+    }
+
+    /// <summary>
     /// Returns the bytes the row would add to this batch, as a defining or a referencing row as the writer's dictionary
     /// says, so a caller plans its batch.
     /// </summary>
@@ -291,9 +314,13 @@ public sealed class LedgerBatch : IDisposable
             throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Row {RowsBegun}'s key lies outside the ledger's range {_range}."), nameof(key));
         }
 
-        if (!RowKinds.IsDefined(kind))
+        if (!RowKinds.IsArchiveKind(kind))
         {
-            throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Row kind {(byte)kind} is not defined."), nameof(kind));
+            throw new ArgumentException(
+                kind == RowKind.Message
+                    ? "Use BeginMessage to write a Message row."
+                    : string.Create(CultureInfo.InvariantCulture, $"Row kind {(byte)kind} is not defined."),
+                nameof(kind));
         }
 
         // The reference stays valid through the row's write, which changes no dictionary.
@@ -336,6 +363,72 @@ public sealed class LedgerBatch : IDisposable
         _bodyRemaining = bodyLength - bodyHead.Length;
         RowsBegun++;
         return version;
+    }
+
+    /// <summary>
+    /// Begins an unversioned <see cref="RowKind.Message"/> row for <paramref name="channel"/>, writing its flags,
+    /// channel, body length, and <paramref name="bodyHead"/> directly into the batch without touching the segment
+    /// dictionary or key range (ledgers.md §2.2, §7).
+    /// </summary>
+    public void BeginMessage(MessageChannel channel, int bodyLength, ReadOnlySpan<byte> bodyHead = default)
+    {
+        _ = Writer;
+        ArgumentNullException.ThrowIfNull(channel);
+        if (_bodyRemaining != 0)
+        {
+            throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"Row {RowsBegun - 1}'s body lacks {_bodyRemaining} bytes."));
+        }
+
+        if (RowsBegun == DeclaredRowCount)
+        {
+            throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"The batch holds {DeclaredRowCount} rows, and every one has begun."));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(bodyLength);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(bodyHead.Length, bodyLength, nameof(bodyHead));
+
+        var channelBytes = channel.Span;
+        var rowLength = MessageEncodedLength(channelBytes.Length, bodyLength);
+        var length = Length + rowLength;
+        if (length > MaxLength)
+        {
+            throw new ArgumentException(
+                string.Create(CultureInfo.InvariantCulture, $"The batch would be {length} bytes, longer than the {MaxLength} bytes it holds, its maxLength, at most the replica's payload limit."),
+                nameof(bodyLength));
+        }
+
+        Span<byte> fields = stackalloc byte[StackedRowLength];
+        fields[0] = (byte)RowKind.Message;
+        fields[1] = (byte)channelBytes.Length;
+        channelBytes.CopyTo(fields[2..]);
+        var offset = 2 + channelBytes.Length;
+        offset += Varint.Write(fields[offset..], (ulong)bodyLength);
+        if (offset + bodyHead.Length <= StackedRowLength)
+        {
+            bodyHead.CopyTo(fields[offset..]);
+            Write(fields[..(offset + bodyHead.Length)]);
+        }
+        else
+        {
+            Write(fields[..offset]);
+            Write(bodyHead);
+        }
+
+        Length = (int)length;
+        _bodyRemaining = bodyLength - bodyHead.Length;
+        RowsBegun++;
+    }
+
+    /// <summary>Writes one <see cref="RowKind.Message"/> row whole: <see cref="BeginMessage"/>, then its body.</summary>
+    public void AddMessage(MessageChannel channel, ReadOnlySequence<byte> body)
+    {
+        if (body.Length > int.MaxValue)
+        {
+            throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"A message's body is at most {int.MaxValue} bytes, not {body.Length}."), nameof(body));
+        }
+
+        BeginMessage(channel, (int)body.Length);
+        WriteBody(body);
     }
 
     /// <summary>Writes the next bytes of the current row's body.</summary>
@@ -444,6 +537,9 @@ public sealed class LedgerBatch : IDisposable
 
     private static long ReferencingLength(ulong ordinal, long bodyLength) =>
         1 + Varint.Length(ordinal) + Varint.Length((ulong)bodyLength) + bodyLength;
+
+    private static long MessageEncodedLength(int channelLength, long bodyLength) =>
+        1 + 1 + channelLength + Varint.Length((ulong)bodyLength) + bodyLength;
 
     /// <summary>Lays out a row's fields up to its key, or its referencing fields and body length, in <paramref name="destination"/>.</summary>
     private static int WriteLeading(Span<byte> destination, ReadOnlySpan<byte> key, RowKind kind, bool references, ulong ordinal, int bodyLength)
