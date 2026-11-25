@@ -25,6 +25,12 @@ public sealed class JournalState
     internal const long ReplaceRequestAlpha = 1;
 
     /// <summary>
+    /// The minimum bytes appended after a journal's base before Journals asks for a <c>Replace</c> by size alone
+    /// (64 KiB; journals.md §8.7), so small journals do not snapshot every few hundred bytes.
+    /// </summary>
+    internal const long ReplaceRequestMinBytes = 64 * 1024;
+
+    /// <summary>
     /// The bytes a state holds, which a primary's warm-state budget counts (journals.md §8.8): the object's 16-byte
     /// header, its version (a 33-byte inline base and an 8-byte count, 48 bytes aligned), its tombstone's 16, its
     /// content's length and base length (16), and its existence (8 aligned).
@@ -73,9 +79,10 @@ public sealed class JournalState
 
     /// <summary>
     /// Gets a value indicating whether the state's bytes appended since its base pass the snapshot-request bound
-    /// (<c>ContentLength &gt; (1 + α) × BaseLength</c>, with <c>α = 1</c>; journals.md §8.7).
+    /// (<c>BytesSinceBase &gt; max(ReplaceRequestMinBytes, α × BaseLength)</c>, with <c>α = 1</c> and
+    /// <c>ReplaceRequestMinBytes = 64 KiB</c>; journals.md §8.7).
     /// </summary>
-    internal bool IsReplaceRequested => BytesSinceBase > ReplaceRequestAlpha * BaseLength;
+    internal bool IsReplaceRequested => BytesSinceBase > Math.Max(ReplaceRequestMinBytes, ReplaceRequestAlpha * BaseLength);
 
     /// <summary>Folds a key's history read, its prefix and its live rows (journals.md §8.3).</summary>
     /// <returns>The state, or <see langword="null"/> when the key has no history: <c>Absent</c> and no live row.</returns>

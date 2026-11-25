@@ -423,10 +423,12 @@ internal static class JournalStoreSpec
 
         if (output.Outcome == JournalOutcome.Accepted)
         {
-            var requested = next.Content.Length > 2L * next.BaseLength || next.Appends >= options.ReplaceRequestAppends;
+            const long ReplaceRequestMinBytes = 64 * 1024;
+            var bytesSinceBase = next.Content.Length - next.BaseLength;
+            var requested = bytesSinceBase > Math.Max(ReplaceRequestMinBytes, next.BaseLength) || next.Appends >= options.ReplaceRequestAppends;
             if (answer.ReplaceRequested != requested)
             {
-                return ValidationResult.Invalid(Invariant($"journals.md §2.4, §8.7: an Accepted answer carries a replace request when its content ({next.Content.Length} bytes) passes twice its base's {next.BaseLength} bytes, or when the store asks for one at its generation of {next.Appends} appends (threshold {options.ReplaceRequestAppends})."));
+                return ValidationResult.Invalid(Invariant($"journals.md §2.4, §8.7: an Accepted answer carries a replace request when its bytes since base ({bytesSinceBase}) exceed max({ReplaceRequestMinBytes}, {next.BaseLength}), or when the store asks for one at its generation of {next.Appends} appends (threshold {options.ReplaceRequestAppends})."));
             }
         }
 
@@ -480,10 +482,12 @@ internal static class JournalStoreSpec
                     return ValidationResult.Invalid(Invariant($"JS-I3: a read returns the fold of every acknowledged entry and of decided entries only, the journal's state {journal}, by one of its names."));
                 }
 
-                var requested = answer.Output.Content.Length > 2L * journal.BaseLength || journal.Appends >= options.ReplaceRequestAppends;
+                const long ReplaceRequestMinBytes = 64 * 1024;
+                var bytesSinceBase = answer.Output.Content.Length - journal.BaseLength;
+                var requested = bytesSinceBase > Math.Max(ReplaceRequestMinBytes, journal.BaseLength) || journal.Appends >= options.ReplaceRequestAppends;
                 return answer.ReplaceRequested == requested
                     ? ValidationResult.Valid()
-                    : ValidationResult.Invalid(Invariant($"journals.md §2.4, §8.7: a read requests a Replace when its content passes twice its base's {journal.BaseLength} bytes, or when the store asks for one at its generation of {journal.Appends} appends."));
+                    : ValidationResult.Invalid(Invariant($"journals.md §2.4, §8.7: a read requests a Replace when its bytes since base ({bytesSinceBase}) exceed max({ReplaceRequestMinBytes}, {journal.BaseLength}), or when the store asks for one at its generation of {journal.Appends} appends."));
             })
             .ThenState<JournalStoreState>(
                 (answer, next) =>

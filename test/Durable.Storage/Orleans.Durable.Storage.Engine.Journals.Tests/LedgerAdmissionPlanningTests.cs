@@ -289,8 +289,8 @@ public sealed class LedgerAdmissionPlanningTests : IDisposable
         ledger.Durable(0);
         Assert.False(three.IsCompleted);
         ledger.Durable(1);
-        Assert.Equal(Requested(V(1)), await AnsweredAsync(one));
-        Assert.Equal(Requested(V(2)), await AnsweredAsync(two));
+        Assert.Equal(Accepted(V(1)), await AnsweredAsync(one));
+        Assert.Equal(Accepted(V(2)), await AnsweredAsync(two));
         Assert.Equal(ReplaceRequired, await AnsweredAsync(three));
         Assert.Equal(2, ledger.Proposals.Count);
         ledger.DrainDurable();
@@ -312,13 +312,13 @@ public sealed class LedgerAdmissionPlanningTests : IDisposable
         ledger.EndSegment();
 
         ledger.Durable(0);
-        Assert.Equal(Requested(V(1)), await AnsweredAsync(one));
+        Assert.Equal(Accepted(V(1)), await AnsweredAsync(one));
         Assert.False(three.IsCompleted);
         Assert.Equal(new LedgerSegmentId(ScriptedLedger.Id, new Slot(1)), Assert.Single(ledger.Proposal(1).Rows).Segment);
         ledger.Durable(1);
-        Assert.Equal(Requested(V(2)), await AnsweredAsync(two));
+        Assert.Equal(Accepted(V(2)), await AnsweredAsync(two));
         ledger.Durable(2);
-        Assert.Equal(Requested(V(3)), await AnsweredAsync(three));
+        Assert.Equal(Accepted(V(3)), await AnsweredAsync(three));
         ledger.DrainDurable();
     }
 

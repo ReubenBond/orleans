@@ -43,11 +43,11 @@ public sealed class JournalStoreOptions
     public TimeSpan ExpiryInterval { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>
-    /// Gets or sets the most history reads the store runs at once, its loads and its owner reads together, at least 1 and 4
+    /// Gets or sets the most history reads the store runs at once, its loads and its owner reads together, at least 1 and 64
     /// by default; a read past it waits for one to end (journals.md §8.8). The bound limits concurrent archive-store and
     /// replica reads and the history a process holds assembling reads.
     /// </summary>
-    public int MaxConcurrentHistoryReads { get; set; } = 4;
+    public int MaxConcurrentHistoryReads { get; set; } = 64;
 
     /// <summary>
     /// Gets or sets the maximum number of <see cref="MessageRecord"/> items attached to a single journal write

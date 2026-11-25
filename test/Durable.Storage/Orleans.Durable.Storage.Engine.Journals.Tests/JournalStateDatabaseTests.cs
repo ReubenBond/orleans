@@ -933,8 +933,13 @@ public sealed class JournalStateDatabaseTests : IDisposable
             await WaitUntilAsync(() => node.StateDb.Watermark(ledgerId) >= new Slot(1), Signal);
             Assert.Equal(Slot.Zero, node.StateDb.DurableWatermark(ledgerId));
 
-            time.Advance(TimeSpan.FromSeconds(2));
-            await WaitUntilAsync(() => node.StateDb.DurableWatermark(ledgerId) >= new Slot(1), Signal);
+            await WaitUntilAsync(
+                () =>
+                {
+                    time.Advance(TimeSpan.FromSeconds(2));
+                    return node.StateDb.DurableWatermark(ledgerId) >= new Slot(1);
+                },
+                Signal);
         }
     }
 

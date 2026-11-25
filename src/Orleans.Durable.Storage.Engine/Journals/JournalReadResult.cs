@@ -64,9 +64,9 @@ public sealed class JournalReadResult : IDisposable
 
     /// <summary>
     /// Gets a value indicating whether the read asks the journal's writer for a <c>Replace</c> (journals.md §2.4, §8.7):
-    /// its content holds more than <c>(1 + α)</c> times the bytes of its base, the content its last opener or the
-    /// archive's prefix began, with <c>α = 1</c>; or the archive store asks for one at the key's current token
-    /// (<c>IsReplaceRequested</c>). A hint the writer latches until a <c>Replace</c> is accepted.
+    /// the bytes appended since its base exceed <c>max(64 KiB, α × BaseLength)</c> with <c>α = 1</c>, where the base is
+    /// the content its last opener or the archive's prefix began; or the archive store asks for one at the key's current
+    /// token (<c>IsReplaceRequested</c>). A hint the writer latches until a <c>Replace</c> is accepted.
     /// </summary>
     public bool ReplaceRequested { get; }
 

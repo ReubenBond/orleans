@@ -262,8 +262,8 @@ public sealed class JournalWarmStateTests : IDisposable
 
     /// <summary>
     /// Warm state tracks <c>BaseLength</c> and <c>BytesSinceBase</c> per journals.md §8.7: <c>ReplaceRequested</c> flips
-    /// strictly above <c>BaseLength</c> (<c>alpha = 1</c>), agrees between <c>Accepted</c> and <c>ReadAsync</c>, and
-    /// resets on <c>Replace</c>, <c>Delete</c>, and <c>Expired</c>.
+    /// strictly above <c>max(ReplaceRequestMinBytes, BaseLength)</c> (<c>alpha = 1</c>, floor 64 KiB), agrees between
+    /// <c>Accepted</c> and <c>ReadAsync</c>, and resets on <c>Replace</c>, <c>Delete</c>, and <c>Expired</c>.
     /// </summary>
     [Fact]
     public async Task SnapshotRequestFollowsSection87ThresholdsAndResets()
@@ -275,39 +275,51 @@ public sealed class JournalWarmStateTests : IDisposable
         await using var store = new JournalStore(nodeA.Registry, env.Store, new JournalStoreOptions { TombstoneRetention = TimeSpan.Zero }, env.Time, nodeA.StateDb);
         await nodeA.Registry.ReconciledAsync(nodeA.Map.Current.Epoch, Token);
 
-        // Append onto empty base (BaseLength == 0, BytesSinceBase > 0): immediately ReplaceRequested == true.
-        var (v1, rr1) = await WriteAppendWithOutcomeAsync(store, "snap", JournalVersion.Origin, "12345");
-        Assert.True(rr1);
-        Assert.True(await ReadReplaceRequestedAsync(store, "snap"));
+        const int Floor = (int)JournalState.ReplaceRequestMinBytes;
+        const int LargeBase = Floor + 4096;
 
-        // Replace with 10-byte snapshot resets BytesSinceBase to 0 -> ReplaceRequested == false.
-        var (v2, rr2) = await WriteReplaceWithOutcomeAsync(store, "snap", v1, "0123456789");
+        // Small appends onto empty base stay below the 64 KiB floor -> ReplaceRequested == false.
+        var (v1, rr1) = await WriteAppendWithOutcomeAsync(store, "snap", JournalVersion.Origin, "12345");
+        Assert.False(rr1);
+        Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
+
+        // Reaching exactly 64 KiB appended since empty base stays false; 1 more byte flips to true!
+        var (v2, rr2) = await WriteAppendWithOutcomeAsync(store, "snap", v1, new string('a', Floor - 5));
         Assert.False(rr2);
         Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
 
-        // Append 10 bytes: BytesSinceBase == 10 <= 1 * 10 -> still false at boundary.
-        var (v3, rr3) = await WriteAppendWithOutcomeAsync(store, "snap", v2, "abcdefghij");
-        Assert.False(rr3);
+        var (v3, rr3) = await WriteAppendWithOutcomeAsync(store, "snap", v2, "!");
+        Assert.True(rr3);
+        Assert.True(await ReadReplaceRequestedAsync(store, "snap"));
+
+        // Replace with a base larger than 64 KiB resets BytesSinceBase to 0 -> ReplaceRequested == false.
+        var (v4, rr4) = await WriteReplaceWithOutcomeAsync(store, "snap", v3, new string('b', LargeBase));
+        Assert.False(rr4);
         Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
 
-        // Append 1 more byte: BytesSinceBase == 11 > 1 * 10 -> flips to true on both Accepted and ReadAsync.
-        var (v4, rr4) = await WriteAppendWithOutcomeAsync(store, "snap", v3, "!");
-        Assert.True(rr4);
+        // Append LargeBase bytes: BytesSinceBase == BaseLength > Floor -> still false at boundary.
+        var (v5, rr5) = await WriteAppendWithOutcomeAsync(store, "snap", v4, new string('c', LargeBase));
+        Assert.False(rr5);
+        Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
+
+        // Append 1 more byte: BytesSinceBase == BaseLength + 1 -> flips to true on both Accepted and ReadAsync.
+        var (v6, rr6) = await WriteAppendWithOutcomeAsync(store, "snap", v5, "!");
+        Assert.True(rr6);
         Assert.True(await ReadReplaceRequestedAsync(store, "snap"));
 
         // Delete resets BytesSinceBase to 0 -> ReplaceRequested == false.
-        var (v5, rr5) = await WriteDeleteWithOutcomeAsync(store, "snap", v4);
-        Assert.False(rr5);
+        var (v7, rr7) = await WriteDeleteWithOutcomeAsync(store, "snap", v6);
+        Assert.False(rr7);
         Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
 
         // Expire keeps ReplaceRequested == false.
         Assert.Equal(1, (await store.ExpireTombstonesAsync(Token)).Expired);
         Assert.False(await ReadReplaceRequestedAsync(store, "snap"));
-        _ = v5;
+        _ = v7;
     }
 
     /// <summary>
-    /// <c>BytesSinceBase == BaseLength</c> vs <c>BaseLength + 1</c> preserves the exact §8.7 boundary after warm-state
+    /// <c>BytesSinceBase == max(64 KiB, BaseLength)</c> vs <c>+ 1</c> preserves the exact §8.7 boundary after warm-state
     /// eviction and reload, and after draining and dropping the ledger into an LSM archive prefix (which rebases
     /// <c>BaseLength</c> to the prefix's content length and resets <c>BytesSinceBase</c> to 0).
     /// </summary>
@@ -329,19 +341,23 @@ public sealed class JournalWarmStateTests : IDisposable
         await using var store = new JournalStore(nodeA.Registry, lsmStore, new JournalStoreOptions { WarmStateBytes = 0 }, env.Time, nodeA.StateDb);
         await nodeA.Registry.ReconciledAsync(nodeA.Map.Current.Epoch, Token);
 
-        // Base of 6 bytes, append 6 bytes -> BytesSinceBase == BaseLength (6 == 6) -> false after eviction & reload.
-        var (v1, rr1) = await WriteReplaceWithOutcomeAsync(store, "rebased", JournalVersion.Origin, "123456");
+        const int Floor = (int)JournalState.ReplaceRequestMinBytes;
+        var basePayload = new string('1', Floor);
+        var appendPayload = new string('a', Floor);
+
+        // Base of 64 KiB, append 64 KiB -> BytesSinceBase == BaseLength == Floor -> false after eviction & reload.
+        var (v1, rr1) = await WriteReplaceWithOutcomeAsync(store, "rebased", JournalVersion.Origin, basePayload);
         Assert.False(rr1);
-        var (v2, rr2) = await WriteAppendWithOutcomeAsync(store, "rebased", v1, "abcdef");
+        var (v2, rr2) = await WriteAppendWithOutcomeAsync(store, "rebased", v1, appendPayload);
         Assert.False(rr2);
         Assert.False(await ReadReplaceRequestedAsync(store, "rebased"));
 
-        // Append 1 more byte after eviction & reload -> BytesSinceBase == BaseLength + 1 (7 > 6) -> true!
+        // Append 1 more byte after eviction & reload -> BytesSinceBase == BaseLength + 1 -> true!
         var (v3, rr3) = await WriteAppendWithOutcomeAsync(store, "rebased", v2, "!");
         Assert.True(rr3);
         Assert.True(await ReadReplaceRequestedAsync(store, "rebased"));
 
-        // Replace open ledger, drain and drop ledger0 into the LSM so "rebased" has a 13-byte archive prefix and 0 live rows.
+        // Replace open ledger, drain and drop ledger0 into the LSM so "rebased" has a (2 * Floor + 1)-byte archive prefix and 0 live rows.
         var ledger0 = nodeA.Map.Current.Find(JournalRowKey.Encode("rebased").Span)!.Value.Open.Id;
         await env.ReplaceAsync(nodeA, ledger0, [NodeA]);
         await nodeA.Map.ReadAsync(Token);
@@ -372,18 +388,19 @@ public sealed class JournalWarmStateTests : IDisposable
         _ = await nodeA.Map.ReadAsync(Token);
         await manifest.ReadAsync(Token);
 
-        // After rebase onto the 13-byte archive prefix: BaseLength == 13, BytesSinceBase == 0 -> ReplaceRequested == false!
+        // After rebase onto the (2 * Floor + 1)-byte archive prefix: BaseLength == 2 * Floor + 1, BytesSinceBase == 0 -> false!
+        var expectedPrefixLength = 2 * Floor + 1;
         var (rebasedVersion, exists, content) = await ReadJournalAsync(store, "rebased");
         Assert.True(exists);
-        Assert.Equal("123456abcdef!", content);
+        Assert.Equal(expectedPrefixLength, content.Length);
         Assert.False(await ReadReplaceRequestedAsync(store, "rebased"));
 
-        // Append 13 bytes onto the 13-byte archive base -> BytesSinceBase == 13 == BaseLength -> still false!
-        var (v4, rr4) = await WriteAppendWithOutcomeAsync(store, "rebased", rebasedVersion, "0123456789abc");
+        // Append expectedPrefixLength bytes onto the archive base -> BytesSinceBase == BaseLength -> still false!
+        var (v4, rr4) = await WriteAppendWithOutcomeAsync(store, "rebased", rebasedVersion, new string('z', expectedPrefixLength));
         Assert.False(rr4);
         Assert.False(await ReadReplaceRequestedAsync(store, "rebased"));
 
-        // Append 1 more byte -> BytesSinceBase == 14 == BaseLength + 1 -> flips to true!
+        // Append 1 more byte -> BytesSinceBase == BaseLength + 1 -> flips to true!
         var (_, rr5) = await WriteAppendWithOutcomeAsync(store, "rebased", v4, "!");
         Assert.True(rr5);
         Assert.True(await ReadReplaceRequestedAsync(store, "rebased"));

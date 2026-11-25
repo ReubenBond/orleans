@@ -35,7 +35,7 @@ public sealed class ControlOptions
     public TimeSpan ReplicaGrace { get; set; } = TimeSpan.FromMinutes(10);
 
     /// <summary>Gets or sets the most balancing transitions in progress at once; 0 pauses balancing.</summary>
-    public int MaxConcurrentTransitions { get; set; } = 8;
+    public int MaxConcurrentTransitions { get; set; } = 2;
 
     /// <summary>
     /// Gets or sets the most departures in progress at once, hand-offs of a stopping or departing node's ledgers, apart from

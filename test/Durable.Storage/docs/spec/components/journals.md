@@ -678,7 +678,11 @@ admitted. Its mechanism:
   its first entry, `MaxBatchBytes` of rows and the replica's payload limit, written into a `LedgerBatch` without
   building a `Row` per entry ([ledgers §2.4](ledgers.md#24-primary-ledgerwriter)); an entry whose body exceeds
   `MaxBatchBytes` rides in a batch of its own. At most `K`, the ledger's window, are outstanding, holding at most the
-  writer's `MaxProposalBytes`, so entries which arrive while the window or that budget is full share the next batch.
+  writer's `MaxProposalBytes`. When no batch is outstanding, admission proposes immediately for minimum idle latency;
+  while a batch is already in flight (and admission is neither draining for cooperative release nor blocking writers
+  waiting for queue room), small entries coalesce in `_unbatched` until either the in-flight batch finishes or queued
+  unbatched entries reach `MaxBatchEntries` or `min(64 KiB, MaxBatchBytes)`, at which point the next batch pipelines
+  immediately up to `K`.
 - **Backpressure.** The rows of entries accepted and not yet in a batch are at most `MaxQueuedBytes`; a write past it
   waits, neither loaded nor decided, until a batch takes entries, and then is accepted in arrival order.
 - **Fencing.** The first proposal which is not `Durable` ends admission (§6): its entries take its outcome, every entry
@@ -977,15 +981,15 @@ Orleans reads as an empty journal ([archive logs](archive-logs.md#5-invariants))
 
 ### 8.7 Snapshot requests
 
-A read which assembles more than `(1 + α) × Sz` bytes of a journal's content, where `Sz` is its base's length, the
-content its last opener or the archive's prefix began, requests a snapshot (`α = 1`), and so does a primary whose warm
-`JournalState.BytesSinceBase` exceeds `α × BaseLength` (`ContentLength > (1 + α) × BaseLength`), so a journal which is
-written and rarely read stays bounded too. The archive store's `IsReplaceRequested`, over the key's current token,
-requests one too, well before its per-generation limits refuse an `Append` (§8.1): admission reports the union of
-`JournalState.IsReplaceRequested` and the store's `IsReplaceRequested` at the key's admitted token on each `Accepted`
-answer, and a read reports the union of the assembled-byte ratio and the store's `IsReplaceRequested` at its next
-token. "Replace request" names both triggers, which a read's and an acceptance's `ReplaceRequested` answer. The
-snapshot arrives as an ordinary `Replace`.
+A read or warm primary requests a snapshot when the bytes appended after the journal's base (`BytesSinceBase =
+ContentLength - BaseLength`, where `BaseLength` is the content its last opener or the archive's prefix began) exceed
+`max(ReplaceRequestMinBytes, α × BaseLength)` with `α = 1` and `ReplaceRequestMinBytes = 64 KiB`, keeping both large
+and rarely read journals bounded without triggering frequent snapshots on tiny journals. The archive store's
+`IsReplaceRequested`, over the key's current token, requests one too, well before its per-generation limits refuse an
+`Append` (§8.1): admission reports the union of `JournalState.IsReplaceRequested` and the store's `IsReplaceRequested`
+at the key's admitted token on each `Accepted` answer, and a read reports the union of `JournalState.IsReplaceRequested`
+and the store's `IsReplaceRequested` at its next token. "Replace request" names both triggers, which a read's and an
+acceptance's `ReplaceRequested` answer. The snapshot arrives as an ordinary `Replace`.
 
 ### 8.8 Policy
 
@@ -993,12 +997,12 @@ snapshot arrives as an ordinary `Replace`.
 | --- | --- |
 | `MaxBodyBytes`: an entry's body, recorded per cluster in the store's record, at most the payload limit less a maximal row's overhead (about 64 KiB) | 16 MiB |
 | `MaxMessagesPerWrite`, `MaxMessageBytesPerWrite`: maximum attached `MessageRecord` count and total payload bytes per journal write, recorded per cluster as `max-messages` and `max-message-bytes` alongside `message-channels` | 8, 64 KiB |
-| Batch: entries, bytes, linger (`MaxBatchEntries`, `MaxBatchBytes`) | 256, 1 MiB, 0 (batch what is queued) |
+| Batch: entries, bytes, coalesce threshold (`MaxBatchEntries`, `MaxBatchBytes`) | 256, 1 MiB, 64 KiB (0 linger when idle; coalesce small writes while a batch is in flight) |
 | Rows accepted and not yet proposed, per ledger's admission (`MaxQueuedBytes`); at least the largest batch | 64 MiB |
 | Warm state, per ledger's admission (`WarmStateBytes`), counting each key's state and its planning state, whose folds `ArchivePlan.MaxStateBytes` bounds | 64 MiB; least recently used keys with nothing waiting or in flight are evicted |
 | `ExpiryInterval`: the least time between the starts of a primary's expiry scans, which never overlap; above zero | 1 hour |
 | `TombstoneRetention` | 7 days |
-| History reads the store runs at once, its loads and its owner reads together (`MaxConcurrentHistoryReads`); a read past it waits, in arrival order, and holds its slot only while it reads the archive and the replicas | 4 |
+| History reads the store runs at once, its loads and its owner reads together (`MaxConcurrentHistoryReads`); a read past it waits, in arrival order, and holds its slot only while it reads the archive and the replicas | 64 |
 
 `LedgerAdmission` copies the settings it uses when it is created. `MaxConcurrentHistoryReads` bounds concurrent archive
 store reads and assembled history memory while key indexes and preloaded LSM metadata avoid slow-path ledger scans and

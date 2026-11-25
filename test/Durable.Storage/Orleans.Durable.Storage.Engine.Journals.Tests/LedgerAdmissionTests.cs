@@ -564,7 +564,7 @@ public sealed class LedgerAdmissionTests : IDisposable
         Assert.Empty(ledger.Proposals);
         var write = ledger.WriteAsync(Entry("four"));
         ledger.Durable(0);
-        Assert.Equal(Accepted(V(1), kind == JournalEntryKind.Append), await AnsweredAsync(write));
+        Assert.Equal(Accepted(V(1)), await AnsweredAsync(write));
     }
 
     /// <summary>
@@ -749,7 +749,7 @@ public sealed class LedgerAdmissionTests : IDisposable
         Assert.Equal(Accepted(V(1)), await AnsweredAsync(first));
         foreach (var write in writes)
         {
-            Assert.Equal(Accepted(V(1)), await AnsweredAsync(write));
+            Assert.Equal(Accepted(V(1), replaceRequested: true), await AnsweredAsync(write));
         }
     }
 
@@ -1377,7 +1377,7 @@ public sealed class LedgerAdmissionTests : IDisposable
         ledger.CheckVersions();
     }
 
-    private static JournalWriteOutcome Accepted(JournalVersion version, bool replaceRequested = true) => new(new JournalWriteOutcome.Accepted(version, ReplaceRequested: replaceRequested));
+    private static JournalWriteOutcome Accepted(JournalVersion version, bool replaceRequested = false) => new(new JournalWriteOutcome.Accepted(version, ReplaceRequested: replaceRequested));
 
     private static JournalWriteOutcome Rejected(JournalVersion currentVersion) => new(new JournalWriteOutcome.Rejected(currentVersion));
 

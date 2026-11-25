@@ -108,12 +108,20 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         _ = admission.LoadAndLeaveAsync(key);
     };
 
+    /// <summary>
+    /// Bytes of unbatched entries required to pipeline an additional concurrent batch while another batch is already in
+    /// flight (journals.md §8.1): idle traffic proposes immediately (<c>_outstanding == 0</c>), small concurrent writes
+    /// coalesce into one multi-row batch while an in-flight batch completes, and large payloads pipeline at full window.
+    /// </summary>
+    internal const int CoalesceThresholdBytes = 64 * 1024;
+
     private readonly LedgerId _ledger;
     private readonly KeyRange _range;
     private readonly int _window;
     private readonly int _maxBatchLength;
     private readonly int _maxBatchEntries;
     private readonly int _maxBatchBytes;
+    private readonly int _coalesceThresholdBytes;
     private readonly long _maxQueuedBytes;
     private readonly long _maxProposalBytes;
     private readonly JournalStoreOptions _options;
@@ -156,6 +164,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
     private int _inlineLength;
     private long _inlineBatchNumber;
     private long _queuedBytes;
+    private long _unbatchedBytes;
     private long _appliedBelow;
     private int _outstanding;
 
@@ -238,6 +247,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         _messageHandlers = handlers;
         _maxBatchEntries = _options.MaxBatchEntries;
         _maxBatchBytes = _options.MaxBatchBytes;
+        _coalesceThresholdBytes = Math.Min(CoalesceThresholdBytes, _maxBatchBytes);
         _maxQueuedBytes = _options.MaxQueuedBytes;
         _maxProposalBytes = maxProposalBytes;
         _tombstoneRetention = _options.TombstoneRetention;
@@ -1527,6 +1537,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                     }
 
                     _unbatched.Enqueue(head);
+                    _unbatchedBytes += head.RowLength;
                     after.Pump = true;
                     break;
                 case Decision.Reject when ReloadsBeforeRejecting(key, head):
@@ -1612,10 +1623,25 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         _ = _keys.Remove(victim.RowKey);
     }
 
-    /// <summary>Starts the pump when entries wait for a batch and the window has room. Under the lock.</summary>
+    /// <summary>
+    /// Returns whether the pump should open a batch now under <see cref="_lock"/>: always when idle
+    /// (<c>_outstanding == 0</c>), in deterministic inline mode, while draining for cooperative release, while writers
+    /// wait for queue room, or once unbatched entries reach <c>MaxBatchEntries</c> or <c>CoalesceThresholdBytes</c>;
+    /// otherwise lets small concurrent writes coalesce behind the in-flight batch until it completes (journals.md §8.1).
+    /// </summary>
+    private bool CanProposeLocked() =>
+        _outstanding < _window
+        && (_outstanding == 0
+            || _inline
+            || _draining
+            || _waitingForRoom.Count > 0
+            || _unbatched.Count >= _maxBatchEntries
+            || _unbatchedBytes >= _coalesceThresholdBytes);
+
+    /// <summary>Starts the pump when entries wait for a batch and the admission should propose now. Under the lock.</summary>
     private bool TryStartPumping()
     {
-        if (_pumping || _fenced || _unbatched.Count == 0 || _outstanding >= _window)
+        if (_pumping || _fenced || _unbatched.Count == 0 || !CanProposeLocked())
         {
             return false;
         }
@@ -1914,7 +1940,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             long batchNumber = 0;
             lock (_lock)
             {
-                if (_fenced || _unbatched.Count == 0 || _outstanding >= _window)
+                if (_fenced || _unbatched.Count == 0 || !CanProposeLocked())
                 {
                     _pumping = false;
                     TryCompleteDrainLocked(ref after);
@@ -2036,7 +2062,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                     after.Pump = false;
                     if (singleBatchInline)
                     {
-                        if (_fenced || _unbatched.Count == 0 || _outstanding >= _window)
+                        if (_fenced || _unbatched.Count == 0 || !CanProposeLocked())
                         {
                             _pumping = false;
                             stopPumping = true;
@@ -2092,7 +2118,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             var stopped = false;
             lock (_lock)
             {
-                if (_fenced || _unbatched.Count == 0 || _outstanding >= _window)
+                if (_fenced || _unbatched.Count == 0 || !CanProposeLocked())
                 {
                     _pumping = false;
                     stopped = true;
@@ -2205,6 +2231,8 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         if (_unbatched.Count == 1)
         {
             var single = _unbatched.Dequeue();
+            _unbatchedBytes -= single.RowLength;
+            Debug.Assert(_unbatchedBytes == 0, "Unbatched bytes equal zero when the queue empties.");
             single.Taken = true;
             var singleLength = LedgerBatch.MaxHeaderLength(single.RowCount) + single.RowLength;
             return (new PendingBatch(single), singleLength);
@@ -2231,9 +2259,11 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         }
 
         var length = LedgerBatch.MaxHeaderLength(totalRows) + rowsBytes;
+        _unbatchedBytes -= rowsBytes;
         if (count == 1)
         {
             var single = _unbatched.Dequeue();
+            Debug.Assert(_unbatched.Count != 0 || _unbatchedBytes == 0, "Unbatched bytes equal zero when the queue empties.");
             single.Taken = true;
             return (new PendingBatch(single), (int)length);
         }
@@ -2246,6 +2276,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             entries[index] = item;
         }
 
+        Debug.Assert(_unbatched.Count != 0 || _unbatchedBytes == 0, "Unbatched bytes equal zero when the queue empties.");
         return (new PendingBatch(entries, totalRows, hasMessages), (int)length);
     }
 
@@ -2327,7 +2358,8 @@ internal sealed class LedgerAdmission : IAsyncDisposable
 
                 if (invokeAfterApply)
                 {
-                    // JS-I12 race mutant: invokes OnBatchDurable after callers received Accepted.
+                    // JS-I12 race mutant: yields so callers observe Accepted before OnBatchDurable.
+                    await Task.Yield();
                     InvokeMessageSessions(proposal.Entries, durableSlot);
                 }
 
@@ -2610,8 +2642,11 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         while (_unbatched.TryDequeue(out var pending))
         {
             _queuedBytes -= pending.RowLength;
+            _unbatchedBytes -= pending.RowLength;
             after.Answer(pending, FencedOutcome);
         }
+
+        Debug.Assert(_unbatchedBytes == 0, "Unbatched bytes equal zero after fencing.");
 
         foreach (var key in _keys.Values)
         {
@@ -2650,6 +2685,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(deadline, TimeSpan.Zero);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var after = default(After);
         Task<bool>? waitDrained = null;
         lock (_lock)
         {
@@ -2659,12 +2695,20 @@ internal sealed class LedgerAdmission : IAsyncDisposable
             }
 
             _draining = true;
+            if (_unbatched.Count > 0)
+            {
+                after.Pump = true;
+                ResolvePumpLocked(ref after);
+            }
+
             if (!IsIdleLocked())
             {
                 _drained ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 waitDrained = _drained.Task;
             }
         }
+
+        Run(ref after);
 
         if (waitDrained is null)
         {

@@ -80,22 +80,24 @@ public sealed class JournalStoreTests : IDisposable
     }
 
     /// <summary>
-    /// The archive store's limits and its replace request (journals.md §2.4, §8.1 step 4): an accepted write carries the
-    /// store's request at the key's token, and a read its own, which its content past twice its base's bytes also gives;
-    /// an <c>Append</c> past the store's per-generation limits is answered <c>ReplaceRequired</c>, with no effect, and a
-    /// <c>Replace</c> then opens a generation, whose request starts afresh.
+    /// The archive store's limits and its replace request (journals.md §2.4, §8.1 step 4, §8.7): an accepted write carries
+    /// the store's request at the key's token, and a read its own, which bytes appended past
+    /// <c>max(ReplaceRequestMinBytes, BaseLength)</c> also give; an <c>Append</c> past the store's per-generation limits
+    /// is answered <c>ReplaceRequired</c>, with no effect, and a <c>Replace</c> then opens a generation, whose request
+    /// starts afresh.
     /// </summary>
     [Fact]
     public async Task AWriteAndAReadCarryTheStoresReplaceRequestAndItsLimitsAnswerReplaceRequired()
     {
+        Assert.Equal(64, new JournalStoreOptions().MaxConcurrentHistoryReads);
         await using var cluster = await JournalCluster.StartAsync(memory: new InMemoryArchiveStore(maxAppends: 3, replaceRequestAppends: 2));
 
-        // On an empty base (0 bytes), the very first non-empty Append passes twice the base (journals.md §8.7) and
-        // requests a Replace on Accepted as well as on Read, even below the store's append threshold.
+        // Tiny appends stay below the 64 KiB size floor (journals.md §8.7), so only the archive store's append threshold
+        // triggers ReplaceRequested on append 2 and append 3.
         var one = AcceptedHint(await cluster.AppendAsync("a", Origin, "1"));
         var two = AcceptedHint(await cluster.AppendAsync("a", one.Version, "2"));
         var full = AcceptedHint(await cluster.AppendAsync("a", two.Version, "3"));
-        Assert.Equal((true, true, true), (one.ReplaceRequested, two.ReplaceRequested, full.ReplaceRequested));
+        Assert.Equal((false, true, true), (one.ReplaceRequested, two.ReplaceRequested, full.ReplaceRequested));
 
         Assert.Equal(new JournalWriteOutcome(JournalWriteOutcome.ReplaceRequired.Instance), await cluster.AppendAsync("a", full.Version, "4"));
         Assert.Equal((full.Version, true, "123", true), await ReadHintAsync(cluster, "a"));
@@ -104,23 +106,26 @@ public sealed class JournalStoreTests : IDisposable
         Assert.False(three.ReplaceRequested);
         Assert.Equal((three.Version, true, "SSSS", false), await ReadHintAsync(cluster, "a"));
 
-        // Within twice its base's bytes, both the write and the read ask for a replace by the store's request alone.
+        // Below the size floor, both the write and the read ask for a replace by the store's request alone.
         var four = AcceptedHint(await cluster.AppendAsync("a", three.Version, "4"));
         var five = AcceptedHint(await cluster.AppendAsync("a", four.Version, "5"));
         Assert.Equal((false, true), (four.ReplaceRequested, five.ReplaceRequested));
         Assert.Equal((five.Version, true, "SSSS45", true), await ReadHintAsync(cluster, "a"));
 
-        // Past twice its base's bytes, both warm state on Accepted and the read ask by size alone (journals.md §8.7).
+        // Size-based request honors the 64 KiB floor (ReplaceRequestMinBytes): exactly 64 KiB appended stays false;
+        // 64 KiB + 1 byte flips both Accepted and ReadAsync to true even below the store's append threshold (journals.md §8.7).
+        var atFloor = new string('a', (int)JournalState.ReplaceRequestMinBytes);
         var six = AcceptedHint(await cluster.ReplaceAsync("a", five.Version, "SS"));
         Assert.False(six.ReplaceRequested);
-        var within = AcceptedHint(await cluster.AppendAsync("a", six.Version, "12"));
+        var within = AcceptedHint(await cluster.AppendAsync("a", six.Version, atFloor));
         Assert.False(within.ReplaceRequested);
-        Assert.Equal((within.Version, true, "SS12", false), await ReadHintAsync(cluster, "a"));
+        Assert.Equal((within.Version, true, "SS" + atFloor, false), await ReadHintAsync(cluster, "a"));
 
+        var overFloor = atFloor + "!";
         var reset = AcceptedHint(await cluster.ReplaceAsync("a", within.Version, "SS"));
-        var seven = AcceptedHint(await cluster.AppendAsync("a", reset.Version, "123"));
+        var seven = AcceptedHint(await cluster.AppendAsync("a", reset.Version, overFloor));
         Assert.True(seven.ReplaceRequested);
-        Assert.Equal((seven.Version, true, "SS123", true), await ReadHintAsync(cluster, "a"));
+        Assert.Equal((seven.Version, true, "SS" + overFloor, true), await ReadHintAsync(cluster, "a"));
     }
 
     /// <summary>
