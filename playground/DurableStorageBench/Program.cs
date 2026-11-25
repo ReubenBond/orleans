@@ -207,6 +207,7 @@ var runtimeInfo = new BenchRuntimeInfo(
     ClusterId: benchOptions.ClusterId,
     ServiceId: benchOptions.ServiceId,
     SiloName: siloName,
+    HttpPort: benchOptions.HttpPort,
     WalStorageType: walStorageType,
     LsmContainer: storage.LsmContainer,
     JobsContainer: storage.JobsContainer,
@@ -222,6 +223,10 @@ builder.Services.AddSingleton<SiloTelemetrySampler>();
 builder.Services.AddHostedService(static sp => sp.GetRequiredService<SiloTelemetrySampler>());
 builder.Services.AddSingleton<ClusterTelemetryAggregator>();
 builder.Services.AddSingleton(sp => new BenchResultsUploader(resultsContainerClient, sp.GetRequiredService<ILogger<BenchResultsUploader>>()));
+builder.Services.AddHttpClient("bench-peer", static client =>
+{
+    client.Timeout = Timeout.InfiniteTimeSpan;
+});
 builder.Services.AddSingleton<BenchRunner>();
 
 var clusteringTableName = BenchBootstrapHelpers.SanitizeAzureTableName(storage.ClusteringTableName, benchOptions.ClusterId);
@@ -234,6 +239,15 @@ builder.UseOrleans(silo =>
             options.ServiceId = benchOptions.ServiceId;
         })
         .Configure<SiloOptions>(options => options.SiloName = siloName)
+        .Configure<ClusterMembershipOptions>(options =>
+        {
+            builder.Configuration.GetSection("Bench:Membership").Bind(options);
+            Console.WriteLine(
+                $"[BenchStartup] ClusterMembershipOptions: ProbeTimeout={options.ProbeTimeout} MinProbeTimeout={options.MinProbeTimeout} " +
+                $"MaxProbeTimeout={options.MaxProbeTimeout} NumMissedProbesLimit={options.NumMissedProbesLimit} " +
+                $"NumVotesForDeathDeclaration={options.NumVotesForDeathDeclaration} TableRefreshTimeout={options.TableRefreshTimeout} " +
+                $"IAmAliveTablePublishTimeout={options.IAmAliveTablePublishTimeout}");
+        })
         .ConfigureEndpoints(advertisedIp, benchOptions.SiloPort, benchOptions.GatewayPort)
         .UseAzureStorageClustering(options =>
         {
@@ -328,7 +342,7 @@ builder.UseOrleans(silo =>
             ds.Node.MaxForwardCallBytes = 128L << 20;
 
             ds.Control.Replicas = resolvedVoters!.Count;
-            ds.Control.LedgersPerNode = 8;
+            ds.Control.LedgersPerNode = 21; // 63 open ledgers across 3 nodes (~32.8% / 32.8% / 34.4% dyadic keyspace balance)
             ds.Control.SequencerWindow = 64;
             ds.Control.MaxConcurrentDrains = 8;
 
@@ -440,6 +454,22 @@ app.MapPost("/bench/run", static async (
     try
     {
         var result = await runner.RunAsync(request, ct);
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/bench/run-local", static async (
+    LocalBenchRequest request,
+    BenchRunner runner,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var result = await runner.RunLocalAsync(request, ct);
         return Results.Ok(result);
     }
     catch (ArgumentException ex)

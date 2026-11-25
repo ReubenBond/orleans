@@ -42,8 +42,108 @@ public sealed class BenchRunRequest
 
     public int CallTimeoutMs { get; set; } = 5000;
 
+    public bool Distributed { get; set; }
+
+    public bool LocalPrimaryOnly { get; set; }
+
+    public List<string>? DriverSilos { get; set; }
+
+    public List<string>? ExcludeSilos { get; set; }
+
     public string? RunTag { get; set; }
 }
+
+public sealed class LocalBenchRequest
+{
+    public string Scenario { get; set; } = "s1-raw-write";
+
+    public string RunTag { get; set; } = string.Empty;
+
+    public int DriverIndex { get; set; }
+
+    public int Grains { get; set; } = 1000;
+
+    public int Concurrency { get; set; } = 32;
+
+    public int DurationSeconds { get; set; } = 30;
+
+    public int WarmupSeconds { get; set; } = 5;
+
+    public int PayloadBytes { get; set; } = 1024;
+
+    public int DelayMs { get; set; } = 1500;
+
+    public bool DeactivateAfterSchedule { get; set; } = true;
+
+    public double ReadRatio { get; set; } = 0.5;
+
+    public double ZipfExponent { get; set; } = 1.0;
+
+    public int ColdSampleGrains { get; set; }
+
+    public bool LocalPrimaryOnly { get; set; } = true;
+
+    public int RetryBackoffMs { get; set; } = 100;
+
+    public int CallTimeoutMs { get; set; } = 5000;
+
+    public int VerifyTimeoutSeconds { get; set; } = 120;
+
+    public double ExpectedKeyspaceFraction { get; set; }
+
+    public int LocalLedgerCount { get; set; }
+
+    public int MaxLatencySamples { get; set; } = 50_000;
+}
+
+public sealed record LocalBenchResponse(
+    string SiloAddress,
+    string SiloName,
+    int? Ordinal,
+    double KeyspaceFraction,
+    int LocalLedgerCount,
+    int LocalGrains,
+    int LocalConcurrency,
+    long Ops,
+    long Errors,
+    double ElapsedMs,
+    double OpsPerSec,
+    long ReadOps,
+    long WriteOps,
+    LatencyStats LatencyMs,
+    double[] LatencySamplesMs,
+    LatencyStats? SecondaryLatencyMs,
+    double[]? SecondaryLatencySamplesMs,
+    List<FailoverSecondBucket>? TimeSeries,
+    Dictionary<string, long>? ErrorsByType,
+    int TouchedGrains,
+    int VerifiedGrains,
+    int FailedVerifyGrains,
+    int LostWriteCount,
+    List<LostWriteDetail>? LostWriteDetails,
+    SiloMemorySnapshot Memory);
+
+public sealed record PerSiloBenchSummary(
+    string SiloAddress,
+    string SiloName,
+    int? Ordinal,
+    double KeyspaceFraction,
+    int LocalLedgerCount,
+    int LocalGrains,
+    int LocalConcurrency,
+    long Ops,
+    long Errors,
+    double ElapsedMs,
+    double OpsPerSec,
+    LatencyStats LatencyMs,
+    LatencyStats? SecondaryLatencyMs);
+
+public sealed record KeyspaceOwnership(
+    string PrimaryNode,
+    string? SiloAddress,
+    int? Ordinal,
+    int LedgerCount,
+    double KeyspaceFraction);
 
 public sealed class RollAndDrainRequest
 {
@@ -90,7 +190,10 @@ public sealed record S1RawWriteResult(
     double OpsPerSec,
     LatencyStats LatencyMs,
     BlobCounterSnapshot MeasuredBlobDelta,
-    List<SiloMemorySnapshot> MemoryBySilo);
+    List<SiloMemorySnapshot> MemoryBySilo,
+    bool Distributed = false,
+    double? ClusterOpsPerSec = null,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S2PopulatePhaseResult(
     int Grains,
@@ -102,7 +205,8 @@ public sealed record S2PopulatePhaseResult(
     double OpsPerSec,
     LatencyStats LatencyMs,
     BlobCounterSnapshot BlobDelta,
-    List<SiloMemorySnapshot> MemoryBySilo);
+    List<SiloMemorySnapshot> MemoryBySilo,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S2MixPhaseResult(
     int DurationSeconds,
@@ -117,7 +221,8 @@ public sealed record S2MixPhaseResult(
     LatencyStats ReadLatencyMs,
     LatencyStats WriteLatencyMs,
     LatencyStats OverallLatencyMs,
-    BlobCounterSnapshot BlobDelta);
+    BlobCounterSnapshot BlobDelta,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S2ColdReadPhaseResult(
     int SampleGrains,
@@ -126,13 +231,15 @@ public sealed record S2ColdReadPhaseResult(
     double ElapsedMs,
     double OpsPerSec,
     LatencyStats LatencyMs,
-    BlobCounterSnapshot BlobDelta);
+    BlobCounterSnapshot BlobDelta,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S2LargeJournalsResult(
     S2PopulatePhaseResult Populate,
     S2MixPhaseResult Mix,
     RollAndDrainResult? RollAndDrain,
-    S2ColdReadPhaseResult? ColdRead);
+    S2ColdReadPhaseResult? ColdRead,
+    bool Distributed = false);
 
 public sealed record S3JobsEarlyCancelResult(
     int Grains,
@@ -146,7 +253,10 @@ public sealed record S3JobsEarlyCancelResult(
     LatencyStats ScheduleLatencyMs,
     LatencyStats CancelLatencyMs,
     BlobCounterSnapshot MeasuredBlobDelta,
-    RollAndDrainResult? PostRunRollAndDrain);
+    RollAndDrainResult? PostRunRollAndDrain,
+    bool Distributed = false,
+    double? ClusterCyclesPerSec = null,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S4aJobsOpenFireResult(
     int RequestedJobs,
@@ -160,7 +270,9 @@ public sealed record S4aJobsOpenFireResult(
     bool AllExecuted,
     double TotalWaitMs,
     LatencyStats ScheduleLatencyMs,
-    LatencyStats DeliveryLagMs);
+    LatencyStats DeliveryLagMs,
+    bool Distributed = false,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record S4bJobsSealedDrainResult(
     int RequestedJobs,
@@ -176,7 +288,9 @@ public sealed record S4bJobsSealedDrainResult(
     LatencyStats ScheduleLatencyMs,
     RollAndDrainResult? Drain,
     long SealedShardBlobPuts,
-    LatencyStats DeliveryLagMs);
+    LatencyStats DeliveryLagMs,
+    bool Distributed = false,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 public sealed record FailoverSecondBucket(
     int Second,
@@ -223,7 +337,9 @@ public sealed record S6FailoverResult(
     int FailedVerifyGrains,
     int LostWriteCount,
     List<LostWriteDetail> LostWriteDetails,
-    FailoverJobVerification? Jobs);
+    FailoverJobVerification? Jobs,
+    bool Distributed = false,
+    List<PerSiloBenchSummary>? PerSilo = null);
 
 /// <summary>
 /// Uploads benchmark JSON reports to an optional standard Azure Blob Storage account using an isolated

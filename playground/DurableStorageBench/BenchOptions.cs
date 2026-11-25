@@ -87,6 +87,7 @@ public sealed record BenchRuntimeInfo(
     string ClusterId,
     string ServiceId,
     string SiloName,
+    int HttpPort,
     string WalStorageType,
     string LsmContainer,
     string JobsContainer,

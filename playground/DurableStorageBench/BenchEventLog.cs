@@ -205,6 +205,41 @@ internal sealed class ObservingWalStorage(WalStorage inner, BenchEventLogStore e
             return result;
         }
 
+        public override async ValueTask<PreparedWalFile> PrepareFileAsync(
+            long preallocatedLength, WalFillPace? pace, CancellationToken cancellationToken)
+        {
+            var sw = Stopwatch.StartNew();
+            var prepared = await innerDir.PrepareFileAsync(preallocatedLength, pace, cancellationToken).ConfigureAwait(false);
+            sw.Stop();
+            eventLog.Record(
+                "Bench.Wal",
+                eventId: 7006,
+                level: "Information",
+                message: string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"WalFilePrepared dir={_dirName} preallocatedMb={preallocatedLength / (1024.0 * 1024.0):F1} elapsedMs={sw.Elapsed.TotalMilliseconds:F1}"),
+                writeConsole: true);
+            return prepared;
+        }
+
+        public override async ValueTask<WalFile> PublishPreparedFileAsync(
+            PreparedWalFile prepared, ulong file, ArcBuffer header, CancellationToken cancellationToken)
+        {
+            var preallocatedLength = prepared.Length;
+            var sw = Stopwatch.StartNew();
+            var result = await innerDir.PublishPreparedFileAsync(prepared, file, header, cancellationToken).ConfigureAwait(false);
+            sw.Stop();
+            eventLog.Record(
+                "Bench.Wal",
+                eventId: 7007,
+                level: "Information",
+                message: string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"WalFilePublished dir={_dirName} file={file} preallocatedMb={preallocatedLength / (1024.0 * 1024.0):F1} elapsedMs={sw.Elapsed.TotalMilliseconds:F3}"),
+                writeConsole: true);
+            return result;
+        }
+
         public override ValueTask<WalFile> OpenFileAsync(ulong file, CancellationToken cancellationToken) =>
             innerDir.OpenFileAsync(file, cancellationToken);
 

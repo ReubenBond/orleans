@@ -10,12 +10,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Bench;
 
-public sealed class BenchRunner(
+public sealed partial class BenchRunner(
     BenchRuntimeInfo runtimeInfo,
     IGrainFactory grainFactory,
     ILocalSiloDetails localSilo,
     ClusterTelemetryAggregator telemetry,
     BenchResultsUploader resultsUploader,
+    IHttpClientFactory httpClientFactory,
     IServiceProvider services,
     ILogger<BenchRunner> logger)
 {
@@ -34,11 +35,13 @@ public sealed class BenchRunner(
         object? durableStatusObj = null;
         var openLedgers = new List<object>();
         var closedLedgers = new List<object>();
+        var keyspaceByPrimary = new Dictionary<string, KeyspaceOwnership>(StringComparer.Ordinal);
 
         if (runtimeInfo.Mode == BenchMode.Clog)
         {
             var dsStatus = services.GetService<DurableStorageStatus>();
             var routing = services.GetService<LocalRouting>();
+            var registryResolver = services.GetService<NodeRegistryResolver>();
 
             if (dsStatus is not null)
             {
@@ -77,22 +80,42 @@ public sealed class BenchRunner(
                 try
                 {
                     var map = await current.View.ReadAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+                    var reg = registryResolver?.Current;
+                    var nodeAgg = new Dictionary<NodeId, (int Count, double Fraction)>();
+
                     foreach (var ledger in map.Ledgers)
                     {
+                        var fraction = Math.Pow(2.0, -ledger.Range.Depth);
                         var info = new
                         {
                             id = ledger.Id.Value,
                             primary = ledger.Primary.Node.ToString(),
+                            depth = ledger.Range.Depth,
+                            keyspaceFraction = Math.Round(fraction, 6),
                             isOpen = ledger.IsOpen,
                         };
                         if (ledger.IsOpen)
                         {
                             openLedgers.Add(info);
+                            var cur = nodeAgg.GetValueOrDefault(ledger.Primary.Node);
+                            nodeAgg[ledger.Primary.Node] = (cur.Count + 1, cur.Fraction + fraction);
                         }
                         else
                         {
                             closedLedgers.Add(info);
                         }
+                    }
+
+                    foreach (var (nodeId, agg) in nodeAgg.OrderBy(static kv => kv.Key.ToString(), StringComparer.Ordinal))
+                    {
+                        var entry = reg?.Find(nodeId);
+                        var key = nodeId.ToString();
+                        keyspaceByPrimary[key] = new KeyspaceOwnership(
+                            PrimaryNode: key,
+                            SiloAddress: entry?.Silo.ToParsableString(),
+                            Ordinal: entry?.Ordinal,
+                            LedgerCount: agg.Count,
+                            KeyspaceFraction: Math.Round(agg.Fraction, 6));
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -123,6 +146,7 @@ public sealed class BenchRunner(
             openLedgers,
             closedLedgerCount = closedLedgers.Count,
             closedLedgers,
+            keyspaceByPrimary,
             blobCounters = new
             {
                 cluster = clusterSnap.AggregateBlobs,
@@ -253,17 +277,29 @@ public sealed class BenchRunner(
         var beforeAll = await telemetry.SnapshotAsync(runTag: null, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
-            "Starting benchmark scenario={Scenario} runTag={RunTag} mode={Mode} grains={Grains} concurrency={Concurrency} duration={Duration}s",
-            scenario, runTag, runtimeInfo.Mode, request.Grains, request.Concurrency, request.DurationSeconds);
+            "Starting benchmark scenario={Scenario} runTag={RunTag} mode={Mode} distributed={Distributed} localPrimaryOnly={LocalPrimaryOnly} grains={Grains} concurrency={Concurrency} duration={Duration}s",
+            scenario, runTag, runtimeInfo.Mode, request.Distributed, request.LocalPrimaryOnly, request.Grains, request.Concurrency, request.DurationSeconds);
 
         object scenarioResult = scenario switch
         {
-            "s1-raw-write" => await RunS1RawWriteAsync(request, runTag, cancellationToken).ConfigureAwait(false),
-            "s2-large-journals" => await RunS2LargeJournalsAsync(request, runTag, cancellationToken).ConfigureAwait(false),
-            "s3-jobs-early-cancel" => await RunS3JobsEarlyCancelAsync(request, runTag, cancellationToken).ConfigureAwait(false),
-            "s4a-jobs-open-fire" => await RunS4aJobsOpenFireAsync(request, runTag, cancellationToken).ConfigureAwait(false),
-            "s4b-jobs-sealed-drain" => await RunS4bJobsSealedDrainAsync(request, runTag, cancellationToken).ConfigureAwait(false),
-            "s6-failover" => await RunS6FailoverAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s1-raw-write" => request.Distributed
+                ? await RunS1RawWriteDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS1RawWriteAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s2-large-journals" => request.Distributed
+                ? await RunS2LargeJournalsDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS2LargeJournalsAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s3-jobs-early-cancel" => request.Distributed
+                ? await RunS3JobsEarlyCancelDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS3JobsEarlyCancelAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s4a-jobs-open-fire" => request.Distributed
+                ? await RunS4aJobsOpenFireDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS4aJobsOpenFireAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s4b-jobs-sealed-drain" => request.Distributed
+                ? await RunS4bJobsSealedDrainDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS4bJobsSealedDrainAsync(request, runTag, cancellationToken).ConfigureAwait(false),
+            "s6-failover" => request.Distributed
+                ? await RunS6FailoverDistributedAsync(request, runTag, cancellationToken).ConfigureAwait(false)
+                : await RunS6FailoverAsync(request, runTag, cancellationToken).ConfigureAwait(false),
             _ => throw new ArgumentException(
                 $"Unknown scenario '{request.Scenario}'. Supported: s1-raw-write, s2-large-journals, s3-jobs-early-cancel, s4a-jobs-open-fire, s4b-jobs-sealed-drain, s6-failover.",
                 nameof(request)),
@@ -332,6 +368,7 @@ public sealed class BenchRunner(
         var payload = CreatePayload(Math.Max(1, req.PayloadBytes));
         var warmup = TimeSpan.FromSeconds(Math.Max(0, req.WarmupSeconds));
         var duration = TimeSpan.FromSeconds(Math.Max(1, req.DurationSeconds));
+        var keys = await GenerateGrainKeysAsync<IBenchJournalGrain>(runTag, "s1", grains, driverIndex: 0, req.LocalPrimaryOnly, ct).ConfigureAwait(false);
 
         if (warmup > TimeSpan.Zero)
         {
@@ -340,8 +377,8 @@ public sealed class BenchRunner(
                 warmup,
                 async (workerId, iter, token) =>
                 {
-                    var keyIdx = (int)((iter * concurrency + workerId) % grains);
-                    var grain = grainFactory.GetGrain<IBenchJournalGrain>($"{runTag}:s1:{keyIdx}");
+                    var keyIdx = (int)((iter * concurrency + workerId) % keys.Length);
+                    var grain = grainFactory.GetGrain<IBenchJournalGrain>(keys[keyIdx]);
                     await grain.WriteAsync(payload).ConfigureAwait(false);
                 },
                 recordStats: false,
@@ -354,8 +391,8 @@ public sealed class BenchRunner(
             duration,
             async (workerId, iter, token) =>
             {
-                var keyIdx = Random.Shared.Next(grains);
-                var grain = grainFactory.GetGrain<IBenchJournalGrain>($"{runTag}:s1:{keyIdx}");
+                var keyIdx = Random.Shared.Next(keys.Length);
+                var grain = grainFactory.GetGrain<IBenchJournalGrain>(keys[keyIdx]);
                 await grain.WriteAsync(payload).ConfigureAwait(false);
             },
             recordStats: true,
