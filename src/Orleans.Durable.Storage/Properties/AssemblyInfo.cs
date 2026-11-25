@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.Durable.Storage.Tests")]
 [assembly: InternalsVisibleTo("Orleans.Durable.Storage.Simulation.Tests")]
 [assembly: InternalsVisibleTo("Orleans.Durable.Storage.Benchmarks")]
+[assembly: InternalsVisibleTo("Orleans.Durable.Storage.Bench")]
