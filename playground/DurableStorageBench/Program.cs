@@ -362,6 +362,13 @@ builder.UseOrleans(silo =>
             {
                 ds.Node.ArchiveStore = ArchiveStoreKind.Lsm;
             }
+
+            Console.WriteLine(
+                $"[BenchStartup] DurableStorageOptions: WalFileSize={ds.Node.WalFileSize / (1024 * 1024)}MiB Prealloc={ds.Node.PreallocateWalFiles} " +
+                $"WalRetention={ds.Node.WalRetentionBytes / (1024L * 1024 * 1024)}GiB MaxSegment={ds.Node.MaxSegmentBytes / (1024 * 1024)}MiB " +
+                $"MaxConcurrentHistoryReads={ds.Node.Journals.MaxConcurrentHistoryReads} LedgersPerNode={ds.Control.LedgersPerNode} " +
+                $"MaxConcurrentTransitions={ds.Control.MaxConcurrentTransitions} MaxConcurrentHandOffs={ds.Control.MaxConcurrentHandOffs} " +
+                $"SequencerWindow={ds.Control.SequencerWindow} MaxConcurrentDrains={ds.Control.MaxConcurrentDrains}");
         }));
 
         var rocksDbWriteBufferBytes = Math.Max(16L << 20, benchOptions.RocksDbWriteBufferBytes);

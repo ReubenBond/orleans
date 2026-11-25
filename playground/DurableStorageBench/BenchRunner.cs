@@ -774,7 +774,6 @@ public sealed partial class BenchRunner(
         var grains = Math.Max(1, req.Grains);
         var concurrency = Math.Max(1, req.Concurrency);
         var durationSeconds = Math.Max(1, req.DurationSeconds);
-        var duration = TimeSpan.FromSeconds(durationSeconds);
         var payload = CreatePayload(Math.Max(1, req.PayloadBytes));
         var retryBackoff = TimeSpan.FromMilliseconds(Math.Max(10, req.RetryBackoffMs));
         var callTimeout = TimeSpan.FromMilliseconds(Math.Max(500, req.CallTimeoutMs));
@@ -816,142 +815,25 @@ public sealed partial class BenchRunner(
             }
         }
 
-        // Continuous load window with 1-second buckets & acknowledged monotonic counter tracking.
-        var lastAcked = new long[grains];
-        var buckets = new ConcurrentDictionary<int, SecondBucketAccumulator>();
-        for (var s = 0; s < durationSeconds; s++)
-        {
-            buckets[s] = new SecondBucketAccumulator();
-        }
-
-        var errorsByType = new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
-        var overallReservoir = new LatencyReservoir(MaxLatencyReservoir);
-        long totalOps = 0;
-        long totalErrors = 0;
-
-        var loadStartUtc = DateTimeOffset.UtcNow;
-        var loadSw = Stopwatch.StartNew();
-
-        var workers = Enumerable.Range(0, concurrency).Select(_ => Task.Run(async () =>
-        {
-            while (loadSw.Elapsed < duration && !ct.IsCancellationRequested)
-            {
-                var idx = Random.Shared.Next(grains);
-                var grain = grainFactory.GetGrain<IBenchJournalGrain>($"{runTag}:s6:{idx}");
-                var opSw = Stopwatch.StartNew();
-                try
-                {
-                    var returnedVersion = await grain.IncrementAndWriteAsync(payload)
-                        .WaitAsync(callTimeout, ct)
-                        .ConfigureAwait(false);
-                    opSw.Stop();
-
-                    AtomicMax(ref lastAcked[idx], returnedVersion);
-                    var sec = Math.Max(0, (int)loadSw.Elapsed.TotalSeconds);
-                    var bucket = buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator());
-                    var ms = opSw.Elapsed.TotalMilliseconds;
-                    bucket.RecordSuccess(ms);
-                    overallReservoir.Add(ms);
-                    Interlocked.Increment(ref totalOps);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    var sec = Math.Max(0, (int)loadSw.Elapsed.TotalSeconds);
-                    var bucket = buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator());
-                    bucket.RecordError();
-                    Interlocked.Increment(ref totalErrors);
-
-                    var errKey = ClassifyException(ex);
-                    errorsByType.AddOrUpdate(errKey, 1, static (_, c) => c + 1);
-
-                    try
-                    {
-                        await Task.Delay(retryBackoff, ct).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                }
-            }
-        }, ct)).ToArray();
-
-        await Task.WhenAll(workers).ConfigureAwait(false);
-        loadSw.Stop();
-
-        var maxSecond = Math.Max(durationSeconds - 1, buckets.Keys.DefaultIfEmpty(0).Max());
-        var timeSeries = new List<FailoverSecondBucket>(maxSecond + 1);
-        for (var s = 0; s <= maxSecond; s++)
-        {
-            var acc = buckets.GetValueOrDefault(s);
-            timeSeries.Add(acc is not null
-                ? acc.Build(s, loadStartUtc.AddSeconds(s))
-                : new FailoverSecondBucket(s, loadStartUtc.AddSeconds(s), 0, 0, 0, 0, 0, 0, 0));
-        }
-
-        // Verify durable acknowledged writes across all touched grains (with retries during post-failover settle).
-        var touchedIndices = new List<int>();
-        for (var i = 0; i < grains; i++)
-        {
-            if (Volatile.Read(ref lastAcked[i]) > 0)
-            {
-                touchedIndices.Add(i);
-            }
-        }
-
-        var verifyDeadline = DateTimeOffset.UtcNow + verifyTimeout;
-        var verifiedGrains = 0;
-        var failedVerifyGrains = 0;
-        var lostWrites = new ConcurrentBag<LostWriteDetail>();
-
-        await Parallel.ForEachAsync(
-            touchedIndices,
-            new ParallelOptions { MaxDegreeOfParallelism = Math.Min(concurrency, 64), CancellationToken = ct },
-            async (idx, token) =>
-            {
-                var grainId = $"{runTag}:s6:{idx}";
-                var expected = Volatile.Read(ref lastAcked[idx]);
-                var grain = grainFactory.GetGrain<IBenchJournalGrain>(grainId);
-
-                while (true)
-                {
-                    try
-                    {
-                        var actual = await grain.ReadVersionAsync().WaitAsync(callTimeout, token).ConfigureAwait(false);
-                        Interlocked.Increment(ref verifiedGrains);
-                        if (actual < expected)
-                        {
-                            lostWrites.Add(new LostWriteDetail(grainId, expected, actual));
-                        }
-
-                        return;
-                    }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch
-                    {
-                        if (DateTimeOffset.UtcNow >= verifyDeadline)
-                        {
-                            Interlocked.Increment(ref failedVerifyGrains);
-                            return;
-                        }
-
-                        await Task.Delay(250, token).ConfigureAwait(false);
-                    }
-                }
-            }).ConfigureAwait(false);
+        var loadWindow = await RunFailoverLoadWindowAsync(
+            runTag,
+            driverIndex: -1,
+            grains,
+            concurrency,
+            durationSeconds,
+            payload,
+            retryBackoff,
+            callTimeout,
+            verifyTimeout,
+            maxSamples: MaxLatencyReservoir,
+            isolateWorkersByPrimary: req.IsolateWorkersByPrimary,
+            ct).ConfigureAwait(false);
 
         // Verify surviving delayed jobs executed across live silos.
         FailoverJobVerification? jobVerification = null;
         if (jobCount > 0)
         {
-            var remainingWait = verifyDeadline - DateTimeOffset.UtcNow;
+            var remainingWait = loadWindow.VerifyDeadline - DateTimeOffset.UtcNow;
             if (remainingWait < TimeSpan.FromSeconds(5))
             {
                 remainingWait = TimeSpan.FromSeconds(5);
@@ -973,28 +855,29 @@ public sealed partial class BenchRunner(
                 DeliveryLagMs: LatencyStats.FromSamples(jobSnap.RunLagSamplesMs));
         }
 
-        var totalAttempts = totalOps + totalErrors;
-        var lostList = lostWrites.ToList();
+        var totalAttempts = loadWindow.TotalOps + loadWindow.TotalErrors;
 
         return new S6FailoverResult(
-            Grains: grains,
+            Grains: loadWindow.GrainCount,
             Concurrency: concurrency,
             DurationSeconds: durationSeconds,
             PayloadBytes: payload.Length,
-            TotalOps: totalOps,
-            TotalErrors: totalErrors,
-            OverallErrorRatePct: totalAttempts > 0 ? Math.Round(100.0 * totalErrors / totalAttempts, 3) : 0,
-            ElapsedMs: Math.Round(loadSw.Elapsed.TotalMilliseconds, 2),
-            OverallOpsPerSec: loadSw.Elapsed.TotalSeconds > 0 ? Math.Round(totalOps / loadSw.Elapsed.TotalSeconds, 2) : 0,
-            OverallLatencyMs: LatencyStats.FromSamples(overallReservoir.Snapshot()),
-            ErrorsByType: new Dictionary<string, long>(errorsByType, StringComparer.Ordinal),
-            TimeSeries: timeSeries,
-            TouchedGrains: touchedIndices.Count,
-            VerifiedGrains: verifiedGrains,
-            FailedVerifyGrains: failedVerifyGrains,
-            LostWriteCount: lostList.Count,
-            LostWriteDetails: lostList,
-            Jobs: jobVerification);
+            TotalOps: loadWindow.TotalOps,
+            TotalErrors: loadWindow.TotalErrors,
+            OverallErrorRatePct: totalAttempts > 0 ? Math.Round(100.0 * loadWindow.TotalErrors / totalAttempts, 3) : 0,
+            ElapsedMs: Math.Round(loadWindow.Elapsed.TotalMilliseconds, 2),
+            OverallOpsPerSec: loadWindow.Elapsed.TotalSeconds > 0 ? Math.Round(loadWindow.TotalOps / loadWindow.Elapsed.TotalSeconds, 2) : 0,
+            OverallLatencyMs: LatencyStats.FromSamples(loadWindow.Samples),
+            ErrorsByType: loadWindow.ErrorsByType,
+            TimeSeries: loadWindow.TimeSeries,
+            TouchedGrains: loadWindow.TouchedGrains,
+            VerifiedGrains: loadWindow.VerifiedGrains,
+            FailedVerifyGrains: loadWindow.FailedVerifyGrains,
+            LostWriteCount: loadWindow.LostWriteDetails.Count,
+            LostWriteDetails: loadWindow.LostWriteDetails,
+            Jobs: jobVerification,
+            IsolateWorkersByPrimary: loadWindow.UsedIsolatedPools,
+            PerInitialPrimaryTimeSeries: loadWindow.PerInitialPrimaryTimeSeries);
     }
 
     private async Task<(ClusterTelemetrySnapshot Snapshot, TimeSpan Elapsed)> WaitForJobExecutionsAsync(

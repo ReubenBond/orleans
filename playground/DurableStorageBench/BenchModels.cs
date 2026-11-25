@@ -46,6 +46,8 @@ public sealed class BenchRunRequest
 
     public bool LocalPrimaryOnly { get; set; }
 
+    public bool IsolateWorkersByPrimary { get; set; }
+
     public List<string>? DriverSilos { get; set; }
 
     public List<string>? ExcludeSilos { get; set; }
@@ -83,6 +85,8 @@ public sealed class LocalBenchRequest
 
     public bool LocalPrimaryOnly { get; set; } = true;
 
+    public bool IsolateWorkersByPrimary { get; set; }
+
     public int RetryBackoffMs { get; set; } = 100;
 
     public int CallTimeoutMs { get; set; } = 5000;
@@ -115,6 +119,7 @@ public sealed record LocalBenchResponse(
     LatencyStats? SecondaryLatencyMs,
     double[]? SecondaryLatencySamplesMs,
     List<FailoverSecondBucket>? TimeSeries,
+    Dictionary<string, List<FailoverSecondBucket>>? PerInitialPrimaryTimeSeries,
     Dictionary<string, long>? ErrorsByType,
     int TouchedGrains,
     int VerifiedGrains,
@@ -339,7 +344,9 @@ public sealed record S6FailoverResult(
     List<LostWriteDetail> LostWriteDetails,
     FailoverJobVerification? Jobs,
     bool Distributed = false,
-    List<PerSiloBenchSummary>? PerSilo = null);
+    List<PerSiloBenchSummary>? PerSilo = null,
+    bool IsolateWorkersByPrimary = false,
+    Dictionary<string, List<FailoverSecondBucket>>? PerInitialPrimaryTimeSeries = null);
 
 /// <summary>
 /// Uploads benchmark JSON reports to an optional standard Azure Blob Storage account using an isolated

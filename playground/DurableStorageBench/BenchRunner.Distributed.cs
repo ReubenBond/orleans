@@ -488,6 +488,7 @@ public sealed partial class BenchRunner
                 DurationSeconds = Math.Max(1, req.DurationSeconds),
                 PayloadBytes = Math.Max(1, req.PayloadBytes),
                 LocalPrimaryOnly = false,
+                IsolateWorkersByPrimary = req.IsolateWorkersByPrimary,
                 RetryBackoffMs = req.RetryBackoffMs,
                 CallTimeoutMs = req.CallTimeoutMs,
                 VerifyTimeoutSeconds = req.VerifyTimeoutSeconds,
@@ -515,7 +516,25 @@ public sealed partial class BenchRunner
             }
         }
 
-        var mergedTimeSeries = MergeFailoverTimeSeries(responses);
+        var mergedTimeSeries = MergeFailoverTimeSeries(responses.Select(static r => r.TimeSeries));
+        Dictionary<string, List<FailoverSecondBucket>>? mergedPerPrimarySeries = null;
+        if (responses.Any(static r => r.PerInitialPrimaryTimeSeries is { Count: > 0 }))
+        {
+            var allPrimaries = responses
+                .Where(static r => r.PerInitialPrimaryTimeSeries is not null)
+                .SelectMany(static r => r.PerInitialPrimaryTimeSeries!.Keys)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static k => k, StringComparer.Ordinal)
+                .ToList();
+
+            mergedPerPrimarySeries = new Dictionary<string, List<FailoverSecondBucket>>(allPrimaries.Count, StringComparer.Ordinal);
+            foreach (var primary in allPrimaries)
+            {
+                mergedPerPrimarySeries[primary] = MergeFailoverTimeSeries(
+                    responses.Select(r => r.PerInitialPrimaryTimeSeries is not null && r.PerInitialPrimaryTimeSeries.TryGetValue(primary, out var series) ? series : null));
+            }
+        }
+
         var lostDetails = responses
             .Where(static r => r.LostWriteDetails is not null)
             .SelectMany(static r => r.LostWriteDetails!)
@@ -558,7 +577,9 @@ public sealed partial class BenchRunner
             LostWriteDetails: lostDetails,
             Jobs: jobVerification,
             Distributed: true,
-            PerSilo: ToPerSiloSummaries(responses));
+            PerSilo: ToPerSiloSummaries(responses),
+            IsolateWorkersByPrimary: mergedPerPrimarySeries is not null,
+            PerInitialPrimaryTimeSeries: mergedPerPrimarySeries);
     }
 
     private async Task<LocalBenchResponse> ExecuteLocalS1Async(
@@ -968,23 +989,66 @@ public sealed partial class BenchRunner
             maxSamples);
     }
 
-    private async Task<LocalBenchResponse> ExecuteLocalS6LoadAsync(
-        LocalBenchRequest req,
+    private sealed record FailoverLoadWindowResult(
+        int GrainCount,
+        long TotalOps,
+        long TotalErrors,
+        TimeSpan Elapsed,
+        List<double> Samples,
+        Dictionary<string, long> ErrorsByType,
+        List<FailoverSecondBucket> TimeSeries,
+        bool UsedIsolatedPools,
+        Dictionary<string, List<FailoverSecondBucket>>? PerInitialPrimaryTimeSeries,
+        int TouchedGrains,
+        int VerifiedGrains,
+        int FailedVerifyGrains,
+        List<LostWriteDetail> LostWriteDetails,
+        DateTimeOffset VerifyDeadline);
+
+    private sealed record PrimaryWorkerPool(
+        string PrimaryLabel,
+        int WorkerCount,
+        int[] KeyIndices,
+        ConcurrentDictionary<int, SecondBucketAccumulator> Buckets);
+
+    private async Task<FailoverLoadWindowResult> RunFailoverLoadWindowAsync(
         string runTag,
-        int localGrains,
-        int localConcurrency,
+        int driverIndex,
+        int grains,
+        int concurrency,
+        int durationSeconds,
+        byte[] payload,
+        TimeSpan retryBackoff,
+        TimeSpan callTimeout,
+        TimeSpan verifyTimeout,
         int maxSamples,
-        double keyspaceFraction,
-        int localLedgerCount,
+        bool isolateWorkersByPrimary,
         CancellationToken ct)
     {
-        var keys = await GenerateGrainKeysAsync<IBenchJournalGrain>(runTag, "s6", localGrains, req.DriverIndex, localPrimaryOnly: false, ct).ConfigureAwait(false);
-        var durationSeconds = Math.Max(1, req.DurationSeconds);
         var duration = TimeSpan.FromSeconds(durationSeconds);
-        var payload = CreatePayload(Math.Max(1, req.PayloadBytes));
-        var retryBackoff = TimeSpan.FromMilliseconds(Math.Max(10, req.RetryBackoffMs));
-        var callTimeout = TimeSpan.FromMilliseconds(Math.Max(500, req.CallTimeoutMs));
-        var verifyTimeout = TimeSpan.FromSeconds(Math.Max(15, req.VerifyTimeoutSeconds));
+        string[] keys;
+        List<PrimaryWorkerPool>? isolatedPools = null;
+
+        if (isolateWorkersByPrimary && runtimeInfo.Mode == BenchMode.Clog)
+        {
+            (keys, isolatedPools) = await PartitionKeysByInitialPrimaryAsync(
+                runTag,
+                driverIndex,
+                grains,
+                concurrency,
+                durationSeconds,
+                ct).ConfigureAwait(false);
+        }
+        else
+        {
+            keys = new string[grains];
+            for (var i = 0; i < grains; i++)
+            {
+                keys[i] = driverIndex >= 0
+                    ? string.Create(CultureInfo.InvariantCulture, $"{runTag}:s6:d{driverIndex}:{i}")
+                    : string.Create(CultureInfo.InvariantCulture, $"{runTag}:s6:{i}");
+            }
+        }
 
         var lastAcked = new long[keys.Length];
         var buckets = new ConcurrentDictionary<int, SecondBucketAccumulator>();
@@ -1001,11 +1065,13 @@ public sealed partial class BenchRunner
         var loadStartUtc = DateTimeOffset.UtcNow;
         var loadSw = Stopwatch.StartNew();
 
-        var workers = Enumerable.Range(0, localConcurrency).Select(_ => Task.Run(async () =>
+        Task SpawnWorker(int[]? poolKeyIndices, ConcurrentDictionary<int, SecondBucketAccumulator>? poolBuckets) => Task.Run(async () =>
         {
             while (loadSw.Elapsed < duration && !ct.IsCancellationRequested)
             {
-                var idx = Random.Shared.Next(keys.Length);
+                var idx = poolKeyIndices is not null
+                    ? poolKeyIndices[Random.Shared.Next(poolKeyIndices.Length)]
+                    : Random.Shared.Next(keys.Length);
                 var grain = grainFactory.GetGrain<IBenchJournalGrain>(keys[idx]);
                 var opSw = Stopwatch.StartNew();
                 try
@@ -1017,9 +1083,9 @@ public sealed partial class BenchRunner
 
                     AtomicMax(ref lastAcked[idx], returnedVersion);
                     var sec = Math.Max(0, (int)loadSw.Elapsed.TotalSeconds);
-                    var bucket = buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator());
                     var ms = opSw.Elapsed.TotalMilliseconds;
-                    bucket.RecordSuccess(ms);
+                    buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator()).RecordSuccess(ms);
+                    poolBuckets?.GetOrAdd(sec, static _ => new SecondBucketAccumulator()).RecordSuccess(ms);
                     overallReservoir.Add(ms);
                     Interlocked.Increment(ref totalOps);
                 }
@@ -1030,8 +1096,8 @@ public sealed partial class BenchRunner
                 catch (Exception ex)
                 {
                     var sec = Math.Max(0, (int)loadSw.Elapsed.TotalSeconds);
-                    var bucket = buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator());
-                    bucket.RecordError();
+                    buckets.GetOrAdd(sec, static _ => new SecondBucketAccumulator()).RecordError();
+                    poolBuckets?.GetOrAdd(sec, static _ => new SecondBucketAccumulator()).RecordError();
                     Interlocked.Increment(ref totalErrors);
 
                     var errKey = ClassifyException(ex);
@@ -1047,22 +1113,44 @@ public sealed partial class BenchRunner
                     }
                 }
             }
-        }, ct)).ToArray();
+        }, ct);
+
+        Task[] workers;
+        if (isolatedPools is { Count: > 0 })
+        {
+            var list = new List<Task>(concurrency);
+            foreach (var pool in isolatedPools)
+            {
+                for (var w = 0; w < pool.WorkerCount; w++)
+                {
+                    list.Add(SpawnWorker(pool.KeyIndices, pool.Buckets));
+                }
+            }
+
+            workers = [.. list];
+        }
+        else
+        {
+            workers = Enumerable.Range(0, concurrency).Select(_ => SpawnWorker(null, null)).ToArray();
+        }
 
         await Task.WhenAll(workers).ConfigureAwait(false);
         loadSw.Stop();
 
         var maxSecond = Math.Max(durationSeconds - 1, buckets.Keys.DefaultIfEmpty(0).Max());
-        var timeSeries = new List<FailoverSecondBucket>(maxSecond + 1);
-        for (var s = 0; s <= maxSecond; s++)
+        var timeSeries = BuildTimeSeries(buckets, maxSecond, loadStartUtc);
+
+        Dictionary<string, List<FailoverSecondBucket>>? perPrimarySeries = null;
+        if (isolatedPools is { Count: > 0 })
         {
-            var acc = buckets.GetValueOrDefault(s);
-            timeSeries.Add(acc is not null
-                ? acc.Build(s, loadStartUtc.AddSeconds(s))
-                : new FailoverSecondBucket(s, loadStartUtc.AddSeconds(s), 0, 0, 0, 0, 0, 0, 0));
+            perPrimarySeries = new Dictionary<string, List<FailoverSecondBucket>>(isolatedPools.Count, StringComparer.Ordinal);
+            foreach (var pool in isolatedPools)
+            {
+                perPrimarySeries[pool.PrimaryLabel] = BuildTimeSeries(pool.Buckets, maxSecond, loadStartUtc);
+            }
         }
 
-        // Verify durable acknowledged writes for all keys driven by this silo.
+        // Verify durable acknowledged writes across all touched grains (with retries during post-failover settle).
         var touchedIndices = new List<int>();
         for (var i = 0; i < keys.Length; i++)
         {
@@ -1079,7 +1167,7 @@ public sealed partial class BenchRunner
 
         await Parallel.ForEachAsync(
             touchedIndices,
-            new ParallelOptions { MaxDegreeOfParallelism = Math.Min(localConcurrency, 64), CancellationToken = ct },
+            new ParallelOptions { MaxDegreeOfParallelism = Math.Min(concurrency, 64), CancellationToken = ct },
             async (idx, token) =>
             {
                 var grainId = keys[idx];
@@ -1116,8 +1204,209 @@ public sealed partial class BenchRunner
                 }
             }).ConfigureAwait(false);
 
-        var samples = overallReservoir.Snapshot();
-        var lostList = lostWrites.ToList();
+        return new FailoverLoadWindowResult(
+            GrainCount: keys.Length,
+            TotalOps: totalOps,
+            TotalErrors: totalErrors,
+            Elapsed: loadSw.Elapsed,
+            Samples: overallReservoir.Snapshot(),
+            ErrorsByType: new Dictionary<string, long>(errorsByType, StringComparer.Ordinal),
+            TimeSeries: timeSeries,
+            UsedIsolatedPools: perPrimarySeries is not null,
+            PerInitialPrimaryTimeSeries: perPrimarySeries,
+            TouchedGrains: touchedIndices.Count,
+            VerifiedGrains: verifiedGrains,
+            FailedVerifyGrains: failedVerifyGrains,
+            LostWriteDetails: [.. lostWrites],
+            VerifyDeadline: verifyDeadline);
+    }
+
+    private async Task<(string[] Keys, List<PrimaryWorkerPool> Pools)> PartitionKeysByInitialPrimaryAsync(
+        string runTag,
+        int driverIndex,
+        int grains,
+        int concurrency,
+        int durationSeconds,
+        CancellationToken ct)
+    {
+        var routing = services.GetRequiredService<LocalRouting>();
+        var current = await routing.ReadyAsync(ct).ConfigureAwait(false);
+        var map = await current.View.ReadAsync(ct).ConfigureAwait(false);
+        var reg = services.GetService<NodeRegistryResolver>()?.Current;
+        var membership = services.GetService<IClusterMembershipService>();
+        var members = membership?.CurrentSnapshot.Members;
+
+        var primaryNodes = map.Ledgers
+            .Where(static l => l.IsOpen)
+            .Select(static l => l.Primary.Node)
+            .Distinct()
+            .Select(nodeId =>
+            {
+                var entry = reg?.Find(nodeId);
+                string label;
+                if (entry is not null && members is not null && members.TryGetValue(entry.Silo, out var member) && !string.IsNullOrWhiteSpace(member.Name))
+                {
+                    label = member.Name;
+                }
+                else if (entry?.Ordinal is { } ord)
+                {
+                    label = string.Create(CultureInfo.InvariantCulture, $"silo-{ord}");
+                }
+                else if (nodeId == current.Node)
+                {
+                    label = localSilo.Name;
+                }
+                else if (entry is not null)
+                {
+                    label = entry.Silo.ToParsableString();
+                }
+                else
+                {
+                    label = nodeId.ToString();
+                }
+
+                return (Node: nodeId, Ordinal: entry?.Ordinal ?? int.MaxValue, Label: label);
+            })
+            .OrderBy(static x => x.Ordinal)
+            .ThenBy(static x => x.Label, StringComparer.Ordinal)
+            .ToList();
+
+        if (primaryNodes.Count == 0)
+        {
+            throw new InvalidOperationException("No open primary ledgers found in LedgerMapView for isolated s6-failover worker pools.");
+        }
+
+        var poolCount = primaryNodes.Count;
+        var targetGrains = new int[poolCount];
+        var baseGrains = grains / poolCount;
+        var remGrains = grains % poolCount;
+        for (var i = 0; i < poolCount; i++)
+        {
+            targetGrains[i] = Math.Max(1, baseGrains + (i < remGrains ? 1 : 0));
+        }
+
+        var nodeToPoolIdx = new Dictionary<NodeId, int>(poolCount);
+        var poolKeyLists = new List<int>[poolCount];
+        for (var i = 0; i < poolCount; i++)
+        {
+            nodeToPoolIdx[primaryNodes[i].Node] = i;
+            poolKeyLists[i] = new List<int>(targetGrains[i]);
+        }
+
+        var totalTargetGrains = targetGrains.Sum();
+        var keys = new string[totalTargetGrains];
+        var grainType = grainFactory.GetGrain<IBenchJournalGrain>("__probe__").GetGrainId().Type;
+        var assignedTotal = 0;
+        long seq = 0;
+        var maxAttempts = Math.Max(200_000L, totalTargetGrains * 128L);
+
+        var sw = Stopwatch.StartNew();
+        while (assignedTotal < totalTargetGrains && seq < maxAttempts)
+        {
+            var candidate = driverIndex >= 0
+                ? string.Create(CultureInfo.InvariantCulture, $"{runTag}:s6:d{driverIndex}:{seq}")
+                : string.Create(CultureInfo.InvariantCulture, $"{runTag}:s6:{seq}");
+            seq++;
+            var grainId = GrainId.Create(grainType, IdSpan.Create(candidate));
+            var rowKey = JournalRowKey.Encode(JournalId.FromGrainId(grainId).Value);
+            if (map.FindOpen(rowKey.Span) is { } open
+                && nodeToPoolIdx.TryGetValue(open.Primary.Node, out var poolIdx)
+                && poolKeyLists[poolIdx].Count < targetGrains[poolIdx])
+            {
+                keys[assignedTotal] = candidate;
+                poolKeyLists[poolIdx].Add(assignedTotal);
+                assignedTotal++;
+            }
+        }
+
+        sw.Stop();
+        if (assignedTotal < totalTargetGrains)
+        {
+            throw new InvalidOperationException(
+                $"Partitioned only {assignedTotal}/{totalTargetGrains} s6-failover keys across {poolCount} primaries after {seq} probes.");
+        }
+
+        var baseWorkers = concurrency / poolCount;
+        var extraWorkers = concurrency % poolCount;
+        var pools = new List<PrimaryWorkerPool>(poolCount);
+        for (var i = 0; i < poolCount; i++)
+        {
+            var workerCount = baseWorkers + (i < extraWorkers ? 1 : 0);
+            if (workerCount <= 0)
+            {
+                continue;
+            }
+
+            var poolBuckets = new ConcurrentDictionary<int, SecondBucketAccumulator>();
+            for (var s = 0; s < durationSeconds; s++)
+            {
+                poolBuckets[s] = new SecondBucketAccumulator();
+            }
+
+            pools.Add(new PrimaryWorkerPool(
+                PrimaryLabel: primaryNodes[i].Label,
+                WorkerCount: workerCount,
+                KeyIndices: [.. poolKeyLists[i]],
+                Buckets: poolBuckets));
+        }
+
+        logger.LogInformation(
+            "Partitioned {Grains} s6-failover keys into {PoolCount} primary-isolated worker pools in {ElapsedMs:F1} ms ({Probes} probes): {Pools}",
+            totalTargetGrains,
+            pools.Count,
+            sw.Elapsed.TotalMilliseconds,
+            seq,
+            string.Join(", ", pools.Select(static p => $"{p.PrimaryLabel}={p.KeyIndices.Length}grains/{p.WorkerCount}workers")));
+
+        return (keys, pools);
+    }
+
+    private static List<FailoverSecondBucket> BuildTimeSeries(
+        ConcurrentDictionary<int, SecondBucketAccumulator> buckets,
+        int maxSecond,
+        DateTimeOffset loadStartUtc)
+    {
+        var series = new List<FailoverSecondBucket>(maxSecond + 1);
+        for (var s = 0; s <= maxSecond; s++)
+        {
+            var acc = buckets.GetValueOrDefault(s);
+            series.Add(acc is not null
+                ? acc.Build(s, loadStartUtc.AddSeconds(s))
+                : new FailoverSecondBucket(s, loadStartUtc.AddSeconds(s), 0, 0, 0, 0, 0, 0, 0));
+        }
+
+        return series;
+    }
+
+    private async Task<LocalBenchResponse> ExecuteLocalS6LoadAsync(
+        LocalBenchRequest req,
+        string runTag,
+        int localGrains,
+        int localConcurrency,
+        int maxSamples,
+        double keyspaceFraction,
+        int localLedgerCount,
+        CancellationToken ct)
+    {
+        var durationSeconds = Math.Max(1, req.DurationSeconds);
+        var payload = CreatePayload(Math.Max(1, req.PayloadBytes));
+        var retryBackoff = TimeSpan.FromMilliseconds(Math.Max(10, req.RetryBackoffMs));
+        var callTimeout = TimeSpan.FromMilliseconds(Math.Max(500, req.CallTimeoutMs));
+        var verifyTimeout = TimeSpan.FromSeconds(Math.Max(15, req.VerifyTimeoutSeconds));
+
+        var loadWindow = await RunFailoverLoadWindowAsync(
+            runTag,
+            req.DriverIndex,
+            localGrains,
+            localConcurrency,
+            durationSeconds,
+            payload,
+            retryBackoff,
+            callTimeout,
+            verifyTimeout,
+            maxSamples,
+            req.IsolateWorkersByPrimary,
+            ct).ConfigureAwait(false);
 
         return new LocalBenchResponse(
             SiloAddress: localSilo.SiloAddress.ToParsableString(),
@@ -1125,25 +1414,26 @@ public sealed partial class BenchRunner
             Ordinal: runtimeInfo.Ordinal,
             KeyspaceFraction: Math.Round(keyspaceFraction, 6),
             LocalLedgerCount: localLedgerCount,
-            LocalGrains: keys.Length,
+            LocalGrains: loadWindow.GrainCount,
             LocalConcurrency: localConcurrency,
-            Ops: totalOps,
-            Errors: totalErrors,
-            ElapsedMs: Math.Round(loadSw.Elapsed.TotalMilliseconds, 2),
-            OpsPerSec: loadSw.Elapsed.TotalSeconds > 0 ? Math.Round(totalOps / loadSw.Elapsed.TotalSeconds, 2) : 0,
+            Ops: loadWindow.TotalOps,
+            Errors: loadWindow.TotalErrors,
+            ElapsedMs: Math.Round(loadWindow.Elapsed.TotalMilliseconds, 2),
+            OpsPerSec: loadWindow.Elapsed.TotalSeconds > 0 ? Math.Round(loadWindow.TotalOps / loadWindow.Elapsed.TotalSeconds, 2) : 0,
             ReadOps: 0,
-            WriteOps: totalOps,
-            LatencyMs: LatencyStats.FromSamples([.. samples]),
-            LatencySamplesMs: Downsample(samples, maxSamples),
+            WriteOps: loadWindow.TotalOps,
+            LatencyMs: LatencyStats.FromSamples([.. loadWindow.Samples]),
+            LatencySamplesMs: Downsample(loadWindow.Samples, maxSamples),
             SecondaryLatencyMs: null,
             SecondaryLatencySamplesMs: null,
-            TimeSeries: timeSeries,
-            ErrorsByType: new Dictionary<string, long>(errorsByType, StringComparer.Ordinal),
-            TouchedGrains: touchedIndices.Count,
-            VerifiedGrains: verifiedGrains,
-            FailedVerifyGrains: failedVerifyGrains,
-            LostWriteCount: lostList.Count,
-            LostWriteDetails: lostList,
+            TimeSeries: loadWindow.TimeSeries,
+            PerInitialPrimaryTimeSeries: loadWindow.PerInitialPrimaryTimeSeries,
+            ErrorsByType: loadWindow.ErrorsByType,
+            TouchedGrains: loadWindow.TouchedGrains,
+            VerifiedGrains: loadWindow.VerifiedGrains,
+            FailedVerifyGrains: loadWindow.FailedVerifyGrains,
+            LostWriteCount: loadWindow.LostWriteDetails.Count,
+            LostWriteDetails: loadWindow.LostWriteDetails,
             Memory: CaptureLocalMemory());
     }
 
@@ -1476,6 +1766,7 @@ public sealed partial class BenchRunner
             SecondaryLatencyMs: secondaryCopy is not null ? LatencyStats.FromSamples(secondaryCopy) : null,
             SecondaryLatencySamplesMs: secondaryLatencies is not null && maxSamples > 0 ? Downsample(secondaryLatencies, maxSamples) : null,
             TimeSeries: null,
+            PerInitialPrimaryTimeSeries: null,
             ErrorsByType: null,
             TouchedGrains: 0,
             VerifiedGrains: 0,
@@ -1602,9 +1893,15 @@ public sealed partial class BenchRunner
         return false;
     }
 
-    private static List<FailoverSecondBucket> MergeFailoverTimeSeries(LocalBenchResponse[] responses)
+    private static List<FailoverSecondBucket> MergeFailoverTimeSeries(IEnumerable<List<FailoverSecondBucket>?> seriesList)
     {
-        var maxSeconds = responses.Max(static r => r.TimeSeries?.Count ?? 0);
+        var nonNull = seriesList.Where(static s => s is { Count: > 0 }).Select(static s => s!).ToList();
+        if (nonNull.Count == 0)
+        {
+            return [];
+        }
+
+        var maxSeconds = nonNull.Max(static s => s.Count);
         var merged = new List<FailoverSecondBucket>(maxSeconds);
         for (var s = 0; s < maxSeconds; s++)
         {
@@ -1614,14 +1911,14 @@ public sealed partial class BenchRunner
             DateTimeOffset ts = DateTimeOffset.UtcNow;
             var hasTs = false;
 
-            foreach (var r in responses)
+            foreach (var series in nonNull)
             {
-                if (r.TimeSeries is null || s >= r.TimeSeries.Count)
+                if (s >= series.Count)
                 {
                     continue;
                 }
 
-                var b = r.TimeSeries[s];
+                var b = series[s];
                 if (!hasTs)
                 {
                     ts = b.UtcTimestamp;
