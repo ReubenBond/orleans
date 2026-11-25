@@ -18,9 +18,9 @@ public static class EntryRules
     private const int KeyLengthField = sizeof(ushort);
     private const int MinLength = 6;
     private const int MaxBase = 32;
-    private const int MaxLocalStreamLength = 64;
-    private const int MaxLocalPayloadLength = 65_536;
-    private const byte HasLocalAppendsFlag = 0x80;
+    private const int MaxMessageChannelLength = 64;
+    private const int MaxMessagePayloadLength = 65_536;
+    private const byte HasMessagesFlag = 0x80;
     private const long LastTick = 3_155_378_975_999_999_999;
 
     /// <summary>Returns a fuzz input of <paramref name="rowKey"/> and <paramref name="record"/>.</summary>
@@ -69,19 +69,19 @@ public static class EntryRules
             return EntryReading.Rejected("crc-mismatch");
         }
 
-        // 3. The kind and HasLocalAppendsFlag.
+        // 3. The kind and HasMessagesFlag.
         var kindByte = record[4];
-        var hasLocalAppends = (kindByte & HasLocalAppendsFlag) != 0;
-        var kind = (byte)(kindByte & ~HasLocalAppendsFlag);
+        var hasMessages = (kindByte & HasMessagesFlag) != 0;
+        var kind = (byte)(kindByte & ~HasMessagesFlag);
         if (kind > 3)
         {
             return EntryReading.Rejected("unknown-kind");
         }
 
-        // 4. Expired cannot carry local appends.
-        if (hasLocalAppends && kind == 3)
+        // 4. Expired cannot carry messages.
+        if (hasMessages && kind == 3)
         {
-            return EntryReading.Rejected("expired-local-appends");
+            return EntryReading.Rejected("expired-messages");
         }
 
         // 5. The expected version: the base's length, the base, and the count.
@@ -124,49 +124,49 @@ public static class EntryRules
             position += 8;
         }
 
-        // 7. Optional local appends.
-        var localAppends = new List<RuleLocalAppend>();
-        if (hasLocalAppends)
+        // 7. Optional messages.
+        var messages = new List<RuleMessage>();
+        if (hasMessages)
         {
             if (record.Length - position < 1)
             {
                 return EntryReading.Rejected("truncated");
             }
 
-            int localCount = record[position++];
-            if (localCount == 0)
+            int messageCount = record[position++];
+            if (messageCount == 0)
             {
-                return EntryReading.Rejected("empty-local-appends");
+                return EntryReading.Rejected("empty-messages");
             }
 
-            for (var i = 0; i < localCount; i++)
+            for (var i = 0; i < messageCount; i++)
             {
                 if (record.Length - position < 1)
                 {
                     return EntryReading.Rejected("truncated");
                 }
 
-                int streamLength = record[position++];
-                if (streamLength == 0)
+                int channelLength = record[position++];
+                if (channelLength == 0)
                 {
-                    return EntryReading.Rejected("empty-local-stream");
+                    return EntryReading.Rejected("empty-message-channel");
                 }
 
-                if (streamLength > MaxLocalStreamLength)
+                if (channelLength > MaxMessageChannelLength)
                 {
-                    return EntryReading.Rejected("local-stream-too-long");
+                    return EntryReading.Rejected("message-channel-too-long");
                 }
 
-                if (record.Length - position < streamLength)
+                if (record.Length - position < channelLength)
                 {
                     return EntryReading.Rejected("truncated");
                 }
 
-                var streamBytes = record.Slice(position, streamLength);
-                position += streamLength;
-                if (!IsValidStream(streamBytes))
+                var channelBytes = record.Slice(position, channelLength);
+                position += channelLength;
+                if (!IsValidChannel(channelBytes))
                 {
-                    return EntryReading.Rejected("bad-local-stream");
+                    return EntryReading.Rejected("bad-message-channel");
                 }
 
                 if (record.Length - position < 1)
@@ -180,9 +180,9 @@ public static class EntryRules
                 }
 
                 position += payloadVarintLength;
-                if (payloadLength > MaxLocalPayloadLength)
+                if (payloadLength > MaxMessagePayloadLength)
                 {
-                    return EntryReading.Rejected("local-payload-too-long");
+                    return EntryReading.Rejected("message-payload-too-long");
                 }
 
                 if ((ulong)(record.Length - position) < payloadLength)
@@ -192,7 +192,7 @@ public static class EntryRules
 
                 var payload = record.Slice(position, (int)payloadLength).ToArray();
                 position += (int)payloadLength;
-                localAppends.Add(new RuleLocalAppend(Encoding.ASCII.GetString(streamBytes), payload));
+                messages.Add(new RuleMessage(Encoding.ASCII.GetString(channelBytes), payload));
             }
         }
 
@@ -208,10 +208,10 @@ public static class EntryRules
             return EntryReading.Rejected("trailing-bytes");
         }
 
-        return EntryReading.Accepted(new RuleEntry(kind, versionBase, count, ticks, body.ToArray(), localAppends));
+        return EntryReading.Accepted(new RuleEntry(kind, versionBase, count, ticks, body.ToArray(), messages));
     }
 
-    private static bool IsValidStream(ReadOnlySpan<byte> bytes)
+    private static bool IsValidChannel(ReadOnlySpan<byte> bytes)
     {
         foreach (var b in bytes)
         {
@@ -290,11 +290,11 @@ public sealed record EntryReading(string? Reason, RuleEntry? Entry)
     internal static EntryReading Accepted(RuleEntry entry) => new(null, entry);
 }
 
-/// <summary>One attached ledger-local append as the format's rules give it.</summary>
-public sealed record RuleLocalAppend(string Stream, byte[] Payload);
+/// <summary>One attached message as the format's rules give it.</summary>
+public sealed record RuleMessage(string Channel, byte[] Payload);
 
 /// <summary>
 /// An entry as the format's rules give it: its kind byte, its expected version's base and count, its deletion ticks, its
-/// payload, and any attached local appends.
+/// payload, and any attached messages.
 /// </summary>
-public sealed record RuleEntry(byte Kind, byte[] Base, ulong Count, long Ticks, byte[] Payload, IReadOnlyList<RuleLocalAppend>? LocalAppends = null);
+public sealed record RuleEntry(byte Kind, byte[] Base, ulong Count, long Ticks, byte[] Payload, IReadOnlyList<RuleMessage>? Messages = null);

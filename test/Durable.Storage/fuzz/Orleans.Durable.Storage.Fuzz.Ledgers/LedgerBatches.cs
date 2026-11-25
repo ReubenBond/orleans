@@ -37,7 +37,7 @@ public static class LedgerBatches
         var placeholders = new Dictionary<ulong, byte[]>();
         foreach (var row in batch.Rows)
         {
-            if (!row.IsDefining && row.Ordinal < batch.OrdinalBase && !placeholders.ContainsKey(row.Ordinal))
+            if (row.Kind != 3 && !row.IsDefining && row.Ordinal < batch.OrdinalBase && !placeholders.ContainsKey(row.Ordinal))
             {
                 var key = Placeholder(row.Ordinal, defined);
                 placeholders.Add(row.Ordinal, key);
@@ -89,7 +89,11 @@ public static class LedgerBatches
             (int)Math.Min(length, 1 << 20));
         foreach (var row in batch.Rows)
         {
-            if (row.IsDefining)
+            if (row.Kind == 3)
+            {
+                encoder.AddMessage(MessageChannel.TryParse(row.Key, out var channel) ? channel : throw new InvalidOperationException(), new ReadOnlySequence<byte>(row.Body));
+            }
+            else if (row.IsDefining)
             {
                 keys[row.Ordinal] = row.Key!;
                 _ = encoder.AddRow(row.Key, (RowKind)row.Kind, new RowVersion(new RowToken(row.VersionBase), row.VersionCount), new RowToken(row.Token), new ReadOnlySequence<byte>(row.Body));

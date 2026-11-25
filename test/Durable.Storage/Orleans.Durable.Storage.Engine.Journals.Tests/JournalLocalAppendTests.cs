@@ -17,11 +17,11 @@ namespace Orleans.Durable.Storage.Engine.Journals.Tests;
 /// Comprehensive tests for Phase J1 ledger-local append journals (journals.md §2.2, §4.2, §7, §8.1, §8.3, §8.4,
 /// JS-I11, JS-I12):
 /// <list type="bullet">
-/// <item>Entry record encoding/decoding, <c>default(LocalAppendRecord)</c> refusal, detached payloads, and <c>WithoutPayload()</c>.</item>
-/// <item><c>StoreParametersOf</c> and <c>CheckStartup</c> (<c>MaxSegmentKeys</c>, <c>LargestBatch(hasLocalStreams: true)</c>).</item>
-/// <item>Atomic journal + <c>RowKind.LocalAppend</c> commit (<c>JS-I11</c>) and zero local rows on <c>Rejected</c>, <c>ReplaceRequired</c>, <c>Moved</c>, and <c>Fenced</c>.</item>
-/// <item><c>LocalSessionOracle</c> verifying <c>JS-I12</c> (strict slot order, non-empty records, before warm-state Apply and Accepted, Dispose once after last OnBatchDurable, cooperative PrepareRelease + CancelDrain, defect -> FatalErrors, and all 3 race mutants).</item>
-/// <item>Real RocksDB <see cref="JournalStateDatabase.TryHasKeyEntryAsync"/> integration across <c>LedgerApplyLoop</c>, non-replicated ledgers, flush+reopen, drop, and zero tombstones.</item>
+/// <item>Entry record encoding/decoding, <c>default(MessageRecord)</c> refusal, detached payloads, and <c>WithoutPayload()</c>.</item>
+/// <item><c>StoreParametersOf</c> and <c>CheckStartup</c> (<c>LargestBatch(hasMessageChannels: true)</c>).</item>
+/// <item>Atomic journal + <c>RowKind.Message</c> commit (<c>JS-I11</c>) and zero message rows on <c>Rejected</c>, <c>ReplaceRequired</c>, <c>Moved</c>, and <c>Fenced</c>.</item>
+/// <item><c>MessageSessionOracle</c> verifying <c>JS-I12</c> (strict slot order, non-empty records, before warm-state Apply and Accepted, Dispose once after last OnBatchDurable, cooperative PrepareRelease + CancelDrain, defect -> FatalErrors, and all 3 race mutants).</item>
+/// <item>Real RocksDB integration verifying <see cref="RowKind.Message"/> produces zero <c>key_index</c> and zero <c>tombstones</c> writes.</item>
 /// </list>
 /// </summary>
 public sealed class JournalLocalAppendTests : IDisposable
@@ -53,10 +53,10 @@ public sealed class JournalLocalAppendTests : IDisposable
     }
 
     [Fact]
-    public void EntryRecordRejectsDefaultLocalAppendAndPreservesDetachedPayloadsAcrossWithoutPayload()
+    public void EntryRecordRejectsDefaultMessageAndPreservesDetachedPayloadsAcrossWithoutPayload()
     {
         var key = JournalRowKey.Encode("grain/1");
-        var stream = LocalStreamName.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("orleans.wakeup");
 
         using (var payload = ArcBuffer.Wrap("body"u8.ToArray()))
         {
@@ -65,17 +65,17 @@ public sealed class JournalLocalAppendTests : IDisposable
             Assert.Throws<ArgumentException>(() => JournalEntryRecord.Delete(key, JournalVersion.Origin, DateTimeOffset.UnixEpoch, [default]));
         }
 
-        Assert.Throws<ArgumentNullException>(() => new LocalAppendRecord(null!, ReadOnlyMemory<byte>.Empty));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LocalAppendRecord(stream, new byte[LocalAppendRecord.MaxPayloadLength + 1]));
+        Assert.Throws<ArgumentNullException>(() => new MessageRecord(null!, ReadOnlyMemory<byte>.Empty));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MessageRecord(channel, new byte[MessageRecord.MaxPayloadLength + 1]));
 
         var mutablePayload = "wk-initial"u8.ToArray();
         JournalEntryRecord stripped;
         using (var payload = ArcBuffer.Wrap("body"u8.ToArray()))
-        using (var encoded = JournalEntryRecord.Append(key, JournalVersion.Origin, payload, [new LocalAppendRecord(stream, mutablePayload)]))
+        using (var encoded = JournalEntryRecord.Append(key, JournalVersion.Origin, payload, [new MessageRecord(channel, mutablePayload)]))
         {
-            // Mutating the caller array after encode cannot affect the sealed record's detached local-append bytes.
+            // Mutating the caller array after encode cannot affect the sealed record's detached message bytes.
             mutablePayload[0] = (byte)'X';
-            Assert.Equal("wk-initial"u8.ToArray(), encoded.LocalAppends[0].Payload.ToArray());
+            Assert.Equal("wk-initial"u8.ToArray(), encoded.Messages[0].Payload.ToArray());
 
             using var wire = encoded.ToArcBuffer();
             Assert.Null(JournalEntryRecord.Decode(key, wire, out var decoded));
@@ -85,145 +85,141 @@ public sealed class JournalLocalAppendTests : IDisposable
             }
         }
 
-        // After both encoded and decoded records (and their ArcBuffer leases) are disposed, detached LocalAppends survive.
-        Assert.Single(stripped.LocalAppends);
-        Assert.Equal(stream, stripped.LocalAppends[0].Stream);
-        Assert.Equal("wk-initial"u8.ToArray(), stripped.LocalAppends[0].Payload.ToArray());
+        // After both encoded and decoded records (and their ArcBuffer leases) are disposed, detached Messages survive.
+        Assert.Single(stripped.Messages);
+        Assert.Equal(channel, stripped.Messages[0].Channel);
+        Assert.Equal("wk-initial"u8.ToArray(), stripped.Messages[0].Payload.ToArray());
     }
 
     [Fact]
-    public void StoreParametersAndStartupChecksCoverLocalStreams()
+    public void StoreParametersAndStartupChecksCoverMessageChannels()
     {
-        var streamB = LocalStreamName.Parse("z.stream");
-        var streamA = LocalStreamName.Parse("a.stream");
-        var handlerB = new RecordingLocalStreamHandler(streamB);
-        var handlerA = new RecordingLocalStreamHandler(streamA);
+        var channelB = MessageChannel.Parse("z.channel");
+        var channelA = MessageChannel.Parse("a.channel");
+        var handlerB = new RecordingMessageHandler(channelB);
+        var handlerA = new RecordingMessageHandler(channelA);
 
         var options = new JournalStoreOptions
         {
             MaxBodyBytes = 1024,
-            MaxLocalAppendsPerWrite = 4,
-            MaxLocalAppendBytesPerWrite = 2048,
+            MaxMessagesPerWrite = 4,
+            MaxMessageBytesPerWrite = 2048,
         };
 
         var parameters = JournalStore.StoreParametersOf(options, [handlerB, handlerA]);
         Assert.Equal("1024", parameters["max-body-bytes"]);
-        Assert.Equal("a.stream,z.stream", parameters["local-streams"]);
-        Assert.Equal("4", parameters["max-local-appends"]);
-        Assert.Equal("2048", parameters["max-local-append-bytes"]);
+        Assert.Equal("a.channel,z.channel", parameters["message-channels"]);
+        Assert.Equal("4", parameters["max-messages"]);
+        Assert.Equal("2048", parameters["max-message-bytes"]);
 
-        // Duplicate stream registration throws ArgumentException.
-        Assert.Throws<ArgumentException>(() => JournalStore.StoreParametersOf(options, [handlerA, new RecordingLocalStreamHandler(streamA)]));
+        // Duplicate channel registration throws ArgumentException.
+        Assert.Throws<ArgumentException>(() => JournalStore.StoreParametersOf(options, [handlerA, new RecordingMessageHandler(channelA)]));
 
-        // LargestBatch with local streams exceeds LargestBatch without local streams when single-entry size exceeds MaxBatchBytes.
+        // LargestBatch with message channels exceeds LargestBatch without message channels when single-entry size exceeds MaxBatchBytes.
         var tightBatchOptions = new JournalStoreOptions
         {
             MaxBodyBytes = 1024,
             MaxBatchBytes = 512,
-            MaxLocalAppendsPerWrite = 4,
-            MaxLocalAppendBytesPerWrite = 2048,
+            MaxMessagesPerWrite = 4,
+            MaxMessageBytesPerWrite = 2048,
         };
-        Assert.True(tightBatchOptions.LargestBatch(hasLocalStreams: true) > tightBatchOptions.LargestBatch(hasLocalStreams: false));
-        Assert.True(LedgerAdmission.LongestBatch(options, hasLocalStreams: true) > LedgerAdmission.LongestBatch(options, hasLocalStreams: false));
+        Assert.True(tightBatchOptions.LargestBatch(hasMessageChannels: true) > tightBatchOptions.LargestBatch(hasMessageChannels: false));
+        Assert.True(LedgerAdmission.LongestBatch(options, hasMessageChannels: true) > LedgerAdmission.LongestBatch(options, hasMessageChannels: false));
 
-        // CheckStartup refuses 1 + MaxLocalAppendsPerWrite > MaxSegmentKeys when local streams are registered.
+        // Unversioned Message rows consume zero MaxSegmentKeys, so CheckStartup succeeds even with small MaxSegmentKeys.
         using var store = new InMemoryArchiveStore();
-        var ex = Assert.Throws<JournalStoreLimitException>(() =>
-            JournalStore.CheckStartup(options, store, maxBatchLength: 32 << 20, maxProposalBytes: 64 << 20, maxSegmentKeys: 4, hasLocalStreams: true));
-        Assert.Equal(JournalStoreLimit.MaxSegmentKeys, ex.Limit);
-
-        // Without local streams, MaxSegmentKeys = 4 is accepted.
-        JournalStore.CheckStartup(options, store, maxBatchLength: 32 << 20, maxProposalBytes: 64 << 20, maxSegmentKeys: 4, hasLocalStreams: false);
+        JournalStore.CheckStartup(options, store, maxBatchLength: 32 << 20, maxProposalBytes: 64 << 20, hasMessageChannels: true);
     }
 
     [Fact]
-    public async Task AtomicWriteCommitsLocalAppendInSameSlotAndRejectionsLeaveZeroLocalRows()
+    public async Task AtomicWriteCommitsMessageInSameSlotAndRejectionsLeaveZeroMessageRows()
     {
-        var streamA = LocalStreamName.Parse("orleans.wakeup");
-        var streamB = LocalStreamName.Parse("orleans.audit");
-        var handlerA = new RecordingLocalStreamHandler(streamA, payload => payload.Length == 1 && payload[0] == 0xFF ? new InvalidDataException("bad payload") : null);
-        var handlerB = new RecordingLocalStreamHandler(streamB);
+        var channelA = MessageChannel.Parse("orleans.wakeup");
+        var channelB = MessageChannel.Parse("orleans.audit");
+        var handlerA = new RecordingMessageHandler(channelA, payload => payload.Length == 1 && payload[0] == 0xFF ? new InvalidDataException("bad payload") : null);
+        var handlerB = new RecordingMessageHandler(channelB);
 
         var options = new JournalStoreOptions
         {
-            MaxLocalAppendsPerWrite = 2,
-            MaxLocalAppendBytesPerWrite = 16,
+            MaxMessagesPerWrite = 2,
+            MaxMessageBytesPerWrite = 16,
         };
         using var memory = new InMemoryArchiveStore(maxAppends: 1, replaceRequestAppends: 1);
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);
         await ledgers.BootstrapAsync(Token);
-        await using var journals = new JournalStore(ledgers.Registry, memory, options, TimeProvider.System, stateDatabase: null, localStreamHandlers: [handlerA, handlerB]);
+        await using var journals = new JournalStore(ledgers.Registry, memory, options, TimeProvider.System, stateDatabase: null, messageHandlers: [handlerA, handlerB]);
 
         var key = JournalRowKey.Encode("grain/atomic");
 
         // Pre-admission rejections throw ArgumentException with zero effect.
         using (var p = ArcBuffer.Wrap("x"u8.ToArray()))
         {
-            // Unregistered stream
-            using var badStream = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new LocalAppendRecord(LocalStreamName.Parse("unknown"), "a"u8.ToArray())]);
-            await Assert.ThrowsAsync<ArgumentException>(() => journals.WriteAsync(badStream, Token));
+            // Unregistered channel
+            using var badChannel = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new MessageRecord(MessageChannel.Parse("unknown"), "a"u8.ToArray())]);
+            await Assert.ThrowsAsync<ArgumentException>(() => journals.WriteAsync(badChannel, Token));
 
             // Handler.Validate rejection
-            using var badPayload = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new LocalAppendRecord(streamA, new byte[] { 0xFF })]);
+            using var badPayload = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new MessageRecord(channelA, new byte[] { 0xFF })]);
             await Assert.ThrowsAsync<ArgumentException>(() => journals.WriteAsync(badPayload, Token));
 
-            // Exceeds MaxLocalAppendsPerWrite
-            using var tooMany = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new LocalAppendRecord(streamA, "a"u8.ToArray()), new LocalAppendRecord(streamA, "b"u8.ToArray()), new LocalAppendRecord(streamB, "c"u8.ToArray())]);
+            // Exceeds MaxMessagesPerWrite
+            using var tooMany = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new MessageRecord(channelA, "a"u8.ToArray()), new MessageRecord(channelA, "b"u8.ToArray()), new MessageRecord(channelB, "c"u8.ToArray())]);
             await Assert.ThrowsAsync<ArgumentException>(() => journals.WriteAsync(tooMany, Token));
 
-            // Exceeds MaxLocalAppendBytesPerWrite
-            using var tooBig = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new LocalAppendRecord(streamA, new byte[17])]);
+            // Exceeds MaxMessageBytesPerWrite
+            using var tooBig = JournalEntryRecord.Append(key, JournalVersion.Origin, p, [new MessageRecord(channelA, new byte[17])]);
             await Assert.ThrowsAsync<ArgumentException>(() => journals.WriteAsync(tooBig, Token));
         }
 
-        // Accepted Append with local appends across two streams.
+        // Accepted Append with messages across two channels.
         JournalVersion v1;
         using (var p = ArcBuffer.Wrap("hello"u8.ToArray()))
-        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new LocalAppendRecord(streamA, "wk1"u8.ToArray()), new LocalAppendRecord(streamB, "au1"u8.ToArray())]))
+        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new MessageRecord(channelA, "wk1"u8.ToArray()), new MessageRecord(channelB, "au1"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(rec, Token);
             v1 = Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value).Version;
         }
 
-        // Stale Rejected write with local append must write ZERO local rows.
+        // Stale Rejected write with message must write ZERO message rows.
         using (var p = ArcBuffer.Wrap("stale"u8.ToArray()))
-        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new LocalAppendRecord(streamA, "wk-stale"u8.ToArray())]))
+        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new MessageRecord(channelA, "wk-stale"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(rec, Token);
             Assert.IsType<JournalWriteOutcome.Rejected>(outcome.Value);
         }
 
-        // ReplaceRequired write with local append must write ZERO local rows (maxAppends = 1 reached).
+        // ReplaceRequired write with message must write ZERO message rows (maxAppends = 1 reached).
         using (var p = ArcBuffer.Wrap("second-append"u8.ToArray()))
-        using (var rec = journals.EncodeAppend(key, v1, p, [new LocalAppendRecord(streamA, "wk-req"u8.ToArray())]))
+        using (var rec = journals.EncodeAppend(key, v1, p, [new MessageRecord(channelA, "wk-req"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(rec, Token);
             Assert.IsType<JournalWriteOutcome.ReplaceRequired>(outcome.Value);
         }
 
-        // Accepted Replace with only streamA (streamB must NOT receive an empty OnBatchDurable callback!).
+        // Accepted Replace with only channelA (channelB must NOT receive an empty OnBatchDurable callback!).
         JournalVersion v2;
         using (var p = ArcBuffer.Wrap("snap"u8.ToArray()))
-        using (var rec = journals.EncodeReplace(key, v1, p, [new LocalAppendRecord(streamA, "wk2"u8.ToArray())]))
+        using (var rec = journals.EncodeReplace(key, v1, p, [new MessageRecord(channelA, "wk2"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(rec, Token);
             v2 = Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value).Version;
         }
 
-        // Accepted Delete with streamA.
-        using (var rec = journals.EncodeDelete(key, v2, [new LocalAppendRecord(streamA, "wk3"u8.ToArray())]))
+        // Accepted Delete with channelA.
+        using (var rec = journals.EncodeDelete(key, v2, [new MessageRecord(channelA, "wk3"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(rec, Token);
             Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value);
         }
 
-        // Verify the ledger's raw slots hold only the 3 accepted writes (0 rows from Rejected / ReplaceRequired / ArgumentException).
+        // Verify the ledger's raw slots hold only the 3 accepted writes (0 rows from Rejected / ReplaceRequired / ArgumentException),
+        // and that RowKind.Message rows are unversioned (IsDefining == false, 0 segment keys consumed).
         var ledgerId = ledgers.OpenContaining(key.Span.ToArray()).Id;
         var ledgerMeta = ledgers.Ledger(ledgerId);
         var tail = await ledgers.ConfirmOpenAsync(ledgerId, Token);
         Assert.Equal(new Slot(3), tail);
 
-        var localRowsBySlot = new List<(Slot Slot, bool Defining, string Stream, string Payload)>();
+        var messageRowsBySlot = new List<(Slot Slot, bool Defining, string Channel, string Payload)>();
         using var view = new LedgerSegmentView(ledgerId);
         await foreach (var item in ledgers.Reader.ScanAsync(ledgerMeta, Slot.Zero, tail, view, cancellationToken: Token))
         {
@@ -232,25 +228,25 @@ public sealed class JournalLocalAppendTests : IDisposable
             {
                 foreach (var row in item.Rows)
                 {
-                    if (row.Kind == RowKind.LocalAppend)
+                    if (row.Kind == RowKind.Message)
                     {
-                        Assert.Null(LedgerLocalKey.Validate(row.Key, ledgerMeta.Range, ledgerId, out var streamSpan));
-                        localRowsBySlot.Add((row.Tag.Slot, row.IsDefining, Encoding.ASCII.GetString(streamSpan), Encoding.UTF8.GetString(row.Body)));
+                        messageRowsBySlot.Add((row.Tag.Slot, row.IsDefining, Encoding.ASCII.GetString(row.Channel), Encoding.UTF8.GetString(row.Body)));
                     }
                 }
             }
         }
 
+        Assert.Equal(1UL, view.DefinedKeys);
         Assert.Equal(
             [
-                (new Slot(0), true, "orleans.wakeup", "wk1"),
-                (new Slot(0), true, "orleans.audit", "au1"),
+                (new Slot(0), false, "orleans.wakeup", "wk1"),
+                (new Slot(0), false, "orleans.audit", "au1"),
                 (new Slot(1), false, "orleans.wakeup", "wk2"),
                 (new Slot(2), false, "orleans.wakeup", "wk3"),
             ],
-            localRowsBySlot);
+            messageRowsBySlot);
 
-        // Verify streamA got 3 callbacks (slots 0, 1, 2) and streamB got ONLY 1 callback (slot 0 — skipped on slots 1 & 2!).
+        // Verify channelA got 3 callbacks (slots 0, 1, 2) and channelB got ONLY 1 callback (slot 0 — skipped on slots 1 & 2!).
         var sessionA = Assert.Single(handlerA.Sessions);
         var sessionB = Assert.Single(handlerB.Sessions);
         Assert.Equal([new Slot(0), new Slot(1), new Slot(2)], sessionA.CallbackSlots);
@@ -258,29 +254,29 @@ public sealed class JournalLocalAppendTests : IDisposable
         Assert.All(sessionA.CallbackSizes, static size => Assert.True(size > 0));
         Assert.All(sessionB.CallbackSizes, static size => Assert.True(size > 0));
 
-        // Verify journal read skips LocalAppend cleanly and sees deleted state.
+        // Verify journal read skips Message rows cleanly and sees deleted state.
         var readOutcome = await journals.ReadAsync(key, Token);
         using var readResult = Assert.IsType<JournalReadResult>(readOutcome.Value);
         Assert.False(readResult.Exists);
     }
 
     [Fact]
-    public async Task LocalSessionOracleVerifiesJsI12OrderingDisposalAndPrepareReleaseCancelDrain()
+    public async Task MessageSessionOracleVerifiesJsI12OrderingDisposalAndPrepareReleaseCancelDrain()
     {
-        var stream = LocalStreamName.Parse("orleans.wakeup");
-        var oracle = new LocalSessionOracle(stream);
+        var channel = MessageChannel.Parse("orleans.wakeup");
+        var oracle = new MessageSessionOracle(channel);
 
         using var archive = new InMemoryArchiveStore();
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);
         await ledgers.BootstrapAsync(Token);
-        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, localStreamHandlers: [oracle]);
+        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, messageHandlers: [oracle]);
 
         var key = JournalRowKey.Encode("grain/js12");
         var v = JournalVersion.Origin;
         for (var i = 0; i < 4; i++)
         {
             using var payload = ArcBuffer.Wrap(Encoding.UTF8.GetBytes($"p{i}"));
-            using var record = journals.EncodeAppend(key, v, payload, [new LocalAppendRecord(stream, Encoding.UTF8.GetBytes($"wk{i}"))]);
+            using var record = journals.EncodeAppend(key, v, payload, [new MessageRecord(channel, Encoding.UTF8.GetBytes($"wk{i}"))]);
             var outcome = await journals.WriteAsync(record, Token);
             v = Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value).Version;
             oracle.ObserveCallerAccepted(i);
@@ -299,7 +295,7 @@ public sealed class JournalLocalAppendTests : IDisposable
         };
 
         using var heldPayload = ArcBuffer.Wrap("held"u8.ToArray());
-        using var heldRecord = journals.EncodeAppend(coldKey, JournalVersion.Origin, heldPayload, [new LocalAppendRecord(stream, "wk-held"u8.ToArray())]);
+        using var heldRecord = journals.EncodeAppend(coldKey, JournalVersion.Origin, heldPayload, [new MessageRecord(channel, "wk-held"u8.ToArray())]);
         var heldWrite = journals.WriteAsync(heldRecord, Token);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
 
@@ -319,7 +315,7 @@ public sealed class JournalLocalAppendTests : IDisposable
 
         // A write after CancelDrain still triggers OnBatchDurable on the same live session.
         using (var payload = ArcBuffer.Wrap("after-cancel"u8.ToArray()))
-        using (var record = journals.EncodeAppend(key, v, payload, [new LocalAppendRecord(stream, "wk-after"u8.ToArray())]))
+        using (var record = journals.EncodeAppend(key, v, payload, [new MessageRecord(channel, "wk-after"u8.ToArray())]))
         {
             var outcome = await journals.WriteAsync(record, Token);
             Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value);
@@ -335,15 +331,15 @@ public sealed class JournalLocalAppendTests : IDisposable
     [InlineData("OnDurableBeforeQuorum")]
     [InlineData("CompleteCallerBeforeOnDurable")]
     [InlineData("DisposeBeforeLastOnDurable")]
-    public async Task LocalSessionOracleCatchesJsI12RaceMutants(string mutant)
+    public async Task MessageSessionOracleCatchesJsI12RaceMutants(string mutant)
     {
-        var stream = LocalStreamName.Parse("orleans.wakeup");
-        var oracle = new LocalSessionOracle(stream);
+        var channel = MessageChannel.Parse("orleans.wakeup");
+        var oracle = new MessageSessionOracle(channel);
 
         using var archive = new InMemoryArchiveStore();
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);
         await ledgers.BootstrapAsync(Token);
-        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, localStreamHandlers: [oracle]);
+        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, messageHandlers: [oracle]);
 
         var quorumHold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         if (mutant == "OnDurableBeforeQuorum")
@@ -351,7 +347,6 @@ public sealed class JournalLocalAppendTests : IDisposable
             journals.OnDurableBeforeQuorumMutant = true;
             journals.BeforeApply = async () =>
             {
-                // Keep proposal outcome pending until we inspect whether OnBatchDurable already fired before quorum!
                 await quorumHold.Task.ConfigureAwait(false);
             };
         }
@@ -368,10 +363,9 @@ public sealed class JournalLocalAppendTests : IDisposable
         if (mutant == "OnDurableBeforeQuorum")
         {
             using var p = ArcBuffer.Wrap("x"u8.ToArray());
-            using var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new LocalAppendRecord(stream, "wk0"u8.ToArray())]);
+            using var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new MessageRecord(channel, "wk0"u8.ToArray())]);
             var writeTask = journals.WriteAsync(rec, Token);
 
-            // Wait briefly for OnBatchDurable to fire prematurely while BeforeApply holds proposal completion.
             await oracle.WaitForCallbackCountAsync(1, Token);
             Assert.False(writeTask.IsCompleted);
             oracle.RecordPrematureBeforeQuorumViolation();
@@ -384,7 +378,7 @@ public sealed class JournalLocalAppendTests : IDisposable
             for (var i = 0; i < 2; i++)
             {
                 using var p = ArcBuffer.Wrap(Encoding.UTF8.GetBytes($"p{i}"));
-                using var rec = journals.EncodeAppend(key, v, p, [new LocalAppendRecord(stream, Encoding.UTF8.GetBytes($"wk{i}"))]);
+                using var rec = journals.EncodeAppend(key, v, p, [new MessageRecord(channel, Encoding.UTF8.GetBytes($"wk{i}"))]);
                 var outcome = await journals.WriteAsync(rec, Token);
                 v = Assert.IsType<JournalWriteOutcome.Accepted>(outcome.Value).Version;
                 oracle.ObserveCallerAccepted(i);
@@ -398,131 +392,101 @@ public sealed class JournalLocalAppendTests : IDisposable
     [Fact]
     public async Task OnBatchDurableDefectReportsFatalErrorFailsBatchAndLeavesWarmStateUntouched()
     {
-        var stream = LocalStreamName.Parse("orleans.wakeup");
-        var handler = new ThrowingLocalStreamHandler(stream, new InvalidOperationException("simulated handler bug"));
+        var channel = MessageChannel.Parse("orleans.wakeup");
+        var handler = new ThrowingMessageHandler(channel, new InvalidOperationException("simulated handler bug"));
 
         var since = FatalErrors.ReportedCount;
         using var archive = new InMemoryArchiveStore();
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);
         await ledgers.BootstrapAsync(Token);
-        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, localStreamHandlers: [handler]);
+        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, stateDatabase: null, messageHandlers: [handler]);
 
         var key = JournalRowKey.Encode("grain/defect");
         using (var p = ArcBuffer.Wrap("x"u8.ToArray()))
-        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new LocalAppendRecord(stream, "wk"u8.ToArray())]))
+        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new MessageRecord(channel, "wk"u8.ToArray())]))
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => journals.WriteAsync(rec, Token));
         }
 
         var report = Assert.Single(FatalErrors.TakeMine(since));
         Assert.Equal(FatalErrorSite.Defect, report.Site);
-        Assert.Equal("JournalsLocalStreamSession", report.Failure.Defect);
+        Assert.Equal("JournalsMessageSession", report.Failure.Defect);
 
         // Warm state was NOT applied after the OnBatchDurable defect, and admission is fenced/abandoned.
         Assert.Null(journals.Warm(key));
     }
 
     /// <summary>
-    /// Real RocksDB integration test for <see cref="JournalStateDatabase.TryHasKeyEntryAsync"/> (journals.md §8.3):
-    /// verifies O(1) presence detection over <see cref="RocksDbJournalIndex"/> via <see cref="LedgerApplyLoop"/>,
-    /// <c>FlushAsync</c> + reopen, non-replicated ledger returning <see langword="null"/> without starting a
-    /// <c>PredecessorScan</c>, <c>DropLedgerAsync</c> cleanup, and zero <c>tombstones</c> entries for
-    /// <see cref="RowKind.LocalAppend"/> rows.
+    /// Real RocksDB integration test: verifies <see cref="RowKind.Message"/> rows produce ZERO writes to
+    /// <see cref="RocksDbJournalIndex"/> (<c>key_index</c> and <c>tombstones</c>) across both <c>LedgerApplyLoop</c>
+    /// and <c>PredecessorScan</c>, while journal rows in the same batch are indexed normally (LG-I15).
     /// </summary>
     [Fact]
-    public async Task RocksDbTryHasKeyEntryAsyncCoversApplyFlushReopenDropAndZeroTombstones()
+    public async Task RocksDbJournalIndexSkipsMessageRowsCompletely()
     {
         var indexDir = Path.Combine(_rocksRoot, "index");
-        var stream = LocalStreamName.Parse("orleans.wakeup");
-        var absentStream = LocalStreamName.Parse("orleans.unused");
-        var handler = new RecordingLocalStreamHandler(stream);
+        var channel = MessageChannel.Parse("orleans.wakeup");
+        var handler = new RecordingMessageHandler(channel);
 
         await using var ledgers = await LiveLedgers.StartAsync(new InMemoryConditionalRegister(), TimeProvider.System, Token);
         await ledgers.BootstrapAsync(Token);
 
-        var open = ledgers.OpenContaining(JournalRowKey.Encode("g1").Span.ToArray());
+        var key = JournalRowKey.Encode("g1");
+        var open = ledgers.OpenContaining(key.Span.ToArray());
         var ledgerId = open.Id;
-        var presentLocalKey = LedgerLocalKey.Encode(ledgerId, open.Range, stream);
-        var absentLocalKey = LedgerLocalKey.Encode(ledgerId, open.Range, absentStream);
 
-        // Open real RocksDbJournalIndex + JournalStateDatabase + LedgerApplyLoop.
         using var archive = new InMemoryArchiveStore();
-        await using (var rocks = new RocksDbJournalIndex(indexDir))
-        await using (var db = await JournalStateDatabase.OpenAsync(rocks, ledgers.Reader, new JournalIndexOptions { FlushInterval = Timeout.InfiniteTimeSpan, QuickCheckInterval = Timeout.InfiniteTimeSpan }, TimeProvider.System, Token))
-        await using (var applyLoop = new LedgerApplyLoop(ledgers.Reader, db.Applier, TimeProvider.System))
-        await using (var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, db, [handler]))
+        await using var rocks = new RocksDbJournalIndex(indexDir);
+        await using var db = await JournalStateDatabase.OpenAsync(rocks, ledgers.Reader, new JournalIndexOptions { FlushInterval = Timeout.InfiniteTimeSpan, QuickCheckInterval = Timeout.InfiniteTimeSpan }, TimeProvider.System, Token);
+        await using var applyLoop = new LedgerApplyLoop(ledgers.Reader, db.Applier, TimeProvider.System);
+        await using var journals = new JournalStore(ledgers.Registry, archive, new JournalStoreOptions(), TimeProvider.System, db, [handler]);
+        db.Attach(applyLoop);
+
+        using (var p = ArcBuffer.Wrap("v1"u8.ToArray()))
+        using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new MessageRecord(channel, "wk1"u8.ToArray())]))
         {
-            db.Attach(applyLoop);
-
-            var key = JournalRowKey.Encode("g1");
-            using (var p = ArcBuffer.Wrap("v1"u8.ToArray()))
-            using (var rec = journals.EncodeAppend(key, JournalVersion.Origin, p, [new LocalAppendRecord(stream, "wk1"u8.ToArray())]))
-            {
-                Assert.IsType<JournalWriteOutcome.Accepted>((await journals.WriteAsync(rec, Token)).Value);
-            }
-
-            // Close ledger at T = 1.
-            await ledgers.ReplaceAsync(ledgerId, Token);
-            var closed = ledgers.Ledger(ledgerId);
-            var closedTail = Assert.IsType<LedgerStatus.Closed>(closed.Status.Value).T;
-            Assert.Equal(new Slot(1), closedTail);
-
-            // Wait for LedgerApplyLoop to catch up the local RocksDB index to closedTail.
-            applyLoop.Wake(ledgerId);
-            var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (db.Watermark(ledgerId) < closedTail && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(10, Token);
-            }
-
-            Assert.Equal(closedTail, db.Watermark(ledgerId));
-
-            // O(1) presence probe on caught-up local ledger: true for written stream, false for unused stream, false for tail 0.
-            Assert.Equal(true, await db.TryHasKeyEntryAsync(closed, presentLocalKey, closedTail, Token));
-            Assert.Equal(false, await db.TryHasKeyEntryAsync(closed, absentLocalKey, closedTail, Token));
-            Assert.Equal(false, await db.TryHasKeyEntryAsync(closed, presentLocalKey, Slot.Zero, Token));
-
-            // Non-replicated ledger returns null without triggering PredecessorScan.
-            var remoteNode = new NodeId(Guid.NewGuid());
-            var nonReplicated = new LedgerMetadata(new LedgerId(999), KeyRange.Root, new LedgerLocation.Nodes([remoteNode]), 4, new PrimaryClaim(remoteNode, SequencerInstanceId.New()), new LedgerStatus.Closed(new Slot(1)));
-            Assert.Null(await db.TryHasKeyEntryAsync(nonReplicated, presentLocalKey, new Slot(1), Token));
-            Assert.Equal(0, db.PredecessorScansStarted);
-
-            // Verify LocalAppend never enters the RocksDB tombstones column family.
-            var tombstones = await rocks.ScanTombstonesAsync(ledgerId, Token);
-            Assert.Empty(tombstones);
-
-            // Atomic flush persists watermarks and key_index to disk.
-            await db.FlushAsync(Token);
+            Assert.IsType<JournalWriteOutcome.Accepted>((await journals.WriteAsync(rec, Token)).Value);
         }
 
-        // Reopen RocksDbJournalIndex and confirm TryHasKeyEntryAsync reads persisted key_index after restart, then drops cleanly.
-        await using (var rocks2 = new RocksDbJournalIndex(indexDir))
-        await using (var db2 = await JournalStateDatabase.OpenAsync(rocks2, ledgers.Reader, new JournalIndexOptions { FlushInterval = Timeout.InfiniteTimeSpan, QuickCheckInterval = Timeout.InfiniteTimeSpan }, TimeProvider.System, Token))
-        {
-            var closed = ledgers.Ledger(ledgerId);
-            var closedTail = Assert.IsType<LedgerStatus.Closed>(closed.Status.Value).T;
-            Assert.Equal(closedTail, db2.Watermark(ledgerId));
-            Assert.Equal(true, await db2.TryHasKeyEntryAsync(closed, presentLocalKey, closedTail, Token));
-            Assert.Equal(false, await db2.TryHasKeyEntryAsync(closed, absentLocalKey, closedTail, Token));
+        await ledgers.ReplaceAsync(ledgerId, Token);
+        var closed = ledgers.Ledger(ledgerId);
+        var closedTail = Assert.IsType<LedgerStatus.Closed>(closed.Status.Value).T;
+        Assert.Equal(new Slot(1), closedTail);
 
-            // Drop ledger from RocksDB index and confirm TryHasKeyEntryAsync returns null (not false!).
-            await db2.Applier.RemoveAsync(ledgerId, Token);
-            Assert.Null(await db2.TryHasKeyEntryAsync(closed, presentLocalKey, closedTail, Token));
+        applyLoop.Wake(ledgerId);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (db.Watermark(ledgerId) < closedTail && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10, Token);
         }
+
+        Assert.Equal(closedTail, db.Watermark(ledgerId));
+
+        // The journal row itself IS indexed (1 entry at slot 0, index 0), and zero tombstones exist.
+        var journalEntries = await rocks.GetKeyEntriesAsync(ledgerId, JournalKeyHash.Compute(key.Span), Slot.Zero, 0, closedTail, Token);
+        var entry = Assert.Single(journalEntries);
+        Assert.Equal(Slot.Zero, entry.Slot);
+        Assert.Equal(0, entry.Index);
+        Assert.Empty(await rocks.ScanTombstonesAsync(ledgerId, Token));
+
+        // Message rows carry no key (empty key hash has zero entries in key_index).
+        var emptyEntries = await rocks.GetKeyEntriesAsync(ledgerId, JournalKeyHash.Compute([]), Slot.Zero, 0, closedTail, Token);
+        Assert.Empty(emptyEntries);
+
+        await db.FlushAsync(Token);
     }
 
-    private sealed class RecordingLocalStreamHandler(LocalStreamName stream, Func<ReadOnlySpan<byte>, InvalidDataException?>? validate = null) : ILocalStreamHandler
+    private sealed class RecordingMessageHandler(MessageChannel channel, Func<ReadOnlySpan<byte>, InvalidDataException?>? validate = null) : IMessageHandler
     {
         private readonly ConcurrentBag<RecordingSession> _sessions = [];
 
-        public LocalStreamName Stream { get; } = stream;
+        public MessageChannel Channel { get; } = channel;
 
         public IReadOnlyCollection<RecordingSession> Sessions => _sessions;
 
         public InvalidDataException? Validate(ReadOnlySpan<byte> payload) => validate?.Invoke(payload);
 
-        public ILocalStreamSession OpenLedger(LedgerId ledger)
+        public IMessageSession OpenLedger(LedgerId ledger)
         {
             var session = new RecordingSession(ledger);
             _sessions.Add(session);
@@ -530,7 +494,7 @@ public sealed class JournalLocalAppendTests : IDisposable
         }
     }
 
-    private sealed class RecordingSession(LedgerId ledger) : ILocalStreamSession
+    private sealed class RecordingSession(LedgerId ledger) : IMessageSession
     {
         public LedgerId Ledger { get; } = ledger;
 
@@ -540,7 +504,7 @@ public sealed class JournalLocalAppendTests : IDisposable
 
         public int DisposeCount { get; private set; }
 
-        public void OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records)
+        public void OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records)
         {
             CallbackSlots.Add(slot);
             CallbackSizes.Add(records.Length);
@@ -549,17 +513,17 @@ public sealed class JournalLocalAppendTests : IDisposable
         public void Dispose() => DisposeCount++;
     }
 
-    private sealed class ThrowingLocalStreamHandler(LocalStreamName stream, Exception exception) : ILocalStreamHandler
+    private sealed class ThrowingMessageHandler(MessageChannel channel, Exception exception) : IMessageHandler
     {
-        public LocalStreamName Stream { get; } = stream;
+        public MessageChannel Channel { get; } = channel;
 
         public InvalidDataException? Validate(ReadOnlySpan<byte> payload) => null;
 
-        public ILocalStreamSession OpenLedger(LedgerId ledger) => new ThrowingSession(exception);
+        public IMessageSession OpenLedger(LedgerId ledger) => new ThrowingSession(exception);
 
-        private sealed class ThrowingSession(Exception exception) : ILocalStreamSession
+        private sealed class ThrowingSession(Exception exception) : IMessageSession
         {
-            public void OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records) => throw exception;
+            public void OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records) => throw exception;
 
             public void Dispose()
             {
@@ -569,10 +533,10 @@ public sealed class JournalLocalAppendTests : IDisposable
 
     /// <summary>
     /// White-box oracle verifying JS-I12 across all sessions: strict slot order, non-empty records,
-    /// <see cref="ILocalStreamSession.OnBatchDurable"/> before caller <c>Accepted</c>, and <c>Dispose()</c> called once
+    /// <see cref="IMessageSession.OnBatchDurable"/> before caller <c>Accepted</c>, and <c>Dispose()</c> called once
     /// strictly after the last <c>OnBatchDurable</c>.
     /// </summary>
-    private sealed class LocalSessionOracle(LocalStreamName stream) : ILocalStreamHandler
+    private sealed class MessageSessionOracle(MessageChannel channel) : IMessageHandler
     {
         private readonly Lock _lock = new();
         private readonly Dictionary<LedgerId, TrackedSession> _sessions = [];
@@ -581,7 +545,7 @@ public sealed class JournalLocalAppendTests : IDisposable
         private TaskCompletionSource? _callbackWaiter;
         private int _callbackTarget;
 
-        public LocalStreamName Stream { get; } = stream;
+        public MessageChannel Channel { get; } = channel;
 
         public IReadOnlyList<string> Violations
         {
@@ -596,7 +560,7 @@ public sealed class JournalLocalAppendTests : IDisposable
 
         public InvalidDataException? Validate(ReadOnlySpan<byte> payload) => null;
 
-        public ILocalStreamSession OpenLedger(LedgerId ledger)
+        public IMessageSession OpenLedger(LedgerId ledger)
         {
             lock (_lock)
             {
@@ -704,7 +668,7 @@ public sealed class JournalLocalAppendTests : IDisposable
             }
         }
 
-        private sealed class TrackedSession(LocalSessionOracle owner, LedgerId ledger) : ILocalStreamSession
+        private sealed class TrackedSession(MessageSessionOracle owner, LedgerId ledger) : IMessageSession
         {
             public LedgerId Ledger { get; } = ledger;
 
@@ -712,7 +676,7 @@ public sealed class JournalLocalAppendTests : IDisposable
 
             public int DisposeCount { get; set; }
 
-            public void OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records) =>
+            public void OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records) =>
                 owner.RecordCallback(this, slot, records.Length);
 
             public void Dispose() => owner.RecordDispose(this);

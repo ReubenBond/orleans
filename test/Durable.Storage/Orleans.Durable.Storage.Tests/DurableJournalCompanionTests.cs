@@ -15,9 +15,9 @@ using Orleans.Runtime;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="DurableJournalStorage"/> implementing <see cref="ICompanionJournalStorage"/>:
-/// argument validation, rebase-retry preserving companion payloads verbatim across ledger drops, and atomic
-/// delivery to <see cref="WakeupStreamHandler"/> (orleans.md §5.5, §5.15).
+/// Unit tests for <see cref="DurableJournalStorage"/> implementing <see cref="IMessageJournalStorage"/>:
+/// argument validation, rebase-retry preserving message payloads verbatim across ledger drops, and atomic
+/// delivery to <see cref="WakeupMessageHandler"/> (orleans.md §5.5, §5.15).
 /// </summary>
 public sealed class DurableJournalCompanionTests : IDisposable
 {
@@ -28,11 +28,11 @@ public sealed class DurableJournalCompanionTests : IDisposable
     public void Dispose() => _leaks.Dispose();
 
     [Fact]
-    public async Task DurableJournalStoragePreservesCompanionsAcrossRebaseRetryAndValidatesArguments()
+    public async Task DurableJournalStoragePreservesMessagesAcrossRebaseRetryAndValidatesArguments()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
         var dispatched = new TaskCompletionSource<IJobRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var handler = new WakeupStreamHandler(
+        var handler = new WakeupMessageHandler(
             new WakeupOptions(),
             new CallbackDispatcher((_, ctx, _) =>
             {
@@ -61,7 +61,7 @@ public sealed class DurableJournalCompanionTests : IDisposable
             new JournalStoreOptions { WarmStateBytes = 0 },
             time,
             stateDatabase: null,
-            localStreamHandlers: [handler]);
+            messageHandlers: [handler]);
 
         var localRouting = new LocalRouting();
         localRouting.Publish(node, map, archive);
@@ -88,12 +88,12 @@ public sealed class DurableJournalCompanionTests : IDisposable
         await storage.ReadAsync(consumer, Token);
         Assert.Empty(consumer.Bytes);
 
-        // Validation: empty Append throws ArgumentOutOfRangeException; default(JournalCompanionRecord) throws ArgumentException.
-        var wakeupPayload = WakeupCompanionCodec.Encode(new WakeupRecord(GrainId.Create("g", "1"), "orleans.messaging.pump", (time.GetUtcNow() + TimeSpan.FromSeconds(5)).UtcTicks));
-        var companion = new JournalCompanionRecord(WakeupCompanionCodec.StreamName, wakeupPayload);
+        // Validation: empty Append throws ArgumentOutOfRangeException; default(JournalMessageRecord) throws ArgumentException.
+        var wakeupPayload = WakeupMessageCodec.Encode(new WakeupRecord(GrainId.Create("g", "1"), "orleans.messaging.pump", (time.GetUtcNow() + TimeSpan.FromSeconds(5)).UtcTicks));
+        var message = new JournalMessageRecord(WakeupMessageCodec.ChannelName, wakeupPayload);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => storage.AppendWithCompanionsAsync(ReadOnlySequence<byte>.Empty, new[] { companion }, Token).AsTask());
-        await Assert.ThrowsAsync<ArgumentException>(() => storage.AppendWithCompanionsAsync(new ReadOnlySequence<byte>("a"u8.ToArray()), new[] { default(JournalCompanionRecord) }, Token).AsTask());
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => storage.AppendWithMessagesAsync(ReadOnlySequence<byte>.Empty, new[] { message }, Token).AsTask());
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.AppendWithMessagesAsync(new ReadOnlySequence<byte>("a"u8.ToArray()), new[] { default(JournalMessageRecord) }, Token).AsTask());
 
         // Write #1: initial Append so we have content before triggering a ledger drop/rebase.
         await storage.AppendAsync(new ReadOnlySequence<byte>("hello-"u8.ToArray()), Token);
@@ -154,9 +154,9 @@ public sealed class DurableJournalCompanionTests : IDisposable
         _ = await committer.CommitAsync(new LedgerMapChange.Drop(closedLedger), Token);
         _ = await map.ReadAsync(Token);
 
-        // Write #2: AppendWithCompanionsAsync hits Rejected on stale pre-drop version, reads unchanged content, rebases,
-        // and resends with the EXACT companion payload preserved!
-        await storage.AppendWithCompanionsAsync(new ReadOnlySequence<byte>("world"u8.ToArray()), new[] { companion }, Token);
+        // Write #2: AppendWithMessagesAsync hits Rejected on stale pre-drop version, reads unchanged content, rebases,
+        // and resends with the EXACT message payload preserved!
+        await storage.AppendWithMessagesAsync(new ReadOnlySequence<byte>("world"u8.ToArray()), new[] { message }, Token);
 
         // Advance FakeTimeProvider by 5s -> WakeupLedgerSession on the new open ledger MUST fire with IsEphemeralWakeup = true!
         time.Advance(TimeSpan.FromSeconds(5));

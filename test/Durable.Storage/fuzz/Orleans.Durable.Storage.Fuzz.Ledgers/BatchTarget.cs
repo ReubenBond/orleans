@@ -40,6 +40,11 @@ public sealed class BatchTarget : FuzzTarget
             return false;
         }
 
+        if (row.Kind == RowKind.Message)
+        {
+            return row.Channel.SequenceEqual(expected.Key);
+        }
+
         return !row.IsDefining
             || row.Key.SequenceEqual(expected.Key)
                 && row.VersionBefore.Base.AsSpan().SequenceEqual(expected.VersionBase)

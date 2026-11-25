@@ -162,7 +162,7 @@ public sealed class LedgerSegmentTarget : FuzzTarget
                 rows.Add(new ResolvedRuleRow(
                     row.Tag.Slot.Value,
                     row.Tag.Index,
-                    row.Key.ToArray(),
+                    row.Kind == RowKind.Message ? row.Channel.ToArray() : row.Key.ToArray(),
                     (byte)row.Kind,
                     row.Version.Base.ToArray(),
                     row.Version.Count,

@@ -6,8 +6,8 @@ using Orleans.Durable.Jobs;
 namespace Orleans.Durable.Storage.Fuzz.Orleans;
 
 /// <summary>
-/// Independent reference model of the <c>orleans.wakeup</c> companion record format (version 1) for fuzzing
-/// <see cref="WakeupCompanionCodec"/> (orleans.md §5.15, verification.md §6.1).
+/// Independent reference model of the <c>orleans.wakeup</c> message record format (version 1) for fuzzing
+/// <see cref="WakeupMessageCodec"/> (orleans.md §5.15, verification.md §6.1).
 /// </summary>
 internal static class WakeupCompanionRules
 {
@@ -19,65 +19,65 @@ internal static class WakeupCompanionRules
     {
         if (input.Length < 1)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
-        if (input[0] != WakeupCompanionCodec.Version)
+        if (input[0] != WakeupMessageCodec.Version)
         {
-            return new(null, WakeupCompanionCodec.ReasonBadVersion);
+            return new(null, WakeupMessageCodec.ReasonBadVersion);
         }
 
         if (input.Length < 2)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
         var flags = input[1];
-        if ((flags & ~WakeupCompanionCodec.HasDueTimeFlag) != 0)
+        if ((flags & ~WakeupMessageCodec.HasDueTimeFlag) != 0)
         {
-            return new(null, WakeupCompanionCodec.ReasonBadFlags);
+            return new(null, WakeupMessageCodec.ReasonBadFlags);
         }
 
-        var hasDueTime = (flags & WakeupCompanionCodec.HasDueTimeFlag) != 0;
+        var hasDueTime = (flags & WakeupMessageCodec.HasDueTimeFlag) != 0;
         var pos = 2;
 
         var grainLenStatus = ReadVarint(input, ref pos, out var grainLen);
         if (grainLenStatus == 1)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
         if (grainLenStatus == 2)
         {
-            return new(null, WakeupCompanionCodec.ReasonBadVarint);
+            return new(null, WakeupMessageCodec.ReasonBadVarint);
         }
 
         if (grainLen == 0)
         {
-            return new(null, WakeupCompanionCodec.ReasonEmptyGrainId);
+            return new(null, WakeupMessageCodec.ReasonEmptyGrainId);
         }
 
-        if (grainLen > WakeupCompanionCodec.MaxGrainIdUtf8Length)
+        if (grainLen > WakeupMessageCodec.MaxGrainIdUtf8Length)
         {
-            return new(null, WakeupCompanionCodec.ReasonGrainIdTooLong);
+            return new(null, WakeupMessageCodec.ReasonGrainIdTooLong);
         }
 
         if (input.Length - pos < (int)grainLen)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
         var grainBytes = input.Slice(pos, (int)grainLen);
         pos += (int)grainLen;
         if (!Utf8.IsValid(grainBytes))
         {
-            return new(null, WakeupCompanionCodec.ReasonInvalidUtf8);
+            return new(null, WakeupMessageCodec.ReasonInvalidUtf8);
         }
 
         var slash = grainBytes.IndexOf((byte)'/');
         if (slash <= 0)
         {
-            return new(null, WakeupCompanionCodec.ReasonBadGrainId);
+            return new(null, WakeupMessageCodec.ReasonBadGrainId);
         }
 
         var grainText = Encoding.UTF8.GetString(grainBytes);
@@ -85,40 +85,40 @@ internal static class WakeupCompanionRules
         var jobLenStatus = ReadVarint(input, ref pos, out var jobLen);
         if (jobLenStatus == 1)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
         if (jobLenStatus == 2)
         {
-            return new(null, WakeupCompanionCodec.ReasonBadVarint);
+            return new(null, WakeupMessageCodec.ReasonBadVarint);
         }
 
         if (jobLen == 0)
         {
-            return new(null, WakeupCompanionCodec.ReasonEmptyJobName);
+            return new(null, WakeupMessageCodec.ReasonEmptyJobName);
         }
 
-        if (jobLen > WakeupCompanionCodec.MaxJobNameUtf8Length)
+        if (jobLen > WakeupMessageCodec.MaxJobNameUtf8Length)
         {
-            return new(null, WakeupCompanionCodec.ReasonJobNameTooLong);
+            return new(null, WakeupMessageCodec.ReasonJobNameTooLong);
         }
 
         if (input.Length - pos < (int)jobLen)
         {
-            return new(null, WakeupCompanionCodec.ReasonTruncated);
+            return new(null, WakeupMessageCodec.ReasonTruncated);
         }
 
         var jobBytes = input.Slice(pos, (int)jobLen);
         pos += (int)jobLen;
         if (!Utf8.IsValid(jobBytes))
         {
-            return new(null, WakeupCompanionCodec.ReasonInvalidUtf8);
+            return new(null, WakeupMessageCodec.ReasonInvalidUtf8);
         }
 
         var jobName = Encoding.UTF8.GetString(jobBytes);
         if (string.IsNullOrWhiteSpace(jobName))
         {
-            return new(null, WakeupCompanionCodec.ReasonBlankJobName);
+            return new(null, WakeupMessageCodec.ReasonBlankJobName);
         }
 
         long? dueTime = null;
@@ -126,14 +126,14 @@ internal static class WakeupCompanionRules
         {
             if (input.Length - pos < sizeof(long))
             {
-                return new(null, WakeupCompanionCodec.ReasonTruncated);
+                return new(null, WakeupMessageCodec.ReasonTruncated);
             }
 
             var ticks = BinaryPrimitives.ReadInt64LittleEndian(input.Slice(pos, sizeof(long)));
             pos += sizeof(long);
             if (ticks < 0 || ticks > DateTimeOffset.MaxValue.UtcTicks)
             {
-                return new(null, WakeupCompanionCodec.ReasonBadTicks);
+                return new(null, WakeupMessageCodec.ReasonBadTicks);
             }
 
             dueTime = ticks;
@@ -141,7 +141,7 @@ internal static class WakeupCompanionRules
 
         if (pos < input.Length)
         {
-            return new(null, WakeupCompanionCodec.ReasonTrailingBytes);
+            return new(null, WakeupMessageCodec.ReasonTrailingBytes);
         }
 
         return new(new Parsed(grainText, jobName, dueTime), null);

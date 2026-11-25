@@ -1,7 +1,4 @@
-using System.Collections.Immutable;
-using System.Diagnostics.Metrics;
 using System.Globalization;
-using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Durable.Storage.Engine.Archive;
 using Orleans.Durable.Storage.Engine.Archive.Control;
@@ -9,11 +6,9 @@ using Orleans.Durable.Storage.Engine.Archive.Logs;
 using Orleans.Durable.Storage.Engine.Archive.Logs.Control;
 using Orleans.Durable.Storage.Engine.Archive.Lsm;
 using Orleans.Durable.Storage.Engine.Archive.Lsm.Control;
-using Orleans.Durable.Storage.Engine.Cluster.Control;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Control;
 using Orleans.Durable.Storage.Engine.Ledgers.Objects;
-using Orleans.Durable.Storage.Engine.ObjectStore;
 using Orleans.Durable.Storage.Engine.ObjectStore.Memory;
 using Orleans.Durable.Storage.Testing;
 using Orleans.Testing.Simulation;
@@ -21,23 +16,23 @@ using Orleans.Testing.Simulation;
 namespace Orleans.Durable.Storage.Simulation.Tests;
 
 /// <summary>
-/// Orleans-free Clockwork simulations for <see cref="LocalStreamDrainCoordinator"/>, <see cref="DrainWorker"/>,
-/// <see cref="ArchiveLogDrainWorker"/>, and <see cref="NodeController"/> covering LG-I15 and LG-I16
-/// (verification.md §7.1, archive.md §2.3, orleans.md §5.6).
+/// Orleans-free Clockwork simulations for unified single-pass <c>DrainScan</c> message draining across
+/// <see cref="DrainWorker"/> (LSM) and <see cref="ArchiveLogDrainWorker"/> (Archive Logs) covering LG-I15 and LG-I16
+/// (verification.md §7.1, archive.md §2.3, orleans.md §5.15).
 /// </summary>
 public sealed class LocalDrainSimulationTests
 {
-    private static readonly LocalStreamName Stream = SimulatedWakeupStreamProcessor.DefaultStream;
+    private static readonly MessageChannel Channel = SimulatedWakeupMessageProcessor.DefaultChannel;
 
     /// <summary>
-    /// LSM up-front barrier on both <c>a &lt; T</c> and <c>a == T</c>: commits surviving wakeups before
-    /// <c>ManifestChange.Drain(..., complete: true)</c> in one manifest replace (0 extra commits), writes 0 backing
-    /// commits when cleared before close, and handles <c>Dropped</c> and <c>Backpressure</c> outcomes cleanly.
+    /// LSM single-pass <c>DrainScan</c> commits surviving wakeups before <c>ManifestChange.Drain</c> in one manifest
+    /// replace (0 extra manifest commits), writes 0 sealed shards on same-segment clear, handles multi-segment open
+    /// draining + cross-segment set-then-clear, and commits message-only segments (<c>Count == 0 &amp;&amp; HasMessages</c>).
     /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void LsmUpFrontBarrierCoversLessThanTailAndAtTailWithZeroExtraManifestCommits(bool drainBeforeClose)
+    public void LsmSinglePassDrainCommitsSurvivingMessagesAndSkipsClearedAndHandlesMessageOnlySegments(bool drainOpenSegmentFirst)
     {
         _ = SeededSimulation.Run(1, async environment =>
         {
@@ -49,16 +44,8 @@ public sealed class LocalDrainSimulationTests
             await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None, writerOptions);
             await ledgers.BootstrapAsync(CancellationToken.None);
 
-            var processor = new SimulatedWakeupStreamProcessor();
-            var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor]);
-            var worker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, localDrainBarrier: coordinator);
-
-            // Ledger 1: key 1 survives, key 2 is set then cleared before close -> only key 1 is committed.
-            var ledger1 = ledgers.OpenContaining([1]).Id;
-            var localKey1 = LedgerLocalKey.Encode(ledger1, KeyRange.Root, Stream);
-            await ProposeMixedAsync(ledgers, ledger1, [1], "j0"u8.ToArray(), localKey1, SimulatedWakeupStreamProcessor.Encode(1, set: true));
-            await ProposeMixedAsync(ledgers, ledger1, [1], "j1"u8.ToArray(), localKey1, SimulatedWakeupStreamProcessor.Encode(2, set: true));
-            await ProposeMixedAsync(ledgers, ledger1, [1], "j2"u8.ToArray(), localKey1, SimulatedWakeupStreamProcessor.Encode(2, set: false));
+            var processor = new SimulatedWakeupMessageProcessor();
+            var worker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
 
             var manifestCommits = 0;
             Task<ManifestCommitOutcome> CommitManifestAsync(ManifestChange change, CancellationToken ct)
@@ -67,44 +54,31 @@ public sealed class LocalDrainSimulationTests
                 return manifestCommitter.CommitAsync(change, ct);
             }
 
-            if (drainBeforeClose)
+            // Ledger 1: key 1 survives, key 2 is set then cleared in the SAME segment -> only key 1 is published!
+            var ledger1 = ledgers.OpenContaining([1]).Id;
+            await ProposeMixedAsync(ledgers, ledger1, [1], "j0"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(1, set: true));
+            await ProposeMixedAsync(ledgers, ledger1, [1], "j1"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(2, set: true));
+            await ProposeMixedAsync(ledgers, ledger1, [1], "j2"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(2, set: false));
+
+            if (drainOpenSegmentFirst)
             {
-                // End segment while open and drain the open segment up to its marker so watermark reaches T - 1 / T.
-                var marker = await ledgers.EndSegmentAsync(ledger1, CancellationToken.None);
+                // End segment 0 while open, drain segment 0 (commits key 1!), then clear key 1 in segment 1 and close.
+                _ = await ledgers.EndSegmentAsync(ledger1, CancellationToken.None);
                 var openTail = await ledgers.ConfirmOpenAsync(ledger1, CancellationToken.None);
                 var openDrain = await worker.DrainAsync(ledgers.Ledger(ledger1), openTail, CommitManifestAsync, CancellationToken.None);
                 Assert.IsType<DrainOutcome.Drained>(openDrain.Value);
-                Assert.Equal(0, processor.CommitCalls);
+                Assert.Equal([1], processor.CommittedKeys);
+                Assert.Equal(1, processor.CreatedShards);
 
-                // Drain the marker segment too once ledger closes so a == T when we test the final closed completion.
+                // Segment 1 clears key 1 -> 0 new shards published when segment 1 drains after close!
+                await ProposeMixedAsync(ledgers, ledger1, [1], "j3"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(1, set: false));
                 await ledgers.ReplaceAsync(ledger1, CancellationToken.None);
                 var closedMeta = ledgers.Ledger(ledger1);
                 var closedTail = Assert.IsType<LedgerStatus.Closed>(closedMeta.Status.Value).T;
-                // Advance manifest watermark directly to closedTail (simulating a == T already drained before close).
-                if (manifest.Current!.Value.RecordedWatermark(ledger1) < closedTail)
-                {
-                    var segDrain = await worker.DrainAsync(closedMeta, closedTail, CommitManifestAsync, CancellationToken.None);
-                    Assert.IsType<DrainOutcome.Drained>(segDrain.Value);
-                }
-
-                // Now test a second ledger whose manifest watermark is explicitly advanced to T without complete: true (pure a == T path).
-                var ledger2 = ledgers.OpenContaining([1]).Id;
-                var localKey2 = LedgerLocalKey.Encode(ledger2, KeyRange.Root, Stream);
-                await ProposeMixedAsync(ledgers, ledger2, [2], "k0"u8.ToArray(), localKey2, SimulatedWakeupStreamProcessor.Encode(7, set: true));
-                await ledgers.ReplaceAsync(ledger2, CancellationToken.None);
-                var meta2 = ledgers.Ledger(ledger2);
-                var tail2 = Assert.IsType<LedgerStatus.Closed>(meta2.Status.Value).T;
-                // Record non-complete watermark at tail2 directly in manifest to force exact a == T branch.
-                var preApplied = await manifestCommitter.CommitAsync(new ManifestChange.Drain(ledger2, Slot.Zero, tail2, [], complete: false), CancellationToken.None);
-                Assert.IsType<ManifestCommitOutcome.Applied>(preApplied.Value);
-                _ = await manifest.ReadAsync(CancellationToken.None);
-
-                var commitsBefore = manifestCommits;
-                var atEndOutcome = await worker.DrainAsync(meta2, tail2, CommitManifestAsync, CancellationToken.None);
-                var drained = Assert.IsType<DrainOutcome.Drained>(atEndOutcome.Value);
+                var seg1Outcome = await worker.DrainAsync(closedMeta, closedTail, CommitManifestAsync, CancellationToken.None);
+                var drained = Assert.IsType<DrainOutcome.Drained>(seg1Outcome.Value);
                 Assert.True(drained.Change.Complete);
-                Assert.Equal(commitsBefore + 1, manifestCommits);
-                Assert.Contains((byte)7, processor.CommittedKeys);
+                Assert.Equal(1, processor.CreatedShards);
             }
             else
             {
@@ -116,87 +90,47 @@ public sealed class LocalDrainSimulationTests
                 Assert.True(drained.Change.Complete);
                 Assert.Equal(1, manifestCommits);
                 Assert.Equal([1], processor.CommittedKeys);
+                Assert.Equal(1, processor.CreatedShards);
             }
 
-            // Cleared-before-close ledger performs 0 backing commits.
+            // Cleared-in-segment ledger performs 0 sealed shard writes.
             var clearedLedger = ledgers.OpenContaining([1]).Id;
-            var localKeyCleared = LedgerLocalKey.Encode(clearedLedger, KeyRange.Root, Stream);
-            await ProposeMixedAsync(ledgers, clearedLedger, [3], "c0"u8.ToArray(), localKeyCleared, SimulatedWakeupStreamProcessor.Encode(9, set: true));
-            await ProposeMixedAsync(ledgers, clearedLedger, [3], "c1"u8.ToArray(), localKeyCleared, SimulatedWakeupStreamProcessor.Encode(9, set: false));
+            await ProposeMixedAsync(ledgers, clearedLedger, [3], "c0"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(9, set: true));
+            await ProposeMixedAsync(ledgers, clearedLedger, [3], "c1"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(9, set: false));
             await ledgers.ReplaceAsync(clearedLedger, CancellationToken.None);
             var clearedMeta = ledgers.Ledger(clearedLedger);
             var clearedTail = Assert.IsType<LedgerStatus.Closed>(clearedMeta.Status.Value).T;
-            var commitsBeforeCleared = processor.CommitCalls;
+            var shardsBeforeCleared = processor.CreatedShards;
             var clearedOutcome = await worker.DrainAsync(clearedMeta, clearedTail, CommitManifestAsync, CancellationToken.None);
             Assert.IsType<DrainOutcome.Drained>(clearedOutcome.Value);
-            Assert.Equal(commitsBeforeCleared, processor.CommitCalls);
+            Assert.Equal(shardsBeforeCleared, processor.CreatedShards);
             Assert.DoesNotContain((byte)9, processor.CommittedKeys);
-            Assert.Equal(32L << 20, coordinator.AvailableMemoryBytes);
+
+            // Message-only segment (0 archive rows, 1 wakeup message) still commits messages and advances manifest!
+            var msgOnlyLedger = ledgers.OpenContaining([1]).Id;
+            await ProposeMessageOnlyAsync(ledgers, msgOnlyLedger, Channel, SimulatedWakeupMessageProcessor.Encode(77, set: true));
+            await ledgers.ReplaceAsync(msgOnlyLedger, CancellationToken.None);
+            var msgOnlyMeta = ledgers.Ledger(msgOnlyLedger);
+            var msgOnlyTail = Assert.IsType<LedgerStatus.Closed>(msgOnlyMeta.Status.Value).T;
+            var msgOnlyOutcome = await worker.DrainAsync(msgOnlyMeta, msgOnlyTail, CommitManifestAsync, CancellationToken.None);
+            var msgOnlyDrained = Assert.IsType<DrainOutcome.Drained>(msgOnlyOutcome.Value);
+            Assert.True(msgOnlyDrained.Change.Complete);
+            Assert.Contains((byte)77, processor.CommittedKeys);
         });
     }
 
     /// <summary>
-    /// LSM <see cref="DrainWorker"/> propagates <see cref="LocalDrainBarrierOutcome.Dropped"/> and
-    /// <see cref="LocalDrainBarrierOutcome.Backpressure"/> without caching completion or committing the manifest.
+    /// Archive Logs single-pass <c>DrainScan</c> commits surviving wakeups before creating the drain marker, writes 0
+    /// sealed shards on same-segment clear, and handles message-only segments (<c>writes.Length == 0 &amp;&amp; HasMessages</c>)
+    /// cleanly so the ledger can drop.
     /// </summary>
     [Fact]
-    public void LsmDrainWorkerHandlesBarrierDroppedAndBackpressureOutcomes()
+    public void ArchiveLogsSinglePassDrainCommitsSurvivingSkipsClearedAndHandlesMessageOnlySegments()
     {
         _ = SeededSimulation.Run(2, async environment =>
         {
             await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
             var objects = new InMemoryObjectStore();
-            var manifest = new ManifestView(objects);
-            await using var manifestCommitter = new ManifestCommitter(objects, manifest, SimulationEnvironment.Clock, TimeSpan.Zero);
-            await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None);
-            await ledgers.BootstrapAsync(CancellationToken.None);
-
-            var ledger = ledgers.OpenContaining([1]).Id;
-            var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, Stream);
-            await ProposeMixedAsync(ledgers, ledger, [1], "v0"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(3, set: true));
-            await ledgers.ReplaceAsync(ledger, CancellationToken.None);
-            var meta = ledgers.Ledger(ledger);
-            var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-
-            var scripted = new ScriptedBarrier([
-                LocalDrainBarrierOutcome.Backpressure.Instance,
-                LocalDrainBarrierOutcome.Dropped.Instance,
-                LocalDrainBarrierOutcome.Drained.Instance,
-            ]);
-            var worker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, localDrainBarrier: scripted);
-
-            var manifestCommits = 0;
-            Task<ManifestCommitOutcome> CommitAsync(ManifestChange change, CancellationToken ct)
-            {
-                manifestCommits++;
-                return manifestCommitter.CommitAsync(change, ct);
-            }
-
-            Assert.IsType<ReplicaWriteOutcome.Backpressure>((await worker.DrainAsync(meta, tail, CommitAsync, CancellationToken.None)).Value);
-            Assert.Equal(0, manifestCommits);
-
-            Assert.IsType<ReplicaWriteOutcome.Dropped>((await worker.DrainAsync(meta, tail, CommitAsync, CancellationToken.None)).Value);
-            Assert.Equal(0, manifestCommits);
-
-            var drained = Assert.IsType<DrainOutcome.Drained>((await worker.DrainAsync(meta, tail, CommitAsync, CancellationToken.None)).Value);
-            Assert.True(drained.Change.Complete);
-            Assert.Equal(1, manifestCommits);
-        });
-    }
-
-    /// <summary>
-    /// Archive Logs <c>Waiting</c> (<c>LG-I10</c>) lineage: <see cref="NodeController"/>'s dedicated eager-drain slot
-    /// drains closed ledger <c>L2</c>'s local streams while <c>L2</c> waits behind older overlapping <c>L1</c>, retries
-    /// transient backing failures with bounded backoff, does not touch <c>_draining</c>, and is awaited by
-    /// <see cref="NodeController.DrainsEnded"/>.
-    /// </summary>
-    [Fact]
-    public void ArchiveLogsWaitingClosedLedgerEagerlyDrainsLocalStreamsWithBackoffAndDrainsEnded()
-    {
-        _ = SeededSimulation.Run(3, async environment =>
-        {
-            await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
-            var objects = new InMemoryObjectStore();
             var logs = new MemoryArchiveLogStore(new ArchiveLogLayout(MemoryArchiveLogStore.LayoutName, ArchiveLogPacking.Blocks, 8, 49_900, 40_000, MemoryArchiveLogStore.NameRule));
             var archiveStore = new LogArchiveStore(logs, objects, ArchiveLogNames.Hexadecimal);
             var record = await archiveStore.StoreRecordAsync(new Dictionary<string, string>(), CancellationToken.None);
@@ -205,101 +139,49 @@ public sealed class LocalDrainSimulationTests
             await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None, chains: new ArchiveChains(archiveStore));
             await ledgers.BootstrapAsync(CancellationToken.None);
 
-            // L1 stays closed & undrained (so L2 is Waiting behind L1).
+            var processor = new SimulatedWakeupMessageProcessor();
+            var worker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+
+            // Ledger 1: surviving wakeup key 11 + cleared key 12 -> only key 11 published.
             var l1 = ledgers.OpenContaining([1]).Id;
-            _ = await ledgers.ProposeAsync(l1, [new LiveRow([1], RowKind.Append, "aaaaaaaa"u8.ToArray())], CancellationToken.None);
+            await ProposeMixedAsync(ledgers, l1, [1], "aaaaaaaa"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(11, set: true));
+            await ProposeMixedAsync(ledgers, l1, [1], "bbbbbbbb"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(12, set: true));
+            await ProposeMixedAsync(ledgers, l1, [1], "cccccccc"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(12, set: false));
             await ledgers.ReplaceAsync(l1, CancellationToken.None);
+            var m1 = ledgers.Ledger(l1);
+            Assert.IsType<ArchiveLogDrainOutcome.Complete>((await worker.DrainAsync(m1, Assert.IsType<LedgerStatus.Closed>(m1.Status.Value).T, CancellationToken.None)).Value);
+            Assert.IsType<LedgerMapCommitOutcome.Applied>((await worker.SubmitDropAsync(l1, ledgers.Committer.CommitAsync, CancellationToken.None)).Value);
+            Assert.Equal([11], processor.CommittedKeys);
+            Assert.Equal(1, processor.CreatedShards);
 
-            // L2 carries a wakeup that should drain eagerly despite Waiting on L1.
+            // Ledger 2: message-only segment (0 archive rows) -> still publishes key 22 and writes drain marker!
             var l2 = ledgers.OpenContaining([1]).Id;
-            var localKey2 = LedgerLocalKey.Encode(l2, KeyRange.Root, Stream);
-            await ProposeMixedAsync(ledgers, l2, [2], "bbbbbbbb"u8.ToArray(), localKey2, SimulatedWakeupStreamProcessor.Encode(42, set: true));
+            await ProposeMessageOnlyAsync(ledgers, l2, Channel, SimulatedWakeupMessageProcessor.Encode(22, set: true));
             await ledgers.ReplaceAsync(l2, CancellationToken.None);
-
-            var failOnce = 1;
-            var gateHold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var enteredSecondAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var processor = new SimulatedWakeupStreamProcessor(onCommitAsync: async (_, _, _) =>
-            {
-                if (Interlocked.Exchange(ref failOnce, 0) == 1)
-                {
-                    throw new IOException("transient backing store failure");
-                }
-
-                enteredSecondAttempt.TrySetResult();
-                await gateHold.Task.ConfigureAwait(false);
-            });
-
-            var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor]);
-            using var meter = new Meter("test.local.drain");
-            var firstNode = ledgers.Ledger(l2).Location.Value is LedgerLocation.Nodes nodes ? nodes.Replicas[0] : throw new InvalidOperationException();
-            var nodeDrains = new ArchiveLogNodeDrains(firstNode, 1000, static () => 1, 1024, TimeSpan.FromSeconds(1), new ArchiveLogOptions(), SimulationEnvironment.Clock, meter, NullLogger.Instance, coordinator);
-            nodeDrains.Observe(new NodeReportReply(ledgers.Map.Current.Epoch, [], ArchiveLogShare: 1000));
-            var executor = new TransitionExecutor(ledgers.Registry, NullLogger<TransitionExecutor>.Instance);
-            var controller = new NodeController(
-                firstNode,
-                generation: 1,
-                ledgers.Map,
-                ledgers.Registry,
-                ledgers.Reader,
-                executor,
-                static () => true,
-                static () => ImmutableDictionary<NodeId, int>.Empty,
-                new NodeArchive.Logs(nodeDrains),
-                SimulationEnvironment.Clock,
-                TimeSpan.FromMinutes(1),
-                drainConcurrency: 1,
-                NullLogger.Instance,
-                localDrainBarrier: coordinator)
-            {
-                FirstExposedBackoff = TimeSpan.FromMilliseconds(50),
-            };
-
-            // Pass 1: drain L2 alone (pass only L2 in drainToo by closing L1 on another node? Here L1 is on firstNode too,
-            // so directly mark L2 as Waiting via DrainLogAsync).
-            var l2Meta = ledgers.Ledger(l2);
-            nodeDrains.Open(gate, ledgers.Map, ledgers.Reader);
-            var waitingOutcome = await nodeDrains.DrainAsync(l2Meta, Assert.IsType<LedgerStatus.Closed>(l2Meta.Status.Value).T, ledgers.Committer.CommitAsync, CancellationToken.None);
-            Assert.IsType<ArchiveLogDrainOutcome.Waiting>(waitingOutcome.Value);
-
-            var errors = new List<(LedgerId Ledger, Exception Error)>();
-            // Pass 1 of StartLogDrains: L2 is Waiting, so eager slot starts and hits the transient failure!
-            _ = controller.StartLogDrains(gate, [l2], (_, _) => Task.FromResult<LedgerMapCommitOutcome>(LedgerMapCommitOutcome.Refused.Instance), (id, ex) => errors.Add((id, ex)), CancellationToken.None);
-            await controller.DrainsEnded;
-            Assert.Contains(errors, e => e.Ledger == l2 && e.Error is IOException);
-            Assert.Empty(processor.CommittedKeys);
-
-            // Immediately calling StartLogDrains again before backoff expires does NOT restart eager drain yet.
-            _ = controller.StartLogDrains(gate, [l2], (_, _) => Task.FromResult<LedgerMapCommitOutcome>(LedgerMapCommitOutcome.Refused.Instance), (id, ex) => errors.Add((id, ex)), CancellationToken.None);
-            Assert.False(enteredSecondAttempt.Task.IsCompleted);
-
-            // Advance clock past FirstExposedBackoff: eager drain retries, holds in flight, and DrainsEnded awaits it!
-            await Task.Delay(TimeSpan.FromMilliseconds(100), SimulationEnvironment.Clock);
-            _ = controller.StartLogDrains(gate, [l2], (_, _) => Task.FromResult<LedgerMapCommitOutcome>(LedgerMapCommitOutcome.Refused.Instance), (id, ex) => errors.Add((id, ex)), CancellationToken.None);
-            await enteredSecondAttempt.Task;
-            var endedTask = controller.DrainsEnded;
-            Assert.False(endedTask.IsCompleted);
-
-            gateHold.SetResult();
-            await endedTask;
-            Assert.Contains((byte)42, processor.CommittedKeys);
+            var m2 = ledgers.Ledger(l2);
+            Assert.IsType<ArchiveLogDrainOutcome.Complete>((await worker.DrainAsync(m2, Assert.IsType<LedgerStatus.Closed>(m2.Status.Value).T, CancellationToken.None)).Value);
+            Assert.IsType<LedgerMapCommitOutcome.Applied>((await worker.SubmitDropAsync(l2, ledgers.Committer.CommitAsync, CancellationToken.None)).Value);
+            Assert.Contains((byte)22, processor.CommittedKeys);
+            Assert.Equal(2, processor.CreatedShards);
         });
     }
 
     /// <summary>
-    /// Archive Logs wraps <see cref="ArchiveCorruptException"/> from both unknown-stream <see cref="RowKind.LocalAppend"/>
-    /// keys and malformed payloads into <see cref="ArchiveLogDrainBlockedException"/> with
-    /// <see cref="ArchiveLogDrainBlockedCause.Corrupt"/>.
+    /// Both Archive Logs and LSM fail closed on unregistered message channels and malformed wakeup payloads:
+    /// LSM throws <see cref="ArchiveCorruptException"/> and Archive Logs wraps it in
+    /// <see cref="ArchiveLogDrainBlockedException"/> with <see cref="ArchiveLogDrainBlockedCause.Corrupt"/>.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ArchiveLogDrainWorkerWrapsLocalCorruptionsAsBlockedCorrupt(bool unknownStream)
+    public void ArchiveLogAndLsmDrainWorkersFailClosedOnUnknownChannelAndCorruptPayload(bool unknownChannel)
     {
         _ = SeededSimulation.Run(4, async environment =>
         {
             await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
             var objects = new InMemoryObjectStore();
+            var manifest = new ManifestView(objects);
+            await using var manifestCommitter = new ManifestCommitter(objects, manifest, SimulationEnvironment.Clock, TimeSpan.Zero);
             var logs = new MemoryArchiveLogStore(new ArchiveLogLayout(MemoryArchiveLogStore.LayoutName, ArchiveLogPacking.Blocks, 8, 49_900, 40_000, MemoryArchiveLogStore.NameRule));
             var archiveStore = new LogArchiveStore(logs, objects, ArchiveLogNames.Hexadecimal);
             var record = await archiveStore.StoreRecordAsync(new Dictionary<string, string>(), CancellationToken.None);
@@ -309,35 +191,39 @@ public sealed class LocalDrainSimulationTests
             await ledgers.BootstrapAsync(CancellationToken.None);
 
             var ledger = ledgers.OpenContaining([1]).Id;
-            var streamName = unknownStream ? LocalStreamName.Parse("sim.unknown") : Stream;
-            var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, streamName);
-            var payload = unknownStream ? SimulatedWakeupStreamProcessor.Encode(1, true) : [0xFF, 0xFF, 0xFF];
-            await ProposeMixedAsync(ledgers, ledger, [1], "aaaaaaaa"u8.ToArray(), localKey, payload);
+            var ch = unknownChannel ? MessageChannel.Parse("sim.unknown") : Channel;
+            var payload = unknownChannel ? SimulatedWakeupMessageProcessor.Encode(1, true) : [0xFF, 0xFF, 0xFF];
+            await ProposeMixedAsync(ledgers, ledger, [1], "aaaaaaaa"u8.ToArray(), ch, payload);
             await ledgers.ReplaceAsync(ledger, CancellationToken.None);
 
-            var processor = new SimulatedWakeupStreamProcessor();
-            var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor]);
-            var worker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, localDrainBarrier: coordinator);
+            var processor = new SimulatedWakeupMessageProcessor();
+            var lsmWorker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+            var logsWorker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
 
             var meta = ledgers.Ledger(ledger);
             var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-            var blocked = await Assert.ThrowsAsync<ArchiveLogDrainBlockedException>(() => worker.DrainAsync(meta, tail, CancellationToken.None));
+
+            _ = await Assert.ThrowsAsync<ArchiveCorruptException>(() => lsmWorker.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None));
+
+            var blocked = await Assert.ThrowsAsync<ArchiveLogDrainBlockedException>(() => logsWorker.DrainAsync(meta, tail, CancellationToken.None));
             Assert.Equal(ArchiveLogDrainBlockedCause.Corrupt, blocked.Cause);
             Assert.IsType<ArchiveCorruptException>(blocked.InnerException);
         });
     }
 
     /// <summary>
-    /// <see cref="LocalStreamDrainCoordinator"/> drains <see cref="LedgerLocation.ObjectStore"/> closed ledgers
-    /// identically to node-backed ledgers.
+    /// Single-pass message drain handles <see cref="LedgerLocation.ObjectStore"/> closed ledgers identically to
+    /// node-backed ledgers.
     /// </summary>
     [Fact]
-    public void CoordinatorDrainsObjectStoreClosedLedger()
+    public void SinglePassDrainHandlesObjectStoreClosedLedger()
     {
         _ = SeededSimulation.Run(5, async environment =>
         {
             await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
             var objects = new InMemoryObjectStore();
+            var manifest = new ManifestView(objects);
+            await using var manifestCommitter = new ManifestCommitter(objects, manifest, SimulationEnvironment.Clock, TimeSpan.Zero);
             var objectStore = ObjectLedgerStore.Over(objects, new ObjectLedgerStoreOptions { Layout = ObjectLedgerLayout.PerSlot, CacheBytes = 64 * 1024 }, SimulationEnvironment.Clock);
             _ = await objectStore.StoreRecordAsync(CancellationToken.None);
 
@@ -359,11 +245,10 @@ public sealed class LocalDrainSimulationTests
             var open = map.Current.Ledgers.Single(static l => l.IsOpen);
             Assert.IsType<LedgerLocation.ObjectStore>(open.Location.Value);
             var writer = registry.TryGet(open.Id)!;
-            var localKey = LedgerLocalKey.Encode(open.Id, open.Range, Stream);
             using (var batch = await writer.CreateBatchAsync(2, 4096, CancellationToken.None))
             {
                 _ = batch.BeginRow([1], RowKind.Append, default, default, 4, "obj0"u8);
-                _ = batch.BeginRow(localKey, RowKind.LocalAppend, default, default, 2, SimulatedWakeupStreamProcessor.Encode(19, set: true));
+                batch.BeginMessage(Channel, 2, SimulatedWakeupMessageProcessor.Encode(19, set: true));
                 Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, CancellationToken.None)).Value);
             }
 
@@ -371,72 +256,70 @@ public sealed class LocalDrainSimulationTests
             Assert.IsType<LedgerMapCommitOutcome.Applied>((await executor.ExecuteAsync(new Transition.Replace(open.Id, replaceChoice), committer.CommitAsync, CancellationToken.None)).Value);
             _ = await map.ReadAsync(CancellationToken.None);
 
-            var processor = new SimulatedWakeupStreamProcessor();
-            var coordinator = new LocalStreamDrainCoordinator(map, reader, [processor]);
+            var processor = new SimulatedWakeupMessageProcessor();
+            var worker = new DrainWorker(objects, manifest, reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
             var meta = map.Current.Get(open.Id)!.Value;
             var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
 
-            var outcome = await coordinator.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None);
-            Assert.IsType<LocalDrainBarrierOutcome.Drained>(outcome.Value);
+            var outcome = await worker.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None);
+            var drained = Assert.IsType<DrainOutcome.Drained>(outcome.Value);
+            Assert.True(drained.Change.Complete);
             Assert.Equal([19], processor.CommittedKeys);
-            Assert.Equal(1, coordinator.SequentialScansStarted);
+            Assert.Equal(1, processor.CreatedShards);
         });
     }
 
     /// <summary>
-    /// Deadlock-free chunked <c>LocalDrainMemoryBytes</c> flushes under 2 concurrent drains: both complete without
-    /// deadlock, flush in chunks, commit all surviving wakeups, and restore full <c>AvailableMemoryBytes</c>.
+    /// Under tight <c>DrainMemoryBytes</c>, <c>DrainScan</c> triggers <c>OverBudget</c> → <c>Alone</c> rescan, clears
+    /// in-memory message folds cleanly on reset, and commits every surviving wakeup exactly once without deadlock.
     /// </summary>
     [Fact]
-    public void ChunkedFlushUnderTwoConcurrentDrainsNeverDeadlocksAndRestoresBudget()
+    public void TightDrainMemoryBudgetResetsMessageFoldsOnOverBudgetAndCommitsAccurately()
     {
         _ = SeededSimulation.Run(6, async environment =>
         {
             await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
+            var objects = new InMemoryObjectStore();
+            var manifest = new ManifestView(objects);
+            await using var manifestCommitter = new ManifestCommitter(objects, manifest, SimulationEnvironment.Clock, TimeSpan.Zero);
             await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None);
             await ledgers.BootstrapAsync(CancellationToken.None);
 
             var ledger1 = ledgers.OpenContaining([1]).Id;
-            var localKey1 = LedgerLocalKey.Encode(ledger1, KeyRange.Root, Stream);
-            for (byte k = 1; k <= 6; k++)
+            for (byte k = 1; k <= 4; k++)
             {
-                await ProposeMixedAsync(ledgers, ledger1, [k], "a"u8.ToArray(), localKey1, SimulatedWakeupStreamProcessor.Encode(k, set: true));
+                await ProposeMixedAsync(ledgers, ledger1, [k], "a"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(k, set: true));
             }
 
             await ledgers.ReplaceAsync(ledger1, CancellationToken.None);
 
             var ledger2 = ledgers.OpenContaining([1]).Id;
-            var localKey2 = LedgerLocalKey.Encode(ledger2, KeyRange.Root, Stream);
-            for (byte k = 101; k <= 106; k++)
+            for (byte k = 101; k <= 104; k++)
             {
-                await ProposeMixedAsync(ledgers, ledger2, [k], "b"u8.ToArray(), localKey2, SimulatedWakeupStreamProcessor.Encode(k, set: true));
+                await ProposeMixedAsync(ledgers, ledger2, [k], "b"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(k, set: true));
             }
 
             await ledgers.ReplaceAsync(ledger2, CancellationToken.None);
 
-            // Budget of 192 bytes with 64 bytes/entry forces mid-ledger chunked flushes when 2 drains run concurrently!
-            const long tinyBudget = 192;
-            var processor = new SimulatedWakeupStreamProcessor(bytesPerEntry: 64);
-            var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor], memoryBudgetBytes: tinyBudget);
+            // Tight DrainMemoryBytes forces OverBudget -> Alone rescan when 2 drains run concurrently (each needs ~96 MiB < 128 MiB, 2 together need ~192 MiB > 128 MiB)!
+            var processor = new SimulatedWakeupMessageProcessor(bytesPerEntry: 24L << 20);
+            var options = new ArchiveOptions { DrainMemoryBytes = 128L << 20 };
+            var worker = new DrainWorker(objects, manifest, ledgers.Reader, options, SimulationEnvironment.Clock, messageProcessors: [processor]);
 
-            var meta1 = ledgers.Ledger(ledger1);
-            var tail1 = Assert.IsType<LedgerStatus.Closed>(meta1.Status.Value).T;
-            var meta2 = ledgers.Ledger(ledger2);
-            var tail2 = Assert.IsType<LedgerStatus.Closed>(meta2.Status.Value).T;
-
-            var t1 = coordinator.EnsureLocalStreamsDrainedAsync(meta1, tail1, CancellationToken.None).AsTask();
-            var t2 = coordinator.EnsureLocalStreamsDrainedAsync(meta2, tail2, CancellationToken.None).AsTask();
+            var m1 = ledgers.Ledger(ledger1);
+            var m2 = ledgers.Ledger(ledger2);
+            var t1 = worker.DrainAsync(m1, Assert.IsType<LedgerStatus.Closed>(m1.Status.Value).T, manifestCommitter.CommitAsync, CancellationToken.None);
+            var t2 = worker.DrainAsync(m2, Assert.IsType<LedgerStatus.Closed>(m2.Status.Value).T, manifestCommitter.CommitAsync, CancellationToken.None);
             var outcomes = await Task.WhenAll(t1, t2);
 
-            Assert.All(outcomes, static o => Assert.IsType<LocalDrainBarrierOutcome.Drained>(o.Value));
-            Assert.True(coordinator.ChunkedFlushes > 0);
-            Assert.Equal(tinyBudget, coordinator.AvailableMemoryBytes);
-            for (byte k = 1; k <= 6; k++)
+            Assert.All(outcomes, static o => Assert.IsType<DrainOutcome.Drained>(o.Value));
+            Assert.Equal(2, processor.CreatedShards);
+            for (byte k = 1; k <= 4; k++)
             {
                 Assert.Contains(k, processor.CommittedKeys);
             }
 
-            for (byte k = 101; k <= 106; k++)
+            for (byte k = 101; k <= 104; k++)
             {
                 Assert.Contains(k, processor.CommittedKeys);
             }
@@ -444,56 +327,13 @@ public sealed class LocalDrainSimulationTests
     }
 
     /// <summary>
-    /// O(1) <see cref="ILocalKeyPresenceLookup"/> zero-read fast path matches sequential scan equivalence: returns
-    /// <c>Drained</c> with 0 sequential scans when <c>Absent</c>, and falls back to sequential scan when <c>Unindexed</c>.
+    /// Transient commit failure leaves manifest/marker uncommitted so retry publishes and commits cleanly, and
+    /// concurrent racing drainers colliding on deterministic <c>(ledger, segmentStart)</c> create at most 1 shard.
     /// </summary>
     [Fact]
-    public void PresenceLookupZeroReadFastPathMatchesSequentialScanEquivalence()
+    public void TransientCommitFailureRetriesSafelyAndRacingDrainersAreIdempotent()
     {
         _ = SeededSimulation.Run(7, async environment =>
-        {
-            await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
-            await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None);
-            await ledgers.BootstrapAsync(CancellationToken.None);
-
-            // Ledger with only journal rows (no local appends).
-            var ledger = ledgers.OpenContaining([1]).Id;
-            _ = await ledgers.ProposeAsync(ledger, [new LiveRow([1], RowKind.Append, "only-journal"u8.ToArray())], CancellationToken.None);
-            await ledgers.ReplaceAsync(ledger, CancellationToken.None);
-            var meta = ledgers.Ledger(ledger);
-            var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-
-            var absentLookup = new SimulatedLocalKeyPresenceLookup((_, _, _) => LocalKeyPresenceRead.Absent.Instance);
-            var procFast = new SimulatedWakeupStreamProcessor();
-            var coordFast = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [procFast], presenceLookup: absentLookup);
-            Assert.IsType<LocalDrainBarrierOutcome.Drained>((await coordFast.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None)).Value);
-            Assert.Equal(1, absentLookup.Probes);
-            Assert.Equal(1, coordFast.PresenceFastPathHits);
-            Assert.Equal(0, coordFast.SequentialScansStarted);
-            Assert.Equal(0, procFast.CommitCalls);
-
-            var unindexedLookup = new SimulatedLocalKeyPresenceLookup((_, _, _) => LocalKeyPresenceRead.Unindexed.Instance);
-            var procSlow = new SimulatedWakeupStreamProcessor();
-            var coordSlow = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [procSlow], presenceLookup: unindexedLookup);
-            Assert.IsType<LocalDrainBarrierOutcome.Drained>((await coordSlow.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None)).Value);
-            Assert.Equal(1, unindexedLookup.Probes);
-            Assert.Equal(0, coordSlow.PresenceFastPathHits);
-            Assert.Equal(1, coordSlow.SequentialScansStarted);
-            Assert.Equal(0, procSlow.CommitCalls);
-        });
-    }
-
-    /// <summary>
-    /// Catches all 3 Phase J2 race/safety mutants: <c>DropBeforeLocalDrainedMutant</c>,
-    /// <c>MarkCompleteBeforeCommitMutant</c>, and <c>SkipUnknownStreamMutant</c>.
-    /// </summary>
-    [Theory]
-    [InlineData("DropBeforeLocalDrainedLsm")]
-    [InlineData("MarkCompleteBeforeCommit")]
-    [InlineData("SkipUnknownStream")]
-    public void RaceAndSafetyMutantsAreCaughtByOracles(string mutant)
-    {
-        _ = SeededSimulation.Run(8, async environment =>
         {
             await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
             var objects = new InMemoryObjectStore();
@@ -503,76 +343,118 @@ public sealed class LocalDrainSimulationTests
             await ledgers.BootstrapAsync(CancellationToken.None);
 
             var ledger = ledgers.OpenContaining([1]).Id;
-            if (mutant == "DropBeforeLocalDrainedLsm")
+            await ProposeMixedAsync(ledgers, ledger, [1], "retry"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(33, set: true));
+            await ledgers.ReplaceAsync(ledger, CancellationToken.None);
+            var meta = ledgers.Ledger(ledger);
+            var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
+
+            var failOnce = 1;
+            var processor = new SimulatedWakeupMessageProcessor(onCommitAsync: (_, _, _, _) =>
+                Interlocked.Exchange(ref failOnce, 0) == 1
+                    ? Task.FromException(new IOException("transient publish failure"))
+                    : Task.CompletedTask);
+
+            var worker1 = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+            var worker2 = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+
+            // First attempt fails during CommitMessagesAsync -> manifest stays unadvanced!
+            _ = await Assert.ThrowsAsync<IOException>(() => worker1.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None));
+            Assert.Equal(Slot.Zero, manifest.Current!.Value.RecordedWatermark(ledger));
+            Assert.Equal(0, processor.CreatedShards);
+
+            // Two racing drainers both scan & publish the exact same segment -> 1 CreatedShard, 1 DuplicateShard!
+            var outcomes = await Task.WhenAll(
+                worker1.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None),
+                worker2.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None));
+            Assert.Contains(outcomes, static o => o.Value is DrainOutcome.Drained { Change.Complete: true });
+            Assert.Equal(1, processor.CreatedShards);
+            Assert.Equal(1, processor.DuplicateShards);
+            Assert.Equal([33], processor.CommittedKeys);
+        });
+    }
+
+    /// <summary>
+    /// Catches race/safety mutants across both LSM and Archive Logs:
+    /// <see cref="DrainWorker.DropBeforeMessagesCommittedMutant"/>,
+    /// <see cref="ArchiveLogDrainWorker.DropBeforeMessagesCommittedMutant"/>,
+    /// <see cref="DrainWorker.SkipUnknownChannelMutant"/>, and
+    /// <see cref="ArchiveLogDrainWorker.SkipUnknownChannelMutant"/>.
+    /// </summary>
+    [Theory]
+    [InlineData("DropBeforeMessagesCommittedLsm")]
+    [InlineData("DropBeforeMessagesCommittedLogs")]
+    [InlineData("SkipUnknownChannelLsm")]
+    [InlineData("SkipUnknownChannelLogs")]
+    public void RaceAndSafetyMutantsAreCaughtByOracles(string mutant)
+    {
+        _ = SeededSimulation.Run(8, async environment =>
+        {
+            await using var register = new SimulatedConditionalRegister(environment, "ledger-map");
+            var objects = new InMemoryObjectStore();
+            var manifest = new ManifestView(objects);
+            await using var manifestCommitter = new ManifestCommitter(objects, manifest, SimulationEnvironment.Clock, TimeSpan.Zero);
+            var logs = new MemoryArchiveLogStore(new ArchiveLogLayout(MemoryArchiveLogStore.LayoutName, ArchiveLogPacking.Blocks, 8, 49_900, 40_000, MemoryArchiveLogStore.NameRule));
+            var archiveStore = new LogArchiveStore(logs, objects, ArchiveLogNames.Hexadecimal);
+            var record = await archiveStore.StoreRecordAsync(new Dictionary<string, string>(), CancellationToken.None);
+            var gate = await ArchiveLogGate.PassAsync(archiveStore, new ArchiveStoreIdentity(ArchiveStoreKind.Logs, ArchiveStorePrefix.Of("sim"), record.Id), new Dictionary<string, string>(), CancellationToken.None);
+            await using var ledgers = await LiveLedgers.StartAsync(register, SimulationEnvironment.Clock, CancellationToken.None, chains: new ArchiveChains(archiveStore));
+            await ledgers.BootstrapAsync(CancellationToken.None);
+
+            var ledger = ledgers.OpenContaining([1]).Id;
+            var ch = mutant.StartsWith("SkipUnknownChannel", StringComparison.Ordinal) ? MessageChannel.Parse("sim.unregistered") : Channel;
+            await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), ch, SimulatedWakeupMessageProcessor.Encode(5, set: true));
+            await ledgers.ReplaceAsync(ledger, CancellationToken.None);
+            var meta = ledgers.Ledger(ledger);
+            var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
+
+            var processor = new SimulatedWakeupMessageProcessor();
+            if (mutant == "DropBeforeMessagesCommittedLsm")
             {
-                var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, Stream);
-                await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(5, set: true));
-                await ledgers.ReplaceAsync(ledger, CancellationToken.None);
-                var meta = ledgers.Ledger(ledger);
-                var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-
-                var processor = new SimulatedWakeupStreamProcessor();
-                var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor]);
-                var mutantWorker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, localDrainBarrier: coordinator)
+                var mutantWorker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
                 {
-                    DropBeforeLocalDrainedMutant = true,
+                    DropBeforeMessagesCommittedMutant = true,
                 };
-
                 var drained = Assert.IsType<DrainOutcome.Drained>((await mutantWorker.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None)).Value);
-                // Mutant marked ledger complete in manifest WITHOUT committing key 5!
                 Assert.True(drained.Change.Complete);
                 Assert.Empty(processor.CommittedKeys);
             }
-            else if (mutant == "MarkCompleteBeforeCommit")
+            else if (mutant == "DropBeforeMessagesCommittedLogs")
             {
-                var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, Stream);
-                await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(6, set: true));
-                await ledgers.ReplaceAsync(ledger, CancellationToken.None);
-                var meta = ledgers.Ledger(ledger);
-                var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
-
-                var failFirst = 1;
-                var processor = new SimulatedWakeupStreamProcessor(onCommitAsync: (_, _, _) =>
-                    Interlocked.Exchange(ref failFirst, 0) == 1
-                        ? Task.FromException(new IOException("commit crashed"))
-                        : Task.CompletedTask);
-                var mutantCoord = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor])
+                var mutantWorker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
                 {
-                    MarkCompleteBeforeCommitMutant = true,
+                    DropBeforeMessagesCommittedMutant = true,
                 };
-
-                _ = await Assert.ThrowsAsync<IOException>(() => mutantCoord.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None).AsTask());
-                // Mutant prematurely cached _completed before commit succeeded, so retry skips commit and loses key 6!
-                var retryOutcome = await mutantCoord.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None);
-                Assert.IsType<LocalDrainBarrierOutcome.Drained>(retryOutcome.Value);
+                Assert.IsType<ArchiveLogDrainOutcome.Complete>((await mutantWorker.DrainAsync(meta, tail, CancellationToken.None)).Value);
                 Assert.Empty(processor.CommittedKeys);
+            }
+            else if (mutant == "SkipUnknownChannelLsm")
+            {
+                var conforming = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+                _ = await Assert.ThrowsAsync<ArchiveCorruptException>(() => conforming.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None));
+
+                var mutantWorker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
+                {
+                    SkipUnknownChannelMutant = true,
+                };
+                Assert.IsType<DrainOutcome.Drained>((await mutantWorker.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None)).Value);
             }
             else
             {
-                var unknownKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, LocalStreamName.Parse("sim.unregistered"));
-                await ProposeMixedAsync(ledgers, ledger, [1], "x"u8.ToArray(), unknownKey, SimulatedWakeupStreamProcessor.Encode(8, set: true));
-                await ledgers.ReplaceAsync(ledger, CancellationToken.None);
-                var meta = ledgers.Ledger(ledger);
-                var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
+                var conforming = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+                _ = await Assert.ThrowsAsync<ArchiveLogDrainBlockedException>(() => conforming.DrainAsync(meta, tail, CancellationToken.None));
 
-                var processor = new SimulatedWakeupStreamProcessor();
-                var conforming = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor]);
-                _ = await Assert.ThrowsAsync<ArchiveCorruptException>(() => conforming.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None).AsTask());
-
-                var mutantCoord = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor])
+                var mutantWorker = new ArchiveLogDrainWorker(gate, ledgers.Map, ledgers.Reader, new ArchiveLogOptions(), SimulationEnvironment.Clock, messageProcessors: [processor])
                 {
-                    SkipUnknownStreamMutant = true,
+                    SkipUnknownChannelMutant = true,
                 };
-                // Mutant silently accepts unknown stream instead of failing closed!
-                var skipped = await mutantCoord.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None);
-                Assert.IsType<LocalDrainBarrierOutcome.Drained>(skipped.Value);
+                Assert.IsType<ArchiveLogDrainOutcome.Complete>((await mutantWorker.DrainAsync(meta, tail, CancellationToken.None)).Value);
             }
         });
     }
 
     /// <summary>
-    /// Deterministic Clockwork replay pin (<c>RunAndReplay</c> + Verify snapshot) for concurrent local-stream draining
-    /// over LSM, ensuring schedule determinism across runs and platforms.
+    /// Deterministic Clockwork replay pin (<c>RunAndReplay</c> + Verify snapshot) for concurrent racing message-drain
+    /// workers over LSM, ensuring schedule determinism and idempotent shard creation across runs and platforms.
     /// </summary>
     [Fact]
     public Task ConcurrentLocalDrainReplaysDeterministicallyAndIsPinned()
@@ -589,54 +471,47 @@ public sealed class LocalDrainSimulationTests
             await ledgers.BootstrapAsync(CancellationToken.None);
 
             var ledger = ledgers.OpenContaining([1]).Id;
-            var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, Stream);
-            await ProposeMixedAsync(ledgers, ledger, [1], "p0"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(1, set: true));
-            await ProposeMixedAsync(ledgers, ledger, [2], "p1"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(2, set: true));
-            await ProposeMixedAsync(ledgers, ledger, [1], "p2"u8.ToArray(), localKey, SimulatedWakeupStreamProcessor.Encode(1, set: false));
+            await ProposeMixedAsync(ledgers, ledger, [1], "p0"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(1, set: true));
+            await ProposeMixedAsync(ledgers, ledger, [2], "p1"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(2, set: true));
+            await ProposeMixedAsync(ledgers, ledger, [1], "p2"u8.ToArray(), Channel, SimulatedWakeupMessageProcessor.Encode(1, set: false));
             await ledgers.ReplaceAsync(ledger, CancellationToken.None);
 
-            var processor = new SimulatedWakeupStreamProcessor(bytesPerEntry: 64);
-            var coordinator = new LocalStreamDrainCoordinator(ledgers.Map, ledgers.Reader, [processor], memoryBudgetBytes: 128)
-            {
-                OnFlushCommitted = (id, chunked) => events.Add(string.Create(CultureInfo.InvariantCulture, $"flush:{id.Value}:chunked={chunked}")),
-                OnBarrierCompleted = (id, outcome) => events.Add(string.Create(CultureInfo.InvariantCulture, $"barrier:{id.Value}:{outcome.Value.GetType().Name}")),
-            };
-            var worker = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, localDrainBarrier: coordinator);
+            var processor = new SimulatedWakeupMessageProcessor(
+                bytesPerEntry: 64,
+                onCommitAsync: (id, seg, keys, _) =>
+                {
+                    events.Add(string.Create(CultureInfo.InvariantCulture, $"publish:{id.Value}:{seg.Start.Value}:{string.Join(',', keys)}"));
+                    return Task.CompletedTask;
+                });
+            var worker1 = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
+            var worker2 = new DrainWorker(objects, manifest, ledgers.Reader, new ArchiveOptions(), SimulationEnvironment.Clock, messageProcessors: [processor]);
             var meta = ledgers.Ledger(ledger);
             var tail = Assert.IsType<LedgerStatus.Closed>(meta.Status.Value).T;
 
-            var d1 = worker.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None);
-            var d2 = coordinator.EnsureLocalStreamsDrainedAsync(meta, tail, CancellationToken.None).AsTask();
+            var d1 = worker1.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None);
+            var d2 = worker2.DrainAsync(meta, tail, manifestCommitter.CommitAsync, CancellationToken.None);
             await Task.WhenAll(d1, d2);
-            events.Add(string.Create(CultureInfo.InvariantCulture, $"committed:{string.Join(',', processor.CommittedKeys.Order())}"));
+            events.Add(string.Create(CultureInfo.InvariantCulture, $"created={processor.CreatedShards}:dups={processor.DuplicateShards}:committed={string.Join(',', processor.CommittedKeys.Order())}"));
         });
 
         Assert.True(run.Steps > 0);
         return Verify(string.Join('\n', events));
     }
 
-    private static async Task ProposeMixedAsync(LiveLedgers ledgers, LedgerId ledger, byte[] journalKey, byte[] journalBody, byte[] localKey, byte[] localPayload)
+    private static async Task ProposeMixedAsync(LiveLedgers ledgers, LedgerId ledger, byte[] journalKey, byte[] journalBody, MessageChannel channel, byte[] messagePayload)
     {
         var writer = ledgers.Registry.TryGet(ledger)!;
         using var batch = await writer.CreateBatchAsync(2, 4096, CancellationToken.None);
         _ = batch.BeginRow(journalKey, RowKind.Append, batch.HeldVersion(journalKey), default, journalBody.Length, journalBody);
-        _ = batch.BeginRow(localKey, RowKind.LocalAppend, batch.HeldVersion(localKey), default, localPayload.Length, localPayload);
+        batch.BeginMessage(channel, messagePayload.Length, messagePayload);
         Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, CancellationToken.None)).Value);
     }
 
-    private sealed class ScriptedBarrier(IEnumerable<LocalDrainBarrierOutcome> outcomes) : ILedgerLocalDrainBarrier
+    private static async Task ProposeMessageOnlyAsync(LiveLedgers ledgers, LedgerId ledger, MessageChannel channel, byte[] messagePayload)
     {
-        private readonly Queue<LocalDrainBarrierOutcome> _outcomes = new(outcomes);
-
-        public void ValidateLocalAppendKey(LedgerMetadata ledger, ReadOnlySpan<byte> rowKey)
-        {
-            if (LedgerLocalKey.Validate(rowKey, ledger.Range, ledger.Id, out _) is { } error)
-            {
-                throw new ArchiveCorruptException(error.Message, error);
-            }
-        }
-
-        public ValueTask<LocalDrainBarrierOutcome> EnsureLocalStreamsDrainedAsync(LedgerMetadata ledger, Slot tail, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(_outcomes.Dequeue());
+        var writer = ledgers.Registry.TryGet(ledger)!;
+        using var batch = await writer.CreateBatchAsync(1, 4096, CancellationToken.None);
+        batch.BeginMessage(channel, messagePayload.Length, messagePayload);
+        Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, CancellationToken.None)).Value);
     }
 }

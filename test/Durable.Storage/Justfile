@@ -99,11 +99,11 @@ ledger-map-traces seeds="": restore
 archive-traces seeds="": restore
     @& ./eng/archive-traces.ps1 -Seeds '{{ seeds }}'
 
-# Generate local-stream drain simulation traces (LSM + Archive Logs + negative controls) and validate each against LocalDrain.qnt.
-local-drain-traces seeds="1..5":
-    @& ./eng/local-drain-traces.ps1 -Seeds '{{ seeds }}'
+# Generate message-drain simulation traces (LSM + Archive Logs + negative controls) and validate each against MessageDrain.qnt.
+message-drain-traces seeds="1..5":
+    @& ./eng/message-drain-traces.ps1 -Seeds '{{ seeds }}'
 
-# Exhaust the Quint models of the ledger protocol, Ledgers, the Archive, archive logs, and local-stream drain, and verify their expected counterexamples, for example `just quint-models -Model LocalDrain`.
+# Exhaust the Quint models of the ledger protocol, Ledgers, the Archive, archive logs, and message drain, and verify their expected counterexamples, for example `just quint-models -Model MessageDrain`.
 quint-models *options:
     @& ./eng/model-check-quint.ps1 {{ options }}
 

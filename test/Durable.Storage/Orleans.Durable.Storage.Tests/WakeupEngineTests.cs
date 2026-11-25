@@ -20,9 +20,10 @@ using static Orleans.Durable.Storage.Testing.SharedVectors;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// Unit tests for Phase J2: <see cref="WakeupCompanionCodec"/> (golden vectors + Verify snapshots),
-/// <see cref="WakeupStreamHandler"/> / <see cref="WakeupLedgerSession"/> (<see cref="FakeTimeProvider"/>),
-/// <see cref="WakeupStreamProcessor"/>, <see cref="SiloArchive.Lsm"/> pre-gate <c>local-streams</c> check, and
+/// Unit tests for <see cref="WakeupMessageCodec"/> (golden vectors + Verify snapshots),
+/// <see cref="WakeupMessageHandler"/> / <see cref="WakeupMessageHandler.WakeupLedgerSession"/> (<see cref="FakeTimeProvider"/>),
+/// <see cref="WakeupMessageProcessor"/> (time-bucketed deterministic sealed shards, canonical ordering, zero writes on
+/// clear, retry skipping succeeded buckets), <see cref="SiloArchive.Lsm"/> pre-gate <c>message-channels</c> check, and
 /// <see cref="NodeRuntime"/> handler/processor parity (orleans.md §5.15, §6).
 /// </summary>
 public sealed class WakeupEngineTests
@@ -36,12 +37,12 @@ public sealed class WakeupEngineTests
         foreach (var vector in Cases("orleans", "wakeup-companions.json"))
         {
             var bytes = Hex(vector);
-            var spanErr = WakeupCompanionCodec.Decode(bytes, out var spanRec);
+            var spanErr = WakeupMessageCodec.Decode(bytes, out var spanRec);
             Assert.Null(spanErr);
-            var seqErr = WakeupCompanionCodec.Decode(MultiSegment(bytes, 3), out var seqRec);
+            var seqErr = WakeupMessageCodec.Decode(MultiSegment(bytes, 3), out var seqRec);
             Assert.Null(seqErr);
             Assert.Equal(spanRec, seqRec);
-            Assert.Equal(bytes, WakeupCompanionCodec.Encode(spanRec));
+            Assert.Equal(bytes, WakeupMessageCodec.Encode(spanRec));
             lines.Add(string.Create(CultureInfo.InvariantCulture, $"{vector.GetProperty("name").GetString()} => {spanRec.Target} | {spanRec.JobName} | {spanRec.DueTimeUtcTicks?.ToString(CultureInfo.InvariantCulture) ?? "clear"}"));
         }
 
@@ -56,11 +57,11 @@ public sealed class WakeupEngineTests
         {
             var bytes = Hex(vector);
             var expectedReason = vector.GetProperty("reason").GetString()!;
-            var spanErr = WakeupCompanionCodec.Decode(bytes, out _);
+            var spanErr = WakeupMessageCodec.Decode(bytes, out _);
             Assert.NotNull(spanErr);
             Assert.Equal(expectedReason, DecodeRejection.ReasonOf(spanErr));
 
-            var seqErr = WakeupCompanionCodec.Decode(MultiSegment(bytes, 2), out _);
+            var seqErr = WakeupMessageCodec.Decode(MultiSegment(bytes, 2), out _);
             Assert.NotNull(seqErr);
             Assert.Equal(expectedReason, DecodeRejection.ReasonOf(seqErr));
             lines.Add($"{vector.GetProperty("name").GetString()} => {expectedReason}");
@@ -130,9 +131,9 @@ public sealed class WakeupEngineTests
             return DurableJobRunResult.Completed;
         });
 
-        var handler = new WakeupStreamHandler(options, dispatcher, time);
+        var handler = new WakeupMessageHandler(options, dispatcher, time);
         var ledger = new LedgerId(7);
-        var session = (WakeupLedgerSession)handler.OpenLedger(ledger);
+        var session = (WakeupMessageHandler.WakeupLedgerSession)handler.OpenLedger(ledger);
         var now = time.GetUtcNow();
 
         // Schedule g1 at +5s, g2 at +20s, g3 at +2s (earlier than g1), and then clear a 4th grain immediately.
@@ -181,7 +182,7 @@ public sealed class WakeupEngineTests
         Assert.All(dispatchedContexts, static ctx => Assert.True(ctx.IsEphemeralWakeup));
 
         // Exceed MaxWakeupBytesPerLedger (500 bytes) -> CollectLedgersNeedingRoll flags ledger 7.
-        var many = new LocalAppendRecord[10];
+        var many = new MessageRecord[10];
         for (var i = 0; i < many.Length; i++)
         {
             many[i] = EncodeRecord(GrainId.Create("bulk", i.ToString(CultureInfo.InvariantCulture)), job, time.GetUtcNow() + TimeSpan.FromHours(1));
@@ -221,8 +222,8 @@ public sealed class WakeupEngineTests
             return DurableJobRunResult.Completed;
         });
 
-        var handler = new WakeupStreamHandler(new WakeupOptions(), dispatcher, time);
-        var session = (WakeupLedgerSession)handler.OpenLedger(new LedgerId(9));
+        var handler = new WakeupMessageHandler(new WakeupOptions(), dispatcher, time);
+        var session = (WakeupMessageHandler.WakeupLedgerSession)handler.OpenLedger(new LedgerId(9));
         var now = time.GetUtcNow();
 
         session.OnBatchDurable(Slot.Zero, [EncodeRecord(g, job, now + TimeSpan.FromSeconds(1))]);
@@ -241,7 +242,7 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public async Task WakeupStreamProcessorFoldsAppliesJitterRespectsCapAndSkipsSucceededOnRetry()
+    public async Task WakeupMessageProcessorPublishesDeterministicTimeBucketedSealedShardsAndSkipsSucceededOnRetry()
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(now);
@@ -251,85 +252,101 @@ public sealed class WakeupEngineTests
             OverdueJitterWindow = TimeSpan.FromSeconds(5),
         };
 
-        var gFuture = GrainId.Create("g", "future");
+        var gFutureB = GrainId.Create("g", "future-b");
+        var gFutureA = GrainId.Create("g", "future-a");
         var gOverdue = GrainId.Create("g", "overdue");
         var gCleared = GrainId.Create("g", "cleared");
-        var gFailOnce = GrainId.Create("g", "fail-once");
         var job = "orleans.messaging.pump";
 
-        var scheduled = new ConcurrentQueue<ScheduleJobRequest>();
+        var published = new ConcurrentQueue<(string DeterministicId, DateTimeOffset MinDue, DateTimeOffset MaxDue, ScheduleJobRequest[] Jobs)>();
         var inFlight = 0;
         var maxInFlight = 0;
-        var failOnceRemaining = 1;
+        var failFutureBucketOnce = 1;
 
-        var jobManager = new FakeDurableJobManager(async (req, ct) =>
-        {
-            var current = Interlocked.Increment(ref inFlight);
-            InterlockedMax(ref maxInFlight, current);
-            try
+        var publisher = new FakeSealedShardPublisher(
+            shardDuration: TimeSpan.FromHours(1),
+            publish: async (detId, minDue, maxDue, jobs, ct) =>
             {
-                await Task.Yield();
-                if (req.Target == gFailOnce && Interlocked.Exchange(ref failOnceRemaining, 0) == 1)
+                var current = Interlocked.Increment(ref inFlight);
+                InterlockedMax(ref maxInFlight, current);
+                try
                 {
-                    throw new IOException("transient schedule failure");
+                    await Task.Yield();
+                    if (minDue > now + TimeSpan.FromMinutes(30) && Interlocked.Exchange(ref failFutureBucketOnce, 0) == 1)
+                    {
+                        throw new IOException("transient publish failure");
+                    }
+
+                    published.Enqueue((detId, minDue, maxDue, [.. jobs]));
+                    return true;
                 }
+                finally
+                {
+                    _ = Interlocked.Decrement(ref inFlight);
+                }
+            });
 
-                scheduled.Enqueue(req);
-                return new DurableJob { Id = Guid.NewGuid().ToString("N"), Name = req.JobName, DueTime = req.DueTime, TargetGrainId = req.Target, ShardId = "s0" };
-            }
-            finally
-            {
-                _ = Interlocked.Decrement(ref inFlight);
-            }
-        });
-
-        using var processor = new WakeupStreamProcessor(jobManager, options, time);
+        using var processor = new WakeupMessageProcessor(publisher, options, time);
         var ledgerMeta = new LedgerMetadata(new LedgerId(3), KeyRange.Root, new LedgerLocation.Nodes([NodeId.New()]), 4, new PrimaryClaim(NodeId.New(), SequencerInstanceId.New()), new LedgerStatus.Closed(new Slot(5)));
+        var segment = new LedgerSegmentId(ledgerMeta.Id, Slot.Zero);
 
-        // 0 surviving entries -> 0 ScheduleJobAsync calls.
-        using (var emptyFold = processor.BeginClosedLedgerFold(ledgerMeta, new Slot(2)))
+        // 0 surviving entries -> 0 PublishSealedShardAsync calls.
+        using (var emptyFold = processor.BeginSegmentFold(ledgerMeta, segment))
         {
-            emptyFold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupCompanionCodec.Encode(new WakeupRecord(gCleared, job, now.UtcTicks + TimeSpan.TicksPerMinute))));
+            emptyFold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gCleared, job, now.UtcTicks + TimeSpan.TicksPerMinute))));
             Assert.True(emptyFold.MemoryBytes > 0);
-            emptyFold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupCompanionCodec.Encode(new WakeupRecord(gCleared, job, null))));
+            emptyFold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gCleared, job, null))));
             Assert.Equal(0, emptyFold.MemoryBytes);
             await emptyFold.CommitAsync(Token);
-            Assert.Empty(scheduled);
+            Assert.Empty(published);
         }
 
         // Malformed payload throws ArchiveCorruptException.
-        using (var badFold = processor.BeginClosedLedgerFold(ledgerMeta, new Slot(1)))
+        using (var badFold = processor.BeginSegmentFold(ledgerMeta, segment))
         {
             _ = Assert.Throws<ArchiveCorruptException>(() => badFold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>([0xFF])));
         }
 
-        // Surviving entries: future preserved, overdue jittered in [now, now + 5s), partial failure retries only failed entry.
-        var futureDue = now + TimeSpan.FromMinutes(10);
+        // Surviving entries across 2 hour buckets:
+        // Bucket 1 (current hour): gOverdue (jittered in [now, now + 5s)).
+        // Bucket 2 (+2h): gFutureB & gFutureA -> canonically sorted [gFutureA, gFutureB] in 1 sealed shard!
+        var futureDue = now + TimeSpan.FromHours(2);
         var overdueDue = now - TimeSpan.FromMinutes(2);
-        using var fold = processor.BeginClosedLedgerFold(ledgerMeta, new Slot(5));
-        fold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupCompanionCodec.Encode(new WakeupRecord(gFuture, job, futureDue.UtcTicks))));
-        fold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupCompanionCodec.Encode(new WakeupRecord(gOverdue, job, overdueDue.UtcTicks))));
-        fold.Add(new Slot(2), 0, new ReadOnlySequence<byte>(WakeupCompanionCodec.Encode(new WakeupRecord(gFailOnce, job, futureDue.UtcTicks))));
+        using var fold = processor.BeginSegmentFold(ledgerMeta, segment);
+        fold.Add(Slot.Zero, 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gFutureB, job, futureDue.UtcTicks))));
+        fold.Add(new Slot(1), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gOverdue, job, overdueDue.UtcTicks))));
+        fold.Add(new Slot(2), 0, new ReadOnlySequence<byte>(WakeupMessageCodec.Encode(new WakeupRecord(gFutureA, job, futureDue.UtcTicks))));
 
+        // First commit: current-hour bucket succeeds and removes its entry, +2h bucket throws IOException.
         _ = await Assert.ThrowsAsync<IOException>(() => fold.CommitAsync(Token));
-        // gFuture and gOverdue succeeded and were removed; only gFailOnce remains!
-        Assert.Equal(2, scheduled.Count);
+        Assert.Single(published);
         Assert.True(fold.MemoryBytes > 0);
 
-        // Retry commits ONLY gFailOnce (no duplicate scheduling of gFuture or gOverdue).
+        // Retry commits ONLY the remaining +2h bucket (zero duplicate publish of current-hour bucket).
         await fold.CommitAsync(Token);
         Assert.Equal(0, fold.MemoryBytes);
-        Assert.Equal(3, scheduled.Count);
+        Assert.Equal(2, published.Count);
         Assert.True(maxInFlight <= options.MaxConcurrentWakeupSchedules);
 
-        var byTarget = scheduled.ToDictionary(static r => r.Target);
-        Assert.Equal(futureDue, byTarget[gFuture].DueTime);
-        Assert.InRange(byTarget[gOverdue].DueTime, now, now + options.OverdueJitterWindow);
-        Assert.Equal(futureDue, byTarget[gFailOnce].DueTime);
+        var shards = published.ToArray();
+        var overdueShard = shards.Single(s => s.Jobs.Length == 1);
+        var futureShard = shards.Single(s => s.Jobs.Length == 2);
+
+        Assert.StartsWith("drain-00000000000000000003-00000000000000000000-", overdueShard.DeterministicId, StringComparison.Ordinal);
+        Assert.StartsWith("drain-00000000000000000003-00000000000000000000-", futureShard.DeterministicId, StringComparison.Ordinal);
+        Assert.NotEqual(overdueShard.DeterministicId, futureShard.DeterministicId);
+
+        // Overdue jitter is deterministic and in [now, now + 5s).
+        var expectedJitter = processor.ComputeOverdueJitter(gOverdue, job);
+        Assert.InRange(overdueShard.Jobs[0].DueTime, now, now + options.OverdueJitterWindow);
+        Assert.Equal(now + expectedJitter, overdueShard.Jobs[0].DueTime);
+
+        // Canonical sort order inside the multi-job shard: gFutureA before gFutureB.
+        Assert.Equal([gFutureA, gFutureB], [.. futureShard.Jobs.Select(static j => j.Target)]);
     }
 
     [Fact]
-    public async Task SiloArchiveLsmRefusesGateBeforePassOnLocalStreamsMismatchAndAllowsOtherParamMismatch()
+    public async Task SiloArchiveLsmRefusesGateBeforePassOnMessageChannelsMismatchAndAllowsOtherParamMismatch()
     {
         var objects = new InMemoryObjectStore();
         var prefix = ArchiveStorePrefix.Of("testcluster");
@@ -338,23 +355,23 @@ public sealed class WakeupEngineTests
         {
             ["format"] = "json",
             ["max-body-bytes"] = "4194304",
-            [JournalStore.LocalStreamsParameter] = "orleans.wakeup",
+            [JournalStore.MessageChannelsParameter] = "orleans.wakeup",
         };
         var identity = await siloArchive.FirstRecordAsync(storedParams, Token);
 
-        // Case 1: local-streams mismatch refuses BEFORE Gate.Pass!
-        var mismatchedLocal = new SiloArchive.Lsm(objects, prefix);
-        var callerParamsBadStreams = new Dictionary<string, string>(storedParams, StringComparer.Ordinal)
+        // Case 1: message-channels mismatch refuses BEFORE Gate.Pass!
+        var mismatchedChannels = new SiloArchive.Lsm(objects, prefix);
+        var callerParamsBadChannels = new Dictionary<string, string>(storedParams, StringComparer.Ordinal)
         {
-            [JournalStore.LocalStreamsParameter] = "",
+            [JournalStore.MessageChannelsParameter] = "",
         };
         var ex1 = await Assert.ThrowsAsync<ArchiveStoreMismatchException>(() =>
-            mismatchedLocal.CheckAsync(identity, callerParamsBadStreams, ResiliencePipeline.Empty, Token));
+            mismatchedChannels.CheckAsync(identity, callerParamsBadChannels, ResiliencePipeline.Empty, Token));
         Assert.True(ex1.IsParameter);
-        Assert.Equal(JournalStore.LocalStreamsParameter, ex1.Field);
-        Assert.False(mismatchedLocal.Gate.IsPassed);
+        Assert.Equal(JournalStore.MessageChannelsParameter, ex1.Field);
+        Assert.False(mismatchedChannels.Gate.IsPassed);
 
-        // Case 2: local-streams matches, max-body-bytes mismatches -> Gate PASSES first (OR-I8), then throws parameter mismatch!
+        // Case 2: message-channels matches, max-body-bytes mismatches -> Gate PASSES first (OR-I8), then throws parameter mismatch!
         var mismatchedBody = new SiloArchive.Lsm(objects, prefix);
         var callerParamsBadBody = new Dictionary<string, string>(storedParams, StringComparer.Ordinal)
         {
@@ -368,25 +385,25 @@ public sealed class WakeupEngineTests
     }
 
     [Fact]
-    public void NodeRuntimeValidateLocalStreamParityRejectsMismatchedSets()
+    public void NodeRuntimeValidateMessageChannelParityRejectsMismatchedSets()
     {
         var time = new FakeTimeProvider();
-        var handler = new WakeupStreamHandler(new WakeupOptions(), new FakeDispatcher((_, _, _) => ValueTask.FromResult(DurableJobRunResult.Completed)), time);
-        using var processor = new WakeupStreamProcessor(new FakeDurableJobManager((_, _) => throw new NotSupportedException()), new WakeupOptions(), time);
+        var handler = new WakeupMessageHandler(new WakeupOptions(), new FakeDispatcher((_, _, _) => ValueTask.FromResult(DurableJobRunResult.Completed)), time);
+        using var processor = new WakeupMessageProcessor(new FakeSealedShardPublisher(TimeSpan.FromHours(1), (_, _, _, _, _) => Task.FromResult(true)), new WakeupOptions(), time);
 
         // Matching sets pass.
-        NodeRuntime.ValidateLocalStreamParity([], []);
-        NodeRuntime.ValidateLocalStreamParity([handler], [processor]);
+        NodeRuntime.ValidateMessageChannelParity([], []);
+        NodeRuntime.ValidateMessageChannelParity([handler], [processor]);
 
         // Handler without processor throws.
-        _ = Assert.Throws<ArgumentException>(() => NodeRuntime.ValidateLocalStreamParity([handler], []));
+        _ = Assert.Throws<ArgumentException>(() => NodeRuntime.ValidateMessageChannelParity([handler], []));
 
         // Processor without handler throws.
-        _ = Assert.Throws<ArgumentException>(() => NodeRuntime.ValidateLocalStreamParity([], [processor]));
+        _ = Assert.Throws<ArgumentException>(() => NodeRuntime.ValidateMessageChannelParity([], [processor]));
     }
 
-    private static LocalAppendRecord EncodeRecord(GrainId target, string jobName, DateTimeOffset? dueTime) =>
-        new(WakeupStreamHandler.WakeupStream, WakeupCompanionCodec.Encode(new WakeupRecord(target, jobName, dueTime?.UtcTicks)));
+    private static MessageRecord EncodeRecord(GrainId target, string jobName, DateTimeOffset? dueTime) =>
+        new(WakeupMessageHandler.WakeupChannel, WakeupMessageCodec.Encode(new WakeupRecord(target, jobName, dueTime?.UtcTicks)));
 
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken ct)
     {
@@ -453,12 +470,18 @@ public sealed class WakeupEngineTests
             dispatch(target, context, cancellationToken);
     }
 
-    private sealed class FakeDurableJobManager(Func<ScheduleJobRequest, CancellationToken, Task<DurableJob>> schedule) : ILocalDurableJobManager
+    private sealed class FakeSealedShardPublisher(
+        TimeSpan shardDuration,
+        Func<string, DateTimeOffset, DateTimeOffset, IReadOnlyList<ScheduleJobRequest>, CancellationToken, Task<bool>> publish) : ISealedJobShardPublisher
     {
-        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) =>
-            schedule(request, cancellationToken);
+        public TimeSpan ShardDuration { get; } = shardDuration;
 
-        public Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken) =>
-            Task.FromResult(false);
+        public Task<bool> PublishSealedShardAsync(
+            string deterministicId,
+            DateTimeOffset minDueTime,
+            DateTimeOffset maxDueTime,
+            IReadOnlyList<ScheduleJobRequest> jobs,
+            CancellationToken cancellationToken) =>
+            publish(deterministicId, minDueTime, maxDueTime, jobs, cancellationToken);
     }
 }

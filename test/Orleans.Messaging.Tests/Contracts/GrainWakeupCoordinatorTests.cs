@@ -27,23 +27,23 @@ public sealed class GrainWakeupCoordinatorTests
     [Fact]
     public async Task JournaledStateManagerStagingCoversDoubleBufferingEmptyAppendEmptyReplaceDefaultAndReset()
     {
-        var storage = new RecordingCompanionStorage();
+        var storage = new RecordingMessageStorage();
         await using var harness = CreateManager(storage);
         var manager = harness.Manager;
 
-        Assert.True(manager.SupportsCompanionWrites);
+        Assert.True(manager.SupportsMessageWrites);
 
-        // default(JournalCompanionRecord) rejected immediately.
-        Assert.Throws<ArgumentException>(() => manager.StageCompanionWrite(default));
+        // default(JournalMessageRecord) rejected immediately.
+        Assert.Throws<ArgumentException>(() => manager.StageMessageWrite(default));
 
         // First write persists the initial stream directory entry; second write with no state change has an empty delta,
-        // so staging a companion on it must throw InvalidOperationException (and fence).
+        // so staging a message on it must throw InvalidOperationException (and fence).
         await manager.WriteStateAsync(Token);
-        manager.StageCompanionWrite(new JournalCompanionRecord(WakeupCompanionCodec.StreamName, new byte[] { 1, 2, 3 }));
+        manager.StageMessageWrite(new JournalMessageRecord(WakeupMessageCodec.ChannelName, new byte[] { 1, 2, 3 }));
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(Token).AsTask());
 
-        // Fresh manager: empty Replace snapshot with staged companion succeeds via ReplaceWithCompanionsAsync.
-        var storage2 = new RecordingCompanionStorage();
+        // Fresh manager: empty Replace snapshot with staged message succeeds via ReplaceWithMessagesAsync.
+        var storage2 = new RecordingMessageStorage();
         await using var harness2 = CreateManager(storage2);
         var m2 = harness2.Manager;
         var v2 = harness2.Value;
@@ -51,10 +51,10 @@ public sealed class GrainWakeupCoordinatorTests
         await m2.WriteStateAsync(Token);
         Assert.Single(storage2.Writes);
         Assert.Equal("Append", storage2.Writes[0].Kind);
-        Assert.Empty(storage2.Writes[0].Companions);
+        Assert.Empty(storage2.Writes[0].Messages);
 
-        // Double-buffer reentrancy: hold write #1 inside AppendWithCompanionsAsync, stage companion #2 while suspended,
-        // and verify write #1 carries only companion #1 while write #2 carries only companion #2!
+        // Double-buffer reentrancy: hold write #1 inside AppendWithMessagesAsync, stage message #2 while suspended,
+        // and verify write #1 carries only message #1 while write #2 carries only message #2!
         var enteredWrite1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseWrite1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         storage2.HoldNextWrite = async () =>
@@ -64,39 +64,39 @@ public sealed class GrainWakeupCoordinatorTests
         };
 
         v2.Value = "w1";
-        m2.StageCompanionWrite(new JournalCompanionRecord("sim.stream", new byte[] { 0x11 }));
+        m2.StageMessageWrite(new JournalMessageRecord("sim.stream", new byte[] { 0x11 }));
         var write1Task = m2.WriteStateAsync(Token).AsTask();
         await enteredWrite1.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
 
-        // While write #1 is in flight, stage companion #2 and a second change.
+        // While write #1 is in flight, stage message #2 and a second change.
         v2.Value = "w2";
-        m2.StageCompanionWrite(new JournalCompanionRecord("sim.stream", new byte[] { 0x22 }));
+        m2.StageMessageWrite(new JournalMessageRecord("sim.stream", new byte[] { 0x22 }));
         var write2Task = m2.WriteStateAsync(Token).AsTask();
 
         releaseWrite1.SetResult();
         await Task.WhenAll(write1Task, write2Task);
 
         Assert.Equal(3, storage2.Writes.Count);
-        Assert.Equal("AppendWithCompanions", storage2.Writes[1].Kind);
-        Assert.Equal([0x11], Assert.Single(storage2.Writes[1].Companions).Payload.ToArray());
-        Assert.Equal("AppendWithCompanions", storage2.Writes[2].Kind);
-        Assert.Equal([0x22], Assert.Single(storage2.Writes[2].Companions).Payload.ToArray());
+        Assert.Equal("AppendWithMessages", storage2.Writes[1].Kind);
+        Assert.Equal([0x11], Assert.Single(storage2.Writes[1].Messages).Payload.ToArray());
+        Assert.Equal("AppendWithMessages", storage2.Writes[2].Kind);
+        Assert.Equal([0x22], Assert.Single(storage2.Writes[2].Messages).Payload.ToArray());
 
-        // Empty Replace snapshot with companions is allowed (triggered via storage.CompactionRequested).
+        // Empty Replace snapshot with messages is allowed (triggered via storage.CompactionRequested).
         storage2.CompactionRequested = true;
-        m2.StageCompanionWrite(new JournalCompanionRecord("sim.stream", new byte[] { 0x33 }));
+        m2.StageMessageWrite(new JournalMessageRecord("sim.stream", new byte[] { 0x33 }));
         await m2.WriteStateAsync(Token);
         storage2.CompactionRequested = false;
-        Assert.Equal("ReplaceWithCompanions", storage2.Writes[^1].Kind);
-        Assert.Equal([0x33], Assert.Single(storage2.Writes[^1].Companions).Payload.ToArray());
+        Assert.Equal("ReplaceWithMessages", storage2.Writes[^1].Kind);
+        Assert.Equal([0x33], Assert.Single(storage2.Writes[^1].Messages).Payload.ToArray());
 
-        // DeleteStateAsync clears staged companions so a subsequent write carries none.
-        m2.StageCompanionWrite(new JournalCompanionRecord("sim.stream", new byte[] { 0x44 }));
+        // DeleteStateAsync clears staged messages so a subsequent write carries none.
+        m2.StageMessageWrite(new JournalMessageRecord("sim.stream", new byte[] { 0x44 }));
         await m2.DeleteStateAsync(Token);
         v2.Value = "after-delete";
         await m2.WriteStateAsync(Token);
         Assert.Equal("Append", storage2.Writes[^1].Kind);
-        Assert.Empty(storage2.Writes[^1].Companions);
+        Assert.Empty(storage2.Writes[^1].Messages);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class GrainWakeupCoordinatorTests
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(now);
-        var storage = new RecordingCompanionStorage();
+        var storage = new RecordingMessageStorage();
         var jobManager = new FakeJobManager();
         var grainId = GrainId.Create("order", "42");
         var source = new FakeWakeupSource("orleans.messaging.pump");
@@ -122,29 +122,29 @@ public sealed class GrainWakeupCoordinatorTests
         harness.Value.Value = "cleared-after-recovery";
         await harness.Manager.WriteStateAsync(Token);
         Assert.Equal(0, jobManager.ScheduleCalls);
-        var clearRec = DecodeSingleWakeup(storage.Writes[^1].Companions);
+        var clearRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
         Assert.Equal(grainId, clearRec.Target);
         Assert.Equal("orleans.messaging.pump", clearRec.JobName);
         Assert.Null(clearRec.DueTimeUtcTicks);
 
-        // Another write with still no pending work emits ZERO companions!
+        // Another write with still no pending work emits ZERO messages!
         harness.Value.Value = "still-idle";
         await harness.Manager.WriteStateAsync(Token);
-        Assert.Empty(storage.Writes[^1].Companions);
+        Assert.Empty(storage.Writes[^1].Messages);
 
         // Immediate due work (due < now + RecheckDelay) clamps to now + 1s.
         source.NextDue = now;
         harness.Value.Value = "work-1";
         await harness.Manager.WriteStateAsync(Token);
-        var clampedRec = DecodeSingleWakeup(storage.Writes[^1].Companions);
+        var clampedRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
         Assert.Equal((now + TimeSpan.FromSeconds(1)).UtcTicks, clampedRec.DueTimeUtcTicks);
 
-        // Redundant later re-emission while now < prev and clamped >= prev is coalesced (0 companions)!
+        // Redundant later re-emission while now < prev and clamped >= prev is coalesced (0 messages)!
         time.Advance(TimeSpan.FromMilliseconds(200));
         source.NextDue = time.GetUtcNow() + TimeSpan.FromSeconds(5);
         harness.Value.Value = "work-2-coalesced";
         await harness.Manager.WriteStateAsync(Token);
-        Assert.Empty(storage.Writes[^1].Companions);
+        Assert.Empty(storage.Writes[^1].Messages);
 
         // Once clock passes prev (now >= prev), next write re-emits SetWakeup!
         time.Advance(TimeSpan.FromSeconds(1));
@@ -152,14 +152,14 @@ public sealed class GrainWakeupCoordinatorTests
         source.NextDue = tNow + TimeSpan.FromSeconds(10);
         harness.Value.Value = "work-3-after-prev";
         await harness.Manager.WriteStateAsync(Token);
-        var afterPrevRec = DecodeSingleWakeup(storage.Writes[^1].Companions);
+        var afterPrevRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
         Assert.Equal((tNow + TimeSpan.FromSeconds(10)).UtcTicks, afterPrevRec.DueTimeUtcTicks);
 
         // Earlier due time than prev re-emits immediately!
         source.NextDue = tNow + TimeSpan.FromSeconds(3);
         harness.Value.Value = "work-4-earlier";
         await harness.Manager.WriteStateAsync(Token);
-        var earlierRec = DecodeSingleWakeup(storage.Writes[^1].Companions);
+        var earlierRec = DecodeSingleWakeup(storage.Writes[^1].Messages);
         Assert.Equal((tNow + TimeSpan.FromSeconds(3)).UtcTicks, earlierRec.DueTimeUtcTicks);
 
         Assert.Equal(0, jobManager.ScheduleCalls);
@@ -170,7 +170,7 @@ public sealed class GrainWakeupCoordinatorTests
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(now);
-        var storage = new RecordingCompanionStorage();
+        var storage = new RecordingMessageStorage();
         var jobManager = new FakeJobManager();
         var grainId = GrainId.Create("order", "99");
         var source = new FakeWakeupSource("orleans.messaging.pump");
@@ -230,17 +230,17 @@ public sealed class GrainWakeupCoordinatorTests
         var coordinator = new GrainWakeupCoordinator(harness.GrainContext, harness.Manager, jobManager, time);
         coordinator.RegisterSource(source, TimeSpan.FromSeconds(1));
 
-        Assert.False(coordinator.SupportsCompanionWrites);
+        Assert.False(coordinator.SupportsMessageWrites);
         await coordinator.EnsureFallbackWakeupAsync(source, now, CancellationToken.None, Token);
         Assert.Equal(1, jobManager.ScheduleCalls);
         Assert.Equal(now + TimeSpan.FromSeconds(1), Assert.Single(jobManager.Requests).DueTime);
     }
 
-    private static WakeupRecord DecodeSingleWakeup(JournalCompanionRecord[] companions)
+    private static WakeupRecord DecodeSingleWakeup(JournalMessageRecord[] messages)
     {
-        var rec = Assert.Single(companions);
-        Assert.Equal(WakeupCompanionCodec.StreamName, rec.StreamName);
-        Assert.Null(WakeupCompanionCodec.Decode(rec.Payload.Span, out var decoded));
+        var rec = Assert.Single(messages);
+        Assert.Equal(WakeupMessageCodec.ChannelName, rec.Channel);
+        Assert.Null(WakeupMessageCodec.Decode(rec.Payload.Span, out var decoded));
         return decoded;
     }
 
@@ -331,9 +331,9 @@ public sealed class GrainWakeupCoordinatorTests
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
-    private sealed class RecordingCompanionStorage : ICompanionJournalStorage
+    private sealed class RecordingMessageStorage : IMessageJournalStorage
     {
-        public List<(string Kind, byte[] Body, JournalCompanionRecord[] Companions)> Writes { get; } = [];
+        public List<(string Kind, byte[] Body, JournalMessageRecord[] Messages)> Writes { get; } = [];
         public bool CompactionRequested { get; set; }
         public Func<Task>? HoldNextWrite { get; set; }
         public bool IsCompactionRequested => CompactionRequested;
@@ -357,23 +357,23 @@ public sealed class GrainWakeupCoordinatorTests
             return ValueTask.CompletedTask;
         }
 
-        public async ValueTask AppendWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+        public async ValueTask AppendWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
         {
             var hold = HoldNextWrite;
             HoldNextWrite = null;
             var body = value.ToArray();
-            var copied = companions.ToArray();
+            var copied = messages.ToArray();
             if (hold is not null)
             {
                 await hold().ConfigureAwait(false);
             }
 
-            Writes.Add(("AppendWithCompanions", body, copied));
+            Writes.Add(("AppendWithMessages", body, copied));
         }
 
-        public ValueTask ReplaceWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+        public ValueTask ReplaceWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
         {
-            Writes.Add(("ReplaceWithCompanions", value.ToArray(), companions.ToArray()));
+            Writes.Add(("ReplaceWithMessages", value.ToArray(), messages.ToArray()));
             return ValueTask.CompletedTask;
         }
 

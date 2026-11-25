@@ -1,4 +1,4 @@
-No bytes.
+﻿No bytes.
   truncated: The batch's 0 bytes do not hold its 9 fixed header bytes and 4-byte CRC-32C.
 The fixed header and three bytes, one short of the CRC-32C.
   truncated: The batch's 12 bytes do not hold its 9 fixed header bytes and 4-byte CRC-32C.
@@ -34,10 +34,18 @@ A body whose length runs one byte past the CRC-32C.
   row-truncated: Row 0's body runs past the batch's CRC-32C.
 A row with bit 3 set.
   bad-row-flags: Row 0 has flags 0x0c: a bit other than the kind and defining is set.
-A LocalAppend row with bit 3 set.
+A Message row with bit 2 (defining) set.
+  bad-row-flags: Row 0 has flags 0x07: a Message row must not set the defining bit.
+A Message row with bit 3 set.
   bad-row-flags: Row 0 has flags 0x0f: a bit other than the kind and defining is set.
 A row with bit 7 set.
   bad-row-flags: Row 0 has flags 0x84: a bit other than the kind and defining is set.
+A Message row with an empty channel.
+  bad-channel: Row 0's channel length is 0; a message channel is 1 to 64 bytes.
+A Message row with a 65-byte channel.
+  bad-channel: Row 0's channel length is 65; a message channel is 1 to 64 bytes.
+A Message row whose channel contains an uppercase ASCII byte.
+  bad-channel: Row 0's channel contains an invalid byte: only ASCII [a-z0-9._-] is allowed.
 A body length of 0 in two bytes, longer than its shortest form.
   bad-varint: Row 0's body length is not a varint which ends within 10 bytes, fits a u64, and is in its shortest form.
 A defining row with an empty key.

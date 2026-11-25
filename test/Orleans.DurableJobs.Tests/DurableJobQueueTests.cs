@@ -703,7 +703,7 @@ public sealed class DurableJobQueueTests
         }
     }
 
-    private sealed class InMemoryCompanionStorage : ICompanionJournalStorage
+    private sealed class InMemoryCompanionStorage : IMessageJournalStorage
     {
         private byte[] _content = [];
 
@@ -738,26 +738,26 @@ public sealed class DurableJobQueueTests
         }
 
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) =>
-            AppendWithCompanionsAsync(value, ReadOnlyMemory<JournalCompanionRecord>.Empty, cancellationToken);
+            AppendWithMessagesAsync(value, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) =>
-            ReplaceWithCompanionsAsync(value, ReadOnlyMemory<JournalCompanionRecord>.Empty, cancellationToken);
+            ReplaceWithMessagesAsync(value, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
 
-        public ValueTask AppendWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+        public ValueTask AppendWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
         {
             var delta = value.ToArray();
             var combined = new byte[_content.Length + delta.Length];
             _content.CopyTo(combined, 0);
             delta.CopyTo(combined, _content.Length);
             _content = combined;
-            RecordWrite("Append", companions);
+            RecordWrite("Append", messages);
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask ReplaceWithCompanionsAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalCompanionRecord> companions, CancellationToken cancellationToken)
+        public ValueTask ReplaceWithMessagesAsync(ReadOnlySequence<byte> value, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
         {
             _content = value.ToArray();
-            RecordWrite("Replace", companions);
+            RecordWrite("Replace", messages);
             return ValueTask.CompletedTask;
         }
 
@@ -767,14 +767,14 @@ public sealed class DurableJobQueueTests
             return ValueTask.CompletedTask;
         }
 
-        private void RecordWrite(string kind, ReadOnlyMemory<JournalCompanionRecord> companions)
+        private void RecordWrite(string kind, ReadOnlyMemory<JournalMessageRecord> messages)
         {
-            var wakeups = new List<WakeupRecord>(companions.Length);
-            foreach (var c in companions.Span)
+            var wakeups = new List<WakeupRecord>(messages.Length);
+            foreach (var c in messages.Span)
             {
-                if (string.Equals(c.StreamName, WakeupCompanionCodec.StreamName, StringComparison.Ordinal))
+                if (string.Equals(c.Channel, WakeupMessageCodec.ChannelName, StringComparison.Ordinal))
                 {
-                    var err = WakeupCompanionCodec.Decode(c.Payload.Span, out var decoded);
+                    var err = WakeupMessageCodec.Decode(c.Payload.Span, out var decoded);
                     Assert.Null(err);
                     wakeups.Add(decoded);
                 }

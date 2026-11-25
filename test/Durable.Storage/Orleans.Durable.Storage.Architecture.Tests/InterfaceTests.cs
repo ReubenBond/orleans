@@ -84,20 +84,17 @@ public sealed class InterfaceTests
         // (journals.md §8.3).
         "Orleans.Durable.Storage.Engine.Journals.IJournalIndex",
 
-        // Ledger-local append stream inversion seam: higher compositions (such as Orleans' WakeupStreamHandler) and
+        // Message channel inversion seam: higher compositions (such as Orleans' WakeupMessageHandler) and
         // Orleans-free simulation/unit test handlers plug into JournalStore/LedgerAdmission without reversing the
         // downward dependency direction (journals.md §4.2, JS-I11, JS-I12).
-        "Orleans.Durable.Storage.Engine.Journals.ILocalStreamHandler",
-        "Orleans.Durable.Storage.Engine.Journals.ILocalStreamSession",
+        "Orleans.Durable.Storage.Engine.Journals.IMessageHandler",
+        "Orleans.Durable.Storage.Engine.Journals.IMessageSession",
 
-        // Closed-ledger local-stream drain barrier and processor seams: Archive drain workers invoke
-        // ILedgerLocalDrainBarrier without depending on Cluster.Control, and Cluster.Control folds and probes local
-        // streams through named interfaces implemented by higher compositions and Orleans-free simulations
-        // (archive.md §2.3, orleans.md §5.6, LG-I15, LG-I16).
-        "Orleans.Durable.Storage.Engine.Archive.Control.ILedgerLocalDrainBarrier",
-        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamProcessor",
-        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalStreamFold",
-        "Orleans.Durable.Storage.Engine.Cluster.Control.ILocalKeyPresenceLookup",
+        // Control-plane message processor and per-segment fold seams: Archive drain workers invoke
+        // IMessageProcessor/IMessageFold during single-pass DrainScan without depending on Cluster.Control or
+        // Orleans types (archive.md §8.1, LG-I15, LG-I16).
+        "Orleans.Durable.Storage.Engine.Archive.Control.IMessageProcessor",
+        "Orleans.Durable.Storage.Engine.Archive.Control.IMessageFold",
 
         // Ephemeral wakeup dispatch boundary in the Orleans composition: GrainFactoryWakeupDispatcher calls Orleans'
         // IDurableJobReceiverExtension while unit tests substitute a fake dispatcher over FakeTimeProvider (orleans.md §5.15).

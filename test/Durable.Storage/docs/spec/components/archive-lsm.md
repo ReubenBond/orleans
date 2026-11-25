@@ -556,17 +556,15 @@ start, uploads and submits nothing, and is repeated by every later drain of the 
 it. A failure-triggered drain (§8.1) is the composition's loop over `DrainAsync` with `below = m + 1`, `m` the marker's
 slot, until a drain's `b` reaches `m`.
 
-**Ledger-local drain barrier (`LG-I15`, `LG-I16`, *Not yet in code*, J1–J2).** `DrainWorker` accepts an optional
-`ILedgerLocalDrainBarrier? localDrainBarrier = null`. During segment scanning (`Segment.Add`), any `RowKind.LocalAppend`
-row is skipped after `localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key)` validates its key (or throws
-`ArchiveCorruptException` if `localDrainBarrier` is null or the key is malformed/unregistered); `RunObjectFormat`
-retains its `kind > RowKind.Delete` defence-in-depth guard so local-append rows never enter LSM run objects. For any
-closed ledger with `T > Slot.Zero` and `localDrainBarrier is not null`, immediately after `StartAsync` confirms `S` is
-not already `Complete` and before `ScanAsync` or `UploadAsync` (holding zero segment memory), `DrainAsync` runs
-`await localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, T, ct)` once up front: `Dropped` forgets `S` and
-returns `Dropped`, `Backpressure` returns `Backpressure`, and `Drained` proceeds with the existing drain body (covering
-both `a < T` and `a == T`) and its single `ManifestChange.Drain(..., complete: segment.End == T)` commit, adding zero
-extra manifest commits and zero `ManifestCommitInterval` stalls.
+**Single-pass message draining (`LG-I15`, `LG-I16`).** `DrainWorker` accepts an optional
+`IEnumerable<IMessageProcessor>? messageProcessors = null`. During segment scanning (`Segment.Add`), every
+`RowKind.Message` row's channel is validated against the registered `IMessageProcessor`s and folded into that segment's
+per-channel `IMessageFold` (charging fold memory to `DrainScan`'s `ByteBudget`, which resets folds via `Clear()` on an
+`OverBudget` → `Alone` rescan), throwing `ArchiveCorruptException` on any unregistered channel or malformed payload;
+`RunObjectFormat` retains its `kind > RowKind.Delete` guard so message rows never enter LSM run objects. Before
+committing `ManifestChange.Drain(..., complete: segment.End == T)`, `DrainAsync` commits
+`await segment.CommitMessagesAsync(ct)` alongside `UploadAsync` (including when `segment.Count == 0 && segment.HasMessages`
+for message-only segments), adding zero extra manifest commits and zero second-pass ledger reads.
 
 An exception from `commit` leaves the change's outcome unknown and the change pending: the worker's next drain of `S`
 submits the same change again, uploading nothing, and answers what the committer decides. Any other exception leaves the
@@ -983,25 +981,25 @@ decodes ([conventions §1](../conventions.md#1-buffers-and-ownership)).
    in this process, `watermark[S]` in the manifest view's current value, or in a manifest read when the view holds none;
    after a `Superseded` one, in a value at least as new as the one which decided it (`ManifestView.RefreshAsync`); a
    segment start (LSM-I2). The start only moves forward. A value which shows `S` complete, or an `a` past `below`, or at
-   it with nothing to complete, answers `Covered`; a closed ledger's `a` past `T` is `ArchiveCorruptException`. For a
-   closed ledger with `T > 0` and an `ILedgerLocalDrainBarrier`, run `EnsureLocalStreamsDrainedAsync(S, T)` once up
-   front before scanning or uploading (`Dropped` forgets `S` and answers `Dropped`; `Backpressure` answers
-   `Backpressure`; `Drained` continues, including when `a == T` so `complete: true` commits in one replace; LG-I16).
+   it with nothing to complete, answers `Covered`; a closed ledger's `a` past `T` is `ArchiveCorruptException`.
    Find the segment's end `b`: the slot of the next decided batch of `S` which starts a segment, when that slot lies
    below a contiguous tail learned after the read (`ReadTailAsync`), usually its known contiguous tail; or `T` when `S`
    is closed and no later segment starts before it. Until the segment closes below the tail, there is nothing to drain:
    the drain answers `OpenSegment(a)`.
 2. Scan the segment `[a, b)` from its start (`ScanAsync`), preferring a local replica below the contiguous tail. The
    batch at `a` starts a segment, or the manifest is corrupt (LSM-I2); the scan stops at the next batch which starts
-   one. Every `RowKind.LocalAppend` row is validated with `localDrainBarrier.ValidateLocalAppendKey` (or rejected with
-   `ArchiveCorruptException` when no barrier is configured) and skipped without entering LSM sections (LG-I15). A read
+   one. Every `RowKind.Message` row is matched to its registered `IMessageProcessor` and folded into its segment
+   `IMessageFold` (or rejected with `ArchiveCorruptException` on an unregistered channel or malformed payload), charging
+   its fold memory to `DrainScan`'s `ByteBudget` without entering LSM sections (LG-I15, LG-I16). A read
    which answers backpressure is retried from the slot the scan reached, with bounded jittered backoff, keeping the
    rows already read; backpressure past the retries, before the segment's end, answers `Backpressure`, since a segment
    drains whole. Each row is charged to the drain memory budget as it is read (§1, A drain's memory is the archive's).
    Each defining row's stored token is empty, the LSM's `Plan` (HI-I4), which Debug builds assert.
 3. Sort the rows by key and tag and upload them, one object at a time, each of one section at the partition §8.8
    chooses: an object ends before the row whose projected length would pass `s`, the section size, which lies below
-   the object bound (§7), and the rows go on in another, so the change carries as many sections as objects.
+   the object bound (§7), and the rows go on in another, so the change carries as many sections as objects. Commit all
+   folded segment messages (`CommitMessagesAsync`) before step 4 (including when a segment holds only messages and zero
+   archive rows; LG-I16).
 4. Commit: submit `Drain(S, a, b, sections, b = T)` through `commit` to the manifest committer, which applies it iff
    `S ≥ DrainedBelow`, `S` is not complete, and `watermark[S] = a` on the value it replaces (§2.9): it adds the
    sections, sets `watermark[S] = b`, marks `S` complete when `b = T`, and advances `DrainedBelow` past complete IDs,

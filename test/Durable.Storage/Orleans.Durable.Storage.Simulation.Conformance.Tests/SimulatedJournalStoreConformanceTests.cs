@@ -127,16 +127,16 @@ public sealed class SimulatedJournalStoreConformanceTests
     }
 
     /// <summary>
-    /// Atomic journal + <see cref="LocalAppendRecord"/> writes conform to <see cref="JournalStoreSpec"/> (JS-I11) and
-    /// <see cref="SimLocalSessionOracle"/> (JS-I12: strict slot order, non-empty records, <c>OnBatchDurable</c> before
+    /// Atomic journal + <see cref="MessageRecord"/> writes conform to <see cref="JournalStoreSpec"/> (JS-I11) and
+    /// <see cref="SimMessageSessionOracle"/> (JS-I12: strict slot order, non-empty records, <c>OnBatchDurable</c> before
     /// caller <c>Accepted</c>, <c>Dispose()</c> once after the last possible <c>OnBatchDurable</c>) across Clockwork
     /// explored windows and seeded three-replica quorum sequences, including takeovers, fenced writes, crashing
-    /// <c>Ambiguous</c> writes, and reads skipping <see cref="RowKind.LocalAppend"/>.
+    /// <c>Ambiguous</c> writes, and reads skipping <see cref="RowKind.Message"/>.
     /// </summary>
     [Fact]
-    public async Task AtomicLocalAppendsConformUnderSimulatedSchedulesAndExploredWindows()
+    public async Task AtomicMessagesConformUnderSimulatedSchedulesAndExploredWindows()
     {
-        var stream = LocalStreamName.Parse("orleans.wakeup");
+        var channel = MessageChannel.Parse("orleans.wakeup");
         var exploredConformance = new SimulatedConformance(ScheduleBound.Current);
         var exploredKit = Kit(
             exploredConformance,
@@ -148,7 +148,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 staleRate: 0,
                 warmStateBytes: seed % 2 == 0 ? 0 : null,
                 rejectionMutation: LedgerAdmission.RejectionMutant.None,
-                localStream: stream));
+                messageChannel: channel));
 
         ConformanceCase[] exploredCases =
         [
@@ -172,7 +172,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 staleRate: 0.1,
                 warmStateBytes: seed % 2 == 0 ? 0 : null,
                 rejectionMutation: LedgerAdmission.RejectionMutant.None,
-                localStream: stream));
+                messageChannel: channel));
 
         await seededKit.SampleAsync(seededKit.Sequences(15), iterations: 20, threads: 1);
         await seededKit.SampleAsync(seededKit.ConcurrentSequences(8), iterations: 20, threads: 1);
@@ -414,7 +414,7 @@ public sealed class SimulatedJournalStoreConformanceTests
         private readonly ImmutableArray<NodeId> _replicaNodes;
         private readonly JournalStoreOptions _options;
         private readonly LedgerAdmission.RejectionMutant _rejectionMutation;
-        private readonly SimLocalSessionOracle? _localOracle;
+        private readonly SimMessageSessionOracle? _messageOracle;
         private readonly int _seed;
         private readonly Lock _lock = new();
         private readonly List<JournalVersion>[] _learned = [.. JournalStoreSpec.Keys.Select(static _ => new List<JournalVersion> { JournalVersion.Origin })];
@@ -436,7 +436,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             ImmutableArray<NodeId> replicaNodes,
             JournalStoreOptions options,
             LedgerAdmission.RejectionMutant rejectionMutation,
-            SimLocalSessionOracle? localOracle,
+            SimMessageSessionOracle? messageOracle,
             int seed,
             LedgerMapView map,
             LedgerReader reader,
@@ -453,7 +453,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             _replicaNodes = replicaNodes;
             _options = options;
             _rejectionMutation = rejectionMutation;
-            _localOracle = localOracle;
+            _messageOracle = messageOracle;
             _seed = seed;
             _map = map;
             _reader = reader;
@@ -471,7 +471,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             double staleRate,
             long? warmStateBytes,
             LedgerAdmission.RejectionMutant rejectionMutation,
-            LocalStreamName? localStream = null)
+            MessageChannel? messageChannel = null)
         {
             var replicaNodes = replicas == 1 ? [PrimaryNode] : ThreeReplicas;
             var register = new SimulatedConditionalRegister(environment, "map") { MaxLatency = maxLatency };
@@ -489,7 +489,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 options.WarmStateBytes = budget;
             }
 
-            var localOracle = localStream is not null ? new SimLocalSessionOracle(localStream) : null;
+            var messageOracle = messageChannel is not null ? new SimMessageSessionOracle(messageChannel) : null;
 
             var (map, reader, committer, registry, executor, journals) = await OpenProcessAsync(
                 register,
@@ -497,7 +497,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 archive,
                 options,
                 rejectionMutation,
-                localOracle,
+                messageOracle,
                 seed,
                 generation: 0);
 
@@ -510,7 +510,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 replicaNodes,
                 options,
                 rejectionMutation,
-                localOracle,
+                messageOracle,
                 seed,
                 map,
                 reader,
@@ -618,7 +618,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             await _committer.DisposeAsync();
             _replicas.Dispose();
             _archive.Dispose();
-            _localOracle?.AssertClean();
+            _messageOracle?.AssertClean();
         }
 
         private static async Task<(
@@ -633,7 +633,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             IArchiveStore archive,
             JournalStoreOptions options,
             LedgerAdmission.RejectionMutant rejectionMutation,
-            SimLocalSessionOracle? localOracle,
+            SimMessageSessionOracle? messageOracle,
             int seed,
             int generation)
         {
@@ -655,7 +655,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 options,
                 clock,
                 stateDatabase: null,
-                localStreamHandlers: localOracle is not null ? [localOracle] : null)
+                messageHandlers: messageOracle is not null ? [messageOracle] : null)
             {
                 RejectionMutation = rejectionMutation,
             };
@@ -743,21 +743,21 @@ public sealed class SimulatedJournalStoreConformanceTests
         {
             var rowKey = JournalRowKey.Encode(JournalStoreSpec.Keys[key]);
             using var buffer = payload.Length == 0 ? default : ArcBuffer.Wrap(payload);
-            var localTag = _localOracle is { } oracle ? oracle.NextTag(key) : 0;
-            LocalAppendRecord[] locals = _localOracle is { } h
-                ? [new LocalAppendRecord(h.Stream, BitConverter.GetBytes(localTag))]
+            var messageTag = _messageOracle is { } oracle ? oracle.NextTag(key) : 0;
+            MessageRecord[] messages = _messageOracle is { } h
+                ? [new MessageRecord(h.Channel, BitConverter.GetBytes(messageTag))]
                 : [];
             using var record = kind switch
             {
-                JournalWriteKind.Append => _journals.EncodeAppend(rowKey, expected, buffer, locals),
-                JournalWriteKind.Replace => _journals.EncodeReplace(rowKey, expected, buffer, locals),
-                JournalWriteKind.Delete => _journals.EncodeDelete(rowKey, expected, locals),
+                JournalWriteKind.Append => _journals.EncodeAppend(rowKey, expected, buffer, messages),
+                JournalWriteKind.Replace => _journals.EncodeReplace(rowKey, expected, buffer, messages),
+                JournalWriteKind.Delete => _journals.EncodeDelete(rowKey, expected, messages),
                 _ => throw new UnreachableException(),
             };
             var outcome = await _journals.WriteAsync(record, CancellationToken.None);
-            if (_localOracle is not null && outcome.Value is JournalWriteOutcome.Accepted)
+            if (_messageOracle is not null && outcome.Value is JournalWriteOutcome.Accepted)
             {
-                _localOracle.AssertObserved(localTag);
+                _messageOracle.AssertObserved(messageTag);
             }
 
             return outcome;
@@ -842,7 +842,7 @@ public sealed class SimulatedJournalStoreConformanceTests
                 _archive,
                 _options,
                 _rejectionMutation,
-                _localOracle,
+                _messageOracle,
                 _seed,
                 ++_generation);
             return outcome;
@@ -868,7 +868,7 @@ public sealed class SimulatedJournalStoreConformanceTests
     /// <c>OnBatchDurable</c> before caller <c>Accepted</c>, and <c>Dispose()</c> called once strictly after the last
     /// <c>OnBatchDurable</c>.
     /// </summary>
-    private sealed class SimLocalSessionOracle(LocalStreamName stream) : ILocalStreamHandler
+    private sealed class SimMessageSessionOracle(MessageChannel channel) : IMessageHandler
     {
         private readonly Lock _lock = new();
         private readonly List<TrackedSession> _sessions = [];
@@ -876,14 +876,14 @@ public sealed class SimulatedJournalStoreConformanceTests
         private readonly List<string> _violations = [];
         private int _nextTag;
 
-        public LocalStreamName Stream { get; } = stream;
+        public MessageChannel Channel { get; } = channel;
 
         public int NextTag(int key) => Interlocked.Increment(ref _nextTag);
 
         public InvalidDataException? Validate(ReadOnlySpan<byte> payload) =>
             payload.Length == sizeof(int) ? null : new InvalidDataException("Expected 4-byte tag.");
 
-        public ILocalStreamSession OpenLedger(LedgerId ledger)
+        public IMessageSession OpenLedger(LedgerId ledger)
         {
             lock (_lock)
             {
@@ -916,7 +916,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             }
         }
 
-        private void OnDurable(TrackedSession session, Slot slot, ReadOnlySpan<LocalAppendRecord> records)
+        private void OnDurable(TrackedSession session, Slot slot, ReadOnlySpan<MessageRecord> records)
         {
             lock (_lock)
             {
@@ -955,7 +955,7 @@ public sealed class SimulatedJournalStoreConformanceTests
             }
         }
 
-        private sealed class TrackedSession(SimLocalSessionOracle owner, LedgerId ledger) : ILocalStreamSession
+        private sealed class TrackedSession(SimMessageSessionOracle owner, LedgerId ledger) : IMessageSession
         {
             public LedgerId Ledger { get; } = ledger;
 
@@ -963,7 +963,7 @@ public sealed class SimulatedJournalStoreConformanceTests
 
             public int DisposeCount { get; set; }
 
-            public void OnBatchDurable(Slot slot, ReadOnlySpan<LocalAppendRecord> records) => owner.OnDurable(this, slot, records);
+            public void OnBatchDurable(Slot slot, ReadOnlySpan<MessageRecord> records) => owner.OnDurable(this, slot, records);
 
             public void Dispose() => owner.OnDispose(this);
         }

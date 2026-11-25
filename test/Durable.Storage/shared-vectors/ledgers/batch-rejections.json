@@ -92,7 +92,12 @@
       "hex": "434c4c4201000000010000010c016b000000006d1df6bc"
     },
     {
-      "name": "A LocalAppend row with bit 3 set.",
+      "name": "A Message row with bit 2 (defining) set.",
+      "reason": "bad-row-flags",
+      "hex": "434c4c4201000000010000010701610004e4f486"
+    },
+    {
+      "name": "A Message row with bit 3 set.",
       "reason": "bad-row-flags",
       "hex": "434c4c4201000000010000010f016b000000003568f304"
     },
@@ -100,6 +105,21 @@
       "name": "A row with bit 7 set.",
       "reason": "bad-row-flags",
       "hex": "434c4c42010000000100000184016b00000000caeeb507"
+    },
+    {
+      "name": "A Message row with an empty channel.",
+      "reason": "bad-channel",
+      "hex": "434c4c4201000000010000010300000b92025d"
+    },
+    {
+      "name": "A Message row with a 65-byte channel.",
+      "reason": "bad-channel",
+      "hex": "434c4c420100000001000001034161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161610093d22cf9"
+    },
+    {
+      "name": "A Message row whose channel contains an uppercase ASCII byte.",
+      "reason": "bad-channel",
+      "hex": "434c4c42010000000100000103026141005059b3fb"
     },
     {
       "name": "A body length of 0 in two bytes, longer than its shortest form.",

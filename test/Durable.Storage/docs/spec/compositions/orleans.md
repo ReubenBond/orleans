@@ -491,22 +491,20 @@ through the controller grain.
 | Per cluster | Controller grain (`IClusterControllerGrain`) | [§5.6](#56-controllers) | Decides for the cluster: the group committers of the ledger map, the manifest, and the node registry, takeovers, balancing, split and merge, configuration and retirement rolls, drops, and sweeping |
 
 `Orleans.Durable.Storage` holds the composition. Its root namespace holds the data plane: the Orleans Journaling
-adapter (`DurableJournalStorage`, implementing `ICompanionJournalStorage` in J3), the router, the placement strategies
+adapter (`DurableJournalStorage`, implementing `IMessageJournalStorage`), the router, the placement strategies
 and directors, the node grain (`JournalStoreGrain`) and the pressure state it consults before admission
 ([§5.9](#59-resource-governance)), the replica transport, the node registry's values, codec, and resolver, and the
-primary-side wakeup handler (`WakeupStreamHandler` / `WakeupLedgerSession`, *Not yet in code*, J2). Its `.Control`
+primary-side wakeup handler (`WakeupMessageHandler` / `WakeupLedgerSession`). Its `.Control`
 namespace holds the control plane: the controller grain, the node control grain (`NodeControlGrain`), the node
-registry's committer (`NodeRegistryCommitter`), and the closed-ledger wakeup processor (`WakeupStreamProcessor`,
-*Not yet in code*, J2). Its `.Hosting` namespace wires both: service registration, the silo lifecycle, and
-`JournalStateLocalKeyPresenceLookup` (*Not yet in code*, J2). Orleans types stay in this assembly,
+registry's committer (`NodeRegistryCommitter`), and the segment wakeup processor (`WakeupMessageProcessor`). Its
+`.Hosting` namespace wires both: service registration and the silo lifecycle. Orleans types stay in this assembly,
 `Orleans.Durable.Storage`. The controllers' decisions and their policies, `ClusterController`, `NodeController`,
-`Placement`, `ControlOptions`, and the closed-ledger local-stream drain coordinator (`LocalStreamDrainCoordinator`,
-`ILocalStreamProcessor`, `ILocalStreamFold`, `ILocalKeyPresenceLookup`, *Not yet in code*, J2), are a component of
-their own, `Orleans.Durable.Storage.Engine.Cluster.Control`, in the same namespace, which uses Ledgers, the Archive,
-and the LSM and no Orleans type, and which the Engine compiles, so that deterministic simulation runs them without
-loading Orleans ([verification §7](../verification.md), [spec README §2.7](../README.md#27-design-rationale)); the
-composition reads their internals through the Engine's one `InternalsVisibleTo` to another production assembly. They
-decide from `RegisteredNodes`, the registry's projection which the controller grain takes from each value it reads.
+`Placement`, and `ControlOptions`, are a component of their own, `Orleans.Durable.Storage.Engine.Cluster.Control`, in
+the same namespace, which uses Ledgers, the Archive, and the LSM and no Orleans type, and which the Engine compiles, so
+that deterministic simulation runs them without loading Orleans ([verification §7](../verification.md), [spec README
+§2.7](../README.md#27-design-rationale)); the composition reads their internals through the Engine's one
+`InternalsVisibleTo` to another production assembly. They decide from `RegisteredNodes`, the registry's projection which
+the controller grain takes from each value it reads.
 `AddDurableJournalStorage` registers it in a silo as Orleans Journaling's default journal storage provider, with the
 silo's options from a configuration section
 (`AddDurableJournalStorage(configuration.GetSection("DurableStorage"))`, whose `Node` and `Control` subsections name the
@@ -662,7 +660,7 @@ Every Orleans guarantee the composition uses, and what happens when it does not 
 | OR-I4 | **Retirement gate.** A retired node's disk is released only once a ledger-map value read from the register, or written by a write which landed, has a retirement floor at or above the registry revision which retired the node and names the node in no node-backed ledger, among its replicas or as its primary. Every later install was chosen from a registry read at or above that revision, which lists the node retired ([LG-I11](../components/ledgers.md#5-invariants), OR-I5), so every later value names the node in none, and an answer that the disk is releasable holds after any crash. For single-node graceful retirement, `NodeStanding.IsReleasable` additionally waits until the map names the node in no ledger at all (so open object-store ledgers whose primary is the retired node hand off to another active silo before the node stops); for a planned whole-cluster stop, `DrainAllStatus.IsReady` opens once zero node-backed ledgers remain, zero active diskful nodes remain, `drain_all_revision` is 0, and the map's floor covers every diskful retirement, since open object-store ledgers hold no state on any node's disk ([§5.14](#514-object-store-ledgers)). In code: `NodeStanding.Of` and `DrainAllStatus.Of`, which `ClusterController` and `ClusterControllerGrain` (`GetRetirementAsync`, `GetDrainAllAsync`) answer from, and the floor raises `ClusterController.RunPass` returns (row 4.4's A, row 4.8 B). |
 | OR-I5 | **Replica choice.** Every ledger a transition opens names `N` distinct replicas and a primary, each active in the registry read whose revision the transition carries as `ChosenAt`, with write quorum `Q = (N + 1) / 2`. Each may be given work when the controller chose them: live in membership, with no hand-off pending. The one exception is a degraded choice. A takeover, whose closed ledger's primary claim ended, or a hand-off of a ledger whose primary is retired, departing, or has its hand-off pending, chosen while fewer than `N` nodes may be given work, names every node which may, at least `Q` of them, its primary first, and then, in their order in the ledger it closes, that ledger's replicas which membership declared `Dead`; repair rolls those out once their grace `G` ends and `N` nodes may be given work ([§5.6](#56-controllers)). In code: `Placement` and `ClusterController` (row 4.3), which choose from the registry's projection, `RegisteredNodes`, and the membership view, which the controller grain projects from its silo's registry resolver and `IClusterMembershipService` (row 4.3's B2), and which ask a degraded choice only for takeovers and those hand-offs; `Placement` asserts the degraded choice's shape. |
 | OR-I7 | **Journal outcomes.** An Orleans journal write completes only for an `Accepted` entry. A `Rejected` write reads the journal once and, when the read's content has the storage instance's digest (its length, existence, and XXH3-128 hash), sends the entry once more conditional on the version read, so that a state's two names after a drop do not fail an unchanged grain (JS-I10); a second `Rejected`, or a read whose content differs, surfaces as `InconsistentStateException`, as `ReplaceRequired` does, and `Ambiguous` as `JournalWriteOutcomeUnknownException`, which asserts nothing about the journal; `ReplaceRequired` also latches the replace request on the storage instance, which Orleans then fences, and the recovering instance's read carries the request again (HI-I5). The answers which report a write without effect are exactly `Rejected`, `ReplaceRequired`, `Moved`, `Fenced`, `Throttled`, `Unavailable`, the node's answer when its Journals fail the write with `JournalStoreUnavailableException` (a key's load which could not reach its ledger's quorum, so the entry was never proposed; [Journals §6](../components/journals.md#6-faults-concurrency-and-cancellation)), the owner's `Refused` before its Journals, §5.5's four no-effect failures (`NotThisNode`, a placement refusal, the Orleans runtime's own overload rejection of the call, and `ForwardQueueTimeout`, a deadline passed in the node's write lane before the send), and the writing silo's refusals before it sends, its own Journals' `ArgumentException` before admission among them; any other failure of its own Journals is `Ambiguous`. The placement refusal and the overload rejection count only at the top level or as the direct inner exception of Orleans' message rejection. The adapter resends `Moved`, `Fenced`, `Throttled`, `Unavailable`, and the four failures to the key's current primary, at once only to follow a named owner and never twice in a row. Every other failure of a send, an exception the remote call ends with among them, is `Ambiguous`; cancellation asserts nothing, and corruption surfaces as itself. In code: the forwarded write's outcomes and their wire encoding (`JournalForwardedWriteOutcome`), and the owner's `Throttled`, `Unavailable`, and `Refused` answers (`LocalJournals`, `JournalNodeHost`), row 4.2's B; `JournalRouter`, `DurableJournalStorage`, and their latch (row 4.2's C). |
-| OR-I8 | **One journal format and local-stream set per cluster.** Every journal payload the adapter stores is the Orleans journal bytes, unwrapped, in the format key recorded with the cluster's archive store. The first silo's check creates the store's record with its journal format, `MaxBodyBytes`, registered `local-streams` (comma-separated ordinal-sorted stream names, `""` when empty), `max-local-appends`, and `max-local-append-bytes` as caller parameters ([archive §2.4](../components/archive.md#24-selecting-the-store); *local-stream parameters not yet in code*, J1–J2), and every silo checks the record against its own before its Journals serve. A silo whose `format`, `max-body-bytes`, `local-streams`, `max-local-appends`, or `max-local-append-bytes` differs from the record's, whose record's store fields differ from its store's, or whose record breaks its format never serves journals, nor does one whose check meets a defect or a store which refuses the check's request definitely: it reports a critical event (6239 for a parameter, 6240 for a record which breaks its format, 6241 for another store, 6242 for a defect, 6246 for a definite refusal), asks to hand its ledgers off, so it is pending and given no work ([§5.6](#56-controllers)), and serves its replicas and its control plane. A cluster whose every silo is refused hands nothing off, since no node may execute a departure, and its journals stay unavailable until its configuration is fixed. A format key the record cannot hold fails the silo's start, naming the parameter. While the check waits for an archive store outage, the keys of the ledgers the silo is primary of answer `Moved` naming no owner. On archive logs, whose Azure layout writes the silo's own `format` into each blob, the silo's drains and sweeps wait for the check too ([archive logs §7.5](../components/archive-logs.md#75-clogs-objects)); on the LSM, `SiloArchive.Lsm.CheckRecordAsync` verifies `local-streams` agreement before calling `Gate.Pass(...)` so a silo with a mismatched local-stream set refuses `ArchiveGate` as well (*Not yet in code*, J2). In code: the check and the hand-off of a refused node (`NodeLedgers`), retried while the store's answer is unknown; the record's parameters, validated at the start (`NodeRuntime.RecordParametersOf`); and the gate (`LocalJournals`), which answers every journal call as stopped, with no effect, until the check passes (row 4.2's A); `DurableJournalStorage`, which stores the Orleans journal bytes unwrapped and reports the silo's format key with each read, the key the check holds (row 4.2's C); and the Journals' state, which `DurableStorageStatus` reports (row 4.2's D); on archive logs the check passes `ArchiveLogGate`, whose parameters' refusal stops the drains and sweeps too (row 4.9). |
+| OR-I8 | **One journal format and message-channel set per cluster.** Every journal payload the adapter stores is the Orleans journal bytes, unwrapped, in the format key recorded with the cluster's archive store. The first silo's check creates the store's record with its journal format, `MaxBodyBytes`, registered `message-channels` (comma-separated ordinal-sorted channel names, `""` when empty), `max-messages`, and `max-message-bytes` as caller parameters ([archive §2.4](../components/archive.md#24-selecting-the-store)), and every silo checks the record against its own before its Journals serve. A silo whose `format`, `max-body-bytes`, `message-channels`, `max-messages`, or `max-message-bytes` differs from the record's, whose record's store fields differ from its store's, or whose record breaks its format never serves journals, nor does one whose check meets a defect or a store which refuses the check's request definitely: it reports a critical event (6239 for a parameter, 6240 for a record which breaks its format, 6241 for another store, 6242 for a defect, 6246 for a definite refusal), asks to hand its ledgers off, so it is pending and given no work ([§5.6](#56-controllers)), and serves its replicas and its control plane. A cluster whose every silo is refused hands nothing off, since no node may execute a departure, and its journals stay unavailable until its configuration is fixed. A format key the record cannot hold fails the silo's start, naming the parameter. While the check waits for an archive store outage, the keys of the ledgers the silo is primary of answer `Moved` naming no owner. On archive logs, whose Azure layout writes the silo's own `format` into each blob, the silo's drains and sweeps wait for the check too ([archive logs §7.5](../components/archive-logs.md#75-clogs-objects)); on the LSM, `SiloArchive.Lsm.CheckAsync` verifies `message-channels` agreement before calling `Gate.Pass(...)` so a silo with a mismatched message-channel set refuses `ArchiveGate` as well. In code: the check and the hand-off of a refused node (`NodeLedgers`), retried while the store's answer is unknown; the record's parameters, validated at the start (`NodeRuntime.RecordParametersOf`); and the gate (`LocalJournals`), which answers every journal call as stopped, with no effect, until the check passes (row 4.2's A); `DurableJournalStorage`, which stores the Orleans journal bytes unwrapped and reports the silo's format key with each read, the key the check holds (row 4.2's C); and the Journals' state, which `DurableStorageStatus` reports (row 4.2's D); on archive logs the check passes `ArchiveLogGate`, whose parameters' refusal stops the drains and sweeps too (row 4.9). |
 | OR-I9 | **One node per silo.** A silo opens exactly one LedgerStore root, registers that store's node identity, and serves replica calls for that store only. In code: `DurableStorageNode` opens the one root and registers its node identity (row 4.1), and `LedgerReplicaHost` serves replica calls on that store only (row 4.7). |
 | OR-I10 | **Throttled admission.** While a primary's node is under disk pressure, or a replica node of its open ledger reported disk pressure within five control intervals of the primary's node receiving the report, the primary's node answers each journal write for that ledger `Throttled` before it calls the Journals, so the write has no effect. A ledger in the object store writes no node's disk, so disk pressure never throttles it ([§5.14](#514-object-store-ledgers)). Reads, drains, compactions, transitions, drops, and sweeps continue. In code: the throttle state, `NodePressure`, whose `IsThrottled(ledger)` the write path reads, the node's disk pressure (`LedgerStore.MeasureDiskAsync`, `NodeDisk`), and the pressure reports through `INodeControlGrain.ReportPressureAsync` (row 4.4's B); the node's Journals gate, `LocalJournals`, which answers `Throttled` from that state for the open ledger its node is primary of, reached by the forwarded write path through `JournalNodeHost` (row 4.2's B) and by the router's local write path, `JournalRouter` (row 4.2's C). |
 | OR-I12 | **Commits are conditional.** The controller grain and the nodes change shared state only through the group committers of the ledger map, the manifest, and the node registry. Every committer, wherever it runs, writes conditionally on the version it read and applies each change only under its commit rule, so any number of controller-grain activations, committers, and node controllers, with any views, produce only states those rules admit. Serializing commits through the controller grain affects only performance and liveness. In code: the node registry's committer (row 4.1); `ClusterController`, which hosts the ledger-map and manifest committers, and `NodeController`, which submits every change through them, hosted by the controller grain and the node control grains (row 4.3). |
@@ -1665,44 +1663,25 @@ The policies below are defaults; the core accepts any transition which meets its
   passing the gate in its record check, `NodeRuntime` building the drains on archive logs with the writer registry's
   sink and the registry view's active nodes, and the loop starting those drains once the gate passed, the drop crossing
   to the controller grain's `CommitLedgerMapAsync` as tag 3 of `LedgerMapChange` ([§7.2](#72-grain-interfaces)).
-- **Ledger-local stream drain (`LocalStreamDrainCoordinator`, *Not yet in code*, J2).**
-  `Orleans.Durable.Storage.Engine.Cluster.Control` defines `ILocalStreamProcessor` (`Stream`,
-  `BeginClosedLedgerFold(LedgerMetadata, Slot) -> ILocalStreamFold`), `ILocalStreamFold : IDisposable` (`MemoryBytes`,
-  `Add(Slot, int, ReadOnlySequence<byte>)`, `Clear()`, idempotent `CommitAsync`), `ILocalKeyPresenceLookup`
-  (`TryHasKeyEntryAsync` returning `LocalKeyPresenceRead`: `Absent`, `Present`, or `Unindexed`), and
-  `LocalStreamDrainCoordinator : ILedgerLocalDrainBarrier` (using `Engine.Archive`'s `ByteBudget` under an explicit
-  component grant). The coordinator owns a dedicated `ByteBudget(ControlOptions.LocalDrainMemoryBytes)` (default 32 MiB,
-  at least 1 MiB) independent of archive `DrainMemoryBytes`, maintains a per-ledger `_completed` cache (pruned as
-  ledgers leave `LedgerMapView`, and populated only after durable completion — never on `Dropped`, `Backpressure`, or
-  failure) and `_inFlight` task coalescing across concurrent callers with independent caller cancellation:
-  1. For `tail == Slot.Zero` or `_completed.Contains(ledger.Id)`, return `Drained` synchronously.
-  2. On `LedgerLocation.Nodes` when `ILocalKeyPresenceLookup` is available (implemented in `.Hosting` by
-     `JournalStateLocalKeyPresenceLookup` over `JournalStateDatabase.TryHasKeyEntryAsync`), check every registered
-     stream's `LedgerLocalKey` in O(1); if every stream answers `Absent`, cache `ledger.Id` in `_completed` and return
-     `Drained` with zero disk reads and zero backing calls.
-  3. Otherwise perform one sequential raw `BatchView` pass over `[0, tail)` via `LedgerReader` (identical on `Nodes`
-     and `ObjectStore`), tracking only defining `RowKind.LocalAppend` ordinals in a per-segment dictionary reset on
-     `IsSegmentStart`, validating every `RowKind.LocalAppend` key via `ValidateLocalAppendKey` (fail-closed with
-     `ArchiveCorruptException`), and feeding each payload into its processor's `ILocalStreamFold.Add`.
-  4. When `delta = fold.MemoryBytes - charged > 0` and `lease.TryGrow(delta)` returns `false`, immediately flush all
-     folds via `CommitAsync`, call `Clear()`, and release the `ByteBudget.Lease` before re-acquiring for the next
-     record, guaranteeing deadlock-free chunked progress under concurrent drains.
-  5. On `ReplicaWriteOutcome.Dropped` from `LedgerReader`, confirm `map.NoLongerLists(ledger.Id)` (refreshing
-     `LedgerMapView` if `Current` still lists `ledger.Id`) before returning `LocalDrainBarrierOutcome.Dropped`; on
-     `Backpressure`, return `Backpressure`.
-  6. Once `[0, tail)` completes, run `CommitAsync` for every registered processor, add `ledger.Id` to `_completed`, and
-     return `Drained`.
-
-  `NodeController` wires `LocalStreamDrainCoordinator` into both `DrainWorker` (LSM up-front barrier) and
-  `ArchiveLogDrainWorker` (before-drop barrier), and gives `Waiting` closed ledgers on Archive Logs a dedicated bounded
-  eager-drain slot (max 1 concurrent in `_eagerLocalDraining`, awaited by `DrainsEnded`, retried with bounded
-  exponential backoff until `Drained`, `Dropped`, or no longer `Waiting`) so a blocked `LG-I10` lineage never delays
-  local-stream wakeups. `NodeRuntime.StartAsync` validates exact set equality between registered `ILocalStreamHandler`s
-  and `ILocalStreamProcessor`s. `ClusterController` refuses range splits past depth `LedgerLocalKey.MaxRangeDepth`
-  (256) when local streams are registered. `NodeLedgers.GovernAsync` polls `WakeupStreamHandler.CollectLedgersNeedingRoll()`
-  unconditionally (before the `runtime.Disk is null` branch) so both diskful and diskless silos roll wakeup-heavy
-  ledgers. `NodeRuntime.StopJournalsAsync()` calls `await WakeupStreamHandler.StopAsync()` immediately before
-  `Journals.DisposeAsync()`.
+- **Single-pass ledger message draining (`IMessageProcessor` / `IMessageFold` / `MessageFolds`).**
+  `Orleans.Durable.Storage.Engine.Archive.Control` defines `IMessageProcessor` (`Channel`,
+  `BeginSegmentFold(LedgerMetadata, LedgerSegmentId) -> IMessageFold`), `IMessageFold : IDisposable` (`MemoryBytes`,
+  `Add(Slot, int, ReadOnlySequence<byte>)`, `Clear()`, idempotent `CommitAsync`), and the shared `MessageFolds` helper
+  wired directly into both `DrainWorker` (LSM) and `ArchiveLogDrainWorker` (Archive Logs):
+  1. During each segment's single `DrainScan` pass, every `RowKind.Message` row's `MessageChannel` is matched against
+     the registered `IMessageProcessor`s and folded into that segment's `IMessageFold` (failing closed with
+     `ArchiveCorruptException` — wrapped as `ArchiveLogDrainBlockedException(Corrupt)` on Archive Logs — on any
+     unregistered channel or malformed payload), charging fold memory to `DrainScan`'s existing `ByteBudget`
+     (`DrainMemoryBytes`, automatically cleared via `Clear()` on an `OverBudget` → `Alone` rescan).
+  2. Before committing `ManifestChange.Drain` (LSM) or creating the segment drain marker `durable-storage/d/{S}/{start}`
+     (Archive Logs), the drain worker awaits `CommitMessagesAsync` across all folds touched in that segment (including
+     message-only segments with zero archive rows), ensuring every surviving message is durably committed before any
+     segment completes or any closed ledger drops (LG-I16).
+  3. `NodeRuntime.StartAsync` validates exact set equality between registered `IMessageHandler`s and
+     `IMessageProcessor`s (`ValidateMessageChannelParity`). `NodeLedgers.GovernAsync` polls
+     `WakeupMessageHandler.CollectLedgersNeedingRoll()` unconditionally (before the `runtime.Disk is null` branch) so
+     both diskful and diskless silos roll wakeup-heavy ledgers. `NodeRuntime.StopJournalsAsync()` calls
+     `await WakeupMessageHandler.StopAsync()` immediately before `Journals.DisposeAsync()`.
 - **Drops** ([LSM §2.6](../components/archive-lsm.md#26-dropping-ledgers)). On the LSM, when a drain which
   completes a ledger applies, and on each pass, the controller grain submits, through its `LedgerDropper`, `Drop(S)` for
   every closed ledger which its manifest view shows complete (`IsComplete`) and which no listed ledger with a lower ID
@@ -2595,9 +2574,9 @@ the container holds nothing but the cluster's archive logs and Clog's objects un
   binds the two stores as far as `LogArchiveStore`'s construction contract holds, both in the one container, which
   `AddAzureArchiveLogs` meets by building both over one container client. A parameter mismatch stops the silo's drains
   and sweeps as well as its Journals, since the Azure layout writes the format into the logs; on the LSM, a
-  `local-streams` mismatch is verified in `SiloArchive.Lsm.CheckRecordAsync` before calling `Gate.Pass(...)` and
-  refuses `ArchiveGate` as well, while write-path parameter mismatches (`format`, `max-body-bytes`, `max-local-appends`,
-  `max-local-append-bytes`) stop only the Journals (OR-I8; *`local-streams` gate check not yet in code*, J2). A gate's
+  `message-channels` mismatch is verified in `SiloArchive.Lsm.CheckAsync` before calling `Gate.Pass(...)` and
+  refuses `ArchiveGate` as well, while write-path parameter mismatches (`format`, `max-body-bytes`, `max-messages`,
+  `max-message-bytes`) stop only the Journals (OR-I8). A gate's
   task faults only with its refusal, `ArchiveStoreMismatchException`, `ArchiveCorruptException`,
   the store's definite refusal (`ObjectStoreRefusedException` but for its authorization, `ArchiveLogRefusedException`),
   or a defect of the check, with its own exception, its owner retrying only a failure whose outcome is unknown, and is
@@ -2757,10 +2736,10 @@ yet in code*: `MaxSegmentAge` rolling for object-store ledgers and provider qual
 
 ### 5.15 Ledger-local wakeups, 1-RTT messaging, and grain-local durable jobs
 
-*Not yet in code* (Phases J2–J4). Companion `RowKind.LocalAppend` records eliminate the second foreground durable I/O
-for grain self-wakeups while preserving crash recovery through the existing `ILocalDurableJobManager` Azure shards:
+Atomic `RowKind.Message` records eliminate the second foreground durable I/O for grain self-wakeups while preserving
+crash recovery through deterministic, time-bucketed sealed `JobShard`s published via `ISealedJobShardPublisher`:
 
-- **Canonical codec (`WakeupCompanionCodec`, `Orleans.Durable.Jobs`, J2).** Stream name `"orleans.wakeup"`. Wire format
+- **Canonical codec (`WakeupMessageCodec`, `Orleans.Durable.Jobs`).** Channel name `"orleans.wakeup"`. Wire format
   v1 (little-endian, canonical, ~35–60 bytes): byte 0 `Version = 1`, byte 1 `Flags` (`0x01` = `HasDueTime`, bits 1..7
   must be 0), `TargetGrainId` (varint length `1..1024` + strict UTF-8 validated by `GrainId.TryParse`), `JobName`
   (varint length `1..256` + strict UTF-8 non-blank string rejecting empty or ASCII-whitespace-only), and optional
@@ -2769,8 +2748,8 @@ for grain self-wakeups while preserving crash recovery through the existing `ILo
   inputs in procedural order: `truncated` → `bad-version` → `bad-flags` → `bad-varint` → `empty-grain-id` →
   `grain-id-too-long` → `truncated` → `invalid-utf8` → `bad-grain-id` → `bad-varint` → `empty-job-name` →
   `job-name-too-long` → `truncated` → `invalid-utf8` → `blank-job-name` → `truncated` → `bad-ticks` → `trailing-bytes`.
-- **Primary-side wakeup handler (`WakeupStreamHandler` and `WakeupLedgerSession`, `Orleans.Durable.Storage`, data
-  plane, J2).** Implements `ILocalStreamHandler` for `"orleans.wakeup"`, configured by `WakeupOptions` (nested on
+- **Primary-side wakeup handler (`WakeupMessageHandler` and `WakeupLedgerSession`, `Orleans.Durable.Storage`, data
+  plane).** Implements `IMessageHandler` for `"orleans.wakeup"`, configured by `WakeupOptions` (nested on
   `DurableStorageOptions` with `TimeProvider`). Each open ledger `L` owns an isolated `WakeupLedgerSession` backed by
   an indexed binary min-heap (`Dictionary<(GrainId Target, string JobName), Entry>` holding `DueTimeUtcTicks`,
   session-monotonic `ulong Generation`, `HeapIndex`, `InFlight`, and `Attempt`):
@@ -2780,33 +2759,39 @@ for grain self-wakeups while preserving crash recovery through the existing `ILo
     `Generation` while retaining an `InFlight` entry until dispatch completes so ABA collisions and duplicate
     dispatches are prevented.
   - When live `MemoryBytes` exceeds `WakeupOptions.MaxWakeupBytesPerLedger` (default 4 MiB), the session flags `L` in
-    `WakeupStreamHandler.CollectLedgersNeedingRoll()`, polled unconditionally in `NodeLedgers.GovernAsync` so both
+    `WakeupMessageHandler.CollectLedgersNeedingRoll()`, polled unconditionally in `NodeLedgers.GovernAsync` so both
     diskful and diskless silos trigger a routine ledger roll.
   - The per-ledger timer loop dispatches due wakeups with bounded concurrency
     (`WakeupOptions.MaxConcurrentWakeupDispatches`, default 32) via `IDurableJobReceiverExtension.ExecuteJobAsync`
     with `IJobRunContext.IsEphemeralWakeup = true`, handling `Completed`, `RescheduleAt`, transient retry backoff
     (capped at `WakeupOptions.MaxRetryDelay`), and mid-dispatch `Generation` / `null` updates safely under lock.
-  - `WakeupStreamHandler.StopAsync()` cancels timer loops and awaits in-flight dispatches via `AdmissionGate` inside
+  - `WakeupMessageHandler.StopAsync()` cancels timer loops and awaits in-flight dispatches via `AdmissionGate` inside
     `NodeRuntime.StopJournalsAsync()` immediately before `Journals.DisposeAsync()`.
-- **Closed-ledger wakeup processor (`WakeupStreamProcessor`, `Orleans.Durable.Storage.Control`, control plane, J2).**
-  Implements `ILocalStreamProcessor` for `"orleans.wakeup"`. Its fold stores
-  `Dictionary<(GrainId Target, string JobName), long>` with accurate `MemoryBytes` accounting, validating every record
-  with `WakeupCompanionCodec.Decode` (throwing `ArchiveCorruptException` on malformed payload or invalid `GrainId`) and
-  applying last-write-wins in slot order (`null` removes the entry and reclaims memory). On `CommitAsync`:
-  - Zero surviving entries returns immediately with zero `ScheduleJobAsync` calls and zero backing Azure Blob writes.
-  - Surviving entries are scheduled through `ILocalDurableJobManager.ScheduleJobAsync(Target, JobName, effectiveDueTime,
-    ct)` under a node-level concurrency cap (`WakeupOptions.MaxConcurrentWakeupSchedules`, default 16), applying
-    deterministic `0..5s` hash jitter when `dueTime < now`, and removing each entry from the fold dictionary as its
-    `ScheduleJobAsync` succeeds so retries skip already-scheduled entries and release memory immediately.
-- **Companion journal storage and `GrainWakeupCoordinator` (`Orleans.Durable`, J3).**
-  - `Orleans.Durable.Journaling` defines `JournalCompanionRecord` (`MaxPayloadLength = 65_536`, validated `[a-z0-9._-]`
-    stream name `1..64`) and `ICompanionJournalStorage : IJournalStorage` (`AppendWithCompanionsAsync`,
-    `ReplaceWithCompanionsAsync`). `DurableJournalStorage` implements `ICompanionJournalStorage`, caching
-    `FrozenDictionary<string, LocalStreamName>`, copying companion payloads once outside its rebase-retry loop, and
-    encoding `JournalEntryRecord` with `HasLocalAppendsFlag`.
-  - `JournaledStateManager` keeps `SupportsCompanionWrites` and `StageCompanionWrite` internal to `Orleans.Durable`,
-    double-buffering `_stagedCompanions` into `_inFlightCompanions` synchronously across the storage write (`Append`
-    requires a non-empty delta; empty `Replace` with companions is allowed; both buffers clear on `Reset`/fence and
+- **Segment wakeup processor (`WakeupMessageProcessor`, `Orleans.Durable.Storage.Control`, control plane).**
+  Implements `IMessageProcessor` for `"orleans.wakeup"`. Its per-segment fold stores
+  `Dictionary<(GrainId Target, string JobName), long>` with accurate `MemoryBytes` accounting (charged to `DrainScan`'s
+  `ByteBudget`), validating every record with `WakeupMessageCodec.Decode` (throwing `ArchiveCorruptException` on
+  malformed payload or invalid `GrainId`) and applying last-write-wins in slot order (`null` removes the entry and
+  reclaims memory). On `CommitAsync`:
+  - Zero surviving entries returns immediately with zero `ISealedJobShardPublisher` calls and zero backing writes.
+  - Surviving entries compute effective due times (future verbatim; overdue clamped to `now + deterministic HashJitter`
+    in `[0, OverdueJitterWindow)`), group by `ISealedJobShardPublisher.ShardDuration` time bucket, sort canonically by
+    `(Target, JobName)`, and publish one deterministic, idempotent, unowned `Closed=true` sealed `JobShard` per
+    non-empty bucket (`drain-{ledgerId:D20}-{segmentStart:D20}-{bucketUtcTicks:D19}` via
+    `JobShardId.ForDeterministic`, backed by atomic `IJournalStorage.CreateIfNotExistsAsync(value, metadata)` so racing
+    drainers or crash retries never create duplicate shards and zero `ScheduleJobAsync` calls occur). Each published
+    bucket removes its entries from the fold and reclaims `MemoryBytes` immediately so retries skip already-published
+    buckets. `LocalDurableJobManager` implements `ISealedJobShardPublisher` and signals `_shardCheckSignal` immediately
+    whenever a newly created shard is due within `ShardLoadLookaheadPeriod`.
+- **Message journal storage and `GrainWakeupCoordinator` (`Orleans.Durable`).**
+  - `Orleans.Durable.Journaling` defines `JournalMessageRecord` (`MaxPayloadLength = 65_536`, validated `[a-z0-9._-]`
+    channel name `1..64`) and `IMessageJournalStorage : IJournalStorage` (`AppendWithMessagesAsync`,
+    `ReplaceWithMessagesAsync`). `DurableJournalStorage` implements `IMessageJournalStorage`, caching
+    `FrozenDictionary<string, MessageChannel>`, copying message payloads once outside its rebase-retry loop, and
+    encoding `JournalEntryRecord` with `HasMessagesFlag`.
+  - `JournaledStateManager` keeps `SupportsMessageWrites` and `StageMessage` internal to `Orleans.Durable`,
+    double-buffering `_stagedMessages` into `_inFlightMessages` synchronously across the storage write (`Append`
+    requires a non-empty delta; empty `Replace` with messages is allowed; both buffers clear on `Reset`/fence and
     `DeleteStateAsync`).
   - `Orleans.Durable.Jobs` defines `IGrainWakeupSource` (`JobName`, `GetNextDueTime(DateTimeOffset now)`) and
     `GrainWakeupCoordinator`, which emits at most one self-only `SetWakeup(GrainId, JobName, clampedDueTime?)` per
@@ -2814,10 +2799,10 @@ for grain self-wakeups while preserving crash recovery through the existing `ILo
     later emissions while `_lastEmittedDueTime` is still ahead of `now`, emitting `SetWakeup(..., null)` when pending
     work clears, seeding `_hadPendingWork` in `OnRecoveryCompleted`, deduplicating `IsEphemeralWakeup` vs backing jobs
     while adopting earlier post-roll backing jobs, and delegating directly to `ILocalDurableJobManager.ScheduleJobAsync`
-    when companion writes are not supported).
+    when message writes are not supported).
   - `Orleans.Durable.Messaging` (`Outbox`, `Inbox`, `MessagingPump`) wires through `GrainWakeupCoordinator`, giving
-    1-RTT local-primary writes with zero Azure Blob writes when messages deliver and retire before ledger close.
-- **Outbox-style grain-local durable jobs (`IDurableJobQueue`, `Orleans.Durable.Jobs`, J4).** Layered directly on
+    1-RTT local-primary writes with zero backing writes when messages deliver and retire before segment drain.
+- **Outbox-style grain-local durable jobs (`IDurableJobQueue`, `Orleans.Durable.Jobs`).** Layered directly on
   `GrainWakeupCoordinator` as an `IStateMachine` + `IGrainWakeupSource` on `IJournaledStateManager`: synchronous atomic
   `Schedule(GrainJobRequest)`, `Cancel(string)`, `TryGetJob`, and `PendingJobs` (`PendingGrainJob`), bounded by
   `DurableJobQueueOptions.MaxPendingJobs` and `MaxMetadataBytesPerJob` well below `MaxBodyBytes`, O(1) min-due via
@@ -2872,7 +2857,7 @@ section. The MetaStore and the archive store's stores are the silo's services, c
 | Manifest commit interval | Shortest interval from one manifest replace's completion to the next one's start; at least the object store's per-object write interval | 1 s (`ControlOptions.ManifestCommitInterval`) | [LSM §8.8](../components/archive-lsm.md#88-policy) | `Control:ManifestCommitInterval` |
 | Sweep interval | Shortest interval between the starts of two sweeps of the archive store, the LSM's object store or archive logs, on the silo of the controller grain, whose passes ask its sweep host to sweep; on archive logs, after the silo's archive gate passed | 10 minutes (`ControlOptions.SweepInterval`) | Sweep host, [§5.6](#56-controllers) | `Control:SweepInterval` |
 | Block cache | Directory on the volatile disk, its byte budget, and its region file size; no cache without a directory or with a zero budget | None, 16 GiB, 64 MiB (`DurableStorageOptions.Lsm.BlockCachePath`, `BlockCacheBytes`, `BlockCacheRegionBytes`) | [§5.9](#59-resource-governance), [LSM §8.7](../components/archive-lsm.md#87-caches) | `Node:Lsm:BlockCachePath`, `Node:Lsm:BlockCacheBytes`, `Node:Lsm:BlockCacheRegionBytes` |
-| Journals policy | Warm state, tombstone retention and the expiry scan's interval, batching, concurrent history reads, and per-write ledger-local append limits | 64 MiB, 7 days, 1 hour, 256 entries, 1 MiB, 4; 8 local appends, 64 KiB ([Journals §8.8](../components/journals.md#88-policy)) (`DurableStorageOptions.Journals`: `WarmStateBytes`, `TombstoneRetention`, `ExpiryInterval`, `MaxBatchEntries`, `MaxBatchBytes`, `MaxConcurrentHistoryReads`, `MaxLocalAppendsPerWrite`, `MaxLocalAppendBytesPerWrite`) | Journals, the node's control loop ([§5.6](#56-controllers)) | `Node:Journals:WarmStateBytes`, `Node:Journals:TombstoneRetention`, `Node:Journals:ExpiryInterval`, `Node:Journals:MaxBatchEntries`, `Node:Journals:MaxBatchBytes`, `Node:Journals:MaxConcurrentHistoryReads`, `Node:Journals:MaxLocalAppendsPerWrite`, `Node:Journals:MaxLocalAppendBytesPerWrite` |
+| Journals policy | Warm state, tombstone retention and the expiry scan's interval, batching, concurrent history reads, and per-write ledger message limits | 64 MiB, 7 days, 1 hour, 256 entries, 1 MiB, 4; 8 messages, 64 KiB ([Journals §8.8](../components/journals.md#88-policy)) (`DurableStorageOptions.Journals`: `WarmStateBytes`, `TombstoneRetention`, `ExpiryInterval`, `MaxBatchEntries`, `MaxBatchBytes`, `MaxConcurrentHistoryReads`, `MaxMessagesPerWrite`, `MaxMessageBytesPerWrite`) | Journals, the node's control loop ([§5.6](#56-controllers)) | `Node:Journals:WarmStateBytes`, `Node:Journals:TombstoneRetention`, `Node:Journals:ExpiryInterval`, `Node:Journals:MaxBatchEntries`, `Node:Journals:MaxBatchBytes`, `Node:Journals:MaxConcurrentHistoryReads`, `Node:Journals:MaxMessagesPerWrite`, `Node:Journals:MaxMessageBytesPerWrite` |
 | Failure domain | The node's failure domain, for example its zone | Optional (`DurableStorageOptions.FailureDomain`) | Node registry | `Node:FailureDomain` |
 | Replica host limits | Replica calls a silo's replica host admits at once through `ILedgerStoreGrain`, and the request and reply payload bytes, each admitted read's reserved reply counted, below which it admits another, before it refuses with backpressure | 128 calls, 128 MiB (`DurableStorageOptions.MaxReplicaCalls`, `MaxReplicaCallBytes`) | [§5.12](#512-replica-transport) | `Node:MaxReplicaCalls`, `Node:MaxReplicaCallBytes` |
 | Node call budgets | Replica writes and reads, and their request payload and remote reply bytes, a silo keeps outstanding to each node in its data lane, its own node included, and the contiguous-tail reads and seals in its control lane, before a call waits in its lane's FIFO queue until its deadline; the bytes of forwarded writes and first read pages outstanding to each node, in a write lane and a read lane of their own, a pinned snapshot's later pages taking none; and the bytes of the read snapshots a node pins for forwarded reads | 32 calls, 64 MiB; 8 calls; 64 MiB; 256 MiB (`DurableStorageOptions.MaxNodeCalls`, `MaxNodeCallBytes`, `MaxNodeControlCalls`, `MaxForwardCallBytes`, `MaxForwardedReadBytes`) | [§5.12](#512-replica-transport), [§5.5](#55-forwarding-and-journal-outcomes) | `Node:MaxNodeCalls`, `Node:MaxNodeCallBytes`, `Node:MaxNodeControlCalls`, `Node:MaxForwardCallBytes`, `Node:MaxForwardedReadBytes` |
@@ -2897,8 +2882,7 @@ section. The MetaStore and the archive store's stores are the silo's services, c
 | Object-store ledger store | Provider, container or bucket, layout (per-slot, or append on Azure), append extent size, append count, and batch size limits, redundancy, and derived local cache (bytes and optional volatile directory, cleared on startup); the store's objects lie under `ledgers/` below the cluster's store prefix, fixed for the cluster's life by the store's record, whose ID the node registry records | None; `PerSlot`, 128 MiB extent target, 40,000 appends per extent, 100 MiB − 49 B max batch (`MaxAppendLength − 49 B`), `SingleZone`, 1 GiB cache, no directory (`DurableStorageOptions.ObjectLedgers`: `ObjectLedgerStoreOptions`) | [§5.14](#514-object-store-ledgers), [object-store ledgers §4](../components/object-ledgers.md#4-data-types) | `Node:ObjectLedgers:Layout`, `Node:ObjectLedgers:ExtentTargetBytes`, `Node:ObjectLedgers:ExtentMaxAppends`, `Node:ObjectLedgers:MaxBatchBytes`, `Node:ObjectLedgers:CacheBytes`, `Node:ObjectLedgers:CacheDirectory`, `Node:ObjectLedgers:Redundancy` |
 | Object-store ledger window | `K` of the object-store ledgers a transition opens | 2 per-slot, 4 append (`ControlOptions.ObjectLedgerWindow`) | [object-store ledgers §8.6](../components/object-ledgers.md#86-policy-and-cost) | `Control:ObjectLedgerWindow` |
 | Object-store request budget | Requests per second per storage account which the controller grain shares among the nodes, agreeing on every silo | 10,000 (`ControlOptions.ObjectStoreRequestsPerSecond`) | [§5.14](#514-object-store-ledgers) | `Control:ObjectStoreRequestsPerSecond` |
-| Local-stream drain memory | Dedicated byte budget for closed-ledger local-stream drain folds (`LocalStreamDrainCoordinator`), independent of archive `DrainMemoryBytes`; at least 1 MiB | 32 MiB (`ControlOptions.LocalDrainMemoryBytes`) | [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs) | `Control:LocalDrainMemoryBytes` |
-| Wakeup engine | Primary-side wakeup heap roll threshold per open ledger, per-ledger concurrent ephemeral dispatch cap, node-level concurrent backing schedule cap, ephemeral retry delay bounds, and overdue backing-job jitter window | 4 MiB, 32, 16, 250 ms, 30 s, 5 s (`DurableStorageOptions.Wakeup`: `WakeupOptions`) | [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs) | `Node:Wakeup:MaxWakeupBytesPerLedger`, `Node:Wakeup:MaxConcurrentWakeupDispatches`, `Node:Wakeup:MaxConcurrentWakeupSchedules`, `Node:Wakeup:InitialRetryDelay`, `Node:Wakeup:MaxRetryDelay`, `Node:Wakeup:OverdueJitterWindow` |
+| Wakeup engine | Primary-side wakeup heap roll threshold per open ledger, per-ledger concurrent ephemeral dispatch cap, node-level concurrent backing shard publish cap, ephemeral retry delay bounds, and overdue backing-job jitter window | 4 MiB, 32, 16, 250 ms, 30 s, 5 s (`DurableStorageOptions.Wakeup`: `WakeupOptions`) | [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs) | `Node:Wakeup:MaxWakeupBytesPerLedger`, `Node:Wakeup:MaxConcurrentWakeupDispatches`, `Node:Wakeup:MaxConcurrentWakeupSchedules`, `Node:Wakeup:InitialRetryDelay`, `Node:Wakeup:MaxRetryDelay`, `Node:Wakeup:OverdueJitterWindow` |
 
 **Durable Jobs.** Durable Jobs lists its shards through its provider's `IJournalStorageCatalog` and claims them through
 conditional journal metadata updates, neither of which the durable storage provider implements
@@ -2913,18 +2897,16 @@ siloBuilder
 ```
 
 Grain journals, among them Messaging's and Durable Tasks' state, use durable storage under the default provider name;
-the backing durable jobs they schedule (including surviving `SetWakeup` records drained from closed ledgers in J2–J4,
-[§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs)) live in the Azure shards, which keep
-Durable Jobs' creation, discovery, metadata-ETag ownership, retries, cancellation, and recovery there. A silo whose Jobs
-provider has no catalog, durable storage among them, does not start: its configuration validation fails with an
-`OrleansConfigurationException` naming the provider and `IJournalStorageCatalog`, before the node starts.
+the backing durable jobs they schedule (including surviving `SetWakeup` records drained into deterministic sealed
+`JobShard`s via `ISealedJobShardPublisher`, [§5.15](#515-ledger-local-wakeups-1-rtt-messaging-and-grain-local-durable-jobs))
+live in the Azure shards, which keep Durable Jobs' creation, discovery, metadata-ETag ownership, retries, cancellation,
+and recovery there. A silo whose Jobs provider has no catalog, durable storage among them, does not start: its
+configuration validation fails with an `OrleansConfigurationException` naming the provider and `IJournalStorageCatalog`,
+before the node starts.
 
-**Ledger-local streams and wakeups (*Not yet in code*, J2).** Once J2 lands, the configuration table above expands with
-`ControlOptions.LocalDrainMemoryBytes` (default 32 MiB, minimum 1 MiB) and `DurableStorageOptions.Wakeups`
-(`WakeupOptions`: `MaxWakeupBytesPerLedger` default 4 MiB, `MaxConcurrentWakeupDispatches` default 32,
-`MaxConcurrentWakeupSchedules` default 16, and `MaxRetryDelay`). Cluster agreement on `local-streams` is derived
-directly from the registered `ILocalStreamHandler`s rather than configured as a separate option, and
-`NodeRuntime.StartAsync` checks parity with registered `ILocalStreamProcessor`s.
+**Message channels and wakeups.** Cluster agreement on `message-channels` is derived directly from the registered
+`IMessageHandler`s rather than configured as a separate option, and `NodeRuntime.StartAsync` checks parity with
+registered `IMessageProcessor`s (`ValidateMessageChannelParity`).
 `MixedProviderDurableJobsTests` in `Orleans.DurableJobs.AzureStorage.Tests` deploys this configuration on four silos
 over Azure Storage (Azurite in CI) and covers shard creation and discovery, a graceful stop's release and a survivor's
 claim, adoption after a silo's loss, a job's retries and cancellation in its adopted shard, and the grains' recovery
@@ -3397,22 +3379,24 @@ has a surrogate whose encoding of every case a Verify snapshot pins, and a test 
 checks against an independent reading of this section's rules. `OrleansCorpusTests` replays each target's committed
 corpus.
 
-**Ledger-local drain and wakeup verification (planned, J2–J4).** `WakeupCompanionRules`, golden vectors
-(`orleans/wakeup-companions.json`, `wakeup-companion-rejections.json`), Verify snapshots, and the `wakeup-companion`
-fuzz target (in `Orleans.Durable.Storage.Fuzz.Orleans`, instrumenting `Orleans.Durable.dll` scoped to
-`Orleans.Durable.Jobs`) pin the canonical `"orleans.wakeup"` codec across `ReadOnlySpan<byte>` and multi-segment
-`ReadOnlySequence<byte>`. Orleans-free Clockwork simulations verify `LocalStreamDrainCoordinator` across both LSM
-(including `a == T`, `Dropped`, `Backpressure`, zero extra manifest commits) and Archive Logs (including blocked
-`LG-I10` lineage eager drain, `ArchiveCorruptException` → `ArchiveLogDrainBlockedException`), `LedgerLocation.ObjectStore`,
-deadlock-free chunked `LocalDrainMemoryBytes` flushes, unknown-stream fail-closed checks, and `HasKeyEntryAsync` 0-read
-equivalence, exporting `DURABLE_STORAGE_LOCAL_DRAIN_TRACES` for Quint trace replay (`just local-drain-traces`). Unit
-tests over `FakeTimeProvider` cover `WakeupLedgerSession`, `WakeupStreamProcessor`, `JournaledStateManager` companion
-staging, `DurableJournalStorage` rebase-retry, `GrainWakeupCoordinator`, and `SiloArchive.Lsm` pre-gate `local-streams`
-checks. `Orleans.TestingHost` end-to-end tests (LSM + Archive Logs) verify 1-RTT local-primary writes, remote forwarded
-companion writes, zero Azure Blob writes when retired before ledger close, crash recovery drain, idle deactivation
-wakeup, and clean `NodeRuntime.StopJournalsAsync()` teardown; `Orleans.Durable.Storage.Interop.Tests` verifies plain
-`AzureBlobJournalStorage` reads mixed journal + `LocalAppend` ledgers cleanly; Phase J4 adds `DurableJobQueueModel`
-CsCheck oracle and E2E tests.
+**Message drain and wakeup verification.** `WakeupCompanionRules`, golden vectors (`orleans/wakeup-companions.json`,
+`wakeup-companion-rejections.json`), Verify snapshots, and the `wakeup-companion` fuzz target (in
+`Orleans.Durable.Storage.Fuzz.Orleans`, instrumenting `Orleans.Durable.dll` scoped to `Orleans.Durable.Jobs`) pin the
+canonical `"orleans.wakeup"` codec across `ReadOnlySpan<byte>` and multi-segment `ReadOnlySequence<byte>`. Orleans-free
+Clockwork simulations (`LocalDrainSimulationTests`) verify unified single-pass `DrainScan` message draining across both
+LSM (`DrainWorker`) and Archive Logs (`ArchiveLogDrainWorker`), covering message-only segments, same-segment clear,
+cross-segment set-then-clear, `LedgerLocation.ObjectStore`, tight `DrainMemoryBytes` `OverBudget` → `Alone` resets,
+racing drainers hitting idempotent deterministic shard IDs, transient commit failure retry, unknown-channel fail-closed
+checks, and all race/safety mutants, exporting `DURABLE_STORAGE_MESSAGE_DRAIN_TRACES` for Quint trace replay
+(`just message-drain-traces`). Unit tests over `FakeTimeProvider` cover `WakeupLedgerSession`, `WakeupMessageProcessor`,
+`JournaledStateManager` message staging, `DurableJournalStorage` rebase-retry, `GrainWakeupCoordinator`, and
+`SiloArchive.Lsm` pre-gate `message-channels` checks. `Orleans.TestingHost` end-to-end tests (LSM + Archive Logs) verify
+1-RTT local-primary writes, remote forwarded message writes, zero sealed shards and zero `ScheduleJobAsync` calls when
+retired before segment drain, crash recovery publishing deterministic sealed `JobShard`s via `ISealedJobShardPublisher`,
+racing-drainer idempotency, idle deactivation wakeup, and clean `NodeRuntime.StopJournalsAsync()` teardown;
+`Orleans.Durable.Storage.Interop.Tests` verifies plain `AzureBlobJournalStorage` reads mixed journal + `Message` ledgers
+cleanly; `DurableJobQueueTests` and `DurableJobQueueEndToEndTests` verify `IDurableJobQueue` with `DurableJobQueueModel`
+CsCheck oracle and 3-silo E2E tests.
 
 | Invariant | Planned evidence |
 | --- | --- |

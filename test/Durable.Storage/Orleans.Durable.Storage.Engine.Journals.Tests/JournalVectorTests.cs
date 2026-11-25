@@ -157,25 +157,25 @@ public sealed partial class JournalVectorTests : IDisposable
     {
         var kind = Enum.Parse<JournalEntryKind>(Text(vector, "kind"));
         var expected = ExpectedVersion(vector);
-        var locals = LocalAppends(vector);
+        var messages = Messages(vector);
         switch (kind)
         {
             case JournalEntryKind.Delete:
-                return JournalEntryRecord.Delete(key, expected, new DateTimeOffset(Int64(vector, "deletedAt"), TimeSpan.Zero), locals);
+                return JournalEntryRecord.Delete(key, expected, new DateTimeOffset(Int64(vector, "deletedAt"), TimeSpan.Zero), messages);
             case JournalEntryKind.Expired:
                 return JournalEntryRecord.Expired(key, expected);
 
             case JournalEntryKind.Append:
                 using (var payload = ArcBuffer.Wrap(Hex(vector, "payload")))
                 {
-                    return JournalEntryRecord.Append(key, expected, payload, locals);
+                    return JournalEntryRecord.Append(key, expected, payload, messages);
                 }
 
             case JournalEntryKind.Replace:
                 var bytes = Hex(vector, "payload");
                 using (var snapshot = bytes.Length == 0 ? default : ArcBuffer.Wrap(bytes))
                 {
-                    return JournalEntryRecord.Replace(key, expected, snapshot, locals);
+                    return JournalEntryRecord.Replace(key, expected, snapshot, messages);
                 }
 
             default:
@@ -183,9 +183,9 @@ public sealed partial class JournalVectorTests : IDisposable
         }
     }
 
-    private static LocalAppendRecord[] LocalAppends(JsonElement vector) =>
+    private static MessageRecord[] Messages(JsonElement vector) =>
         vector.TryGetProperty("localAppends", out var array)
-            ? [.. array.EnumerateArray().Select(static item => new LocalAppendRecord(LocalStreamName.Parse(Text(item, "stream")), Hex(item, "payload")))]
+            ? [.. array.EnumerateArray().Select(static item => new MessageRecord(MessageChannel.Parse(Text(item, "stream")), Hex(item, "payload")))]
             : [];
 
     private static void AssertFields(JsonElement vector, JournalEntry entry)
@@ -195,12 +195,12 @@ public sealed partial class JournalVectorTests : IDisposable
         Assert.Equal(ExpectedVersion(vector), entry.ExpectedVersion);
         Assert.Equal(kind == JournalEntryKind.Delete ? Int64(vector, "deletedAt") : 0, entry.DeletionTicks);
         Assert.Equal(vector.TryGetProperty("payload", out _) ? Hex(vector, "payload").Length : 0, entry.PayloadLength);
-        var expectedLocals = LocalAppends(vector);
-        Assert.Equal(expectedLocals.Length, entry.LocalAppends.Length);
-        for (var i = 0; i < expectedLocals.Length; i++)
+        var expectedMessages = Messages(vector);
+        Assert.Equal(expectedMessages.Length, entry.Messages.Length);
+        for (var i = 0; i < expectedMessages.Length; i++)
         {
-            Assert.Equal(expectedLocals[i].Stream, entry.LocalAppends[i].Stream);
-            Assert.Equal(expectedLocals[i].Payload.ToArray(), entry.LocalAppends[i].Payload.ToArray());
+            Assert.Equal(expectedMessages[i].Channel, entry.Messages[i].Channel);
+            Assert.Equal(expectedMessages[i].Payload.ToArray(), entry.Messages[i].Payload.ToArray());
         }
     }
 

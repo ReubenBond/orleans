@@ -28,11 +28,11 @@ using Orleans.TestingHost;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// End-to-end <see cref="TestCluster"/> tests for Phase J4 <see cref="IDurableJobQueue"/> over real
-/// Durable Storage (both LSM and Archive Logs): 1-RTT atomic grain-state + job scheduling, zero Azure/backing
-/// writes when completed or cancelled before ledger drain, idle deactivation wakeup via <see cref="WakeupLedgerSession"/>,
-/// primary-crash recovery via <see cref="LocalStreamDrainCoordinator"/>, and sharing <see cref="GrainWakeupCoordinator"/>
-/// alongside <see cref="IOutbox"/>/<see cref="IInbox"/> on the same grain (v6 §7.3, §8.5).
+/// End-to-end <see cref="TestCluster"/> tests for <see cref="IDurableJobQueue"/> over real Durable Storage (both LSM
+/// and Archive Logs): 1-RTT atomic grain-state + job scheduling, zero Azure/backing writes when completed or cancelled
+/// before ledger drain, idle deactivation wakeup via <see cref="WakeupMessageHandler.WakeupLedgerSession"/>, primary-crash recovery via
+/// single-pass <c>DrainScan</c> + deterministic sealed <c>JobShard</c> publishing, and sharing
+/// <see cref="GrainWakeupCoordinator"/> alongside <see cref="IOutbox"/>/<see cref="IInbox"/> on the same grain.
 /// </summary>
 [TestCategory("EndToEnd")]
 public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
@@ -132,19 +132,21 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
         Assert.Equal(0, _state.TotalScheduleJobCalls);
         Assert.Equal(objectWritesBefore, _state.TotalObjectWrites);
 
-        // Roll & drain the worker's ledger -> cleared SetWakeup(null) produces ZERO backing ScheduleJobAsync calls!
+        // Roll & drain the worker's ledger -> cleared SetWakeup(null) produces ZERO backing sealed shards or ScheduleJobAsync calls!
         var workerRowKey = JournalRowKey.Encode(JournalId.FromGrainId(worker.GetGrainId()).Value);
         var workerLedger = (await ReadMapAsync()).FindOpen(workerRowKey.Span)!.Value;
         var controller = cluster.GrainFactory.GetGrain<IClusterControllerGrain>(IClusterControllerGrain.Key);
         await controller.RequestRollAsync(workerLedger.Id);
         await WaitUntilAsync(async () => (await ReadMapAsync()).Get(workerLedger.Id) is null, "worker ledger to drain and drop");
         Assert.Equal(0, _state.TotalScheduleJobCalls);
+        Assert.Equal(0, _state.TotalSealedShardPublishes);
 
-        // 3. Primary crash after committing delayed job -> closed-ledger drain schedules backing job and executes on surviving silo!
+        // 3. Primary crash after committing delayed job -> closed-ledger drain publishes deterministic sealed JobShard and executes on surviving silo!
         // Poll out-of-band E2EState.ExecutedJobs (without calling crashWorker!) to prove the backing durable job itself woke the grain!
         var crashWorker = cluster.GrainFactory.GetGrain<IJobQueueWorkerGrain>("worker-crash");
         await crashWorker.ScheduleWithStateAsync("job-crash", "survive-crash", delay: TimeSpan.FromSeconds(2), stateTag: "crash-state");
         Assert.Equal(0, _state.TotalScheduleJobCalls);
+        Assert.Equal(0, _state.TotalSealedShardPublishes);
 
         var crashRowKey = JournalRowKey.Encode(JournalId.FromGrainId(crashWorker.GetGrainId()).Value);
         var crashLedger = (await ReadMapAsync()).FindOpen(crashRowKey.Span)!.Value;
@@ -155,8 +157,9 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
 
         await WaitUntilAsync(
             () => Task.FromResult(_state.ExecutedJobs.Contains("job-crash")),
-            "surviving silo to drain closed ledger wakeup and wake crashWorker without external calls");
-        Assert.True(_state.TotalScheduleJobCalls >= 1, "Expected closed-ledger drain to schedule at least 1 backing durable job after primary crash.");
+            "surviving silo to drain closed ledger wakeup into sealed JobShard and wake crashWorker without external calls");
+        Assert.Equal(0, _state.TotalScheduleJobCalls);
+        Assert.True(_state.TotalSealedShardPublishes >= 1, "Expected closed-ledger drain to publish at least 1 deterministic sealed JobShard after primary crash.");
         Assert.Equal("crash-state", await crashWorker.StateTagAsync());
         Assert.Contains("job-crash", await crashWorker.ExecutedJobsAsync());
     }
@@ -207,18 +210,24 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
         public AtomicWakeupEndToEndTests.CountingObjectStore LsmObjects { get; } = new(new InMemoryObjectStore());
         public AtomicWakeupEndToEndTests.CountingObjectStore LogObjects { get; } = new(new InMemoryObjectStore());
         public MemoryArchiveLogContainer LogsContainer { get; }
+        public VolatileJournalStorageProvider SharedJobsStorage { get; } = new();
         internal ConcurrentDictionary<string, LocalNode> Nodes { get; } = new(StringComparer.Ordinal);
         internal ConcurrentDictionary<string, LocalJournals> Journals { get; } = new(StringComparer.Ordinal);
         public ConcurrentBag<string> ExecutedJobs { get; } = [];
         private int _scheduleJobCalls;
+        private int _sealedShardPublishes;
 
         public E2EState() => LogsContainer = new MemoryArchiveLogContainer(LogObjects);
 
         public int TotalScheduleJobCalls => Volatile.Read(ref _scheduleJobCalls);
 
+        public int TotalSealedShardPublishes => Volatile.Read(ref _sealedShardPublishes);
+
         public int TotalObjectWrites => LsmObjects.WriteCount + LogObjects.WriteCount;
 
         public void RecordScheduleJob() => Interlocked.Increment(ref _scheduleJobCalls);
+
+        public void RecordSealedShardPublish() => Interlocked.Increment(ref _sealedShardPublishes);
 
         public string SiloByNode(NodeId node) => Nodes.Single(kvp => kvp.Value.Node == node).Key;
     }
@@ -267,12 +276,14 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
                 silo.Control.ManifestCommitInterval = TimeSpan.Zero;
             }));
 
-            _ = siloBuilder.AddVolatileJournalStorage("jobs");
+            _ = siloBuilder.AddJournalStorage("jobs", _ => state.SharedJobsStorage);
             _ = siloBuilder.UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
             _ = siloBuilder.AddMessaging(options => options.RetryInitialInterval = TimeSpan.FromMilliseconds(100));
 
             _ = siloBuilder.Services.Replace(ServiceDescriptor.Singleton<ILocalDurableJobManager>(sp =>
                 new CountingDurableJobManager(sp.GetRequiredService<LocalDurableJobManager>(), state)));
+            _ = siloBuilder.Services.Replace(ServiceDescriptor.Singleton<ISealedJobShardPublisher>(sp =>
+                new CountingSealedShardPublisher(sp.GetRequiredService<LocalDurableJobManager>(), state)));
 
             _ = siloBuilder.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp =>
                 new HandleCapture(siloName, state, sp.GetRequiredService<LocalNode>(), sp.GetRequiredService<LocalJournals>()));
@@ -300,6 +311,22 @@ public sealed class DurableJobQueueEndToEndTests : IAsyncLifetime
 
         public Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken) =>
             inner.CancelAsync(job, requestCancellationToken);
+    }
+
+    private sealed class CountingSealedShardPublisher(ISealedJobShardPublisher inner, E2EState state) : ISealedJobShardPublisher
+    {
+        public TimeSpan ShardDuration => inner.ShardDuration;
+
+        public Task<bool> PublishSealedShardAsync(
+            string deterministicId,
+            DateTimeOffset minDueTime,
+            DateTimeOffset maxDueTime,
+            IReadOnlyList<ScheduleJobRequest> jobs,
+            CancellationToken cancellationToken)
+        {
+            state.RecordSealedShardPublish();
+            return inner.PublishSealedShardAsync(deterministicId, minDueTime, maxDueTime, jobs, cancellationToken);
+        }
     }
 
     public interface IJobQueueWorkerGrain : IGrainWithStringKey

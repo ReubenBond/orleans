@@ -2,62 +2,72 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Globalization;
 using Orleans.Durable.Storage.Engine.Archive;
-using Orleans.Durable.Storage.Engine.Cluster.Control;
+using Orleans.Durable.Storage.Engine.Archive.Control;
 using Orleans.Durable.Storage.Engine.Ledgers;
 
 namespace Orleans.Durable.Storage.Simulation;
 
 /// <summary>
-/// Orleans-free simulated <see cref="ILocalStreamProcessor"/> for Clockwork simulation and Quint trace validation of
-/// <see cref="LocalStreamDrainCoordinator"/>, <c>DrainWorker</c>, <c>ArchiveLogDrainWorker</c>, and
-/// <c>NodeController</c> (verification.md §5.1, §7.1).
+/// Orleans-free simulated <see cref="IMessageProcessor"/> for Clockwork simulation and Quint trace validation of
+/// single-pass <c>DrainScan</c> message draining across <c>DrainWorker</c> and <c>ArchiveLogDrainWorker</c>
+/// (verification.md §5.1, §7.1). Models deterministic per-(ledger, segmentStart) sealed-shard publishing so racing
+/// drainers and crash-retries produce at most one published shard per segment.
 /// </summary>
-public sealed class SimulatedWakeupStreamProcessor : ILocalStreamProcessor
+public sealed class SimulatedWakeupMessageProcessor : IMessageProcessor
 {
-    /// <summary>The canonical stream name for simulated wakeup records.</summary>
-    public static readonly LocalStreamName DefaultStream = LocalStreamName.Parse("sim.wakeup");
+    /// <summary>The canonical channel name for simulated wakeup records.</summary>
+    public static readonly MessageChannel DefaultChannel = MessageChannel.Parse("sim.wakeup");
 
     private readonly long _bytesPerEntry;
-    private readonly Func<LedgerId, IReadOnlyCollection<byte>, CancellationToken, Task>? _onCommitAsync;
+    private readonly Func<LedgerId, LedgerSegmentId, IReadOnlyCollection<byte>, CancellationToken, Task>? _onCommitAsync;
+    private readonly ConcurrentDictionary<(LedgerId Ledger, Slot Start), byte[]> _publishedShards = new();
     private readonly ConcurrentDictionary<byte, int> _committedCounts = new();
     private int _commitCalls;
+    private int _createdShards;
+    private int _duplicateShards;
     private int _zeroEntryCommits;
 
-    /// <summary>Initializes a new instance of the <see cref="SimulatedWakeupStreamProcessor"/> class.</summary>
-    /// <param name="stream">Stream name (defaults to <see cref="DefaultStream"/>).</param>
+    /// <summary>Initializes a new instance of the <see cref="SimulatedWakeupMessageProcessor"/> class.</summary>
+    /// <param name="channel">Channel name (defaults to <see cref="DefaultChannel"/>).</param>
     /// <param name="bytesPerEntry">Approximate memory weight charged per live entry in the fold.</param>
     /// <param name="onCommitAsync">Optional asynchronous hook invoked on non-empty commits (for fault/crash/race injection).</param>
-    public SimulatedWakeupStreamProcessor(
-        LocalStreamName? stream = null,
+    public SimulatedWakeupMessageProcessor(
+        MessageChannel? channel = null,
         long bytesPerEntry = 64,
-        Func<LedgerId, IReadOnlyCollection<byte>, CancellationToken, Task>? onCommitAsync = null)
+        Func<LedgerId, LedgerSegmentId, IReadOnlyCollection<byte>, CancellationToken, Task>? onCommitAsync = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(bytesPerEntry, 1, nameof(bytesPerEntry));
-        Stream = stream ?? DefaultStream;
+        Channel = channel ?? DefaultChannel;
         _bytesPerEntry = bytesPerEntry;
         _onCommitAsync = onCommitAsync;
     }
 
     /// <inheritdoc />
-    public LocalStreamName Stream { get; }
+    public MessageChannel Channel { get; }
 
     /// <summary>Gets the number of non-empty backing commit calls executed.</summary>
     public int CommitCalls => Volatile.Read(ref _commitCalls);
 
+    /// <summary>Gets the number of deterministic sealed shards newly created (unique (ledger, segmentStart) keys).</summary>
+    public int CreatedShards => Volatile.Read(ref _createdShards);
+
+    /// <summary>Gets the number of idempotent duplicate publishes (racing drainer / crash retry hitting existing shard).</summary>
+    public int DuplicateShards => Volatile.Read(ref _duplicateShards);
+
     /// <summary>Gets the number of empty commits (0 surviving entries, 0 backing writes).</summary>
     public int ZeroEntryCommits => Volatile.Read(ref _zeroEntryCommits);
 
-    /// <summary>Gets the set of wakeup keys durably committed at least once.</summary>
+    /// <summary>Gets the set of wakeup keys durably published in at least one sealed shard.</summary>
     public IReadOnlyCollection<byte> CommittedKeys => [.. _committedCounts.Keys];
 
     /// <summary>Encodes a simulated SetWakeup record (2 bytes: key, 1 = set or 0 = clear).</summary>
     public static byte[] Encode(byte key, bool set) => [key, set ? (byte)1 : (byte)0];
 
     /// <inheritdoc />
-    public ILocalStreamFold BeginClosedLedgerFold(LedgerMetadata ledger, Slot tail) =>
-        new Fold(this, ledger.Id);
+    public IMessageFold BeginSegmentFold(LedgerMetadata ledger, LedgerSegmentId segment) =>
+        new Fold(this, ledger.Id, segment);
 
-    private sealed class Fold(SimulatedWakeupStreamProcessor owner, LedgerId ledger) : ILocalStreamFold
+    private sealed class Fold(SimulatedWakeupMessageProcessor owner, LedgerId ledger, LedgerSegmentId segment) : IMessageFold
     {
         private readonly Dictionary<byte, bool> _entries = [];
 
@@ -101,43 +111,29 @@ public sealed class SimulatedWakeupStreamProcessor : ILocalStreamProcessor
                 return;
             }
 
-            var keys = _entries.Keys.ToArray();
+            var keys = _entries.Keys.Order().ToArray();
             if (owner._onCommitAsync is not null)
             {
-                await owner._onCommitAsync(ledger, keys, cancellationToken).ConfigureAwait(false);
+                await owner._onCommitAsync(ledger, segment, keys, cancellationToken).ConfigureAwait(false);
             }
 
-            foreach (var key in keys)
+            if (owner._publishedShards.TryAdd((ledger, segment.Start), keys))
             {
-                _ = owner._committedCounts.AddOrUpdate(key, 1, static (_, c) => c + 1);
-                _ = _entries.Remove(key);
+                _ = Interlocked.Increment(ref owner._createdShards);
+                foreach (var key in keys)
+                {
+                    _ = owner._committedCounts.AddOrUpdate(key, 1, static (_, c) => c + 1);
+                }
+            }
+            else
+            {
+                _ = Interlocked.Increment(ref owner._duplicateShards);
             }
 
+            _entries.Clear();
             _ = Interlocked.Increment(ref owner._commitCalls);
         }
 
         public void Dispose() => _entries.Clear();
-    }
-}
-
-/// <summary>
-/// Orleans-free simulated <see cref="ILocalKeyPresenceLookup"/> for verifying O(1) zero-read fast path equivalence.
-/// </summary>
-public sealed class SimulatedLocalKeyPresenceLookup(Func<LedgerMetadata, ReadOnlyMemory<byte>, Slot, LocalKeyPresenceRead> probe) : ILocalKeyPresenceLookup
-{
-    private readonly Func<LedgerMetadata, ReadOnlyMemory<byte>, Slot, LocalKeyPresenceRead> _probe = probe ?? throw new ArgumentNullException(nameof(probe));
-
-    /// <summary>Gets the number of times <see cref="TryHasKeyEntryAsync"/> was called.</summary>
-    public int Probes { get; private set; }
-
-    /// <inheritdoc />
-    public ValueTask<LocalKeyPresenceRead> TryHasKeyEntryAsync(
-        LedgerMetadata ledger,
-        ReadOnlyMemory<byte> localKey,
-        Slot tail,
-        CancellationToken cancellationToken)
-    {
-        Probes++;
-        return ValueTask.FromResult(_probe(ledger, localKey, tail));
     }
 }

@@ -18,7 +18,7 @@ public sealed class WakeupCompanionTarget : FuzzTarget
 
     public override string Name => "wakeup-companion";
 
-    public override int MaxLength => WakeupCompanionCodec.MaxEncodedLength + 16;
+    public override int MaxLength => WakeupMessageCodec.MaxEncodedLength + 16;
 
     public override IEnumerable<byte[]> Seeds(GoldenVectors vectors)
     {
@@ -33,14 +33,14 @@ public sealed class WakeupCompanionTarget : FuzzTarget
         var expected = WakeupCompanionRules.Read(input);
 
         var spanBound = MeasureAllocations(input.Length);
-        var spanRejection = WakeupCompanionCodec.Decode(input, out var spanRecord);
-        spanBound.Check("WakeupCompanionCodec.Decode(ReadOnlySpan<byte>)");
+        var spanRejection = WakeupMessageCodec.Decode(input, out var spanRecord);
+        spanBound.Check("WakeupMessageCodec.Decode(ReadOnlySpan<byte>)");
         var outcome = Check(input, spanRejection, spanRecord, expected, "contiguous bytes");
 
         var sequence = Segments(input.ToArray(), 3 + input.Length % 11);
         var seqBound = MeasureAllocations(input.Length);
-        var seqRejection = WakeupCompanionCodec.Decode(sequence, out var seqRecord);
-        seqBound.Check("WakeupCompanionCodec.Decode(ReadOnlySequence<byte>)");
+        var seqRejection = WakeupMessageCodec.Decode(sequence, out var seqRecord);
+        seqBound.Check("WakeupMessageCodec.Decode(ReadOnlySequence<byte>)");
         _ = Check(input, seqRejection, seqRecord, expected, "segments");
 
         return outcome;
@@ -62,7 +62,7 @@ public sealed class WakeupCompanionTarget : FuzzTarget
         Require(actualGrain == parsed.TargetGrainId, $"decoded {layout} target '{actualGrain}' != expected '{parsed.TargetGrainId}'.");
         Require(record.JobName == parsed.JobName, $"decoded {layout} job '{record.JobName}' != expected '{parsed.JobName}'.");
         Require(record.DueTimeUtcTicks == parsed.DueTimeUtcTicks, $"decoded {layout} due time {record.DueTimeUtcTicks} != expected {parsed.DueTimeUtcTicks}.");
-        Require(input.SequenceEqual(WakeupCompanionCodec.Encode(record)), $"accepted {layout}, whose value does not encode back to its exact bytes.");
+        Require(input.SequenceEqual(WakeupMessageCodec.Encode(record)), $"accepted {layout}, whose value does not encode back to its exact bytes.");
         return FuzzOutcome.Accepted;
     }
 

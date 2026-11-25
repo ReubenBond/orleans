@@ -1277,9 +1277,9 @@ public sealed class JournalStoreTests : IDisposable
             new Dictionary<string, string>
             {
                 ["max-body-bytes"] = "1234567",
-                ["local-streams"] = string.Empty,
-                ["max-local-appends"] = options.MaxLocalAppendsPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["max-local-append-bytes"] = options.MaxLocalAppendBytesPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["message-channels"] = string.Empty,
+                ["max-messages"] = options.MaxMessagesPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["max-message-bytes"] = options.MaxMessageBytesPerWrite.ToString(System.Globalization.CultureInfo.InvariantCulture),
             },
             cluster.Journals.StoreParameters);
         _ = Accepted(await cluster.AppendAsync("a", Origin, "more than one byte"));

@@ -115,7 +115,41 @@ public static class LedgerSegmentRules
             byte[]? token = null;
             ulong versionCount = 0;
             ulong ordinal;
-            if (isDefining)
+            if (kind == 3)
+            {
+                if (isDefining)
+                {
+                    return BatchReading.Rejected("bad-row-flags");
+                }
+
+                if (!fields.Take(1, out var chLenBytes))
+                {
+                    return BatchReading.Rejected("row-truncated");
+                }
+
+                var chLen = chLenBytes[0];
+                if (chLen is 0 or > 64)
+                {
+                    return BatchReading.Rejected("bad-channel");
+                }
+
+                if (!fields.Take(chLen, out var chBytes))
+                {
+                    return BatchReading.Rejected("row-truncated");
+                }
+
+                foreach (var b in chBytes)
+                {
+                    if (b is not (>= (byte)'a' and <= (byte)'z' or >= (byte)'0' and <= (byte)'9' or (byte)'.' or (byte)'_' or (byte)'-'))
+                    {
+                        return BatchReading.Rejected("bad-channel");
+                    }
+                }
+
+                key = chBytes.ToArray();
+                ordinal = 0;
+            }
+            else if (isDefining)
             {
                 if (RowVarint(ref fields, out var keyLength) is { } badKeyLength)
                 {
@@ -232,6 +266,16 @@ public static class LedgerSegmentRules
             for (var rowIndex = 0; rowIndex < batch.Rows.Count; rowIndex++)
             {
                 var row = batch.Rows[rowIndex];
+                if (row.Kind == 3)
+                {
+                    if (key is null)
+                    {
+                        resolved.Add(new ResolvedRuleRow(slot, rowIndex, row.Key!, row.Kind, [], 0, [], row.Body));
+                    }
+
+                    continue;
+                }
+
                 RuleKey entry;
                 if (row.IsDefining)
                 {
@@ -318,7 +362,12 @@ public static class LedgerSegmentRules
         foreach (var row in batch.Rows)
         {
             bytes.Add((byte)(row.Kind | (row.IsDefining ? 4 : 0)));
-            if (row.IsDefining)
+            if (row.Kind == 3)
+            {
+                bytes.Add((byte)row.Key!.Length);
+                bytes.AddRange(row.Key);
+            }
+            else if (row.IsDefining)
             {
                 AddVarint(bytes, (ulong)row.Key!.Length);
                 bytes.AddRange(row.Key);

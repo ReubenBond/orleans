@@ -67,7 +67,7 @@ internal sealed class Journal(string id)
                 RowKind.Append => [.. content, .. command.Body],
                 RowKind.Replace => command.Body,
                 RowKind.Delete => [],
-                RowKind.LocalAppend => throw new ArgumentOutOfRangeException(nameof(commands)),
+                RowKind.Message => throw new ArgumentOutOfRangeException(nameof(commands)),
                 _ => throw new ArgumentOutOfRangeException(nameof(commands)),
             };
         }

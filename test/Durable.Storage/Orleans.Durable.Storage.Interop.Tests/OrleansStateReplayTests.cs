@@ -86,13 +86,13 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
     }
 
     /// <summary>
-    /// Verifies that a closed ledger mixing journal rows and <see cref="RowKind.LocalAppend"/> wakeup rows drains
+    /// Verifies that a closed ledger mixing journal rows and <see cref="RowKind.Message"/> wakeup rows drains
     /// cleanly to Azure Archive Logs via <see cref="ArchiveLogDrainWorker"/> (with an
-    /// <see cref="Engine.Archive.Control.ILedgerLocalDrainBarrier"/>) and replays identically through plain
-    /// <c>AzureBlobJournalStorage</c> with zero local-append rows leaking into the archive log (LG-I15, LG-I16).
+    /// <see cref="Engine.Archive.Control.IMessageProcessor"/>) and replays identically through plain
+    /// <c>AzureBlobJournalStorage</c> with zero message rows leaking into the archive log (LG-I15, LG-I16).
     /// </summary>
     [Fact]
-    public async Task MixedJournalAndLocalAppendLedgerDrainsToArchiveLogsAndReplaysThroughPlainOrleans()
+    public async Task MixedJournalAndMessageLedgerDrainsToArchiveLogsAndReplaysThroughPlainOrleans()
     {
         const string format = "json";
         await using var services = await InteropServices.CreateAsync(InteropBackend.Fake, emulators);
@@ -147,17 +147,16 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
         var open = map.Current.Ledgers.Single(static l => l.IsOpen);
         var ledgerId = open.Id;
         var rowKey = Orleans.Durable.Storage.Engine.Journals.JournalRowKey.Encode("replay/mixed-local").Span.ToArray();
-        var stream = LocalStreamName.Parse("orleans.wakeup");
-        var localKey = LedgerLocalKey.Encode(ledgerId, open.Range, stream);
+        var channel = MessageChannel.Parse("orleans.wakeup");
         var writerHandle = registry.TryGet(ledgerId)!;
 
-        // Propose Replace + Append journal rows interleaved with RowKind.LocalAppend rows in the same batch.
+        // Propose Replace + Append journal rows interleaved with RowKind.Message rows in the same batch.
         using (var batch = await writerHandle.CreateBatchAsync(4, 1 << 20, Token))
         {
             _ = batch.BeginRow(rowKey, RowKind.Replace, default, default, captured.Snapshot.Length, captured.Snapshot);
-            _ = batch.BeginRow(localKey, RowKind.LocalAppend, default, default, 4, "wk-1"u8);
+            batch.BeginMessage(channel, 4, "wk-1"u8);
             _ = batch.BeginRow(rowKey, RowKind.Append, batch.HeldVersion(rowKey), default, captured.Appended[0].Length, captured.Appended[0]);
-            _ = batch.BeginRow(localKey, RowKind.LocalAppend, batch.HeldVersion(localKey), default, 4, "wk-2"u8);
+            batch.BeginMessage(channel, 4, "wk-2"u8);
             Assert.IsType<ProposalOutcome.Durable>((await writerHandle.ProposeAsync(batch, Token)).Value);
         }
 
@@ -167,18 +166,13 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
         var closedMeta = map.Current.Get(ledgerId)!.Value;
         var closedTail = Assert.IsType<LedgerStatus.Closed>(closedMeta.Status.Value).T;
 
-        var barrierCalls = 0;
-        var validatedKeys = 0;
-        var barrier = new InteropLocalBarrier(
-            stream,
-            onValidate: () => Interlocked.Increment(ref validatedKeys),
-            onDrain: () => Interlocked.Increment(ref barrierCalls));
-        var drainWorker = new ArchiveLogDrainWorker(gate, map, reader, new Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogOptions(), TimeProvider.System, localDrainBarrier: barrier);
+        var committedPayloads = new List<string>();
+        var processor = new InteropMessageProcessor(channel, committedPayloads);
+        var drainWorker = new ArchiveLogDrainWorker(gate, map, reader, new Orleans.Durable.Storage.Engine.Archive.Logs.ArchiveLogOptions(), TimeProvider.System, messageProcessors: [processor]);
 
         var outcome = await drainWorker.DrainAsync(closedMeta, closedTail, Token);
         Assert.IsType<ArchiveLogDrainOutcome.Complete>(outcome.Value);
-        Assert.True(validatedKeys >= 1);
-        Assert.Equal(1, barrierCalls);
+        Assert.Equal(["wk-1", "wk-2"], committedPayloads);
 
         // Plain Orleans reads the drained journal cleanly via read-only AzureBlobJournalStorage!
         var (recovering, recovered) = await ManagerAsync(journals.Orleans, "replay/mixed-local");
@@ -192,31 +186,32 @@ public sealed class OrleansStateReplayTests(CloudEmulators emulators) : IDisposa
         services.AssertNoViolations();
     }
 
-    private sealed class InteropLocalBarrier(LocalStreamName stream, Action onValidate, Action onDrain) : Orleans.Durable.Storage.Engine.Archive.Control.ILedgerLocalDrainBarrier
+    private sealed class InteropMessageProcessor(MessageChannel channel, List<string> committedPayloads) : Orleans.Durable.Storage.Engine.Archive.Control.IMessageProcessor
     {
-        public void ValidateLocalAppendKey(LedgerMetadata ledger, ReadOnlySpan<byte> rowKey)
+        public MessageChannel Channel { get; } = channel;
+
+        public Orleans.Durable.Storage.Engine.Archive.Control.IMessageFold BeginSegmentFold(LedgerMetadata ledger, LedgerSegmentId segment) =>
+            new Fold(committedPayloads);
+
+        private sealed class Fold(List<string> committedPayloads) : Orleans.Durable.Storage.Engine.Archive.Control.IMessageFold
         {
-            if (LedgerLocalKey.Validate(rowKey, ledger.Range, ledger.Id, out var streamSpan) is { } error)
+            private readonly List<string> _items = [];
+
+            public long MemoryBytes => _items.Count * 16L;
+
+            public void Add(Slot slot, int rowIndex, System.Buffers.ReadOnlySequence<byte> payload) =>
+                _items.Add(System.Text.Encoding.UTF8.GetString(System.Buffers.BuffersExtensions.ToArray(payload)));
+
+            public void Clear() => _items.Clear();
+
+            public Task CommitAsync(CancellationToken cancellationToken)
             {
-                throw new Orleans.Durable.Storage.Engine.Archive.ArchiveCorruptException(error.Message, error);
+                committedPayloads.AddRange(_items);
+                _items.Clear();
+                return Task.CompletedTask;
             }
 
-            if (!streamSpan.SequenceEqual(stream.Span))
-            {
-                throw new Orleans.Durable.Storage.Engine.Archive.ArchiveCorruptException("Unknown stream.");
-            }
-
-            onValidate();
-        }
-
-        public ValueTask<Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome> EnsureLocalStreamsDrainedAsync(
-            LedgerMetadata ledger,
-            Slot tail,
-            CancellationToken cancellationToken)
-        {
-            onDrain();
-            return ValueTask.FromResult<Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome>(
-                Orleans.Durable.Storage.Engine.Archive.Control.LocalDrainBarrierOutcome.Drained.Instance);
+            public void Dispose() => _items.Clear();
         }
     }
 

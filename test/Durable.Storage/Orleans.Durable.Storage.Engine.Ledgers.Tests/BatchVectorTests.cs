@@ -85,9 +85,11 @@ public sealed class BatchVectorTests : IDisposable
             _ = text.AppendLine(Name(vector)).AppendLine(CultureInfo.InvariantCulture, $"  length {buffer.Length}, start {batch.IsSegmentStart}, offset {batch.LedgerSegmentOffset}, ordinal base {batch.OrdinalBase}, row count {batch.Count}");
             foreach (var row in batch)
             {
-                _ = row.IsDefining
-                    ? text.AppendLine(CultureInfo.InvariantCulture, $"  row {row.Index}: {row.Kind}, defines ordinal {row.Ordinal}, key {Rendered(row.Key)}, version before ({Rendered(row.VersionBefore.Base.AsSpan())}, {row.VersionBefore.Count}), token {Rendered(row.Token.AsSpan())}, body {Rendered(row.Body.ToArray())}")
-                    : text.AppendLine(CultureInfo.InvariantCulture, $"  row {row.Index}: {row.Kind}, references ordinal {row.Ordinal}, body {Rendered(row.Body.ToArray())}");
+                _ = row.Kind == RowKind.Message
+                    ? text.AppendLine(CultureInfo.InvariantCulture, $"  row {row.Index}: {row.Kind}, channel '{Encoding.ASCII.GetString(row.Channel)}', body {Rendered(row.Body.ToArray())}")
+                    : row.IsDefining
+                        ? text.AppendLine(CultureInfo.InvariantCulture, $"  row {row.Index}: {row.Kind}, defines ordinal {row.Ordinal}, key {Rendered(row.Key)}, version before ({Rendered(row.VersionBefore.Base.AsSpan())}, {row.VersionBefore.Count}), token {Rendered(row.Token.AsSpan())}, body {Rendered(row.Body.ToArray())}")
+                        : text.AppendLine(CultureInfo.InvariantCulture, $"  row {row.Index}: {row.Kind}, references ordinal {row.Ordinal}, body {Rendered(row.Body.ToArray())}");
             }
         }
 
@@ -118,9 +120,23 @@ public sealed class BatchVectorTests : IDisposable
             [
                 .. vector.GetProperty("rows").EnumerateArray().Select(static row =>
                 {
+                    var kind = Enum.Parse<RowKind>(Text(row, "kind"));
+                    if (kind == RowKind.Message)
+                    {
+                        return new RuleRow(
+                            (byte)kind,
+                            IsDefining: false,
+                            Ordinal: 0,
+                            Encoding.ASCII.GetBytes(Text(row, "channel")),
+                            VersionBase: null,
+                            VersionCount: 0,
+                            Token: null,
+                            Hex(row, "body"));
+                    }
+
                     var defining = row.GetProperty("defining").GetBoolean();
                     return new RuleRow(
-                        (byte)Enum.Parse<RowKind>(Text(row, "kind")),
+                        (byte)kind,
                         defining,
                         ulong.Parse(Text(row, "ordinal"), CultureInfo.InvariantCulture),
                         defining ? Hex(row, "key") : null,

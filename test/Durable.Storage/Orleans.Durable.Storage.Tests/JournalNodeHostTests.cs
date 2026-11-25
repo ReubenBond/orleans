@@ -251,13 +251,13 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
     public async Task PreAdmissionArgumentExceptionReturnsRefusedArgument()
     {
         var host = await HostAsync(reachable: true);
-        var stream = LocalStreamName.Parse("unregistered.stream");
+        var channel = MessageChannel.Parse("unregistered.channel");
         using var payload = ArcBuffer.Wrap("x"u8.ToArray());
         using var record = JournalEntryRecord.Append(
             JournalRowKey.Encode("k"),
             JournalVersion.Origin,
             payload,
-            [new LocalAppendRecord(stream, "wk"u8.ToArray())]);
+            [new MessageRecord(channel, "wk"u8.ToArray())]);
         using var raw = record.ToArcBuffer();
         var forwarded = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Of(raw.ToArray())) };
 
@@ -265,7 +265,7 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
 
         var refused = Assert.IsType<JournalCallRefused>(outcome.Value);
         Assert.Equal(JournalRefusal.Argument, refused.Kind);
-        Assert.Contains("unregistered.stream", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("unregistered.channel", refused.Message, StringComparison.Ordinal);
     }
 
     private static byte[] RecordBytes(string key)

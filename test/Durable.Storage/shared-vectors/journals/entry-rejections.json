@@ -44,9 +44,9 @@
       "hex": "777689e5ff280000000000000000000000000000000000000000000000000000000000000000000000000000000000"
     },
     {
-      "name": "An Expired entry with HasLocalAppendsFlag set.",
+      "name": "An Expired entry with HasMessagesFlag set.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "expired-local-appends",
+      "reason": "expired-messages",
       "hex": "1ebb1ace830000010e6f726c65616e732e77616b65757004776b3031"
     },
     {
@@ -134,79 +134,79 @@
       "hex": "10ade50c020001ffffffffffffffff00"
     },
     {
-      "name": "HasLocalAppendsFlag set with no localCount byte.",
+      "name": "HasMessagesFlag set with no messageCount byte.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "truncated",
       "hex": "3d160740800000"
     },
     {
-      "name": "HasLocalAppendsFlag set with localCount 0.",
+      "name": "HasMessagesFlag set with messageCount 0.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "empty-local-appends",
+      "reason": "empty-messages",
       "hex": "0033adbc8000000078"
     },
     {
-      "name": "HasLocalAppendsFlag set with localCount 1 and missing streamLen.",
+      "name": "HasMessagesFlag set with messageCount 1 and missing channelLen.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "truncated",
       "hex": "26d29d2f80000001"
     },
     {
-      "name": "A local append with an empty stream name.",
+      "name": "A message with an empty channel name.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "empty-local-stream",
+      "reason": "empty-message-channel",
       "hex": "c2ef049a80000001000078"
     },
     {
-      "name": "A local append with a 65-byte stream name.",
+      "name": "A message with a 65-byte channel name.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "local-stream-too-long",
+      "reason": "message-channel-too-long",
       "hex": "8b3c9699800000014161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161610078"
     },
     {
-      "name": "A local append whose stream bytes are truncated.",
+      "name": "A message whose channel bytes are truncated.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "truncated",
       "hex": "808b194980000001056162"
     },
     {
-      "name": "A local append whose stream name contains disallowed ASCII bytes.",
+      "name": "A message whose channel name contains disallowed ASCII bytes.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "bad-local-stream",
+      "reason": "bad-message-channel",
       "hex": "7bcb36b0800000010341217a0078"
     },
     {
-      "name": "A local append ending before its payload length.",
+      "name": "A message ending before its payload length.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "truncated",
       "hex": "35f3c255800000010161"
     },
     {
-      "name": "A local append with an overlong payload-length varint.",
+      "name": "A message with an overlong payload-length varint.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "bad-varint",
       "hex": "80b8b0e8800000010161800078"
     },
     {
-      "name": "A local append with payload length 65,537.",
+      "name": "A message with payload length 65,537.",
       "rowKey": "19f68fb16f72646572732f3432",
-      "reason": "local-payload-too-long",
+      "reason": "message-payload-too-long",
       "hex": "da4be98a800000010161818004"
     },
     {
-      "name": "A local append whose payload bytes are truncated.",
+      "name": "A message whose payload bytes are truncated.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "truncated",
       "hex": "d7467d21800000010161053132"
     },
     {
-      "name": "An Append with local appends and an empty journal body.",
+      "name": "An Append with messages and an empty journal body.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "empty-append",
       "hex": "7d8a2605800000010e6f726c65616e732e77616b65757004776b3031"
     },
     {
-      "name": "A Delete with local appends and a trailing body byte.",
+      "name": "A Delete with messages and a trailing body byte.",
       "rowKey": "19f68fb16f72646572732f3432",
       "reason": "trailing-bytes",
       "hex": "1bb192ad8200010000000000000000010e6f726c65616e732e77616b65757004776b303178"

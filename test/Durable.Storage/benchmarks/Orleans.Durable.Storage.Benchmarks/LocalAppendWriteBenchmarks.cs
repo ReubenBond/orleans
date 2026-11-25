@@ -29,7 +29,7 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     private LedgerReader? _reader;
     private LedgerWriterRegistry? _registry;
     private InMemoryArchiveStore? _archive;
-    private WakeupStreamHandler? _wakeupHandler;
+    private WakeupMessageHandler? _wakeupHandler;
     private JournalStore? _journals;
     private ArcBuffer _payload;
     private JournalRowKey _key = null!;
@@ -56,7 +56,7 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
         _ = await map.ReadAsync(CancellationToken.None).ConfigureAwait(false);
         await _registry.ReconciledAsync(map.Current.Epoch, CancellationToken.None).ConfigureAwait(false);
 
-        _wakeupHandler = new WakeupStreamHandler(
+        _wakeupHandler = new WakeupMessageHandler(
             new WakeupOptions(),
             new NoOpDispatcher(),
             TimeProvider.System);
@@ -67,13 +67,13 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
             new JournalStoreOptions { MaxBodyBytes = 16 << 20, MaxQueuedBytes = 128 << 20, WarmStateBytes = 128 << 20 },
             TimeProvider.System,
             stateDatabase: null,
-            localStreamHandlers: [_wakeupHandler]);
+            messageHandlers: [_wakeupHandler]);
 
         var bytes = new byte[1024];
         RandomNumberGenerator.Fill(bytes);
         _payload = ArcBuffer.Wrap(bytes);
-        _key = JournalRowKey.Encode("bench-local-append");
-        _wakeupPayload = WakeupCompanionCodec.Encode(new WakeupRecord(
+        _key = JournalRowKey.Encode("bench-message");
+        _wakeupPayload = WakeupMessageCodec.Encode(new WakeupRecord(
             GrainId.Create("bench", "1"),
             "orleans.messaging.pump",
             (DateTimeOffset.UtcNow + TimeSpan.FromHours(1)).UtcTicks));
@@ -84,7 +84,7 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     }
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationsPerInvoke)]
-    public async Task AppendZeroLocalAppendsAsync()
+    public async Task AppendZeroMessagesAsync()
     {
         for (var i = 0; i < OperationsPerInvoke; i++)
         {
@@ -95,12 +95,12 @@ public class LocalAppendWriteBenchmarks : IAsyncDisposable
     }
 
     [Benchmark(OperationsPerInvoke = OperationsPerInvoke)]
-    public async Task AppendOneWakeupCompanionAsync()
+    public async Task AppendOneWakeupMessageAsync()
     {
-        var companion = new LocalAppendRecord(WakeupStreamHandler.WakeupStream, _wakeupPayload);
+        var message = new MessageRecord(WakeupMessageHandler.WakeupChannel, _wakeupPayload);
         for (var i = 0; i < OperationsPerInvoke; i++)
         {
-            using var record = _journals!.EncodeAppend(_key, _version, _payload, [companion]);
+            using var record = _journals!.EncodeAppend(_key, _version, _payload, [message]);
             var outcome = await _journals.WriteAsync(record, CancellationToken.None).ConfigureAwait(false);
             _version = ((JournalWriteOutcome.Accepted)outcome.Value!).Version;
         }

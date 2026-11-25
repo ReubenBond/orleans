@@ -55,7 +55,7 @@ internal sealed record ArchiveFold(bool Exists, byte[] Content, bool HasBase, by
         RowKind.Append => new(true, [.. Content, .. body], HasBase, null),
         RowKind.Replace => new(true, body, true, null),
         RowKind.Delete => new(true, [], false, body.Length == 0 ? null : body),
-        RowKind.LocalAppend => throw new ArgumentOutOfRangeException(nameof(kind), kind, "RowKind.LocalAppend is excluded from archive folds (LG-I15)."),
+        RowKind.Message => throw new ArgumentOutOfRangeException(nameof(kind), kind, "RowKind.Message is excluded from archive folds (LG-I15)."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 

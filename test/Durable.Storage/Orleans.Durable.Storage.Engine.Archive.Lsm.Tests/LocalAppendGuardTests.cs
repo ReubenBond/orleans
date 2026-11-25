@@ -10,8 +10,8 @@ namespace Orleans.Durable.Storage.Engine.Archive.Lsm.Tests;
 
 /// <summary>
 /// LG-I15 guards in the LSM layer: <see cref="DrainWorker"/> fails closed with <see cref="ArchiveCorruptException"/> on
-/// <see cref="RowKind.LocalAppend"/> without a drain barrier (until J2), and <see cref="RunObjectFormat.Decode"/> rejects
-/// any run object row carrying <see cref="RowKind.LocalAppend"/> (<c>3</c>) as <c>unknown-kind</c>.
+/// unregistered <see cref="RowKind.Message"/> channels, and <see cref="RunObjectFormat.Decode"/> rejects
+/// any run object row carrying <see cref="RowKind.Message"/> (<c>3</c>) as <c>unknown-kind</c>.
 /// </summary>
 public sealed class LocalAppendGuardTests : IDisposable
 {
@@ -22,15 +22,15 @@ public sealed class LocalAppendGuardTests : IDisposable
     public void Dispose() => _leaks.Dispose();
 
     [Fact]
-    public async Task DrainWorkerFailsClosedOnLocalAppendWithoutBarrier()
+    public async Task DrainWorkerFailsClosedOnUnregisteredMessageChannel()
     {
         await using var world = await ArchiveWorld.StartAsync(Token);
         var ledger = world.Ledgers.OpenContaining([0]).Id;
-        var localKey = LedgerLocalKey.Encode(ledger, KeyRange.Root, LocalStreamName.Parse("orleans.wakeup"));
+        var channel = MessageChannel.Parse("orleans.wakeup");
         var writer = world.Ledgers.Registry.TryGet(ledger)!;
         using (var batch = await writer.CreateBatchAsync(1, 1024, Token))
         {
-            _ = batch.BeginRow(localKey, RowKind.LocalAppend, default, default, 2, "wk"u8);
+            batch.BeginMessage(channel, 2, "wk"u8);
             Assert.IsType<ProposalOutcome.Durable>((await writer.ProposeAsync(batch, Token)).Value);
         }
 
@@ -40,13 +40,13 @@ public sealed class LocalAppendGuardTests : IDisposable
         var tail = await world.Ledgers.ConfirmOpenAsync(ledger, Token);
         var ex = await Assert.ThrowsAsync<ArchiveCorruptException>(() =>
             world.DrainOnceAsync(worker, world.Ledgers.Ledger(ledger), tail, Token));
-        Assert.Contains("LocalAppend", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("orleans.wakeup", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void RunObjectFormatDecodeRejectsRowKindLocalAppend()
+    public void RunObjectFormatDecodeRejectsRowKindMessage()
     {
-        // Take the first valid single-row run object vector, overwrite its row kind byte with RowKind.LocalAppend (3),
+        // Take the first valid single-row run object vector, overwrite its row kind byte with RowKind.Message (3),
         // recompute the block CRC-32C (first block starts at section.Offset), and verify RunObjectFormat.Decode rejects it.
         var vector = Cases("archive", "run-objects.json").First();
         var original = Hex(vector);
@@ -63,7 +63,7 @@ public sealed class LocalAppendGuardTests : IDisposable
         Assert.InRange(rowKeyLen, 1, 1024);
         var kindOffset = blockStart + sizeof(ushort) + rowKeyLen + sizeof(ulong) + sizeof(ulong) + sizeof(uint);
         Assert.True(mutated[kindOffset] <= (byte)RowKind.Delete);
-        mutated[kindOffset] = (byte)RowKind.LocalAppend;
+        mutated[kindOffset] = (byte)RowKind.Message;
 
         var newBlockCrc = Crc32.HashToUInt32(Crc32ParameterSet.Crc32C, mutated.AsSpan(blockStart, blockCrcOffset - blockStart));
         BinaryPrimitives.WriteUInt32LittleEndian(mutated.AsSpan(blockCrcOffset, sizeof(uint)), newBlockCrc);

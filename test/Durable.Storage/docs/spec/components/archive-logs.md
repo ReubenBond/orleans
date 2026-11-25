@@ -502,18 +502,17 @@ and segments completed, so a long segment's drain shows progress before it compl
 Its rate, when the composition gives a `RequestsPerSecondSource`, is read before each request, so a share whose deadline
 passes applies to the next request, not to the next drain.
 
-**Ledger-local drain barrier (`LG-I15`, `LG-I16`, *Not yet in code*, J1–J2).** `ArchiveLogDrainWorker` accepts an
-optional `ILedgerLocalDrainBarrier? localDrainBarrier = null`. During segment scanning (`Segment.Add`), any
-`RowKind.LocalAppend` row is skipped after `localDrainBarrier.ValidateLocalAppendKey(ledger, row.Key)` validates its
-key (wrapping `ArchiveCorruptException`, or a null `localDrainBarrier`, in `ArchiveLogDrainBlockedException(Corrupt)`
-so critical event 6244, the blocked gauge, and 1-minute backoff handle it uniformly). Before marking a closed ledger
-(`T > Slot.Zero`) complete and returning `Complete` for `SubmitDropAsync`, the worker calls
-`await localDrainBarrier.EnsureLocalStreamsDrainedAsync(ledger, T, ct)` (wrapping `ArchiveCorruptException` in
-`ArchiveLogDrainBlockedException(Corrupt)`): `Dropped` forgets `S` and answers `Dropped`, `Backpressure` answers
-`Drained(T)` without marking `S` complete, and `Drained` proceeds to mark `S` complete. For closed ledgers that answer
-`Waiting(Older)` behind a blocked lineage ([LG-I10](ledgers.md#5-invariants)), `NodeController` drives a dedicated
-bounded eager-drain slot (max 1 concurrent, retried with bounded exponential backoff) so local-stream wakeups deliver
-without waiting for `Older` to drop ([orleans §5.6](../compositions/orleans.md#56-controllers)).
+**Single-pass message draining (`LG-I15`, `LG-I16`).** `ArchiveLogDrainWorker` accepts an optional
+`IEnumerable<IMessageProcessor>? messageProcessors = null`. During segment scanning (`Segment.Add`), every
+`RowKind.Message` row's channel is validated against the registered `IMessageProcessor`s and folded into that segment's
+per-channel `IMessageFold` (charging fold memory to `DrainScan`'s `ByteBudget`, wrapping `ArchiveCorruptException` on an
+unregistered channel or malformed payload in `ArchiveLogDrainBlockedException(Corrupt)` so critical event 6244, the
+blocked gauge, and 1-minute backoff handle it uniformly). Alongside writing each key's archive log entries and before
+creating the segment's drain marker `durable-storage/d/{S}/{start}`, the worker commits
+`await segment.CommitMessagesAsync(ct)` (wrapping `ArchiveCorruptException` in
+`ArchiveLogDrainBlockedException(Corrupt)`), writing the drain marker for message-only segments
+(`Writes.Count == 0 && segment.HasMessages`) as well so the closed ledger drops only after every segment's messages are
+durably committed.
 
 ### 2.4 Drops
 
@@ -969,10 +968,10 @@ digits.
    2. Scan the segment from its start (`LedgerReader.ScanAsync`), preferring a local replica below the contiguous tail,
       and compute each key's write from its resolved rows: an `ArchiveWrite` carrying the token of its defining row,
       the opener or append run, and the commands' bodies as pages lent from the verified batches. Every
-      `RowKind.LocalAppend` row is validated through `localDrainBarrier.ValidateLocalAppendKey` (blocking with `Corrupt`
-      if `localDrainBarrier` is null or rejects the key) and skipped without creating an archive-log write (LG-I15). A
-      segment with no archive rows holds no write: the drain advances past it with no request and no marker. A key's
-      write is built by `ArchiveWriteBuilder`, the history read's merge's own, so the two agree (HI-I1).
+      `RowKind.Message` row is matched to its registered `IMessageProcessor` and folded into its segment `IMessageFold`
+      (blocking with `Corrupt` if unregistered or malformed) without creating an archive-log write (LG-I15, LG-I16). A
+      segment with neither archive rows nor messages holds no work: the drain advances past it with no request and no
+      marker. A key's write is built by `ArchiveWriteBuilder`, the history read's merge's own, so the two agree (HI-I1).
    3. Check each key's chain: when the call drained the key's write in the previous segment, the token the key's write
       stores must equal that write's `Plan`, else the drain blocks with `Corrupt` before any write of the segment lands
       (HI-I4).
@@ -985,17 +984,14 @@ digits.
       no more, wait for those in flight to settle, and throw that exception, as `ArchiveLogDrainBlockedException` when
       no retry removes its cause (§6): an `ArchiveCorruptException` or a `PredecessorMissing` blocks with `Corrupt`, an
       `ArchiveLogRefusedException` with `Refused`, and a batch which breaks its format while the scan reads it with
-      `Damaged`.
-   5. Once every key's write is held, create the segment's marker, within the rate; `Exists` is the same marker. The
-      segment is complete (LOG-I3), and the worker forgets its held keys.
-4. When `S` is closed and every segment below `T` is complete: if `T > 0` and an `ILedgerLocalDrainBarrier` is
-   configured, invoke `EnsureLocalStreamsDrainedAsync(S, T)` before marking `S` complete (wrapping
-   `ArchiveCorruptException` as `ArchiveLogDrainBlockedException(Corrupt)`; answering `Dropped` and forgetting `S` on
-   `Dropped`; answering `Drained(T)` without marking complete on `Backpressure`; and proceeding on `Drained`, LG-I16),
-   then answer `Complete`. Otherwise answer `OpenSegment` at the first segment not yet complete when it is open at
-   `below`, and `Drained` at it otherwise, which this worker remembers for `S`. The worker forgets its drains of `S` once
-   its drop applies, remembering the drop until a map value no longer lists `S` (§2.4), and forgets `S` once a map value
-   shows it dropped.
+      `Damaged`. Commit all folded segment messages (`CommitMessagesAsync`) before step 5 (blocking with `Corrupt` on
+      `ArchiveCorruptException`; LG-I16).
+   5. Once every key's write is held and the segment's messages are committed, create the segment's marker, within the
+      rate; `Exists` is the same marker. The segment is complete (LOG-I3), and the worker forgets its held keys.
+4. When `S` is closed and every segment below `T` is complete, answer `Complete`. Otherwise answer `OpenSegment` at the
+   first segment not yet complete when it is open at `below`, and `Drained` at it otherwise, which this worker remembers
+   for `S`. The worker forgets its drains of `S` once its drop applies, remembering the drop until a map value no longer
+   lists `S` (§2.4), and forgets `S` once a map value shows it dropped.
 
 A predecessor which a listed lower-ID overlapping ledger may hold answers `Waiting(Older)` at step 1, and segments of
 `S` complete in order, so when a write is classified `PredecessorMissing` every older write of the key is held (HI-I1,

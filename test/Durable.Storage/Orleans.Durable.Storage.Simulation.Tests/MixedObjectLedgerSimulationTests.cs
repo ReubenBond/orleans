@@ -1464,7 +1464,7 @@ public sealed class MixedObjectLedgerSimulationTests
                             expectedExists = false;
                             expectedContent.Clear();
                             break;
-                        case RowKind.LocalAppend:
+                        case RowKind.Message:
                             break;
                         default:
                             throw new InvalidOperationException();
