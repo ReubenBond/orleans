@@ -197,7 +197,7 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
         // Validate and copy message payloads once outside the rebase-retry loop so retries preserve exact messages.
         var engineMessages = CopyMessages(messages);
 
-        var routing = await _routing.ReadyAsync(cancellationToken).ConfigureAwait(false);
+        var routing = _routing.Current ?? await _routing.ReadyAsync(cancellationToken).ConfigureAwait(false);
         if (!routing.Archive.AdmitsKey(_rowKey.Span))
         {
             throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"The archive store cannot name the journal '{_key}'."));
@@ -216,7 +216,7 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
                 WriteKind.Delete => JournalEntryRecord.Delete(_rowKey, expected, _timeProvider.GetUtcNow(), engineMessages.AsSpan()),
                 _ => throw new UnreachableException(),
             };
-            var outcome = await _router.WriteAsync(_key, _rowKey, record, cancellationToken).ConfigureAwait(false);
+            var outcome = await _router.WriteFastAsync(_key, _rowKey, record, cancellationToken).ConfigureAwait(false);
             switch (outcome.Value)
             {
                 case JournalWriteOutcome.Accepted accepted:

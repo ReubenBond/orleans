@@ -588,30 +588,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _ = call.ContinueWith(
-                static (ended, state) =>
-                {
-                    var (onAbandoned, toRelease) = ((Action<TAnswer>?, IDisposable?))state!;
-                    try
-                    {
-                        if (ended.IsCompletedSuccessfully)
-                        {
-                            onAbandoned?.Invoke(ended.Result);
-                        }
-                        else
-                        {
-                            _ = ended.Exception;
-                        }
-                    }
-                    finally
-                    {
-                        toRelease?.Dispose();
-                    }
-                },
-                (abandoned, releaseOnEnd),
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
+            ObserveAbandoned(call, abandoned, releaseOnEnd);
             throw;
         }
         catch
@@ -626,6 +603,35 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 releaseOnEnd?.Dispose();
             }
         }
+    }
+
+    /// <summary>Observes an abandoned in-flight grain call, releasing any unconsumed buffer or abandoned answer once it settles.</summary>
+    internal static void ObserveAbandoned<TAnswer>(Task<TAnswer> call, Action<TAnswer>? abandoned, IDisposable? releaseOnEnd)
+    {
+        _ = call.ContinueWith(
+            static (ended, state) =>
+            {
+                var (onAbandoned, toRelease) = ((Action<TAnswer>?, IDisposable?))state!;
+                try
+                {
+                    if (ended.IsCompletedSuccessfully)
+                    {
+                        onAbandoned?.Invoke(ended.Result);
+                    }
+                    else
+                    {
+                        _ = ended.Exception;
+                    }
+                }
+                finally
+                {
+                    toRelease?.Dispose();
+                }
+            },
+            (abandoned, releaseOnEnd),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     /// <summary>Releases the DATA of a read's answer which no caller takes.</summary>
@@ -771,18 +777,70 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             _controlLane = budgets.Control;
         }
 
-        public override async ValueTask<ReplicaWriteOutcome> WriteAsync(Slot slot, ArcBuffer payload, Slot contiguousTail, bool recovery, CancellationToken cancellationToken = default)
+        public override ValueTask<ReplicaWriteOutcome> WriteAsync(Slot slot, ArcBuffer payload, Slot contiguousTail, bool recovery, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             CheckWrite(slot, payload);
             var held = payload.Retain();
-            var lease = default(CallBudget.Lease);
+            var deadline = Transport.DeadlineFromNow();
+            var leaseTask = _writeLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken);
+            if (!leaseTask.IsCompletedSuccessfully)
+            {
+                return WriteSlowAsync(slot, held, contiguousTail, recovery, deadline, leaseTask, servingTask: null, lease: default, cancellationToken);
+            }
+
+            var lease = leaseTask.Result;
+            var servingTask = Transport.ServingLocallyAsync(Node, deadline, cancellationToken);
+            if (!servingTask.IsCompletedSuccessfully)
+            {
+                return WriteSlowAsync(slot, held, contiguousTail, recovery, deadline, leaseTask: default, servingTask, lease, cancellationToken);
+            }
+
             ValueTask<ReplicaWriteOutcome> operation;
             try
             {
-                var deadline = Transport.DeadlineFromNow();
-                lease = await _writeLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false);
-                await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
+                operation = _replica.WriteAsync(slot, held, contiguousTail, recovery, CancellationToken.None);
+            }
+            catch (ObjectDisposedException closed) when (Transport._local.State == LocalNode.NodeState.Closed)
+            {
+                lease.Dispose();
+                held.Dispose();
+                return ValueTask.FromException<ReplicaWriteOutcome>(new LedgerReplicaUnavailableException(Node, "this silo's node is closed.", closed));
+            }
+            catch
+            {
+                lease.Dispose();
+                held.Dispose();
+                throw;
+            }
+
+            return AwaitOperationAsync(operation, lease, held, abandoned: null, cancellationToken);
+        }
+
+        private async ValueTask<ReplicaWriteOutcome> WriteSlowAsync(
+            Slot slot,
+            ArcBuffer held,
+            Slot contiguousTail,
+            bool recovery,
+            long deadline,
+            ValueTask<CallBudget.Lease> leaseTask,
+            ValueTask? servingTask,
+            CallBudget.Lease lease,
+            CancellationToken cancellationToken)
+        {
+            ValueTask<ReplicaWriteOutcome> operation;
+            try
+            {
+                if (servingTask is null)
+                {
+                    lease = await leaseTask.ConfigureAwait(false);
+                    await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await servingTask.Value.ConfigureAwait(false);
+                }
+
                 operation = _replica.WriteAsync(slot, held, contiguousTail, recovery, CancellationToken.None);
             }
             catch (ObjectDisposedException closed) when (Transport._local.State == LocalNode.NodeState.Closed)
@@ -1068,7 +1126,31 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                             throw;
                         }
 
-                        answer = await UntilCancelledAsync(call, abandoned: null, releaseOnEnd: proxyCopy, cancellationToken).ConfigureAwait(false);
+                        var completed = false;
+                        try
+                        {
+                            answer = cancellationToken.CanBeCanceled
+                                ? await call.WaitAsync(cancellationToken).ConfigureAwait(false)
+                                : await call.ConfigureAwait(false);
+                            completed = true;
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            ObserveAbandoned(call, abandoned: null, releaseOnEnd: proxyCopy);
+                            throw;
+                        }
+                        catch
+                        {
+                            completed = true;
+                            throw;
+                        }
+                        finally
+                        {
+                            if (completed)
+                            {
+                                proxyCopy?.Dispose();
+                            }
+                        }
                     }
                     catch (Exception failure)
                     {

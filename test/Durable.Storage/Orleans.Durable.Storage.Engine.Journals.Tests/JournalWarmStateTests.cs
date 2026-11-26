@@ -432,13 +432,13 @@ public sealed class JournalWarmStateTests : IDisposable
 
         Assert.False(await ReadReplaceRequestedAsync(store, "chain"));
 
-        // The 32nd append flips ReplaceRequested on both Accepted and ReadAsync.
-        var (v32, rr32) = await WriteAppendWithOutcomeAsync(store, "chain", version, "x");
-        Assert.True(rr32);
+        // The ReplaceRequestMaxAppends-th append flips ReplaceRequested on both Accepted and ReadAsync.
+        var (vMax, rrMax) = await WriteAppendWithOutcomeAsync(store, "chain", version, "x");
+        Assert.True(rrMax);
         Assert.True(await ReadReplaceRequestedAsync(store, "chain"));
 
         // A Replace resets AppendsSinceBase to 0.
-        var (vReplaced, rrReplaced) = await WriteReplaceWithOutcomeAsync(store, "chain", v32, "snap");
+        var (vReplaced, rrReplaced) = await WriteReplaceWithOutcomeAsync(store, "chain", vMax, "snap");
         Assert.False(rrReplaced);
         Assert.False(await ReadReplaceRequestedAsync(store, "chain"));
 

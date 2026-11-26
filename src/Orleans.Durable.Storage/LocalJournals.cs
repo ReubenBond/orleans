@@ -85,10 +85,14 @@ internal sealed class LocalJournals(NodePressure pressure)
     /// which it throws only for an entry it never proposed (journals.md §6). The caller keeps the record until the call
     /// completes, and disposes it.
     /// </summary>
-    public async Task<LocalJournalWriteOutcome> WriteAsync(JournalEntryRecord record, CancellationToken cancellationToken)
+    public async ValueTask<LocalJournalWriteOutcome> WriteAsync(JournalEntryRecord record, CancellationToken cancellationToken)
     {
-        if (State == JournalsState.Serving && Volatile.Read(ref _served) is { } served
-            && served.View.FindOpen(record.Key.Span) is { } open && open.Primary.Node == served.Node && pressure.IsThrottled(open))
+        if (State != JournalsState.Serving || Volatile.Read(ref _served) is not { } served)
+        {
+            return Stopped;
+        }
+
+        if (served.View.FindOpen(record.Key.Span) is { } open && open.Primary.Node == served.Node && pressure.IsThrottled(open))
         {
             pressure.CountThrottledWrite(open.Id);
             return LocalJournalWriteOutcome.Throttled.Instance;
@@ -97,7 +101,17 @@ internal sealed class LocalJournals(NodePressure pressure)
         JournalWriteOutcome written;
         try
         {
-            written = await RunAsync(static (store, record, cancellationToken) => store.WriteAsync(record, cancellationToken), record, new JournalWriteOutcome(Stopped), cancellationToken).ConfigureAwait(false);
+            if (BeforeCall is { } before)
+            {
+                await before().ConfigureAwait(false);
+            }
+
+            written = await served.Store.WriteAsync(record, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException) when (State == JournalsState.Stopped)
+        {
+            // The store refused the call without effect: the runtime disposed it after closing the gate.
+            return Stopped;
         }
         catch (JournalStoreUnavailableException)
         {

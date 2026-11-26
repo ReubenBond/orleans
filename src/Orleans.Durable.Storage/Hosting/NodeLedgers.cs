@@ -315,7 +315,7 @@ internal sealed partial class NodeLedgers(
                 messageChannels,
                 cancellationToken).ConfigureAwait(false);
             _runtime = runtime;
-            nodeControl.Serve(runtime.Controller, runtime.Scheduler, runtime.Stopping);
+            nodeControl.Serve(runtime.Controller, runtime.Scheduler, runtime.Stopping, runtime.DrainsStopping);
             routing.Publish(node, runtime.View, runtime.Archive);
             using (ExecutionContext.SuppressFlow())
             {
@@ -562,15 +562,19 @@ internal sealed partial class NodeLedgers(
             await HandOffAsync(runtime, cancellationToken).ConfigureAwait(false);
             LogStopStep(_logger, local.Node, StopStep.HandOff, StopStepPhase.Ends);
 
-            // (2) Wait for the calls admitted before the hand-off began, and the drains the node started.
+            // (2) Cancel background drains immediately (drains are idempotent and retried by surviving replicas or
+            // after restart) and wait briefly for transitions admitted before hand-off began plus drain cancellation unwind,
+            // so graceful shutdown preserves time for JournalStateDatabase.FlushAsync() and LedgerStore final checkpoints.
             LogStopStep(_logger, local.Node, StopStep.AdmittedWork, StopStepPhase.Begins);
+            var admittedTimeout = TimeSpan.FromTicks(Math.Min(control.TransitionTimeout.Ticks, TimeSpan.FromSeconds(5).Ticks));
             try
             {
-                await nodeControl.CloseAdmissionAsync().WaitAsync(control.TransitionTimeout, timeProvider, cancellationToken).ConfigureAwait(false);
+                await runtime.CancelDrainsAsync().WaitAsync(admittedTimeout, timeProvider, cancellationToken).ConfigureAwait(false);
+                await nodeControl.CloseAdmissionAsync().WaitAsync(admittedTimeout, timeProvider, cancellationToken).ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
-                LogAdmittedWorkOutlasted(_logger, local.Node, control.TransitionTimeout);
+                LogAdmittedWorkOutlasted(_logger, local.Node, admittedTimeout);
             }
 
             LogStopStep(_logger, local.Node, StopStep.AdmittedWork, StopStepPhase.Ends);
@@ -1471,6 +1475,8 @@ internal sealed class NodeRuntime : IAsyncDisposable
 
     private readonly ConcurrentExclusiveSchedulerPair _schedulers = new();
     private readonly CancellationTokenSource _stopping = new();
+    private readonly CancellationTokenSource _drainsStopping;
+    private readonly TimeProvider _timeProvider;
     private readonly LedgerReader _reader;
     private readonly LedgerApplyLoop? _applyLoop;
     private readonly JournalStateDatabase? _stateDatabase;
@@ -1511,6 +1517,8 @@ internal sealed class NodeRuntime : IAsyncDisposable
         ReleaseDistance = releaseDistance;
         Metrics = metrics;
         View = view;
+        _drainsStopping = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token);
+        _timeProvider = timeProvider;
         _reader = reader;
         _stateDatabase = stateDatabase;
         _applyLoop = applyLoop;
@@ -1588,6 +1596,9 @@ internal sealed class NodeRuntime : IAsyncDisposable
 
     /// <summary>Gets the token under which all the runtime's work runs, which <see cref="CancelAsync"/> cancels.</summary>
     public CancellationToken Stopping => _stopping.Token;
+
+    /// <summary>Gets the token under which background drains run, cancelled early during graceful stop step 2.</summary>
+    public CancellationToken DrainsStopping => _drainsStopping.Token;
 
     /// <summary>
     /// Starts the node's runtime over its map view and store: builds its reader, writer registry, archive store and the
@@ -1830,6 +1841,9 @@ internal sealed class NodeRuntime : IAsyncDisposable
     /// <summary>Cancels the runtime's work.</summary>
     public Task CancelAsync() => _stopping.CancelAsync();
 
+    /// <summary>Cancels background drains while keeping transitions and hand-off active.</summary>
+    public Task CancelDrainsAsync() => _drainsStopping.CancelAsync();
+
     /// <summary>
     /// Stops every registered <see cref="IMessageHandler"/>, then disposes the node's Journals, which retires every
     /// admission and waits for the outcomes of their proposals while the registry lives (journals.md §9,
@@ -1910,7 +1924,12 @@ internal sealed class NodeRuntime : IAsyncDisposable
                     {
                         try
                         {
-                            await _stateDatabase.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+                            using var flushBound = new CancellationTokenSource(TimeSpan.FromSeconds(5), _timeProvider);
+                            await _stateDatabase.FlushAsync(flushBound.Token).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Bounded shutdown flush elapsed; proceed with disposal so LedgerStore checkpoints still run.
                         }
                         catch (JournalIndexCorruptException)
                         {
@@ -1929,6 +1948,7 @@ internal sealed class NodeRuntime : IAsyncDisposable
 
             // The scheduler pair is never completed: work which outlasted the stop's wait may still continue on it,
             // and a completed pair would drop that continuation. It holds no thread or handle of its own.
+            _drainsStopping.Dispose();
             _stopping.Dispose();
         }
 

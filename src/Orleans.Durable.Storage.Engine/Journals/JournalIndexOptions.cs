@@ -7,11 +7,11 @@ public sealed class JournalIndexOptions
 {
     /// <summary>
     /// Gets or sets the interval between periodic atomic flushes of the journal index's column families. Defaults to
-    /// <see cref="Timeout.InfiniteTimeSpan"/>, which disables periodic flushes so flushing scales with traffic via
-    /// RocksDB's <see cref="MaxWriteBufferBytes"/> budget and explicit <see cref="JournalStateDatabase.FlushAsync"/>
-    /// (including clean shutdown).
+    /// 30 seconds, bounding crash replay to at most 30 seconds of unflushed index updates while keeping background flush
+    /// overhead negligible alongside size-bounded <see cref="MaxWriteBufferBytes"/> and clean-shutdown flushes; set to
+    /// <see cref="Timeout.InfiniteTimeSpan"/> to disable periodic flushes.
     /// </summary>
-    public TimeSpan FlushInterval { get; set; } = Timeout.InfiniteTimeSpan;
+    public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Gets or sets the interval between low-priority background integrity checks of the journal index;

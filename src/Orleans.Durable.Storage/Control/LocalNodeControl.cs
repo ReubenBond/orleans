@@ -55,14 +55,14 @@ internal sealed class LocalNodeControl
     public ControlState State => (ControlState)Volatile.Read(ref _state);
 
     /// <summary>
-    /// Publishes the started runtime's node controller, the exclusive scheduler it runs on, and the runtime's stopping
-    /// token, and starts serving.
+    /// Publishes the started runtime's node controller, the exclusive scheduler it runs on, the runtime's stopping
+    /// token, and an optional dedicated drain-stopping token cancelled early during graceful shutdown, and starts serving.
     /// </summary>
-    public void Serve(NodeController controller, TaskScheduler scheduler, CancellationToken stopping)
+    public void Serve(NodeController controller, TaskScheduler scheduler, CancellationToken stopping, CancellationToken? drainsStopping = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
         ArgumentNullException.ThrowIfNull(scheduler);
-        Volatile.Write(ref _runtime, new Runtime(controller, scheduler, stopping));
+        Volatile.Write(ref _runtime, new Runtime(controller, scheduler, stopping, drainsStopping ?? stopping));
         Advance(ControlState.Serving);
         _ = _ready.TrySetResult();
     }
@@ -160,7 +160,7 @@ internal sealed class LocalNodeControl
             return null;
         }
 
-        return await runtime.RunAsync<ImmutableArray<LedgerId>?>(controller => Task.FromResult<ImmutableArray<LedgerId>?>(controller.StartDrains(drainToo, commit, failed, runtime.Stopping))).ConfigureAwait(false);
+        return await runtime.RunAsync<ImmutableArray<LedgerId>?>(controller => Task.FromResult<ImmutableArray<LedgerId>?>(controller.StartDrains(drainToo, commit, failed, runtime.DrainsStopping))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -180,7 +180,7 @@ internal sealed class LocalNodeControl
             return null;
         }
 
-        return await runtime.RunAsync<ImmutableArray<LedgerId>?>(controller => Task.FromResult<ImmutableArray<LedgerId>?>(controller.StartLogDrains(gate, drainToo, commit, failed, runtime.Stopping))).ConfigureAwait(false);
+        return await runtime.RunAsync<ImmutableArray<LedgerId>?>(controller => Task.FromResult<ImmutableArray<LedgerId>?>(controller.StartLogDrains(gate, drainToo, commit, failed, runtime.DrainsStopping))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -219,12 +219,14 @@ internal sealed class LocalNodeControl
         while (Interlocked.CompareExchange(ref _state, (int)state, current) != current);
     }
 
-    /// <summary>The published runtime: its node controller, the exclusive scheduler the controller runs on, and its stopping token.</summary>
-    private sealed class Runtime(NodeController controller, TaskScheduler scheduler, CancellationToken stopping)
+    /// <summary>The published runtime: its node controller, the exclusive scheduler the controller runs on, and its stopping tokens.</summary>
+    private sealed class Runtime(NodeController controller, TaskScheduler scheduler, CancellationToken stopping, CancellationToken drainsStopping)
     {
         public NodeController Controller { get; } = controller;
 
         public CancellationToken Stopping { get; } = stopping;
+
+        public CancellationToken DrainsStopping { get; } = drainsStopping;
 
         public Task<T> RunAsync<T>(Func<NodeController, Task<T>> work) =>
             Task.Factory.StartNew(() => work(Controller), CancellationToken.None, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();

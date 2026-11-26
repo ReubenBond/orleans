@@ -755,9 +755,10 @@ Each node keeps, in its state database:
     native memtables with `disableWAL = true` (eliminating RocksDB WAL I/O and fsyncs) and opens RocksDB with
     `atomic_flush = true`. Each batch's `key_index` writes, `tombstones` writes/deletes, and watermark advance commit
     together in one `WriteBatch`, so lookups see every batch's changes atomically. Size-bounded
-    (`JournalIndexOptions.MaxWriteBufferBytes`, default 64 MiB), clean-shutdown, and optional periodic
-    (`JournalIndexOptions.FlushInterval`, defaulting to `Timeout.InfiniteTimeSpan` so flushing scales with traffic
-    rather than emitting small L0 SSTs on a fixed timer) flushes (`FlushAsync`) issue an atomic multi-CF flush
+    (`JournalIndexOptions.MaxWriteBufferBytes`, default 64 MiB), clean-shutdown, and periodic
+    (`JournalIndexOptions.FlushInterval`, defaulting to 30 seconds to bound crash replay while keeping background flush
+    overhead negligible; set `Timeout.InfiniteTimeSpan` to disable periodic flushes) flushes (`FlushAsync`) issue an
+    atomic multi-CF flush
     (`rocksdb_flush_cfs` with `force_atomic_flush`) so `key_index`, `tombstones`, and `watermarks` advance together
     durably in SSTs + `MANIFEST`; `db_write_buffer_size` bounds total memtable memory so crash replay from `LedgerStore`
     starting at each ledger's durable watermark stays short.
@@ -993,8 +994,8 @@ A read or warm primary requests a snapshot when either:
   content its last opener or the archive's prefix began) exceed `max(ReplaceRequestMinBytes, α × BaseLength)` with
   `α = 1` and `ReplaceRequestMinBytes = 64 KiB`, or
 - the number of `Append` entries applied after the journal's base (`AppendsSinceBase`) reaches
-  `ReplaceRequestMaxAppends = 32`, bounding cold-read tail length even for small payloads while keeping ~97% snapshot
-  reduction on small writes.
+  `ReplaceRequestMaxAppends = 128`, bounding cold-read tail length to a few concurrent waves even for small payloads
+  while keeping high snapshot reduction on small writes.
 
 The archive store's `IsReplaceRequested`, over the key's current token, requests one too, well before its
 per-generation limits refuse an `Append` (§8.1): admission reports the union of `JournalState.IsReplaceRequested` and

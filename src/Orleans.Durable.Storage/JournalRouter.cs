@@ -73,6 +73,9 @@ internal sealed partial class JournalRouter
     private readonly ForwardingBudgets _budgets;
     private readonly ReplicaCallLimits _limits;
     private readonly Func<NodeId, IJournalStoreGrain> _grains;
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _firstBackoff;
+    private readonly TimeSpan _longestBackoff;
     private readonly ILogger _logger;
     private readonly ResiliencePipeline<Attempt<JournalWriteOutcome>> _writes;
     private readonly ResiliencePipeline<Attempt<RoutedRead>> _reads;
@@ -104,10 +107,11 @@ internal sealed partial class JournalRouter
         _budgets = budgets;
         _limits = limits;
         _grains = grains;
+        _timeProvider = timeProvider;
         _logger = logger;
-        var (first, longest) = backoff ?? (TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(1));
-        _writes = Pipeline<JournalWriteOutcome>(timeProvider, first, longest);
-        _reads = Pipeline<RoutedRead>(timeProvider, first, longest);
+        (_firstBackoff, _longestBackoff) = backoff ?? (TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(1));
+        _writes = Pipeline<JournalWriteOutcome>(timeProvider, _firstBackoff, _longestBackoff);
+        _reads = Pipeline<RoutedRead>(timeProvider, _firstBackoff, _longestBackoff);
     }
 
     /// <summary>Gets the forwarding budgets, which tests read.</summary>
@@ -126,11 +130,166 @@ internal sealed partial class JournalRouter
     /// </exception>
     /// <exception cref="JournalStoreCorruptException">The journal's history contradicts itself.</exception>
     /// <exception cref="OperationCanceledException">The caller cancelled; an entry already sent may still be decided.</exception>
-    public async Task<JournalWriteOutcome> WriteAsync(string key, JournalRowKey rowKey, JournalEntryRecord record, CancellationToken cancellationToken)
+    public Task<JournalWriteOutcome> WriteAsync(string key, JournalRowKey rowKey, JournalEntryRecord record, CancellationToken cancellationToken) =>
+        WriteFastAsync(key, rowKey, record, cancellationToken).AsTask();
+
+    /// <summary>
+    /// Steady-state fast path for <see cref="WriteAsync"/> that avoids allocating <see cref="WriteState"/>, Polly's retry
+    /// pipeline, and nested <see cref="Task{TResult}"/> wrappers when the first local or forwarded write settles directly.
+    /// </summary>
+    internal async ValueTask<JournalWriteOutcome> WriteFastAsync(string key, JournalRowKey rowKey, JournalEntryRecord record, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(key);
         Debug.Assert(record.Key.Span.SequenceEqual(rowKey.Span), "The record is an entry of the journal it is routed by.");
-        return await RouteAsync(_writes, new WriteState(key, rowKey, record), static (router, state, target, node, cancellationToken) => router.WriteOnceAsync(state, target, node, cancellationToken), StoppedWrite, cancellationToken).ConfigureAwait(false);
+        if (_routing.Current is not { } routing || routing.View.FindOpen(rowKey.Span)?.Primary.Node is not { } target)
+        {
+            return await RouteAsync(
+                _writes,
+                new WriteState(key, rowKey, record),
+                static (router, state, target, node, cancellationToken) => router.WriteOnceAsync(state, target, node, cancellationToken),
+                StoppedWrite,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (target == routing.Node)
+        {
+            LocalJournalWriteOutcome localOutcome;
+            try
+            {
+                localOutcome = await _journals.WriteAsync(record, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (!IsOwnCancellation(failure, cancellationToken) && !Has<JournalStoreCorruptException>(failure) && failure is not ArgumentException)
+            {
+                LogAmbiguous(_logger, key, target, failure);
+                return AmbiguousOutcome;
+            }
+
+            return localOutcome.Value switch
+            {
+                JournalWriteOutcome.Accepted accepted => new JournalWriteOutcome(accepted),
+                JournalWriteOutcome.Rejected rejected => new JournalWriteOutcome(rejected),
+                JournalWriteOutcome.ReplaceRequired replaceRequired => new JournalWriteOutcome(replaceRequired),
+                JournalWriteOutcome.Ambiguous ambiguous => new JournalWriteOutcome(ambiguous),
+                JournalMoved moved => await ContinueWriteResendAsync(key, rowKey, record, Follow(moved, target, routing.Node), nameof(JournalMoved), cancellationToken).ConfigureAwait(false),
+                JournalWriteOutcome.Fenced => await ContinueWriteResendAsync(key, rowKey, record, new Resend(RereadMap: true), nameof(JournalWriteOutcome.Fenced), cancellationToken).ConfigureAwait(false),
+                LocalJournalWriteOutcome.Throttled => await ContinueWriteResendAsync(key, rowKey, record, new Resend(To: target), nameof(LocalJournalWriteOutcome.Throttled), cancellationToken).ConfigureAwait(false),
+                LocalJournalWriteOutcome.Unavailable => await ContinueWriteResendAsync(key, rowKey, record, new Resend(RereadMap: true), nameof(LocalJournalWriteOutcome.Unavailable), cancellationToken).ConfigureAwait(false),
+                _ => throw new UnreachableException(),
+            };
+        }
+
+        var lane = _budgets.Writes(target);
+        CallBudget.Lease lease;
+        try
+        {
+            lease = await lane.EnterLeaseAsync(record.Length, lane.DeadlineAfter(_limits.Deadline), cancellationToken).ConfigureAwait(false);
+        }
+        catch (JournalForwardQueueTimeoutException)
+        {
+            return await ContinueWriteResendAsync(key, rowKey, record, new Resend(), nameof(JournalForwardQueueTimeoutException), cancellationToken).ConfigureAwait(false);
+        }
+
+        JournalForwardedWriteOutcome remoteOutcome;
+        using (lease)
+        {
+            // Encode directly into Durable Storage's pooled ArcBuffer (zero GC byte[] allocation, zero receiver copy; OR-I18).
+            using var wire = WireArcBuffer.FromRecord(record);
+            try
+            {
+                Task<JournalForwardedWriteOutcome> call;
+                WireArcBuffer? proxyCopy = null;
+                try
+                {
+                    call = _grains(target).WriteAsync(new JournalForwardedEntry { Key = key, Record = wire }, cancellationToken);
+                    proxyCopy = wire.DetachLastCopy();
+                }
+                catch
+                {
+                    wire.DetachLastCopy()?.Dispose();
+                    throw;
+                }
+
+                var completed = false;
+                try
+                {
+                    remoteOutcome = cancellationToken.CanBeCanceled
+                        ? await call.WaitAsync(cancellationToken).ConfigureAwait(false)
+                        : await call.ConfigureAwait(false);
+                    completed = true;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    OrleansLedgerReplicaTransport.ObserveAbandoned(call, abandoned: null, releaseOnEnd: proxyCopy);
+                    throw;
+                }
+                catch
+                {
+                    completed = true;
+                    throw;
+                }
+                finally
+                {
+                    if (completed)
+                    {
+                        proxyCopy?.Dispose();
+                    }
+                }
+            }
+            catch (Exception failure) when (!IsOwnCancellation(failure, cancellationToken) && !Has<JournalStoreCorruptException>(failure))
+            {
+                if (NoEffect(failure) is { } resend)
+                {
+                    return await ContinueWriteResendAsync(key, rowKey, record, resend, failure.GetType().Name, cancellationToken).ConfigureAwait(false);
+                }
+
+                LogAmbiguous(_logger, key, target, failure);
+                return AmbiguousOutcome;
+            }
+        }
+
+        return remoteOutcome.Value switch
+        {
+            JournalWriteOutcome.Accepted accepted => new JournalWriteOutcome(accepted),
+            JournalWriteOutcome.Rejected rejected => new JournalWriteOutcome(rejected),
+            JournalWriteOutcome.ReplaceRequired replaceRequired => new JournalWriteOutcome(replaceRequired),
+            JournalWriteOutcome.Ambiguous ambiguous => new JournalWriteOutcome(ambiguous),
+            JournalMoved moved => await ContinueWriteResendAsync(key, rowKey, record, Follow(moved, target, routing.Node), nameof(JournalMoved), cancellationToken).ConfigureAwait(false),
+            JournalWriteOutcome.Fenced => await ContinueWriteResendAsync(key, rowKey, record, new Resend(RereadMap: true), nameof(JournalWriteOutcome.Fenced), cancellationToken).ConfigureAwait(false),
+            LocalJournalWriteOutcome.Throttled => await ContinueWriteResendAsync(key, rowKey, record, new Resend(To: target), nameof(LocalJournalWriteOutcome.Throttled), cancellationToken).ConfigureAwait(false),
+            LocalJournalWriteOutcome.Unavailable => await ContinueWriteResendAsync(key, rowKey, record, new Resend(RereadMap: true), nameof(LocalJournalWriteOutcome.Unavailable), cancellationToken).ConfigureAwait(false),
+            NotThisNode => await ContinueWriteResendAsync(key, rowKey, record, new Resend(RereadMap: true, RereadRegistry: true), nameof(NotThisNode), cancellationToken).ConfigureAwait(false),
+            JournalCallRefused refused => throw Refusal(refused, target),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    private async ValueTask<JournalWriteOutcome> ContinueWriteResendAsync(
+        string key,
+        JournalRowKey rowKey,
+        JournalEntryRecord record,
+        Resend resend,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        if (resend.RereadRegistry)
+        {
+            _rereadRegistry();
+        }
+
+        if (!resend.Immediately)
+        {
+            var delay = Backoff(0, _firstBackoff, _longestBackoff, Random.Shared.NextDouble());
+            await Task.Delay(delay, _timeProvider, cancellationToken).ConfigureAwait(false);
+        }
+
+        var state = new WriteState(key, rowKey, record);
+        _ = state.Resend<JournalWriteOutcome>(resend, reason);
+        return await RouteAsync(
+            _writes,
+            state,
+            static (router, state, target, node, cancellationToken) => router.WriteOnceAsync(state, target, node, cancellationToken),
+            StoppedWrite,
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

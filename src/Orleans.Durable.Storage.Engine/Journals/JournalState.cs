@@ -32,9 +32,10 @@ public sealed class JournalState
 
     /// <summary>
     /// The maximum number of appends after a journal's base before Journals asks for a <c>Replace</c> (journals.md §8.7),
-    /// bounding cold-read tail length even for small payloads.
+    /// bounding cold-read tail length to a few concurrent waves even for small payloads while preserving high compaction
+    /// reduction on small writes.
     /// </summary>
-    internal const int ReplaceRequestMaxAppends = 32;
+    internal const int ReplaceRequestMaxAppends = 128;
 
     /// <summary>
     /// The bytes a state holds, which a primary's warm-state budget counts (journals.md §8.8): the object's 16-byte
@@ -91,7 +92,7 @@ public sealed class JournalState
     /// Gets a value indicating whether the state passes the snapshot-request bound
     /// (<c>BytesSinceBase &gt; max(ReplaceRequestMinBytes, α × BaseLength)</c> or
     /// <c>AppendsSinceBase &gt;= ReplaceRequestMaxAppends</c>, with <c>α = 1</c>,
-    /// <c>ReplaceRequestMinBytes = 64 KiB</c>, and <c>ReplaceRequestMaxAppends = 32</c>; journals.md §8.7).
+    /// <c>ReplaceRequestMinBytes = 64 KiB</c>, and <c>ReplaceRequestMaxAppends = 128</c>; journals.md §8.7).
     /// </summary>
     internal bool IsReplaceRequested =>
         BytesSinceBase > Math.Max(ReplaceRequestMinBytes, ReplaceRequestAlpha * BaseLength)

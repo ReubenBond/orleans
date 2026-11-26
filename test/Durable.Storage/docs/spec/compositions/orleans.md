@@ -755,8 +755,10 @@ in order:
    silo stops (in an `N`-node cluster, via degraded placement keeping the stopping node's replica slot under OR-I5);
    with fewer than `Q` other active nodes, no quorum hand-off can be placed, so the node proceeds through the steps
    below and any remaining ledgers are taken over once enough nodes return.
-2. **Drain in-flight work.** It closes admission and waits, for at most `TransitionTimeout`, for the transitions and
-   compactions admitted before the hand-off began and every drain the node started (`DrainsEnded`).
+2. **Drain in-flight work.** It cancels background drains immediately (drains are idempotent and retried by surviving
+   replicas or after restart), closes admission, and waits, for at most `min(TransitionTimeout, 5 s)`, for transitions
+   and compactions admitted before the hand-off began and for cancelled drains to unwind (`DrainsEnded`), preserving
+   shutdown budget for `JournalStateDatabase.FlushAsync` and `LedgerStore.CloseAsync` final checkpoints.
 3. **Re-check.** It hands off again any ledger an install admitted before step 2 made it primary of.
 4. **Cancel.** It stops the Journals, so every later journal call is answered `Moved` naming no owner, with no effect,
    and disposes their `JournalStore`, which retires every admission and waits for the outcomes of their proposals; it
@@ -2874,7 +2876,7 @@ section. The MetaStore and the archive store's stores are the silo's services, c
 | Uniform replica limits | Every silo of a cluster runs with the same replica host limits, node call budgets, read reply, and Orleans `MaxMessageBodySize`, since a callee refuses a payload or reserved reply above its own payload limit | A deployment requirement | [§5.12](#512-replica-transport) | — (a deployment requirement) |
 | In-flight bytes per ledger | Entries a primary has accepted and not yet put in a batch, and batches it has created and not yet decided; the first at least the largest batch, the second at least the replica payload limit, which holds it | 64 MiB, 64 MiB (`DurableStorageOptions.Journals.MaxQueuedBytes`, `DurableStorageOptions.MaxProposalBytes`) | [Journals §8.8](../components/journals.md#88-policy), [ledgers](../components/ledgers.md) | `Node:Journals:MaxQueuedBytes`, `Node:MaxProposalBytes` |
 | LedgerStore | WAL file preallocation, checkpoint cadence | [LedgerStore §8](../components/ledgerstore.md#8-mechanism-and-policy) | LedgerStore | — (fixed by the composition) |
-| Journal index | Memtable budget and size-based plus clean-shutdown atomic-flush policy (`JournalIndexOptions`: `MaxWriteBufferBytes = 64 MiB`, `FlushInterval = Timeout.InfiniteTimeSpan`) | [Journals §8.3](../components/journals.md#83-warm-state) | Journals | — (fixed by the composition) |
+| Journal index | Memtable budget and periodic, size-based, and clean-shutdown atomic-flush policy (`JournalIndexOptions`: `MaxWriteBufferBytes = 64 MiB`, `FlushInterval = 30 s`) | [Journals §8.3](../components/journals.md#83-warm-state) | Journals | — (fixed by the composition) |
 | MetaStore | Provider and its settings, holding `ledger-map` and `node-registry` | Required | [MetaStore §9](../components/metastore.md#9-providers-and-implementations) | — (a service) |
 | Archive store | The kind of the cluster's archive store, fixed for its life: the LSM or archive logs; its ID is no option, which a silo takes from the node registry or, at a new cluster's first registration, from the store's record | Required (`DurableStorageOptions.ArchiveStore`, `Lsm` or `Logs`) | [archive §2.4](../components/archive.md#24-selecting-the-store), OR-I20 | `Node:ArchiveStore` |
 | Archive store prefix | The cluster's store prefix, under which its store lies in the bucket or container its services supply; unique within it, and equal on every silo, whose node registry records it | 10 base32 characters of the SHA-256 of `ClusterOptions.ServiceId`, which is then neither of Orleans' defaults, `default` and `dev`, or the silo does not start; or 1 to 16 characters of `[a-z0-9_-]` (`DurableStorageOptions.ArchiveStorePrefix`) | [§5.13](#513-archive-log-store), OR-I20 | `Node:ArchiveStorePrefix` |

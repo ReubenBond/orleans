@@ -87,15 +87,17 @@ public sealed class JournalStateDatabaseTests : IDisposable
         Assert.True(alphaSlots.Count <= 3, $"Expected at most 3 distinct slots for 'alpha', read {alphaSlots.Count}: [{string.Join(", ", alphaSlots)}].");
         Assert.True(alphaSlots.Count < tail.ContiguousTail.Value, "Indexed read must not scan the whole ledger.");
 
-        // Read "beta" via ArchiveReader directly with the same KeyIndex (returns all 3 raw history rows in order),
-        // and via JournalStore (which applies Replace semantics to yield "B2+b3").
+        // Read "beta" via ArchiveReader directly with the same KeyIndex: the descending indexed scan stops at the
+        // verified Replace ("B2") and skips the superseded pre-Replace Append ("b1"), reporting SupersededBefore = 1
+        // and returning the active tail ("B2+b3") in chronological order; JournalStore yields the same "B2+b3".
         var archiveReader = new ArchiveReader(nodeA.Reader, env.Store, TimeProvider.System, nodeA.StateDb.KeyIndex);
         nodeA.Transport.ResetCounts();
         using (var betaRead = await archiveReader.ReadAsync(JournalRowKey.Encode("beta").Memory, token))
         {
             Assert.NotNull(betaRead);
-            Assert.Equal("b1B2+b3", ReadArchiveContent(betaRead));
-            Assert.Equal(3, betaRead.Rows.Length);
+            Assert.Equal("B2+b3", ReadArchiveContent(betaRead));
+            Assert.Equal(2, betaRead.Rows.Length);
+            Assert.Equal(1, betaRead.Rows[0].SupersededBefore);
             Assert.True(archiveReader.Counts.IndexedLedgers.Value > 0);
             Assert.True(archiveReader.Counts.PointReads.Value <= 3);
         }
@@ -970,24 +972,52 @@ public sealed class JournalStateDatabaseTests : IDisposable
     }
 
     /// <summary>
-    /// Verifies <see cref="JournalIndexOptions.FlushInterval"/> defaults to <see cref="Timeout.InfiniteTimeSpan"/>
-    /// (size-based + explicit/clean-shutdown flushing without periodic timer flushes), while an explicit positive
-    /// <see cref="JournalIndexOptions.FlushInterval"/> still triggers periodic flushes.
+    /// Verifies <see cref="JournalIndexOptions.FlushInterval"/> defaults to 30 seconds (bounding crash replay via
+    /// periodic atomic flushes alongside size-based and clean-shutdown flushes), while
+    /// <see cref="Timeout.InfiniteTimeSpan"/> disables periodic timer flushes.
     /// </summary>
     [Fact]
-    public async Task DefaultFlushIntervalDisablesPeriodicFlushWhileExplicitIntervalFlushesPeriodically()
+    public async Task DefaultFlushIntervalFlushesPeriodicallyWhileInfiniteDisablesPeriodicFlush()
     {
         var defaults = new JournalIndexOptions();
-        Assert.Equal(Timeout.InfiniteTimeSpan, defaults.FlushInterval);
+        Assert.Equal(TimeSpan.FromSeconds(30), defaults.FlushInterval);
         Assert.Equal(64L * 1024 * 1024, defaults.MaxWriteBufferBytes);
 
-        // With default FlushInterval (Timeout.InfiniteTimeSpan), advancing time does not advance DurableWatermark
-        // until an explicit FlushAsync is called.
+        // With default FlushInterval (30 seconds), advancing time triggers a periodic atomic flush.
         await using (var env = new MultiNodeEnvironment())
         {
             var storage = new InMemoryJournalIndex();
             var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
             await using var node = await env.OpenNodeAsync(NodeA, storage, new JournalIndexOptions { QuickCheckInterval = Timeout.InfiniteTimeSpan }, timeProvider: time);
+            await env.BootstrapAsync(node, [NodeA]);
+            var ledgerId = node.Map.Current.Find(JournalRowKey.Encode("k").Span)!.Value.Open.Id;
+
+            await using var store = new JournalStore(node.Registry, env.Store, new JournalStoreOptions(), time, node.StateDb);
+            _ = await AppendAsync(store, "k", JournalVersion.Origin, "v1");
+            node.ApplyLoop.Wake(ledgerId);
+            await WaitUntilAsync(() => node.StateDb.Watermark(ledgerId) >= new Slot(1), Signal);
+            Assert.Equal(Slot.Zero, node.StateDb.DurableWatermark(ledgerId));
+
+            await WaitUntilAsync(
+                () =>
+                {
+                    time.Advance(TimeSpan.FromSeconds(30));
+                    return node.StateDb.DurableWatermark(ledgerId) >= new Slot(1);
+                },
+                Signal);
+        }
+
+        // With explicit Timeout.InfiniteTimeSpan, advancing time does not advance DurableWatermark
+        // until an explicit FlushAsync is called.
+        await using (var env = new MultiNodeEnvironment())
+        {
+            var storage = new InMemoryJournalIndex();
+            var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+            await using var node = await env.OpenNodeAsync(
+                NodeA,
+                storage,
+                new JournalIndexOptions { FlushInterval = Timeout.InfiniteTimeSpan, QuickCheckInterval = Timeout.InfiniteTimeSpan },
+                timeProvider: time);
             await env.BootstrapAsync(node, [NodeA]);
             var ledgerId = node.Map.Current.Find(JournalRowKey.Encode("k").Span)!.Value.Open.Id;
 
@@ -1002,34 +1032,6 @@ public sealed class JournalStateDatabaseTests : IDisposable
 
             await node.StateDb.FlushAsync(Token);
             Assert.Equal(new Slot(1), node.StateDb.DurableWatermark(ledgerId));
-        }
-
-        // With an explicit positive FlushInterval, advancing time triggers a periodic atomic flush.
-        await using (var env = new MultiNodeEnvironment())
-        {
-            var storage = new InMemoryJournalIndex();
-            var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
-            await using var node = await env.OpenNodeAsync(
-                NodeA,
-                storage,
-                new JournalIndexOptions { FlushInterval = TimeSpan.FromSeconds(2), QuickCheckInterval = Timeout.InfiniteTimeSpan },
-                timeProvider: time);
-            await env.BootstrapAsync(node, [NodeA]);
-            var ledgerId = node.Map.Current.Find(JournalRowKey.Encode("k").Span)!.Value.Open.Id;
-
-            await using var store = new JournalStore(node.Registry, env.Store, new JournalStoreOptions(), time, node.StateDb);
-            _ = await AppendAsync(store, "k", JournalVersion.Origin, "v1");
-            node.ApplyLoop.Wake(ledgerId);
-            await WaitUntilAsync(() => node.StateDb.Watermark(ledgerId) >= new Slot(1), Signal);
-            Assert.Equal(Slot.Zero, node.StateDb.DurableWatermark(ledgerId));
-
-            await WaitUntilAsync(
-                () =>
-                {
-                    time.Advance(TimeSpan.FromSeconds(2));
-                    return node.StateDb.DurableWatermark(ledgerId) >= new Slot(1);
-                },
-                Signal);
         }
     }
 

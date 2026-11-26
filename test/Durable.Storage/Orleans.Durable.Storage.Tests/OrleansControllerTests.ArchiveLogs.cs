@@ -650,18 +650,16 @@ public sealed partial class OrleansControllerTests
     }
 
     /// <summary>
-    /// orleans.md §5.2, §5.6: on archive logs, a silo stopped mid-drain, its drain's append held by a request which ends only
-    /// when released or cancelled, stops within its bounds. Step 2 waits for the drain round admitted before the hand-off,
-    /// for at most <c>TransitionTimeout</c>, and the held append keeps it waiting that long; step 4 then cancels the round,
-    /// whose held append ends with the cancellation, so the runtime's cancelled work ends within the second bound. Its
-    /// disposal, step 5, ends within what step 4 left of the bound, or is deferred with its warning to the silo's disposal,
-    /// which ends it within a bound of its own: neither the stop nor the silo's disposal logs a defect.
+    /// orleans.md §5.2, §5.6: on archive logs, a silo stopped mid-drain cancels background drains immediately at step 2
+    /// (<c>AdmittedWork</c>) instead of waiting <c>TransitionTimeout</c> for drains to finish; a drain whose append honors
+    /// cancellation unwinds promptly so the stop completes well within <c>TransitionTimeout</c> without outlasting admitted
+    /// control work or starving final flushes and checkpoints.
     /// </summary>
     [Fact(Timeout = 180_000)]
     public async Task ASiloStoppedMidDrainCancelsItsHeldAppendWithinItsBound()
     {
         _state.ArchiveStore = ArchiveStoreKind.Logs;
-        var bound = TimeSpan.FromSeconds(3);
+        var bound = TimeSpan.FromSeconds(5);
         _state.Control = options => options.TransitionTimeout = bound;
         var cluster = await DeployAsync(3, TestContext.Current.CancellationToken);
         _ = await ServedAsync(cluster, ranges: 3, done: value => Balanced(cluster, value));
@@ -682,10 +680,10 @@ public sealed partial class OrleansControllerTests
             _state.LogAppends.Release();
         }
 
-        Assert.InRange(StopTime(handle.Name, nameof(NodeLedgers), nameof(ServiceLifecycleStage.Active)), bound, bound * 2);
-        Assert.Contains(_state.StopEvents, line => line.Contains($"{handle.Name}:", StringComparison.Ordinal) && line.Contains("admitted control work outlasted", StringComparison.Ordinal));
+        Assert.InRange(StopTime(handle.Name, nameof(NodeLedgers), nameof(ServiceLifecycleStage.Active)), TimeSpan.Zero, bound);
         Assert.DoesNotContain(_state.StopEvents, line => line.Contains($"{handle.Name}:", StringComparison.Ordinal)
-            && (line.Contains("Journals' outstanding writes outlasted", StringComparison.Ordinal)
+            && (line.Contains("admitted control work outlasted", StringComparison.Ordinal)
+                || line.Contains("Journals' outstanding writes outlasted", StringComparison.Ordinal)
                 || line.Contains("spent the stop's whole bound", StringComparison.Ordinal)
                 || line.Contains("did not end within", StringComparison.Ordinal)));
     }
