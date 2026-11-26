@@ -3510,10 +3510,7 @@ internal sealed class LedgerAdmission : IAsyncDisposable
                 IsCommandOf(Command, entry.RowKind, bodyLength, bodyHead),
                 "The command the folds take is the archive command of the row the entry writes (journals.md §8.1).");
             var version = batch.BeginRow(RowKey.Span, entry.RowKind, before.ToRowVersion(), Token, bodyLength, bodyHead);
-            foreach (var span in _record.Payload)
-            {
-                batch.WriteBody(span);
-            }
+            _record.WritePayloadTo(batch);
 
             if (entry.HasMessages)
             {

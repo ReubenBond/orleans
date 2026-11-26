@@ -157,6 +157,7 @@ public sealed class DurableStorageConfigurationTests
         var options = services.GetRequiredService<IOptions<DurableStorageSiloOptions>>().Value;
 
         Assert.Equal(2, new ControlOptions().MaxConcurrentTransitions);
+        Assert.Equal(2, new ControlOptions().MaxConcurrentDrains);
         Assert.Equal(32, new ControlOptions().MaxConcurrentHandOffs);
         Assert.Equal(64, new ControlOptions().MaxConcurrentRepairs);
         Assert.Equal(64, new Orleans.Durable.Storage.Engine.Journals.JournalStoreOptions().MaxConcurrentHistoryReads);

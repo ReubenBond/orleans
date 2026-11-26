@@ -25,12 +25,27 @@ public readonly struct JournalEntryRecord : IDisposable
     internal const int MaxHeadLength = JournalEntry.MaxHeadLength;
 
     private readonly uint _crc32C;
+    private readonly ArcBuffer _payload;
+    private readonly ReadOnlySequence<byte> _borrowedPayload;
+    private readonly bool _hasBorrowedPayload;
 
     private JournalEntryRecord(JournalRowKey key, uint crc32C, ArcBuffer payload, JournalEntry entry)
     {
         Key = key;
         _crc32C = crc32C;
-        Payload = payload;
+        _payload = payload;
+        _borrowedPayload = default;
+        _hasBorrowedPayload = false;
+        Entry = entry;
+    }
+
+    private JournalEntryRecord(JournalRowKey key, uint crc32C, ReadOnlySequence<byte> borrowedPayload, JournalEntry entry)
+    {
+        Key = key;
+        _crc32C = crc32C;
+        _payload = default;
+        _borrowedPayload = borrowedPayload;
+        _hasBorrowedPayload = true;
         Entry = entry;
     }
 
@@ -41,13 +56,16 @@ public readonly struct JournalEntryRecord : IDisposable
     public JournalEntry Entry { get; }
 
     /// <summary>Gets the payload, whose lease the record owns; the default for every entry without one.</summary>
-    public ArcBuffer Payload { get; }
+    /// <exception cref="InvalidOperationException">The record borrows a <see cref="ReadOnlySequence{T}"/> payload rather than owning an <see cref="ArcBuffer"/>.</exception>
+    public ArcBuffer Payload => _hasBorrowedPayload
+        ? throw new InvalidOperationException("This JournalEntryRecord borrows a ReadOnlySequence<byte> payload; use WriteTo, ToArcBuffer, or construct from ArcBuffer.")
+        : _payload;
 
     /// <summary>Gets the attached message records, empty when none are attached.</summary>
     public ImmutableArray<MessageRecord> Messages => Entry.Messages;
 
     /// <summary>Gets the record's length in bytes: its head (including any messages) and its payload; 0 for the default record.</summary>
-    public long Length => Entry.HeadLength + (long)Payload.Length;
+    public long Length => Entry.HeadLength + Entry.PayloadLength;
 
     /// <summary>Gets the record's CRC-32C, its first four bytes.</summary>
     /// <exception cref="InvalidOperationException">The record is the default, which no encoding made.</exception>
@@ -127,6 +145,25 @@ public readonly struct JournalEntryRecord : IDisposable
         return Encode(key, JournalEntryKind.Append, expectedVersion, deletionTicks: null, payload.Retain(), validated);
     }
 
+    /// <summary>
+    /// Encodes an <c>Append</c> borrowing <paramref name="payload"/> without copying (JS-I5, JS-I11). The caller must
+    /// keep <paramref name="payload"/>'s backing memory pinned and immutable across any synchronous write,
+    /// <see cref="WriteTo"/>, or <see cref="ToArcBuffer"/> call; asynchronous admission paths detach a copy on demand.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="payload"/> is empty, or a message is default or exceeds wire limits.</exception>
+    public static JournalEntryRecord AppendBorrowed(JournalRowKey key, JournalVersion expectedVersion, ReadOnlySequence<byte> payload, ReadOnlySpan<MessageRecord> messages = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (payload.IsEmpty)
+        {
+            throw new ArgumentException("An Append adds a non-empty payload.", nameof(payload));
+        }
+
+        var validated = DetachMessages(messages);
+        return EncodeBorrowed(key, JournalEntryKind.Append, expectedVersion, payload, validated);
+    }
+
     /// <summary>Encodes a <c>Replace</c> with <paramref name="snapshot"/>, possibly empty, at <paramref name="expectedVersion"/>, retaining its own lease on it.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
     /// <exception cref="InvalidOperationException"><paramref name="snapshot"/> has been released.</exception>
@@ -142,6 +179,18 @@ public readonly struct JournalEntryRecord : IDisposable
         ArgumentNullException.ThrowIfNull(key);
         var validated = DetachMessages(messages);
         return Encode(key, JournalEntryKind.Replace, expectedVersion, deletionTicks: null, snapshot.Retain(), validated);
+    }
+
+    /// <summary>
+    /// Encodes a <c>Replace</c> borrowing <paramref name="snapshot"/> without copying (JS-I5, JS-I11). The caller must
+    /// keep <paramref name="snapshot"/>'s backing memory pinned and immutable across any synchronous write,
+    /// <see cref="WriteTo"/>, or <see cref="ToArcBuffer"/> call; asynchronous admission paths detach a copy on demand.
+    /// </summary>
+    public static JournalEntryRecord ReplaceBorrowed(JournalRowKey key, JournalVersion expectedVersion, ReadOnlySequence<byte> snapshot, ReadOnlySpan<MessageRecord> messages = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var validated = DetachMessages(messages);
+        return EncodeBorrowed(key, JournalEntryKind.Replace, expectedVersion, snapshot, validated);
     }
 
     /// <summary>Encodes a <c>Delete</c> at <paramref name="expectedVersion"/>, stamped with <paramref name="deletedAt"/> in UTC.</summary>
@@ -208,7 +257,19 @@ public readonly struct JournalEntryRecord : IDisposable
         }
 
         var written = WriteHeadTo(destination);
-        written += Payload.CopyTo(destination[written..]);
+        if (_hasBorrowedPayload)
+        {
+            if (!_borrowedPayload.IsEmpty)
+            {
+                _borrowedPayload.CopyTo(destination[written..]);
+                written += checked((int)_borrowedPayload.Length);
+            }
+        }
+        else
+        {
+            written += _payload.CopyTo(destination[written..]);
+        }
+
         Debug.Assert(written == total, "Written record length matches Length.");
         return written;
     }
@@ -236,13 +297,52 @@ public readonly struct JournalEntryRecord : IDisposable
             WriteMessagesToWriter(writer, Entry.Messages.AsSpan());
         }
 
-        Payload.CopyTo(writer);
+        if (_hasBorrowedPayload)
+        {
+            if (!_borrowedPayload.IsEmpty)
+            {
+                writer.Write(_borrowedPayload);
+            }
+        }
+        else
+        {
+            _payload.CopyTo(writer);
+        }
+
         Debug.Assert(writer.Length == Length, "Written buffer length matches Length.");
         return writer.ConsumeSlice(writer.Length);
     }
 
     /// <summary>Releases the record's lease on its payload.</summary>
-    public void Dispose() => Payload.Dispose();
+    public void Dispose()
+    {
+        if (!_hasBorrowedPayload)
+        {
+            _payload.Dispose();
+        }
+    }
+
+    /// <summary>Writes the record's payload bytes directly into <paramref name="batch"/> without intermediate copying.</summary>
+    internal void WritePayloadTo(LedgerBatch batch)
+    {
+        if (_hasBorrowedPayload)
+        {
+            foreach (var segment in _borrowedPayload)
+            {
+                if (!segment.IsEmpty)
+                {
+                    batch.WriteBody(segment.Span);
+                }
+            }
+
+            return;
+        }
+
+        foreach (var span in _payload)
+        {
+            batch.WriteBody(span);
+        }
+    }
 
     /// <summary>
     /// Encodes an <c>Expired</c> of the deleted state at <paramref name="expectedVersion"/> (journals.md §2.1, §8.6). Only
@@ -255,14 +355,19 @@ public readonly struct JournalEntryRecord : IDisposable
         return Encode(key, JournalEntryKind.Expired, expectedVersion, deletionTicks: null, payload: default, []);
     }
 
-    /// <summary>Returns a record which holds its own lease on the payload; the caller disposes it.</summary>
-    internal JournalEntryRecord Retain() => new(Key, _crc32C, Payload.Retain(), Entry);
+    /// <summary>
+    /// Returns a record which holds its own owned <see cref="ArcBuffer"/> lease on the payload (detaching a borrowed
+    /// <see cref="ReadOnlySequence{T}"/> into a pooled buffer when needed); the caller disposes it.
+    /// </summary>
+    internal JournalEntryRecord Retain() => _hasBorrowedPayload
+        ? new(Key, _crc32C, ArcBuffer.CopyFrom(_borrowedPayload), Entry)
+        : new(Key, _crc32C, _payload.Retain(), Entry);
 
     /// <summary>
     /// Returns this record's key, CRC-32C, and fields (preserving <see cref="Messages"/>) without its payload,
     /// which the caller still owns.
     /// </summary>
-    internal JournalEntryRecord WithoutPayload() => new(Key, _crc32C, default, Entry);
+    internal JournalEntryRecord WithoutPayload() => new(Key, _crc32C, default(ArcBuffer), Entry);
 
     /// <summary>Validates and copies caller-supplied messages into one detached immutable buffer.</summary>
     private static ImmutableArray<MessageRecord> DetachMessages(ReadOnlySpan<MessageRecord> messages)
@@ -341,6 +446,24 @@ public readonly struct JournalEntryRecord : IDisposable
         var headLength = checked(fixedHeadLength + messagesWireLength);
         var crc32C = ComputeCrc(key, fixedHead[JournalEntry.CrcLength..fixedHeadLength], hasMessages ? messages.AsSpan() : default, payload);
         var entry = new JournalEntry(kind, expectedVersion, deletionTicks ?? 0, headLength: headLength, payloadLength: payload.Length, messages);
+        return new JournalEntryRecord(key, crc32C, payload, entry);
+    }
+
+    private static JournalEntryRecord EncodeBorrowed(
+        JournalRowKey key,
+        JournalEntryKind kind,
+        JournalVersion expectedVersion,
+        ReadOnlySequence<byte> payload,
+        ImmutableArray<MessageRecord> messages)
+    {
+        Debug.Assert(kind is JournalEntryKind.Append or JournalEntryKind.Replace, "Borrowed payloads are used for Append and Replace.");
+        var hasMessages = !messages.IsDefaultOrEmpty;
+        Span<byte> fixedHead = stackalloc byte[FixedMaxHeadLength];
+        var fixedHeadLength = WriteFixedHeadAfterCrc(fixedHead, kind, hasMessages, expectedVersion, deletionTicks: null);
+        var messagesWireLength = hasMessages ? MessagesWireLength(messages.AsSpan()) : 0;
+        var headLength = checked(fixedHeadLength + messagesWireLength);
+        var crc32C = ComputeCrc(key, fixedHead[JournalEntry.CrcLength..fixedHeadLength], hasMessages ? messages.AsSpan() : default, payload);
+        var entry = new JournalEntry(kind, expectedVersion, deletionTicks: 0, headLength: headLength, payloadLength: payload.Length, messages);
         return new JournalEntryRecord(key, crc32C, payload, entry);
     }
 
@@ -444,6 +567,47 @@ public readonly struct JournalEntryRecord : IDisposable
         foreach (var span in payload)
         {
             crc.Append(span);
+        }
+
+        return crc.Hash;
+    }
+
+    private static uint ComputeCrc(
+        JournalRowKey key,
+        ReadOnlySpan<byte> fixedHeadAfterCrc,
+        ReadOnlySpan<MessageRecord> messages,
+        ReadOnlySequence<byte> payload)
+    {
+        using var crc = JournalCrc.Start();
+        crc.Append(key.Span);
+        crc.Append(fixedHeadAfterCrc);
+        if (!messages.IsEmpty)
+        {
+            Span<byte> small = stackalloc byte[Varint.MaxLength];
+            small[0] = (byte)messages.Length;
+            crc.Append(small[..1]);
+            for (var i = 0; i < messages.Length; i++)
+            {
+                ref readonly var item = ref messages[i];
+                var channel = item.Channel.Span;
+                small[0] = (byte)channel.Length;
+                crc.Append(small[..1]);
+                crc.Append(channel);
+                var varintLength = Varint.Write(small, (ulong)item.Payload.Length);
+                crc.Append(small[..varintLength]);
+                if (!item.Payload.IsEmpty)
+                {
+                    crc.Append(item.Payload.Span);
+                }
+            }
+        }
+
+        foreach (var segment in payload)
+        {
+            if (!segment.IsEmpty)
+            {
+                crc.Append(segment.Span);
+            }
         }
 
         return crc.Hash;

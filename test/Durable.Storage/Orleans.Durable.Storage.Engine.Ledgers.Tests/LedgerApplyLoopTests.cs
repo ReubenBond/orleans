@@ -48,6 +48,72 @@ public sealed class LedgerApplyLoopTests : IDisposable
         Assert.Equal(Enumerable.Range(0, (int)End).Select(static slot => (long)slot), applier.Slots);
         Assert.Equal(expected, applier.Rows);
         Assert.True(lacking.Lacked > 0, "The node's own replica was never asked for a slot it lacks.");
+        Assert.Equal(0, lacking.RepairWrites);
+    }
+
+    /// <summary>
+    /// On an open ledger, a catch-up scan still read-repairs slots its own replica lacked, while once the ledger is
+    /// recorded <c>Closed(T)</c> in the map, <see cref="LedgerReader"/> suppresses read repair so rejoining replicas do
+    /// not write futile recovery batches to closed ledgers pending drain and drop (ledgers.md §8.5).
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task OpenLedgerCatchUpRepairsLackingReplicaWhileClosedLedgerSkipsReadRepair()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var transport = new InMemoryLedgerReplicaTransport();
+        var (map, open, _) = await LedgerSegmentScript.WriteAsync(transport, token);
+        var learned = await RetainedTailAsync(transport, token);
+        var lacking = new LackingTransport(transport, Node, lacks: [1, 5]);
+        await using var reader = new LedgerReader(map.View, lacking, new FakeTimeProvider(), Node);
+        var applier = new RecordingApplier(Slot.Zero);
+
+        await using (new LedgerApplyLoop(reader, applier.Callbacks, new FakeTimeProvider()))
+        {
+            await applier.Until(applied => applied.Next == learned).WaitAsync(Signal, TimeProvider.System, token);
+        }
+
+        Assert.True(lacking.Lacked >= 2);
+        Assert.True(lacking.RepairWrites >= 2, $"Expected open ledger catch-up to repair lacked slots, saw {lacking.RepairWrites}.");
+    }
+
+    /// <summary>
+    /// <see cref="LedgerApplyLoop"/> bounds concurrent in-flight scan reads across all ledger deliveries on a node via a
+    /// shared window so rejoin catch-up across many ledgers does not flood peer read lanes (ledgers.md §8.5).
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task ConcurrentDeliveriesShareTheNodeWideScanReadWindow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var transport = new InMemoryLedgerReplicaTransport();
+        var (map, open, _) = await LedgerSegmentScript.WriteAsync(transport, token);
+        var closed = await LedgerSegmentScript.RecoverAsync(map, transport, open, token);
+        await map.PublishAsync(new LedgerMapValue(2, new LedgerId(LedgerSegmentScript.Id.Value + 1), 0, [closed]), token);
+
+        const int MaxWindow = 2;
+        var inFlight = 0;
+        var maxObserved = 0;
+        var bounded = new ConcurrencyTrackingTransport(
+            transport,
+            onEnter: () =>
+            {
+                var current = Interlocked.Increment(ref inFlight);
+                var prev = Volatile.Read(ref maxObserved);
+                while (current > prev && Interlocked.CompareExchange(ref maxObserved, current, prev) != prev)
+                {
+                    prev = Volatile.Read(ref maxObserved);
+                }
+            },
+            onExit: () => _ = Interlocked.Decrement(ref inFlight));
+
+        await using var reader = new LedgerReader(map.View, bounded, new FakeTimeProvider(), Node);
+        var applier = new RecordingApplier(Slot.Zero);
+
+        await using (new LedgerApplyLoop(reader, applier.Callbacks, new FakeTimeProvider(), maxConcurrentScanReads: MaxWindow))
+        {
+            await applier.Until(applied => applied.Next == End).WaitAsync(Signal, TimeProvider.System, token);
+        }
+
+        Assert.InRange(Volatile.Read(ref maxObserved), 1, MaxWindow);
     }
 
     /// <summary>
@@ -239,9 +305,13 @@ public sealed class LedgerApplyLoopTests : IDisposable
     {
         private readonly System.Collections.Concurrent.ConcurrentDictionary<long, int> _reads = new();
         private int _lacked;
+        private int _repairWrites;
 
         /// <summary>Gets how many reads of a slot it lacks the node's replica answered missing.</summary>
         public int Lacked => Volatile.Read(ref _lacked);
+
+        /// <summary>Gets how many recovery writes (read repairs) targeted the lacking node's replica.</summary>
+        public int RepairWrites => Volatile.Read(ref _repairWrites);
 
         /// <summary>Returns how many reads of <paramref name="slot"/> the node's replica served.</summary>
         public int ReadsOf(long slot) => _reads.GetValueOrDefault(slot);
@@ -259,7 +329,15 @@ public sealed class LedgerApplyLoopTests : IDisposable
 
             return new DelegatingLedgerReplica
             {
-                Write = replica.WriteAsync,
+                Write = (slot, payload, tail, recovery, token) =>
+                {
+                    if (recovery)
+                    {
+                        _ = Interlocked.Increment(ref _repairWrites);
+                    }
+
+                    return replica.WriteAsync(slot, payload, tail, recovery, token);
+                },
                 Read = (slot, tail, token) =>
                 {
                     _ = _reads.AddOrUpdate(slot.Value, 1, static (_, count) => count + 1);
@@ -270,6 +348,36 @@ public sealed class LedgerApplyLoopTests : IDisposable
 
                     _ = Interlocked.Increment(ref _lacked);
                     return ValueTask.FromResult<ReplicaRead>(ReplicaRead.Missing.Instance);
+                },
+                ReadTail = replica.ReadTailAsync,
+                Disposal = replica.DisposeAsync,
+            };
+        }
+    }
+
+    private sealed class ConcurrencyTrackingTransport(ILedgerReplicaTransport inner, Action onEnter, Action onExit) : ILedgerReplicaTransport
+    {
+        public ValueTask<ReplicaHeartbeatRead> HeartbeatAsync(NodeId target, ReadOnlyMemory<LedgerId> ledgers, CancellationToken cancellationToken = default) =>
+            inner.HeartbeatAsync(target, ledgers, cancellationToken);
+
+        public ILedgerReplica Open(NodeId target, LedgerId ledger, LedgerReplicaOptions options)
+        {
+            var replica = inner.Open(target, ledger, options);
+            return new DelegatingLedgerReplica
+            {
+                Write = replica.WriteAsync,
+                Read = async (slot, tail, token) =>
+                {
+                    onEnter();
+                    try
+                    {
+                        await Task.Yield();
+                        return await replica.ReadAsync(slot, tail, token).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        onExit();
+                    }
                 },
                 ReadTail = replica.ReadTailAsync,
                 Disposal = replica.DisposeAsync,

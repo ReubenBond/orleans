@@ -29,6 +29,7 @@ internal sealed partial class LedgerQuorum
     // The slots whose repairs are in flight, at most K (ledger-protocol.md §8.3).
     private readonly ConcurrentDictionary<long, byte> _repairing = new();
     private int _repairsInFlight;
+    private int _suppressReadRepair;
     private int _hedgeBudget = HedgeBudgetCapacity;
     private uint _readRotation;
     private long _readHedges;
@@ -485,6 +486,9 @@ internal sealed partial class LedgerQuorum
     /// <summary>Returns whether a replica's read failed because the replica's copy fails its integrity check (LR-I2).</summary>
     private static bool IsCorrupt(Task<ReplicaRead> completed) => completed.Exception?.InnerException is LedgerReplicaCorruptException;
 
+    /// <inheritdoc/>
+    public void SuppressReadRepair() => Volatile.Write(ref _suppressReadRepair, 1);
+
     /// <summary>
     /// Copies the batch a whole read below the known contiguous tail found to its preferred replica, which answered missing
     /// or corrupt, with a recovery write carrying <paramref name="contiguousTail"/> (read repair, LP-I7, LP-I10). The slot
@@ -499,7 +503,7 @@ internal sealed partial class LedgerQuorum
     /// </summary>
     private void Repair(ReadTarget target, ArcBuffer batch, Slot contiguousTail)
     {
-        if (target.IsByteRange || _preferredReplica is not { } preferred || _verifyBatch is not { } verify || !verify(batch))
+        if (Volatile.Read(ref _suppressReadRepair) != 0 || target.IsByteRange || _preferredReplica is not { } preferred || _verifyBatch is not { } verify || !verify(batch))
         {
             return;
         }

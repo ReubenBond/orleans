@@ -6,7 +6,6 @@ using System.Globalization;
 using System.IO.Hashing;
 using Microsoft.Extensions.Options;
 using Orleans.Durable.Journaling;
-using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Journals;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Storage;
@@ -179,10 +178,17 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
     public ValueTask DeleteAsync(CancellationToken cancellationToken) =>
         WriteAsync(WriteKind.Delete, ReadOnlySequence<byte>.Empty, ReadOnlyMemory<JournalMessageRecord>.Empty, cancellationToken);
 
+    private static string OperationName(WriteKind kind) => kind switch
+    {
+        WriteKind.Append => nameof(AppendAsync),
+        WriteKind.Replace => nameof(ReplaceAsync),
+        WriteKind.Delete => nameof(DeleteAsync),
+        _ => throw new UnreachableException(),
+    };
+
     private async ValueTask WriteAsync(WriteKind kind, ReadOnlySequence<byte> body, ReadOnlyMemory<JournalMessageRecord> messages, CancellationToken cancellationToken)
     {
-        var operation = string.Create(CultureInfo.InvariantCulture, $"{kind}Async");
-        var expected = _version ?? throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"{operation} requires reading the journal first."));
+        var expected = _version ?? throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"{OperationName(kind)} requires reading the journal first."));
         if (body.Length > _maxBodyBytes)
         {
             throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"A journal entry's body is at most MaxBodyBytes, {_maxBodyBytes} bytes, not {body.Length}."), "value");
@@ -197,14 +203,16 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
             throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"The archive store cannot name the journal '{_key}'."));
         }
 
-        using var payload = Copy(body);
         var retried = false;
         while (true)
         {
+            // Borrow body directly without an intermediate ArcBuffer copy: JournaledStateManager keeps the buffer
+            // pinned and immutable for the duration of WriteAsync, and LedgerAdmission detaches a copy only if the
+            // entry is queued asynchronously.
             using var record = kind switch
             {
-                WriteKind.Append => JournalEntryRecord.Append(_rowKey, expected, payload, engineMessages.AsSpan()),
-                WriteKind.Replace => JournalEntryRecord.Replace(_rowKey, expected, payload, engineMessages.AsSpan()),
+                WriteKind.Append => JournalEntryRecord.AppendBorrowed(_rowKey, expected, body, engineMessages.AsSpan()),
+                WriteKind.Replace => JournalEntryRecord.ReplaceBorrowed(_rowKey, expected, body, engineMessages.AsSpan()),
                 WriteKind.Delete => JournalEntryRecord.Delete(_rowKey, expected, _timeProvider.GetUtcNow(), engineMessages.AsSpan()),
                 _ => throw new UnreachableException(),
             };
@@ -223,15 +231,15 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
                     retried = true;
                     continue;
                 case JournalWriteOutcome.Rejected rejected:
-                    throw Inconsistent(operation, rejected.CurrentVersion.ToString(), expected, "a state the journal held conflicts with this storage instance's version");
+                    throw Inconsistent(OperationName(kind), rejected.CurrentVersion.ToString(), expected, "a state the journal held conflicts with this storage instance's version");
                 case JournalWriteOutcome.ReplaceRequired:
                     _replaceLatched = true;
-                    throw Inconsistent(operation, expected.ToString(), expected, "the archive store takes no Append of the journal until a Replace");
+                    throw Inconsistent(OperationName(kind), expected.ToString(), expected, "the archive store takes no Append of the journal until a Replace");
                 case JournalWriteOutcome.Ambiguous:
-                    throw new JournalWriteOutcomeUnknownException(_key, operation);
+                    throw new JournalWriteOutcomeUnknownException(_key, OperationName(kind));
                 case JournalMoved:
                     // The router's stopped answer: the silo's runtime stopped before any send took effect.
-                    throw new ObjectDisposedException(nameof(JournalRouter), string.Create(CultureInfo.InvariantCulture, $"The silo's journal runtime stopped; {operation} of the journal '{_key}' had no effect."));
+                    throw new ObjectDisposedException(nameof(JournalRouter), string.Create(CultureInfo.InvariantCulture, $"The silo's journal runtime stopped; {OperationName(kind)} of the journal '{_key}' had no effect."));
                 default:
                     throw new UnreachableException();
             }
@@ -303,9 +311,6 @@ internal sealed class DurableJournalStorage : IMessageJournalStorage
 
     private InconsistentStateException Inconsistent(string operation, string? storedEtag, JournalVersion expected, string reason) =>
         new(string.Create(CultureInfo.InvariantCulture, $"Version conflict ({operation}): {reason} (journal '{_key}')."), storedEtag, expected.ToString());
-
-    /// <summary>Copies <paramref name="body"/>, which Orleans owns, into a buffer from Durable Storage's page pool, which the caller owns.</summary>
-    private static ArcBuffer Copy(ReadOnlySequence<byte> body) => ArcBuffer.CopyFrom(body);
 
     private ImmutableArray<MessageRecord> CopyMessages(ReadOnlyMemory<JournalMessageRecord> messages)
     {

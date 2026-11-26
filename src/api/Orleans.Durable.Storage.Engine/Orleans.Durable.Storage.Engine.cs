@@ -2653,6 +2653,8 @@ namespace Orleans.Durable.Storage.Engine.Journals
 
         public static JournalEntryRecord Append(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer payload) { throw null; }
 
+        public static JournalEntryRecord AppendBorrowed(JournalRowKey key, JournalVersion expectedVersion, System.Buffers.ReadOnlySequence<byte> payload, System.ReadOnlySpan<MessageRecord> messages = default) { throw null; }
+
         public static System.IO.InvalidDataException? Decode(JournalRowKey key, Buffers.ArcBuffer bytes, out JournalEntryRecord record) { throw null; }
 
         public static JournalEntryRecord Delete(JournalRowKey key, JournalVersion expectedVersion, System.DateTimeOffset deletedAt, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
@@ -2664,6 +2666,8 @@ namespace Orleans.Durable.Storage.Engine.Journals
         public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot, System.ReadOnlySpan<MessageRecord> messages) { throw null; }
 
         public static JournalEntryRecord Replace(JournalRowKey key, JournalVersion expectedVersion, Buffers.ArcBuffer snapshot) { throw null; }
+
+        public static JournalEntryRecord ReplaceBorrowed(JournalRowKey key, JournalVersion expectedVersion, System.Buffers.ReadOnlySequence<byte> snapshot, System.ReadOnlySpan<MessageRecord> messages = default) { throw null; }
 
         public readonly Buffers.ArcBuffer ToArcBuffer() { throw null; }
 

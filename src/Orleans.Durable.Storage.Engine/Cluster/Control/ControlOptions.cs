@@ -89,7 +89,7 @@ public sealed class ControlOptions
     /// within each. The exposed ledgers also have one slot reserved beyond these, so a node holds at most
     /// <c>MaxConcurrentDrains + 1</c> drains (orleans.md §5.6, OR-I23).
     /// </summary>
-    public int MaxConcurrentDrains { get; set; } = 8;
+    public int MaxConcurrentDrains { get; set; } = 2;
 
     /// <summary>
     /// Gets or sets how often a node reconciles its replicas, reports to the controller, and drains what is due

@@ -988,9 +988,13 @@ public sealed class LedgerReader : IAsyncDisposable
 
         /// <summary>
         /// Passes the ledger's recorded <c>T</c> to its <see cref="Ledgers.Ledger"/>, which raises its known contiguous
-        /// tail; repeating it changes nothing (LP-I11).
+        /// tail and suppresses read repair on the closed ledger (LP-I7, LP-I11); repeating it changes nothing.
         /// </summary>
-        public void ObserveRecordedTail(Slot recordedTail) => Ledger.ObserveRecordedTail(recordedTail);
+        public void ObserveRecordedTail(Slot recordedTail)
+        {
+            Ledger.ObserveRecordedTail(recordedTail);
+            Ledger.SuppressReadRepair();
+        }
 
         private void TryStartDisposal()
         {

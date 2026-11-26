@@ -45,6 +45,28 @@ public sealed class JournalEntryCodecTests : IDisposable
                 using var again = forwarded.ToArcBuffer();
                 Assert.Equal(array, again.ToArray());
             }
+
+            if (sample.Kind is JournalEntryKind.Append or JournalEntryKind.Replace)
+            {
+                var sequence = Segments.Of(sample.Payload, segment);
+                using var borrowed = sample.Kind == JournalEntryKind.Append
+                    ? JournalEntryRecord.AppendBorrowed(key, record.Entry.ExpectedVersion, sequence, record.Entry.Messages.AsSpan())
+                    : JournalEntryRecord.ReplaceBorrowed(key, record.Entry.ExpectedVersion, sequence, record.Entry.Messages.AsSpan());
+                Assert.Equal(record.Crc32C, borrowed.Crc32C);
+                Assert.Equal(record.Length, borrowed.Length);
+                Assert.Throws<InvalidOperationException>(() => _ = borrowed.Payload);
+
+                var spanBytes = new byte[borrowed.Length];
+                Assert.Equal(array.Length, borrowed.WriteTo(spanBytes));
+                Assert.Equal(array, spanBytes);
+
+                using var fromBorrowed = borrowed.ToArcBuffer();
+                Assert.Equal(array, fromBorrowed.ToArray());
+
+                using var retained = borrowed.Retain();
+                Assert.Equal(sample.Payload, retained.Payload.ToArray());
+                Assert.Equal(record.Crc32C, retained.Crc32C);
+            }
         }));
 
     /// <summary>

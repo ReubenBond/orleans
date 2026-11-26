@@ -20,11 +20,12 @@ namespace Orleans.Durable.Storage;
 /// <para>
 /// A call refuses a payload or range above the payload limit with <see cref="ArgumentException"/> before it is sent
 /// (OR-I17), takes one deadline, Orleans' response timeout from when the call is made, against which every wait it makes
-/// counts, and then waits for its node's budget in one of two FIFO lanes (<see cref="NodeCallBudget"/>): writes and reads
-/// share the data lane, at most <see cref="ReplicaCallLimits.MaxNodeCalls"/> calls and
-/// <see cref="ReplicaCallLimits.MaxNodeCallBytes"/> of request payloads and replies outstanding to the node; contiguous-tail
-/// reads and seals take the control lane, at most <see cref="ReplicaCallLimits.MaxNodeControlCalls"/> calls, so the failover
-/// path never waits behind large writes. A call beyond its lane waits in arrival order and fails with
+/// counts, and then waits for its node's budget in one of three FIFO lanes (<see cref="NodeCallBudget"/>): writes take the
+/// write lane and reads take the read lane, each at most <see cref="ReplicaCallLimits.MaxNodeCalls"/> calls and
+/// <see cref="ReplicaCallLimits.MaxNodeCallBytes"/> of payloads outstanding to the node so background catch-up or drain
+/// reads never head-of-line block foreground quorum writes; contiguous-tail reads, seals, and heartbeats take the control
+/// lane, at most <see cref="ReplicaCallLimits.MaxNodeControlCalls"/> calls, so the failover path never waits behind large
+/// writes or reads. A call beyond its lane waits in arrival order and fails with
 /// <see cref="LedgerReplicaQueueTimeoutException"/>, unsent, only once its deadline passes.
 /// </para>
 /// <para>
@@ -56,7 +57,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     private readonly LocalNode _local;
     private readonly Func<NodeId, ILedgerStoreGrain> _grain;
     private readonly Action _invalidate;
-    private readonly Func<NodeId, bool>? _isNodeActive;
+    private readonly NodeRegistryResolver? _resolver;
+    private readonly IClusterMembershipService? _membership;
+    private readonly Func<NodeId, SiloAddress?>? _resolveActiveSilo;
     private readonly Action _invalidateIfStale;
     private readonly Func<NodeId, long, int, TimeProvider, CallBudget> _createBudget;
     private readonly ConcurrentDictionary<NodeId, NodeBudgets> _budgets = new();
@@ -81,10 +84,13 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             NodeCallBudget.Create,
             new Random(),
             timeProvider,
-            node => IsNodeActive(resolver, membership, node),
+            resolveActiveSilo: null,
             resolver.RequestRereadIfStale)
     {
+        ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(membership);
+        _resolver = resolver;
+        _membership = membership;
     }
 
     /// <summary>Initializes a new instance of the <see cref="OrleansLedgerReplicaTransport"/> class over explicit seams.</summary>
@@ -95,8 +101,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     /// <param name="createBudget">Creates one of a node's lanes, from the node, its bytes, its calls, and the clock.</param>
     /// <param name="jitter">Jitters the backoff.</param>
     /// <param name="timeProvider">Times the deadlines and the backoff.</param>
-    /// <param name="isNodeActive">Optional check returning whether a remote node currently has an active silo in membership.</param>
-    /// <param name="invalidateIfStale">Optional stale-registry re-read trigger invoked when <paramref name="isNodeActive"/> returns <see langword="false"/>.</param>
+    /// <param name="resolveActiveSilo">Optional resolver returning the active <see cref="SiloAddress"/> for a remote node, or <see langword="null"/> when inactive.</param>
+    /// <param name="invalidateIfStale">Optional stale-registry re-read trigger invoked when a remote node is inactive or stopping.</param>
     internal OrleansLedgerReplicaTransport(
         LocalNode local,
         Func<NodeId, ILedgerStoreGrain> grain,
@@ -105,7 +111,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         Func<NodeId, long, int, TimeProvider, CallBudget> createBudget,
         Random jitter,
         TimeProvider timeProvider,
-        Func<NodeId, bool>? isNodeActive = null,
+        Func<NodeId, SiloAddress?>? resolveActiveSilo = null,
         Action? invalidateIfStale = null)
     {
         ArgumentNullException.ThrowIfNull(local);
@@ -118,7 +124,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         _local = local;
         _grain = grain;
         _invalidate = invalidate;
-        _isNodeActive = isNodeActive;
+        _resolveActiveSilo = resolveActiveSilo;
         _invalidateIfStale = invalidateIfStale ?? invalidate;
         Limits = limits;
         _createBudget = createBudget;
@@ -126,20 +132,106 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         _timeProvider = timeProvider;
     }
 
-    private static bool IsNodeActive(NodeRegistryResolver resolver, IClusterMembershipService membership, NodeId node) =>
-        resolver.Resolve(node) is { } silo && membership.CurrentSnapshot.GetSiloStatus(silo) == SiloStatus.Active;
-
     /// <summary>
-    /// Fast-fails calls targeting a remote node with no active registered silo in membership before entering
-    /// <see cref="CallBudget"/>, acquiring <see cref="SenderCopies"/>, or invoking Orleans grain placement
-    /// (avoiding <see cref="NodePlacementRefusedException"/> log storms during degraded quorum writes; orleans.md §5.12).
+    /// Fast-fails calls targeting a remote node with no active registered silo in membership or whose resolved silo
+    /// incarnation has already reported stopping/unavailable, before entering <see cref="CallBudget"/>, acquiring
+    /// <see cref="SenderCopies"/>, or invoking Orleans grain placement (orleans.md §5.12).
     /// </summary>
-    private void EnsureRemoteActive(NodeId node)
+    private SiloAddress? EnsureRemoteActive(NodeId node, NodeBudgets budgets)
     {
-        if (_isNodeActive is not null && !_isNodeActive(node))
+        SiloAddress? silo;
+        if (_resolver is not null && _membership is not null)
+        {
+            var registry = _resolver.Current;
+            var snapshot = _membership.CurrentSnapshot;
+            if (ReferenceEquals(registry, Volatile.Read(ref budgets.CachedRegistry))
+                && ReferenceEquals(snapshot, Volatile.Read(ref budgets.CachedSnapshot)))
+            {
+                silo = Volatile.Read(ref budgets.CachedActiveSilo);
+            }
+            else
+            {
+                var candidate = registry?.Find(node)?.Silo;
+                silo = candidate is not null && snapshot.GetSiloStatus(candidate) == SiloStatus.Active ? candidate : null;
+                budgets.UpdateActiveCache(registry, snapshot, silo);
+            }
+        }
+        else if (_resolveActiveSilo is not null)
+        {
+            silo = _resolveActiveSilo(node);
+        }
+        else
+        {
+            return null;
+        }
+
+        if (silo is null)
         {
             _invalidateIfStale();
             throw new LedgerReplicaUnavailableException(node, "the node has no active registered silo in membership.");
+        }
+
+        var stopping = Volatile.Read(ref budgets.StoppingSilo);
+        if (stopping is not null)
+        {
+            if (stopping.Equals(silo))
+            {
+                _invalidateIfStale();
+                throw new LedgerReplicaUnavailableException(node, string.Create(CultureInfo.InvariantCulture, $"silo {silo} for node {node} is stopping or unavailable."));
+            }
+
+            // The registry advanced to a newer active silo incarnation for this node: clear the stale stopping mark.
+            _ = Interlocked.CompareExchange(ref budgets.StoppingSilo, null, stopping);
+        }
+
+        return silo;
+    }
+
+    private void ObserveStoppingRefusal(NodeBudgets budgets, SiloAddress? activeSilo, ReplicaCallRefused refused)
+    {
+        if (refused.Kind == ReplicaRefusal.Stopping)
+        {
+            MarkIncarnationStopping(budgets, activeSilo);
+        }
+    }
+
+    private void ObserveCallFailure(NodeBudgets budgets, SiloAddress? activeSilo, Exception failure)
+    {
+        if (failure is NodePlacementRefusedException)
+        {
+            _invalidate();
+            return;
+        }
+
+        if (IsStoppingOrUnavailableFailure(failure))
+        {
+            MarkIncarnationStopping(budgets, activeSilo);
+        }
+    }
+
+    private void MarkIncarnationStopping(NodeBudgets budgets, SiloAddress? activeSilo)
+    {
+        if (activeSilo is not null)
+        {
+            Volatile.Write(ref budgets.StoppingSilo, activeSilo);
+            _invalidateIfStale();
+        }
+    }
+
+    private static bool IsStoppingOrUnavailableFailure(Exception failure) => failure switch
+    {
+        SiloUnavailableException => true,
+        OrleansMessageRejectionException { InnerException: SiloUnavailableException } => true,
+        OrleansMessageRejectionException rejection => rejection.Message.Contains("stopping", StringComparison.OrdinalIgnoreCase),
+        _ => false,
+    };
+
+    /// <summary>Clears any recorded stopping incarnation mark for <paramref name="node"/>; for tests that inject synthetic stopping replies on a live silo.</summary>
+    internal void ClearStoppingIncarnation(NodeId node)
+    {
+        if (_budgets.TryGetValue(node, out var budgets))
+        {
+            Volatile.Write(ref budgets.StoppingSilo, null);
         }
     }
 
@@ -150,7 +242,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     internal int SenderCopyCount => _senderCopies.Count;
 
     /// <summary>Gets every lane of every node called so far.</summary>
-    internal IEnumerable<CallBudget> Lanes => _budgets.Values.SelectMany(static budgets => new[] { budgets.Data, budgets.Control });
+    internal IEnumerable<CallBudget> Lanes => _budgets.Values.SelectMany(static budgets => new[] { budgets.Write, budgets.Read, budgets.Control });
 
     /// <inheritdoc/>
     /// <remarks>
@@ -307,7 +399,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
     private async ValueTask<ReplicaHeartbeatRead> HeartbeatRemoteAsync(NodeId node, ReadOnlyMemory<LedgerId> ledgers, CancellationToken cancellationToken)
     {
-        EnsureRemoteActive(node);
+        var budgets = Budgets(node);
+        _ = EnsureRemoteActive(node, budgets);
         var deadline = DeadlineFromNow();
         var rawLedgers = new ulong[ledgers.Length];
         var span = ledgers.Span;
@@ -322,11 +415,11 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             Ledgers = rawLedgers,
         };
         var grain = _grain(node);
-        var controlLane = ControlBudget(node);
+        var controlLane = budgets.Control;
         var backoff = FirstBackoff;
         while (true)
         {
-            EnsureRemoteActive(node);
+            var activeSilo = EnsureRemoteActive(node, budgets);
             TimeSpan delay;
             using (await controlLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false))
             {
@@ -337,11 +430,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 }
                 catch (Exception failure)
                 {
-                    if (failure is NodePlacementRefusedException)
-                    {
-                        _invalidate();
-                    }
-
+                    ObserveCallFailure(budgets, activeSilo, failure);
                     ExceptionDispatchInfo.Throw(LedgerReplicaCallResults.Failure(node, failure, cancellationToken));
                     throw new UnreachableException();
                 }
@@ -349,6 +438,10 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 if (answer.Value is NotThisNode)
                 {
                     _invalidate();
+                }
+                else if (answer.Value is ReplicaCallRefused refused)
+                {
+                    ObserveStoppingRefusal(budgets, activeSilo, refused);
                 }
 
                 if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextHeartbeatBackoff(deadline, backoff, out delay))
@@ -368,15 +461,19 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         return Remaining(deadline) > delay;
     }
 
-    /// <summary>Returns <paramref name="node"/>'s data lane, of writes and reads.</summary>
-    internal CallBudget Budget(NodeId node) => Budgets(node).Data;
+    /// <summary>Returns <paramref name="node"/>'s write lane.</summary>
+    internal CallBudget Budget(NodeId node) => Budgets(node).Write;
 
-    /// <summary>Returns <paramref name="node"/>'s control lane, of contiguous-tail reads and seals.</summary>
+    /// <summary>Returns <paramref name="node"/>'s read lane.</summary>
+    internal CallBudget ReadBudget(NodeId node) => Budgets(node).Read;
+
+    /// <summary>Returns <paramref name="node"/>'s control lane, of contiguous-tail reads, seals, and heartbeats.</summary>
     internal CallBudget ControlBudget(NodeId node) => Budgets(node).Control;
 
     private NodeBudgets Budgets(NodeId node) => _budgets.GetOrAdd(
         node,
         static (node, transport) => new NodeBudgets(
+            transport._createBudget(node, transport.Limits.MaxNodeCallBytes, transport.Limits.MaxNodeCalls, transport._timeProvider),
             transport._createBudget(node, transport.Limits.MaxNodeCallBytes, transport.Limits.MaxNodeCalls, transport._timeProvider),
             transport._createBudget(node, 1, transport.Limits.MaxNodeControlCalls, transport._timeProvider)),
         this);
@@ -508,8 +605,32 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         }
     }
 
-    /// <summary>A node's two lanes.</summary>
-    private sealed record NodeBudgets(CallBudget Data, CallBudget Control);
+    /// <summary>A node's three lanes (Write, Read, Control) plus its cached active/stopping silo incarnation state.</summary>
+    private sealed class NodeBudgets(CallBudget write, CallBudget read, CallBudget control)
+    {
+        private readonly Lock _cacheLock = new();
+
+        public CallBudget Write { get; } = write;
+
+        public CallBudget Read { get; } = read;
+
+        public CallBudget Control { get; } = control;
+
+        public NodeRegistryValue? CachedRegistry;
+        public ClusterMembershipSnapshot? CachedSnapshot;
+        public SiloAddress? CachedActiveSilo;
+        public SiloAddress? StoppingSilo;
+
+        public void UpdateActiveCache(NodeRegistryValue? registry, ClusterMembershipSnapshot snapshot, SiloAddress? activeSilo)
+        {
+            lock (_cacheLock)
+            {
+                Volatile.Write(ref CachedActiveSilo, activeSilo);
+                Volatile.Write(ref CachedSnapshot, snapshot);
+                Volatile.Write(ref CachedRegistry, registry);
+            }
+        }
+    }
 
     /// <summary>Base of the transport's replica handles: the node and disposal.</summary>
     private abstract class Replica(OrleansLedgerReplicaTransport transport, NodeId node) : ILedgerReplica
@@ -586,7 +707,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         };
 
         private readonly LedgerStoreReplica _replica;
-        private readonly CallBudget _dataLane;
+        private readonly CallBudget _writeLane;
+        private readonly CallBudget _readLane;
         private readonly CallBudget _controlLane;
 
         public LocalReplica(OrleansLedgerReplicaTransport transport, NodeId node, LedgerStoreReplica replica)
@@ -594,7 +716,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         {
             _replica = replica;
             var budgets = transport.Budgets(node);
-            _dataLane = budgets.Data;
+            _writeLane = budgets.Write;
+            _readLane = budgets.Read;
             _controlLane = budgets.Control;
         }
 
@@ -608,7 +731,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             try
             {
                 var deadline = Transport.DeadlineFromNow();
-                lease = await _dataLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false);
+                lease = await _writeLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false);
                 await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
                 operation = _replica.WriteAsync(slot, held, contiguousTail, recovery, CancellationToken.None);
             }
@@ -637,7 +760,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             try
             {
                 var deadline = Transport.DeadlineFromNow();
-                lease = await _dataLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
+                lease = await _readLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
                 await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
                 operation = _replica.ReadAsync(slot, contiguousTail, CancellationToken.None);
             }
@@ -664,7 +787,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             try
             {
                 var deadline = Transport.DeadlineFromNow();
-                lease = await _dataLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
+                lease = await _readLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
                 await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
                 operation = _replica.ReadAsync(slot, offset, length, contiguousTail, CancellationToken.None);
             }
@@ -807,7 +930,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         private readonly LedgerId _ledger;
         private readonly int _windowSize;
         private readonly ILedgerStoreGrain _grain;
-        private readonly CallBudget _dataLane;
+        private readonly NodeBudgets _budgets;
+        private readonly CallBudget _writeLane;
+        private readonly CallBudget _readLane;
         private readonly CallBudget _controlLane;
 
         public RemoteReplica(OrleansLedgerReplicaTransport transport, NodeId node, LedgerId ledger, int windowSize, ILedgerStoreGrain grain)
@@ -816,9 +941,10 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             _ledger = ledger;
             _windowSize = windowSize;
             _grain = grain;
-            var budgets = transport.Budgets(node);
-            _dataLane = budgets.Data;
-            _controlLane = budgets.Control;
+            _budgets = transport.Budgets(node);
+            _writeLane = _budgets.Write;
+            _readLane = _budgets.Read;
+            _controlLane = _budgets.Control;
         }
 
         public override async ValueTask<ReplicaWriteOutcome> WriteAsync(Slot slot, ArcBuffer payload, Slot contiguousTail, bool recovery, CancellationToken cancellationToken = default)
@@ -830,9 +956,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             var backoff = FirstBackoff;
             while (true)
             {
-                Transport.EnsureRemoteActive(Node);
+                var activeSilo = Transport.EnsureRemoteActive(Node, _budgets);
                 TimeSpan delay;
-                using (await _dataLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false))
+                using (await _writeLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false))
                 {
                     RemoteReplicaWriteOutcome answer;
                     try
@@ -855,13 +981,17 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                     }
                     catch (Exception failure)
                     {
-                        ThrowCallFailure(failure, cancellationToken);
+                        ThrowCallFailure(failure, activeSilo, cancellationToken);
                         throw new UnreachableException();
                     }
 
                     if (answer.Value is NotThisNode)
                     {
                         Transport._invalidate();
+                    }
+                    else if (answer.Value is ReplicaCallRefused refused)
+                    {
+                        Transport.ObserveStoppingRefusal(_budgets, activeSilo, refused);
                     }
 
                     if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
@@ -904,7 +1034,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             var backoff = FirstBackoff;
             while (true)
             {
-                Transport.EnsureRemoteActive(Node);
+                var activeSilo = Transport.EnsureRemoteActive(Node, _budgets);
                 TimeSpan delay;
                 using (await _controlLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false))
                 {
@@ -915,13 +1045,17 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                     }
                     catch (Exception failure)
                     {
-                        ThrowCallFailure(failure, cancellationToken);
+                        ThrowCallFailure(failure, activeSilo, cancellationToken);
                         throw new UnreachableException();
                     }
 
                     if (answer.Value is NotThisNode)
                     {
                         Transport._invalidate();
+                    }
+                    else if (answer.Value is ReplicaCallRefused refused)
+                    {
+                        Transport.ObserveStoppingRefusal(_budgets, activeSilo, refused);
                     }
 
                     if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
@@ -959,9 +1093,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 var backoff = FirstBackoff;
                 while (true)
                 {
-                    Transport.EnsureRemoteActive(Node);
+                    var activeSilo = Transport.EnsureRemoteActive(Node, _budgets);
                     TimeSpan delay;
-                    using (await _dataLane.EnterLeaseAsync(reserved, deadline, cancellationToken).ConfigureAwait(false))
+                    using (await _readLane.EnterLeaseAsync(reserved, deadline, cancellationToken).ConfigureAwait(false))
                     {
                         RemoteReplicaRead answer;
                         try
@@ -970,13 +1104,17 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                         }
                         catch (Exception failure)
                         {
-                            ThrowCallFailure(failure, cancellationToken);
+                            ThrowCallFailure(failure, activeSilo, cancellationToken);
                             throw new UnreachableException();
                         }
 
                         if (answer.Value is NotThisNode)
                         {
                             Transport._invalidate();
+                        }
+                        else if (answer.Value is ReplicaCallRefused refused)
+                        {
+                            Transport.ObserveStoppingRefusal(_budgets, activeSilo, refused);
                         }
 
                         if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
@@ -997,13 +1135,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             }
         }
 
-        private void ThrowCallFailure(Exception failure, CancellationToken cancellationToken)
+        private void ThrowCallFailure(Exception failure, SiloAddress? activeSilo, CancellationToken cancellationToken)
         {
-            if (failure is NodePlacementRefusedException)
-            {
-                Transport._invalidate();
-            }
-
+            Transport.ObserveCallFailure(_budgets, activeSilo, failure);
             ExceptionDispatchInfo.Throw(LedgerReplicaCallResults.Failure(Node, failure, cancellationToken));
         }
 

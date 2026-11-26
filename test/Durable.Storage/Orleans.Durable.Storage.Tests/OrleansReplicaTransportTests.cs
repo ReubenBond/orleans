@@ -158,17 +158,20 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
         var transport = Cluster.Transport(Caller);
         var context = new ReplicaResultTable.Context(replica, transport.Limits.MaxReadReplyBytes);
         var rows = new List<ReplicaResultTable.RowReport>();
+        var calleeNode = Cluster.Node(Callee).Node;
         try
         {
             foreach (var row in ReplicaResultTable.AnswerRows(transport.Limits.MaxReadReplyBytes))
             {
                 Cluster.CalleeScript = row.WireAnswer ?? row.Answer;
                 rows.Add(await ReplicaResultTable.RunAsync(row, context).WaitAsync(TestContext.Current.CancellationToken));
+                transport.ClearStoppingIncarnation(calleeNode);
             }
         }
         finally
         {
             Cluster.CalleeScript = null;
+            transport.ClearStoppingIncarnation(calleeNode);
         }
 
         rows.Add(await ReplicaResultTable.CancelledWhileQueuedAsync(context, transport.Budget(Cluster.Node(Callee).Node)));

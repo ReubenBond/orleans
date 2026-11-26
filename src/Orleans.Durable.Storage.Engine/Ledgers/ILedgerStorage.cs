@@ -99,6 +99,13 @@ internal interface ILedgerStorage : IAsyncDisposable
     ValueTask<Slot> LearnTailAsync(Slot acknowledged, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Suppresses read-repair recovery writes on the preferred replica for this storage (used by
+    /// <see cref="LedgerReader"/> once the ledger map records the ledger as <c>Closed(T)</c>, where every slot below
+    /// <c>T</c> is already durable on <c>Q</c> replicas per LP-I7 and the ledger is pending drain and drop).
+    /// </summary>
+    void SuppressReadRepair() { }
+
+    /// <summary>
     /// Stops the reads, seal checks, and recoveries, in progress and later, which fail with
     /// <see cref="ObjectDisposedException"/>, while writes go on (ledger-protocol.md §6.3).
     /// </summary>

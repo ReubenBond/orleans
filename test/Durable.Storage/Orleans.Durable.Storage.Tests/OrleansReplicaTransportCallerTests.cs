@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Testing;
@@ -366,9 +367,9 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
     }
 
     /// <summary>
-    /// OR-I17: a remote whole read reserves the read reply and a ranged read its length in the data lane until its reply
-    /// arrives; a local read reserves no bytes, so it runs while the lane's bytes are all held; and contiguous-tail reads
-    /// and seals take the control lane, by call count alone, apart from the data lane.
+    /// OR-I17: writes take the write lane, reads take the separate read lane (reserving the read reply or range length
+    /// remotely, and zero bytes locally), and contiguous-tail reads and seals take the control lane, so saturating one
+    /// lane never blocks the others on either local or remote nodes.
     /// </summary>
     [Fact]
     public async Task ReadsReserveTheirRepliesAndTailReadsTakeTheControlLane()
@@ -376,18 +377,20 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         var token = TestContext.Current.CancellationToken;
         await using var scenario = await TransportScenario.CreateAsync();
         var remote = scenario.Open(local: false);
-        var lane = scenario.Transport.Budget(scenario.Remote);
+        var writeLane = scenario.Transport.Budget(scenario.Remote);
+        var readLane = scenario.Transport.ReadBudget(scenario.Remote);
         var control = scenario.Transport.ControlBudget(scenario.Remote);
 
         var whole = remote.ReadAsync(new Slot(0), Slot.Zero, token).AsTask();
         await scenario.Grain.WaitSentAsync(1);
-        Assert.Equal((TransportScenario.ReadReply, 1L), (lane.OutstandingBytes, (long)lane.OutstandingCalls));
+        Assert.Equal((TransportScenario.ReadReply, 1L), (readLane.OutstandingBytes, (long)readLane.OutstandingCalls));
+        Assert.Equal((0L, 0), (writeLane.OutstandingBytes, writeLane.OutstandingCalls));
         var ranged = remote.ReadAsync(new Slot(0), 2, 5, Slot.Zero, token).AsTask();
         await scenario.Grain.WaitSentAsync(2);
-        Assert.Equal(TransportScenario.ReadReply + 5, lane.OutstandingBytes);
+        Assert.Equal(TransportScenario.ReadReply + 5, readLane.OutstandingBytes);
         var tail = remote.ReadTailAsync(Slot.Zero, seal: true, token).AsTask();
         await scenario.Grain.WaitSentAsync(3);
-        Assert.Equal((2, 1), (lane.OutstandingCalls, control.OutstandingCalls));
+        Assert.Equal((2, 1), (readLane.OutstandingCalls, control.OutstandingCalls));
         Assert.Equal(TransportScenario.ReadReply, ((LedgerReplicaReadRequest)scenario.Grain.Calls[0].Request).MaxReplyBytes);
         Assert.Equal(5, ((LedgerReplicaReadRequest)scenario.Grain.Calls[1].Request).MaxReplyBytes);
 
@@ -396,13 +399,32 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         Assert.Equal(ReplicaRead.Missing.Instance, (await ranged.WaitAsync(Bound, token)).Value);
         _ = await tail.WaitAsync(Bound, token);
 
+        // Saturating the remote read lane does not block remote writes (and vice versa).
+        scenario.Grain.Answer = request => request is LedgerReplicaWriteRequest ? ReplicaWriteOutcome.Written.Instance : ReplicaRead.Missing.Instance;
+        using (await readLane.EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
+        {
+            Assert.Equal(ReplicaWriteOutcome.Written.Instance, (await WriteAsync(remote, 0, 10, token).WaitAsync(Bound, token)).Value);
+        }
+
+        using (await writeLane.EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
+        {
+            Assert.True((await remote.ReadAsync(new Slot(0), Slot.Zero, token).AsTask().WaitAsync(Bound, token)).TryGetValue(out ReplicaRead.Missing? _));
+        }
+
         var local = scenario.Open(local: true);
-        var localLane = scenario.Transport.Budget(scenario.Local.Node);
+        var localWriteLane = scenario.Transport.Budget(scenario.Local.Node);
+        var localReadLane = scenario.Transport.ReadBudget(scenario.Local.Node);
         var localControl = scenario.Transport.ControlBudget(scenario.Local.Node);
-        using (await localLane.EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
+        using (await localWriteLane.EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
         {
             Assert.True((await local.ReadAsync(new Slot(0), Slot.Zero, token).AsTask().WaitAsync(Bound, token)).TryGetValue(out ReplicaRead.Missing? _));
             Assert.True((await local.ReadTailAsync(Slot.Zero, seal: false, token).AsTask().WaitAsync(Bound, token)).TryGetValue(out LedgerReplicaTail _));
+        }
+
+        // Saturating the local read lane does not block local writes.
+        using (await localReadLane.EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
+        {
+            _ = Assert.IsType<ReplicaWriteOutcome.Written>((await WriteAsync(local, 0, 10, token).WaitAsync(Bound, token)).Value);
         }
 
         var held = new List<IDisposable>();
@@ -636,8 +658,8 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
     public async Task AnInactiveRemoteNodeShortCircuitsWithoutCallingGrainOrCopyingPayload()
     {
         var token = TestContext.Current.CancellationToken;
-        var active = false;
-        await using var scenario = await TransportScenario.CreateAsync(isNodeActive: _ => Volatile.Read(ref active));
+        SiloAddress? activeSilo = null;
+        await using var scenario = await TransportScenario.CreateAsync(resolveActiveSilo: _ => Volatile.Read(ref activeSilo));
         scenario.Grain.Answer = request => request switch
         {
             LedgerReplicaWriteRequest => ReplicaWriteOutcome.Written.Instance,
@@ -658,12 +680,79 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         Assert.Equal(0, scenario.Transport.SenderCopyCount);
         Assert.Equal(4, scenario.StaleInvalidations);
 
-        Volatile.Write(ref active, true);
+        Volatile.Write(ref activeSilo, NodeRegistrySamples.Silo(2, 1));
         Assert.Equal(ReplicaWriteOutcome.Written.Instance, (await WriteAsync(replica, 0, 12, token)).Value);
         Assert.True((await replica.ReadAsync(new Slot(0), Slot.Zero, token)).TryGetValue(out ReplicaRead.Missing? _));
         Assert.True((await replica.ReadTailAsync(Slot.Zero, seal: false, token)).TryGetValue(out LedgerReplicaTail _));
         Assert.True((await scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token)).TryGetValue(out ReplicaHeartbeatReply _));
         Assert.Equal(4, scenario.Grain.Sent);
+    }
+
+    /// <summary>
+    /// orleans.md §5.12: once a remote call observes <see cref="ReplicaRefusal.Stopping"/>,
+    /// <see cref="SiloUnavailableException"/>, or an <see cref="OrleansMessageRejectionException"/> for a stopping silo
+    /// against a resolved silo incarnation, subsequent calls to that incarnation fast-fail locally without entering lanes,
+    /// copying payloads, or invoking the grain until the registry advances to a newer active silo incarnation; an
+    /// unrelated message rejection does not mark the incarnation stopping.
+    /// </summary>
+    [Fact]
+    public async Task AStoppingOrUnavailableSiloIncarnationFastFailsUntilRegistryAdvances()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var v1 = NodeRegistrySamples.Silo(2, 1);
+        var v2 = NodeRegistrySamples.Silo(2, 2);
+        var v3 = NodeRegistrySamples.Silo(2, 3);
+        var v4 = NodeRegistrySamples.Silo(2, 4);
+        SiloAddress? activeSilo = v1;
+        await using var scenario = await TransportScenario.CreateAsync(resolveActiveSilo: _ => Volatile.Read(ref activeSilo));
+        var replica = scenario.Open(local: false);
+
+        // 1. ReplicaRefusal.Stopping marks v1 stopping.
+        scenario.Grain.Answer = _ => new ReplicaCallRefused(ReplicaRefusal.Stopping, "silo stopping");
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 0, 12, token));
+        Assert.Equal(1, scenario.Grain.Sent);
+
+        // Subsequent calls against v1 fast-fail with zero grain calls and zero sender copies.
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 1, 12, token));
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadAsync(new Slot(0), Slot.Zero, token).AsTask());
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadTailAsync(Slot.Zero, seal: false, token).AsTask());
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token).AsTask());
+        Assert.Equal(1, scenario.Grain.Sent);
+        Assert.Equal(0, scenario.Transport.SenderCopyCount);
+
+        // 2. Advancing to v2 clears the stopping mark; SiloUnavailableException marks v2 stopping.
+        Volatile.Write(ref activeSilo, v2);
+        scenario.Grain.Answer = _ => new SiloUnavailableException("silo dead");
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 1, 12, token));
+        Assert.Equal(2, scenario.Grain.Sent);
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 2, 12, token));
+        Assert.Equal(2, scenario.Grain.Sent);
+
+        // 3. Advancing to v3 clears v2; OrleansMessageRejectionException("Silo stopping") marks v3 stopping.
+        Volatile.Write(ref activeSilo, v3);
+        scenario.Grain.Answer = _ => Rejection("Silo stopping");
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadAsync(new Slot(0), Slot.Zero, token).AsTask());
+        Assert.Equal(3, scenario.Grain.Sent);
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 2, 12, token));
+        Assert.Equal(3, scenario.Grain.Sent);
+
+        // 4. Advancing to v4 clears v3; an unrelated OrleansMessageRejectionException does not mark v4 stopping.
+        Volatile.Write(ref activeSilo, v4);
+        scenario.Grain.Answer = _ => Rejection("Temporary overload");
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 2, 12, token));
+        Assert.Equal(4, scenario.Grain.Sent);
+
+        scenario.Grain.Answer = _ => ReplicaWriteOutcome.Written.Instance;
+        Assert.Equal(ReplicaWriteOutcome.Written.Instance, (await WriteAsync(replica, 2, 12, token)).Value);
+        Assert.Equal(5, scenario.Grain.Sent);
+
+        static OrleansMessageRejectionException Rejection(string message) =>
+            (OrleansMessageRejectionException)Activator.CreateInstance(
+                typeof(OrleansMessageRejectionException),
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                binder: null,
+                [message],
+                culture: null)!;
     }
 
     /// <summary>

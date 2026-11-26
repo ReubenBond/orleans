@@ -4,6 +4,7 @@ using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Store;
 using Orleans.Durable.Storage.Testing;
+using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage.Tests;
 
@@ -43,7 +44,7 @@ internal sealed class TransportScenario : IAsyncDisposable
         CallBudgetMutant mutant,
         int seed,
         bool registered,
-        Func<NodeId, bool>? isNodeActive)
+        Func<NodeId, SiloAddress?>? resolveActiveSilo)
     {
         _root = root;
         Storage = storage;
@@ -62,7 +63,7 @@ internal sealed class TransportScenario : IAsyncDisposable
             (node, bytes, calls, time) => new MutantCallBudget(bytes, calls, time, waited => new LedgerReplicaQueueTimeoutException(node, waited), mutant),
             new Random(seed),
             Time,
-            isNodeActive,
+            resolveActiveSilo,
             () => Interlocked.Increment(ref _staleInvalidations));
     }
 
@@ -98,7 +99,7 @@ internal sealed class TransportScenario : IAsyncDisposable
         CallBudgetMutant mutant = CallBudgetMutant.None,
         int seed = 0,
         bool registered = true,
-        Func<NodeId, bool>? isNodeActive = null)
+        Func<NodeId, SiloAddress?>? resolveActiveSilo = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "clog-orleans-transport-tests", Guid.NewGuid().ToString("N"));
         _ = System.IO.Directory.CreateDirectory(root);
@@ -110,7 +111,7 @@ internal sealed class TransportScenario : IAsyncDisposable
             create: true,
             new LedgerStoreCheckpointOptions(),
             TimeProvider.System);
-        return new TransportScenario(root, storage, store, mutant, seed, registered, isNodeActive);
+        return new TransportScenario(root, storage, store, mutant, seed, registered, resolveActiveSilo);
     }
 
     /// <summary>Registers the scenario's node, so its serving gate admits calls.</summary>

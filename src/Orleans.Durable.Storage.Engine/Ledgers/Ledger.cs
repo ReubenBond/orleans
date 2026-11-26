@@ -536,6 +536,12 @@ internal sealed class Ledger : IAsyncDisposable
     }
 
     /// <summary>
+    /// Suppresses read-repair recovery writes on the preferred replica (used by <see cref="LedgerReader"/> once a
+    /// ledger is recorded <c>Closed(T)</c> in the map).
+    /// </summary>
+    internal void SuppressReadRepair() => _storage.SuppressReadRepair();
+
+    /// <summary>
     /// Disposes the ledger and its storage, which ends every call it has in flight by cancelling it (ledger-protocol.md
     /// §6.3).
     /// </summary>

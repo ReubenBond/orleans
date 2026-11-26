@@ -32,12 +32,19 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     /// <summary>How often an open ledger's delivery learns its contiguous tail: the writer's explicit-tail interval.</summary>
     internal static readonly TimeSpan LearnInterval = LedgerWriter.ContiguousTailInterval;
 
+    /// <summary>
+    /// Maximum concurrent in-flight scan reads shared across all ledger deliveries on a node, preventing rejoin catch-up
+    /// across dozens of ledgers from saturating peer read lanes and exhausting hedge budgets (ledgers.md §8.5).
+    /// </summary>
+    internal const int DefaultMaxConcurrentScanReads = 32;
+
     private static readonly TimeSpan MaximumDelay = TimeSpan.FromSeconds(1);
 
     private readonly LedgerReader _reader;
     private readonly LedgerApplier _applier;
     private readonly TimeProvider _timeProvider;
     private readonly NodeId _node;
+    private readonly SemaphoreSlim _scanWindow;
     private readonly CancellationTokenSource _stop = new();
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -55,14 +62,21 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     /// <param name="timeProvider">The clock of the learns and the backoff.</param>
     /// <exception cref="ArgumentException"><paramref name="reader"/> names no local node.</exception>
     public LedgerApplyLoop(LedgerReader reader, LedgerApplier applier, TimeProvider timeProvider)
+        : this(reader, applier, timeProvider, DefaultMaxConcurrentScanReads)
+    {
+    }
+
+    internal LedgerApplyLoop(LedgerReader reader, LedgerApplier applier, TimeProvider timeProvider, int maxConcurrentScanReads)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(applier);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConcurrentScanReads);
         _node = reader.LocalNode ?? throw new ArgumentException("The apply loop runs on a node, so its reader names that node.", nameof(reader));
         _reader = reader;
         _applier = applier;
         _timeProvider = timeProvider;
+        _scanWindow = new SemaphoreSlim(maxConcurrentScanReads, maxConcurrentScanReads);
 
         // The loop serves no caller, so it runs in none's execution context (conventions.md §12).
         using (ExecutionContext.SuppressFlow())
@@ -103,6 +117,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
 
         await _stop.CancelAsync().ConfigureAwait(false);
         await _run.ConfigureAwait(false);
+        _scanWindow.Dispose();
         _stop.Dispose();
         _ = _completion.TrySetResult();
     }
@@ -342,7 +357,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         {
             var flush = _loop._applier.FlushAsync;
             var buffered = false;
-            await foreach (var item in _loop._reader.ScanAsync(listed, next, below, view, cancellationToken: cancellationToken).ConfigureAwait(false))
+            await foreach (var item in _loop._reader.ScanAsync(listed, next, below, view, window: _loop._scanWindow, cancellationToken: cancellationToken).ConfigureAwait(false))
             {
                 var read = item.Read;
                 if (read.TryGetValue(out LedgerRead.Data data))
