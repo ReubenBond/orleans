@@ -1,7 +1,9 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using CsCheck;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
@@ -451,6 +453,287 @@ public sealed class ArcBufferLifetimeTests
             Assert.Fail("Reading past empty Arc input must throw.");
         }
         catch (IndexOutOfRangeException)
+        {
+        }
+    }
+
+    [Fact]
+    public void Wrap_EmptyMemory_ReturnsOwnerFreeEmpty()
+    {
+        var empty = ArcBuffer.Wrap(ReadOnlyMemory<byte>.Empty);
+        Assert.True(empty.IsEmpty);
+        Assert.Null(empty.First);
+        empty.Dispose();
+
+        var slicedEmpty = ArcBuffer.Wrap(Bytes(16).AsMemory(5, 0));
+        Assert.True(slicedEmpty.IsEmpty);
+        Assert.Null(slicedEmpty.First);
+        slicedEmpty.Dispose();
+    }
+
+    [Fact]
+    public void Wrap_NonArrayBackedMemory_ThrowsArgumentException()
+    {
+        using var manager = new NonArrayMemoryManager(32);
+        var error = Assert.Throws<ArgumentException>(() => ArcBuffer.Wrap(manager.Memory));
+        Assert.Equal("memory", error.ParamName);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(619)]
+    [InlineData(ArcBufferWriter.MinimumPageSize)]
+    [InlineData(ArcBufferWriter.MinimumPageSize + 17)]
+    public void Wrap_ExternalPage_EnforcesLifetimeAndNonPooledContracts(int length)
+    {
+        var source = Bytes(length);
+        var wrapped = ArcBuffer.Wrap(source);
+        var page = Assert.IsType<ArcBufferPage>(wrapped.First);
+        var version = page.Version;
+
+        Assert.Same(source, page.Array);
+        Assert.Equal(length, page.Length);
+        Assert.Equal(0, wrapped.Offset);
+        Assert.Equal(length, wrapped.Length);
+        Assert.False(page.IsMinimumSize);
+        Assert.Equal(1, page.ReferenceCount);
+        Assert.Equal(source, wrapped.ToArray());
+        Assert.Equal(source, page.AsMemory(0, length).ToArray());
+        Assert.Equal(source, page.AsMemory(0).ToArray());
+        Assert.Throws<InvalidOperationException>(() => page.ResizeLargeSegment(ArcBufferWriter.MinimumPageSize * 2));
+
+        var retained = wrapped.Slice(0);
+        Assert.Equal(2, page.ReferenceCount);
+
+        wrapped.Dispose();
+        Assert.Equal(1, page.ReferenceCount);
+        Assert.Throws<InvalidOperationException>(() => wrapped.ToArray());
+        Assert.Throws<InvalidOperationException>(() => wrapped.Dispose());
+        Assert.Equal(source, retained.ToArray());
+
+        retained.Dispose();
+        Assert.Equal(0, page.ReferenceCount);
+        Assert.NotEqual(version, page.Version);
+        Assert.Empty(page.Array);
+        Assert.Throws<InvalidOperationException>(() => retained.ToArray());
+        Assert.Throws<InvalidOperationException>(() => retained.AsReadOnlySequence());
+        Assert.Throws<InvalidOperationException>(() => retained.Slice(0));
+        Assert.Throws<InvalidOperationException>(() => retained.Dispose());
+    }
+
+    [Fact]
+    public void Wrap_ExternalPage_IsNotReturnedToPagePoolAndArrayIsReclaimed()
+    {
+        var sourceRef = WrapAndRelease(ArcBufferWriter.MinimumPageSize);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(sourceRef.IsAlive);
+
+        static WeakReference WrapAndRelease(int size)
+        {
+            var array = new byte[size];
+            var buffer = ArcBuffer.Wrap(array);
+            buffer.Dispose();
+            return new WeakReference(array);
+        }
+    }
+
+    [Fact]
+    public void Wrap_ArbitrarySliceAndSubSlices_PreserveBytesAndOwnership()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var lengthGen = Gen.OneOf(
+            Gen.Int[0, 64],
+            Gen.Const(ArcBufferWriter.MinimumPageSize - 1),
+            Gen.Const(ArcBufferWriter.MinimumPageSize),
+            Gen.Const(ArcBufferWriter.MinimumPageSize + 1),
+            Gen.Int[ArcBufferWriter.MinimumPageSize - 32, ArcBufferWriter.MinimumPageSize * 2 + 32]);
+
+        Gen.Select(lengthGen, Gen.Int[0, 100], Gen.Int[0, 100], Gen.Int[0, 100], Gen.Int[0, 100], Gen.Bool)
+            .Sample((totalLength, rawOffset, rawCount, rawSubOffset, rawSubLength, disposeOriginalFirst) =>
+            {
+                var source = Bytes(totalLength);
+                var offset = totalLength == 0 ? 0 : rawOffset % (totalLength + 1);
+                var maxCount = totalLength - offset;
+                var count = maxCount == 0 ? 0 : rawCount % (maxCount + 1);
+                var expected = source.AsSpan(offset, count).ToArray();
+
+                var wrapped = ArcBuffer.Wrap(source.AsMemory(offset, count));
+                if (count == 0)
+                {
+                    Assert.True(wrapped.IsEmpty);
+                    Assert.Null(wrapped.First);
+                    wrapped.Dispose();
+                    return;
+                }
+
+                var page = Assert.IsType<ArcBufferPage>(wrapped.First);
+                var initialVersion = page.Version;
+                Assert.False(page.IsMinimumSize);
+                Assert.Same(source, page.Array);
+                Assert.Equal(offset, wrapped.Offset);
+                Assert.Equal(count, wrapped.Length);
+                Assert.Equal(1, page.ReferenceCount);
+
+                Assert.Equal(expected, wrapped.ToArray());
+                Assert.Equal(expected, wrapped.AsReadOnlySequence().ToArray());
+                var copied = new byte[count];
+                Assert.Equal(count, wrapped.CopyTo(copied));
+                Assert.Equal(expected, copied);
+
+                var memoryBytes = new List<byte>(count);
+                foreach (var segment in wrapped.MemorySegments)
+                {
+                    memoryBytes.AddRange(segment.ToArray());
+                }
+
+                Assert.Equal(expected, memoryBytes);
+
+                var spanBytes = new List<byte>(count);
+                foreach (var segment in wrapped.SpanSegments)
+                {
+                    spanBytes.AddRange(segment.ToArray());
+                }
+
+                Assert.Equal(expected, spanBytes);
+
+                var reader = Reader.Create(wrapped, session);
+                Assert.Equal(count, reader.Length);
+                var readBytes = new byte[count];
+                reader.ReadBytes(readBytes);
+                Assert.Equal(expected, readBytes);
+
+                var subOffset = rawSubOffset % (count + 1);
+                var maxSubLength = count - subOffset;
+                var subLength = maxSubLength == 0 ? 0 : rawSubLength % (maxSubLength + 1);
+                var subExpected = expected.AsSpan(subOffset, subLength).ToArray();
+                var sub = wrapped.Slice(subOffset, subLength);
+                Assert.Equal(2, page.ReferenceCount);
+
+                using var appendedWriter = new ArcBufferWriter();
+                appendedWriter.AppendPinned(wrapped);
+                Assert.Equal(3, page.ReferenceCount);
+                using (var appendedSlice = appendedWriter.PeekSlice(appendedWriter.Length))
+                {
+                    Assert.Equal(expected, appendedSlice.ToArray());
+                }
+
+                if (disposeOriginalFirst)
+                {
+                    wrapped.Dispose();
+                    Assert.Equal(2, page.ReferenceCount);
+                    Assert.Throws<InvalidOperationException>(() => wrapped.ToArray());
+                    Assert.Equal(subExpected, sub.ToArray());
+                    sub.Dispose();
+                    Assert.Equal(1, page.ReferenceCount);
+                    using var appendedSlice = appendedWriter.PeekSlice(appendedWriter.Length);
+                    Assert.Equal(expected, appendedSlice.ToArray());
+                }
+                else
+                {
+                    sub.Dispose();
+                    Assert.Equal(2, page.ReferenceCount);
+                    Assert.Throws<InvalidOperationException>(() => sub.ToArray());
+                    Assert.Equal(expected, wrapped.ToArray());
+                    wrapped.Dispose();
+                    Assert.Equal(1, page.ReferenceCount);
+                    using var appendedSlice = appendedWriter.PeekSlice(appendedWriter.Length);
+                    Assert.Equal(expected, appendedSlice.ToArray());
+                }
+
+                appendedWriter.Dispose();
+                Assert.Equal(0, page.ReferenceCount);
+                Assert.NotEqual(initialVersion, page.Version);
+                Assert.Empty(page.Array);
+            }, iter: 150);
+    }
+
+    [Fact]
+    public void Wrap_CodecAndCopier_RoundTripArbitraryMemorySlices()
+    {
+        using var services = Services();
+        var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
+        var copier = services.GetRequiredService<DeepCopier<ArcBuffer>>();
+        var lengthGen = Gen.OneOf(
+            Gen.Int[0, 64],
+            Gen.Const(ArcBufferWriter.MinimumPageSize - 1),
+            Gen.Const(ArcBufferWriter.MinimumPageSize),
+            Gen.Const(ArcBufferWriter.MinimumPageSize + 1),
+            Gen.Int[ArcBufferWriter.MinimumPageSize + 2, ArcBufferWriter.MinimumPageSize * 2 + 64]);
+
+        Gen.Select(lengthGen, Gen.Int[0, 64], Gen.Bool)
+            .Sample((count, leadOffset, disposeOriginalFirst) =>
+            {
+                var source = Bytes(leadOffset + count + 7);
+                var expected = source.AsSpan(leadOffset, count).ToArray();
+                var wrapped = ArcBuffer.Wrap(source.AsMemory(leadOffset, count));
+                var page = wrapped.First;
+
+                var encoded = serializer.SerializeToArray(wrapped);
+                using var decoded = serializer.Deserialize(encoded);
+                var deepCopy = copier.Copy(wrapped);
+                try
+                {
+                    if (page is not null)
+                    {
+                        Assert.Same(page, deepCopy.First);
+                        Assert.Equal(2, page.ReferenceCount);
+                    }
+
+                    if (disposeOriginalFirst)
+                    {
+                        wrapped.Dispose();
+                        if (page is not null)
+                        {
+                            Assert.Equal(1, page.ReferenceCount);
+                        }
+
+                        Assert.Equal(expected, deepCopy.ToArray());
+                        Assert.Equal(expected, decoded.ToArray());
+                    }
+                    else
+                    {
+                        Assert.Equal(expected, deepCopy.ToArray());
+                        deepCopy.Dispose();
+                        deepCopy = default;
+                        if (page is not null)
+                        {
+                            Assert.Equal(1, page.ReferenceCount);
+                        }
+
+                        Assert.Equal(expected, wrapped.ToArray());
+                        Assert.Equal(expected, decoded.ToArray());
+                        wrapped.Dispose();
+                    }
+                }
+                finally
+                {
+                    deepCopy.Dispose();
+                }
+
+                if (page is not null)
+                {
+                    Assert.Equal(0, page.ReferenceCount);
+                    Assert.Empty(page.Array);
+                }
+            }, iter: 100);
+    }
+
+    private sealed class NonArrayMemoryManager(int length) : MemoryManager<byte>
+    {
+        private readonly byte[] _backing = new byte[length];
+
+        public override Span<byte> GetSpan() => _backing;
+
+        public override MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+        public override void Unpin()
+        {
+        }
+
+        protected override void Dispose(bool disposing)
         {
         }
     }

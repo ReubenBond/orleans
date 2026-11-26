@@ -1,4 +1,5 @@
 using System.Buffers;
+using CsCheck;
 using Orleans.Durable.Storage.Testing;
 
 namespace Orleans.Durable.Storage.Engine.Buffers.Tests;
@@ -378,6 +379,178 @@ public sealed class ArcBufferTests : IDisposable
 
         Assert.Equal(referenceCount, page.ReferenceCount);
         Assert.Equal([1], owner.ToArray());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(PageSize - 1)]
+    [InlineData(PageSize)]
+    [InlineData(PageSize + 1)]
+    [InlineData(ArcBufferPagePool.LargestPageSize - 1)]
+    [InlineData(ArcBufferPagePool.LargestPageSize)]
+    [InlineData(ArcBufferPagePool.LargestPageSize + 1)]
+    public void CopyFromBoundaries_PreserveBytesAndPageCountWithoutLeaks(int length) =>
+        _leaks.InScope(() =>
+        {
+            var source = CreatePayload(length);
+            var expected = (byte[])source.Clone();
+
+            using (var fromSpan = ArcBuffer.CopyFrom(source))
+            {
+                Array.Fill(source, (byte)0xEE);
+                Assert.Equal(length, fromSpan.Length);
+                Assert.Equal(expected, fromSpan.ToArray());
+                Assert.Equal(expected, fromSpan.AsReadOnlySequence().ToArray());
+                Assert.Equal(length == 0, fromSpan.IsDefault);
+                if (length is > 0 and <= ArcBufferPagePool.LargestPageSize)
+                {
+                    Assert.Single(fromSpan.Pages);
+                }
+                else if (length > ArcBufferPagePool.LargestPageSize)
+                {
+                    Assert.True(fromSpan.Pages.Count() > 1);
+                }
+            }
+
+            // Build a multi-segment sequence with leading/middle/trailing empty segments around the payload.
+            var sequence = length == 0
+                ? BuildSequence([ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty])
+                : BuildSequence([ReadOnlyMemory<byte>.Empty, expected.AsMemory(0, length / 2), ReadOnlyMemory<byte>.Empty, expected.AsMemory(length / 2), ReadOnlyMemory<byte>.Empty]);
+
+            using var fromSequence = ArcBuffer.CopyFrom(sequence);
+            Assert.Equal(length, fromSequence.Length);
+            Assert.Equal(expected, fromSequence.ToArray());
+            Assert.Equal(expected, fromSequence.AsReadOnlySequence().ToArray());
+            if (length is > 0 and <= ArcBufferPagePool.LargestPageSize)
+            {
+                Assert.Single(fromSequence.Pages);
+            }
+        });
+
+    [Fact]
+    public void CopyFromSpan_ArbitraryLengthsAndMutations_PreservesBytesWithoutLeaks()
+    {
+        var lengthGen = Gen.OneOf(
+            Gen.Int[0, 64],
+            Gen.Int[PageSize - 16, PageSize + 16],
+            Gen.Int[PageSize * 2 - 16, PageSize * 2 + 16],
+            Gen.Const(ArcBufferPagePool.LargestPageSize - 1),
+            Gen.Const(ArcBufferPagePool.LargestPageSize),
+            Gen.Const(ArcBufferPagePool.LargestPageSize + 17));
+
+        Gen.Select(lengthGen, Gen.Byte).Sample((length, seed) => _leaks.InScope(() =>
+        {
+            var source = new byte[length];
+            for (var i = 0; i < source.Length; i++)
+            {
+                source[i] = unchecked((byte)(seed + i * 31));
+            }
+
+            var expected = (byte[])source.Clone();
+            using var copied = ArcBuffer.CopyFrom(source);
+
+            // Mutate source immediately to prove full copy independence.
+            Array.Fill(source, unchecked((byte)(seed ^ 0xFF)));
+
+            Assert.Equal(length, copied.Length);
+            Assert.Equal(expected, copied.ToArray());
+            Assert.Equal(expected, copied.AsReadOnlySequence().ToArray());
+            var destination = new byte[length];
+            Assert.Equal(length, copied.CopyTo(destination));
+            Assert.Equal(expected, destination);
+
+            if (length == 0)
+            {
+                Assert.True(copied.IsDefault);
+            }
+            else if (length <= ArcBufferPagePool.LargestPageSize)
+            {
+                Assert.Single(copied.Pages);
+            }
+        }), iter: 120);
+    }
+
+    [Fact]
+    public void CopyFromSequence_ArbitrarySegmentSplits_MatchesConcatenationWithoutLeaks()
+    {
+        var segmentLengthGen = Gen.OneOf(
+            Gen.Const(0),
+            Gen.Int[1, 32],
+            Gen.Int[PageSize - 8, PageSize + 8]);
+
+        Gen.Select(segmentLengthGen.Array[0, 10], Gen.Int[0, 15], Gen.Byte).Sample((segmentLengths, leadOffset, seed) => _leaks.InScope(() =>
+        {
+            var totalLength = segmentLengths.Sum();
+            var expected = new byte[totalLength];
+            var backingArrays = new byte[segmentLengths.Length][];
+            var memories = new ReadOnlyMemory<byte>[segmentLengths.Length];
+            var offset = 0;
+            for (var i = 0; i < segmentLengths.Length; i++)
+            {
+                var segLen = segmentLengths[i];
+                var array = new byte[leadOffset + segLen + 3];
+                for (var j = 0; j < segLen; j++)
+                {
+                    var value = unchecked((byte)(seed + (offset + j) * 17 + i));
+                    array[leadOffset + j] = value;
+                    expected[offset + j] = value;
+                }
+
+                backingArrays[i] = array;
+                memories[i] = array.AsMemory(leadOffset, segLen);
+                offset += segLen;
+            }
+
+            var sequence = BuildSequence(memories);
+            using var copied = ArcBuffer.CopyFrom(sequence);
+
+            foreach (var array in backingArrays)
+            {
+                Array.Fill(array, unchecked((byte)(seed ^ 0xAA)));
+            }
+
+            Assert.Equal(totalLength, copied.Length);
+            Assert.Equal(expected, copied.ToArray());
+            Assert.Equal(expected, copied.AsReadOnlySequence().ToArray());
+            if (totalLength == 0)
+            {
+                Assert.True(copied.IsDefault);
+            }
+            else if (totalLength <= ArcBufferPagePool.LargestPageSize)
+            {
+                Assert.Single(copied.Pages);
+            }
+        }), iter: 150);
+    }
+
+    private static ReadOnlySequence<byte> BuildSequence(ReadOnlyMemory<byte>[] segments)
+    {
+        if (segments.Length == 0)
+        {
+            return ReadOnlySequence<byte>.Empty;
+        }
+
+        var first = new MemorySegment(segments[0]);
+        var last = first;
+        for (var i = 1; i < segments.Length; i++)
+        {
+            last = last.Append(segments[i]);
+        }
+
+        return new ReadOnlySequence<byte>(first, 0, last, last.Memory.Length);
+    }
+
+    private sealed class MemorySegment : ReadOnlySequenceSegment<byte>
+    {
+        public MemorySegment(ReadOnlyMemory<byte> memory) => Memory = memory;
+
+        public MemorySegment Append(ReadOnlyMemory<byte> memory)
+        {
+            var next = new MemorySegment(memory) { RunningIndex = RunningIndex + Memory.Length };
+            Next = next;
+            return next;
+        }
     }
 
     private static byte[] CreatePayload(int length) =>

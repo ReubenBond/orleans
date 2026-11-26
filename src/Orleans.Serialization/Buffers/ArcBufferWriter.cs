@@ -779,7 +779,7 @@ public sealed class ArcBufferPage
 
     internal void ReleaseArray()
     {
-        if (!IsMinimumSize)
+        if (!_isExternal && !IsMinimumSize)
         {
             ArrayPool<byte>.Shared.Return(Array);
         }

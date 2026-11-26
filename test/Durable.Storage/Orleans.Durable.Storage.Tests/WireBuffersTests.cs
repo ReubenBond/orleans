@@ -142,12 +142,13 @@ public sealed class WireBuffersTests : IDisposable
     }
 
     /// <summary>
-    /// A small copy into Orleans' pool takes a page longer than Orleans' minimum, which Orleans rents from the shared
-    /// <c>ArrayPool</c> rather than from its pool of pinned 16 KiB pages, and which is below the large object heap's
-    /// threshold, so a copy Orleans keeps is reclaimed as an ordinary small array (orleans.md §5.12).
+    /// A small copy into Orleans wraps an exact-sized ordinary array below the large object heap's threshold rather than
+    /// renting from Orleans' pool of pinned 16 KiB pages or leaking a 32 KiB <see cref="System.Buffers.ArrayPool{T}"/>
+    /// buffer, so a copy Orleans keeps is reclaimed as an ordinary small array (orleans.md §5.12).
     /// </summary>
     [Theory]
     [InlineData(1)]
+    [InlineData(619)]
     [InlineData(4 << 10)]
     [InlineData(16 << 10)]
     public void ASmallCopyIntoOrleansPoolIsAnOrdinaryArray(int length)
@@ -157,10 +158,13 @@ public sealed class WireBuffersTests : IDisposable
         using var source = writer.ConsumeSlice(length);
 
         var copy = WireBuffers.CopyToOrleans(source);
-        var array = copy.First!.Array;
+        var page = copy.First!;
+        var array = page.Array;
+        Assert.False(page.IsMinimumSize);
+        Assert.Equal(length, array.Length);
         copy.Dispose();
 
-        Assert.InRange(array.Length, OrleansBufferWriter.MinimumPageSize + 1, 84_975);
+        Assert.InRange(array.Length, 1, 84_975);
     }
 
     /// <summary>
@@ -254,7 +258,8 @@ public sealed class WireBuffersTests : IDisposable
                 var held = copy;
                 Assert.Equal(expected.ToArray(), copy.ToArray());
                 Assert.True(copy is { Offset: 0 } && copy.First!.Length == record.Length);
-                Assert.True(copy.First!.Array.Length > OrleansBufferWriter.MinimumPageSize);
+                Assert.Equal(record.Length, copy.First!.Array.Length);
+                Assert.False(copy.First!.IsMinimumSize);
 
                 using var moved = WireBuffers.MoveToArcBuffer(ref copy);
                 Assert.True(WireBytes.IsReleased(held));
@@ -268,5 +273,59 @@ public sealed class WireBuffersTests : IDisposable
         }
 
         _ = Assert.Throws<InvalidOperationException>(() => WireBuffers.CopyToOrleans(default(JournalEntryRecord)));
+    }
+
+    /// <summary>
+    /// Property check across arbitrary payload lengths (including Orleans' 16 KiB minimum page size boundary and
+    /// multi-page Clog buffers) and source offsets: <see cref="WireBuffers.CopyToOrleans(ArcBuffer)"/> produces an
+    /// exact-sized non-POH external Orleans buffer and <see cref="WireBuffers.MoveToArcBuffer"/> round-trips it cleanly
+    /// into Clog's pool while releasing the Orleans buffer.
+    /// </summary>
+    [Fact]
+    public void WireRoundTripPreservesArbitraryPayloadsAndExactOrleansBufferSizing()
+    {
+        var lengthGen = Gen.OneOf(
+            Gen.Int[0, 64],
+            Gen.Const(OrleansBufferWriter.MinimumPageSize - 1),
+            Gen.Const(OrleansBufferWriter.MinimumPageSize),
+            Gen.Const(OrleansBufferWriter.MinimumPageSize + 1),
+            Gen.Int[OrleansBufferWriter.MinimumPageSize - 32, OrleansBufferWriter.MinimumPageSize * 3 + 32]);
+
+        Gen.Select(lengthGen, Gen.Int[0, 31], Gen.Byte).Sample((length, leadOffset, seed) => _leaks.InScope(() =>
+        {
+            var raw = new byte[leadOffset + length];
+            for (var i = 0; i < raw.Length; i++)
+            {
+                raw[i] = unchecked((byte)(seed + i * 29));
+            }
+
+            var expected = raw[leadOffset..];
+            using var writer = new ArcBufferWriter();
+            writer.Write(raw);
+            writer.AdvanceReader(leadOffset);
+            using var source = writer.ConsumeSlice(length);
+
+            var sent = WireBuffers.CopyToOrleans(source);
+            var held = sent;
+            if (length == 0)
+            {
+                Assert.True(sent.IsEmpty);
+                Assert.Null(sent.First);
+            }
+            else
+            {
+                Assert.Equal(0, sent.Offset);
+                Assert.Equal(length, sent.Length);
+                Assert.Equal(length, sent.First!.Length);
+                Assert.Equal(length, sent.First!.Array.Length);
+                Assert.False(sent.First!.IsMinimumSize);
+                Assert.Equal(expected, sent.ToArray());
+            }
+
+            using var received = WireBuffers.MoveToArcBuffer(ref sent);
+            Assert.True(sent is { First: null, Length: 0 });
+            Assert.Equal(length > 0, WireBytes.IsReleased(held));
+            Assert.Equal(expected, received.ToArray());
+        }), iter: 120);
     }
 }
