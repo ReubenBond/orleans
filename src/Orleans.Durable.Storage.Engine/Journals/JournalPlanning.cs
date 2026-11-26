@@ -72,6 +72,12 @@ internal sealed class JournalPlanning
         var planning = new JournalPlanning(newest[0].Segment, token, store.Begin(token), store.Begin(token));
         foreach (var row in newest)
         {
+            if (row.SupersededBefore > 0)
+            {
+                planning.Written.Supersede(row.SupersededBefore);
+                planning.Admitted.Supersede(row.SupersededBefore);
+            }
+
             var command = row.ToCommand();
             planning.AddWritten(store, command);
             planning.AddAdmitted(store, command);

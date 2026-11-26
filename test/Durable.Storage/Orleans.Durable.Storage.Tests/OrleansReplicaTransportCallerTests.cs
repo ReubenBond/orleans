@@ -511,33 +511,30 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         };
         await scenario.Grain.WaitSentAsync(2);
         var copies = scenario.Grain.Calls.Select(static call => ((LedgerReplicaWriteRequest)call.Request).Payload).ToArray();
-        Assert.Same(copies[0].First, copies[1].First);
-        Assert.NotSame(payload.First.Array, copies[0].First!.Array);
+        Assert.NotSame(copies[0], copies[1]);
         Assert.Equal(payload.ToArray(), copies[0].ToArray());
-        Assert.Equal(1, scenario.Transport.SenderCopyCount);
+        Assert.Equal(payload.ToArray(), copies[1].ToArray());
 
         scenario.Grain.ReleaseAll();
         _ = await Task.WhenAll(writes).WaitAsync(Bound, token);
-        Assert.Equal(0, scenario.Transport.SenderCopyCount);
         Assert.True(WireBytes.IsReleased(copies[0]));
+        Assert.True(WireBytes.IsReleased(copies[1]));
         await second.DisposeAsync();
 
         using (await scenario.Transport.Budget(scenario.Remote).EnterAsync(TransportScenario.Budget, scenario.DeadlineFromNow(), token))
         {
             var waiting = WriteAsync(first, 2, 10, token);
-            Assert.Equal(0, scenario.Transport.SenderCopyCount);
             Assert.Equal(1, scenario.Transport.Budget(scenario.Remote).Waiting);
             _ = waiting;
         }
 
         await scenario.Grain.WaitSentAsync(3);
-        var reply = WireBytes.Of(1, 2, 3);
+        var reply = WireBytes.Arc(1, 2, 3);
         scenario.Grain.Answer = _ => new RemoteReplicaRead.Data(reply);
         Assert.True((await first.ReadAsync(new Slot(0), Slot.Zero, token)).TryGetValue(out ArcBuffer batch));
         using (batch)
         {
             Assert.Equal([1, 2, 3], batch.ToArray());
-            Assert.NotSame(reply.First!.Array, batch.First.Array);
         }
 
         Assert.True(WireBytes.IsReleased(reply));
@@ -677,7 +674,6 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token).AsTask());
 
         Assert.Equal(0, scenario.Grain.Sent);
-        Assert.Equal(0, scenario.Transport.SenderCopyCount);
         Assert.Equal(4, scenario.StaleInvalidations);
 
         Volatile.Write(ref activeSilo, NodeRegistrySamples.Silo(2, 1));
@@ -718,7 +714,6 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
         _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadTailAsync(Slot.Zero, seal: false, token).AsTask());
         _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token).AsTask());
         Assert.Equal(1, scenario.Grain.Sent);
-        Assert.Equal(0, scenario.Transport.SenderCopyCount);
 
         // 2. Advancing to v2 clears the stopping mark; SiloUnavailableException marks v2 stopping.
         Volatile.Write(ref activeSilo, v2);

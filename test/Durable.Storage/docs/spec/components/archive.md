@@ -252,7 +252,8 @@ A key's commands are its decided archive rows ([ledgers §2.2](ledgers.md#22-row
 `RowKinds.IsArchiveKind`): `Append`, which applies on top of the earlier commands; `Replace`, which supersedes them and
 becomes the base; and `Delete`, which supersedes them and leaves its tombstone, its body, when it has one.
 `RowKind.Message` rows are unversioned ledger messages excluded from `History(k)`, `ArchiveRow.Live`, and all three
-`ArchiveReader` scan and point-read paths (`Collect`, `FetchSingleSlotIndexedAsync`, and `ProcessSlot`); during archive
+`ArchiveReader` scan and point-read paths (`Collect`, `FetchSingleSlotIndexedAsync`, and
+`FetchMultiSlotIndexedAsync`); during archive
 segment draining (`DrainScan`), every `RowKind.Message` row's channel is matched against registered `IMessageProcessor`s
 and folded in the same pass, throwing `ArchiveCorruptException` if an unregistered channel or malformed payload is
 encountered ([LG-I15](ledgers.md#5-invariants), [LG-I16](ledgers.md#5-invariants)).
@@ -522,12 +523,16 @@ prefix with the rows it does not hold is a prefix of the key's history.
 `JournalStateDatabase`, [journals §8.3](journals.md#83-warm-state)), it reads each live ledger through the index rather
 than scanning the whole ledger: after the ledger's end is known (`T` for a closed ledger, the seal check's tail for the
 open one), `ArchiveKeyIndex.ReadAsync(ledger, below, key)` waits for the index's catch-up through `below` (JS-I9) and
-returns the key's `KeyIndexEntry(Tag, DefiningSlot, Ordinal)` records in tag order. The reader streams point reads of
-the distinct defining and row slots in ascending slot order through `LedgerReader.ReadAsync` (bounded to at most `K` in
-flight and sharing the read's `K`-place window, releasing the window across backpressure backoff), looks up each
-defining row by ordinal through `BatchView.FindDefining` (rejecting an out-of-range ordinal or mismatched row with
-`InvalidDataException` carrying reason `unknown-ordinal`), verifies the defining row's full key bytes against `key` so a
-hash collision is skipped silently, materializes each matching `ArchiveRow`, and releases each batch's buffer at once. A
+returns the key's `KeyIndexEntry(Tag, DefiningSlot, Ordinal)` records in tag order. The reader precomputes each entry's
+1-based offset within its `(DefiningSlot, Ordinal)` segment and streams point reads in descending waves (bounded to
+`clamp(K, 16, 32)` entries per wave and sharing the read's `K`-place window, releasing the window across backpressure
+backoff), resolving each defining row by ordinal through `BatchView.FindDefining` (rejecting an out-of-range ordinal or
+mismatched row with `InvalidDataException` carrying reason `unknown-ordinal`) and verifying the defining row's full key
+bytes against `key` so a hash collision is skipped silently. As soon as a verified matching row is an opener (`Replace`
+or `Delete`), the reader records `SupersededBefore = offset - 1` on the opener `ArchiveRow` (preserving exact
+`ArchiveWrite.Superseded` and `HI-I4` version continuity), stops reading older entries in that segment, and—when the
+opener's `RowToken` is empty (as in the LSM)—stops reading earlier segments and omits older ledgers before reversing the
+surviving tail into ascending chronological order and releasing each batch's buffer at once. A
 `KeyIndexRead.Dropped` answer cancels sibling reads and restarts the history read with a fresh map; a
 `KeyIndexRead.Unindexed` answer waits for the in-flight store read (restarting if cancelled by a sibling drop or a `Stale`
 answer) and falls back to `LedgerReader.ScanAsync`, starting at the store's `Absent` bound for that ledger (or slot 0

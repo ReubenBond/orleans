@@ -987,15 +987,20 @@ Orleans reads as an empty journal ([archive logs](archive-logs.md#5-invariants))
 
 ### 8.7 Snapshot requests
 
-A read or warm primary requests a snapshot when the bytes appended after the journal's base (`BytesSinceBase =
-ContentLength - BaseLength`, where `BaseLength` is the content its last opener or the archive's prefix began) exceed
-`max(ReplaceRequestMinBytes, α × BaseLength)` with `α = 1` and `ReplaceRequestMinBytes = 64 KiB`, keeping both large
-and rarely read journals bounded without triggering frequent snapshots on tiny journals. The archive store's
-`IsReplaceRequested`, over the key's current token, requests one too, well before its per-generation limits refuse an
-`Append` (§8.1): admission reports the union of `JournalState.IsReplaceRequested` and the store's `IsReplaceRequested`
-at the key's admitted token on each `Accepted` answer, and a read reports the union of `JournalState.IsReplaceRequested`
-and the store's `IsReplaceRequested` at its next token. "Replace request" names both triggers, which a read's and an
-acceptance's `ReplaceRequested` answer. The snapshot arrives as an ordinary `Replace`.
+A read or warm primary requests a snapshot when either:
+
+- the bytes appended after the journal's base (`BytesSinceBase = ContentLength - BaseLength`, where `BaseLength` is the
+  content its last opener or the archive's prefix began) exceed `max(ReplaceRequestMinBytes, α × BaseLength)` with
+  `α = 1` and `ReplaceRequestMinBytes = 64 KiB`, or
+- the number of `Append` entries applied after the journal's base (`AppendsSinceBase`) reaches
+  `ReplaceRequestMaxAppends = 32`, bounding cold-read tail length even for small payloads while keeping ~97% snapshot
+  reduction on small writes.
+
+The archive store's `IsReplaceRequested`, over the key's current token, requests one too, well before its
+per-generation limits refuse an `Append` (§8.1): admission reports the union of `JournalState.IsReplaceRequested` and
+the store's `IsReplaceRequested` at the key's admitted token on each `Accepted` answer, and a read reports the union of
+`JournalState.IsReplaceRequested` and the store's `IsReplaceRequested` at its next token. "Replace request" names both
+triggers, which a read's and an acceptance's `ReplaceRequested` answer. The snapshot arrives as an ordinary `Replace`.
 
 ### 8.8 Policy
 

@@ -41,7 +41,7 @@ internal sealed class JournalNodeHost(LocalNode local, LocalJournals journals, F
 
     private async Task<JournalForwardedWriteOutcome> WriteCoreAsync(IGrainBase? grain, TaskScheduler? scheduler, NodeId key, JournalForwardedEntry entry, CancellationToken cancellationToken)
     {
-        var received = entry.Record;
+        var received = entry.Record ?? WireArcBuffer.Empty;
         try
         {
             if (scheduler is not null)
@@ -64,7 +64,7 @@ internal sealed class JournalNodeHost(LocalNode local, LocalJournals journals, F
                 return NoJournalKey(entry.Key);
             }
 
-            using var bytes = WireBuffers.MoveToArcBuffer(ref received);
+            using var bytes = received.TakeBuffer();
             if (JournalEntryRecord.Decode(rowKey, bytes, out var record) is { } rejection)
             {
                 return new JournalCallRefused(JournalRefusal.Invalid, rejection.Message);

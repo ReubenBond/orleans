@@ -136,7 +136,7 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
     public async Task ACallOfAnUnknownProtocolVersionIsRefusedAndChangesNothing()
     {
         var grain = Cluster.TestCluster.Client.GetGrain<ILedgerStoreGrain>(Cluster.Node(Callee).Node.Value);
-        var request = new LedgerReplicaWriteRequest { Version = LedgerReplicaProtocol.Version + 1, Ledger = 13, WindowSize = 4, Payload = WireBytes.Of(1) };
+        var request = new LedgerReplicaWriteRequest { Version = LedgerReplicaProtocol.Version + 1, Ledger = 13, WindowSize = 4, Payload = WireBytes.Arc(1) };
 
         var answer = await grain.WriteAsync(request, TestContext.Current.CancellationToken);
         request.Payload.Dispose();
@@ -212,7 +212,6 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
         var failure = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 0, [1]).WaitAsync(TestContext.Current.CancellationToken));
 
         Assert.Null(failure.InnerException);
-        Assert.Equal(0, Cluster.Transport(Caller).SenderCopyCount);
         Assert.False(await IsActiveAsync(Cluster.TestCluster.Client.GetGrain<IManagementGrain>(0), node));
     }
 
@@ -414,26 +413,31 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
     {
         var token = TestContext.Current.CancellationToken;
         var grain = Cluster.TestCluster.Client.GetGrain<ILedgerStoreGrain>(Cluster.Node(Callee).Node.Value);
-        LedgerReplicaWriteRequest Write(ulong ledger, long slot) => new()
+        async Task<RemoteReplicaWriteOutcome> SendWriteAsync(ulong ledger, long slot)
         {
-            Version = LedgerReplicaProtocol.Version,
-            Ledger = ledger,
-            WindowSize = Window.WindowSize,
-            Slot = slot,
-            Payload = WireBytes.Of((byte)(slot + 1)),
-        };
+            using var payload = WireBytes.Arc((byte)(slot + 1));
+            var request = new LedgerReplicaWriteRequest
+            {
+                Version = LedgerReplicaProtocol.Version,
+                Ledger = ledger,
+                WindowSize = Window.WindowSize,
+                Slot = slot,
+                Payload = payload,
+            };
+            return await grain.WriteAsync(request, token);
+        }
 
-        _ = Assert.IsType<ReplicaWriteOutcome.Written>((await grain.WriteAsync(Write(18, 0), token)).Value);
-        _ = Assert.IsType<ReplicaWriteOutcome.Written>((await grain.WriteAsync(Write(18, 0), token)).Value);
+        _ = Assert.IsType<ReplicaWriteOutcome.Written>((await SendWriteAsync(18, 0)).Value);
+        _ = Assert.IsType<ReplicaWriteOutcome.Written>((await SendWriteAsync(18, 0)).Value);
         var replica = Open(Callee, new LedgerId(18));
         Assert.Equal([1], await ReadAsync(replica, 0));
 
         _ = await replica.ReadTailAsync(Slot.Zero, seal: true, token);
-        Assert.Same(ReplicaWriteOutcome.Sealed.Instance, (await grain.WriteAsync(Write(18, 1), token)).Value);
+        Assert.Same(ReplicaWriteOutcome.Sealed.Instance, (await SendWriteAsync(18, 1)).Value);
         Assert.True((await replica.ReadAsync(new Slot(1), Slot.Zero, token)).TryGetValue(out ReplicaRead.Missing? _));
 
         await Cluster.Node(Callee).Store.DropReplicaAsync(new LedgerId(19), token);
-        Assert.Same(ReplicaWriteOutcome.Dropped.Instance, (await grain.WriteAsync(Write(19, 0), token)).Value);
+        Assert.Same(ReplicaWriteOutcome.Dropped.Instance, (await SendWriteAsync(19, 0)).Value);
         var seal = new LedgerReplicaTailRequest { Version = LedgerReplicaProtocol.Version, Ledger = 19, WindowSize = Window.WindowSize, Seal = true };
         Assert.Same(ReplicaWriteOutcome.Dropped.Instance, (await grain.ReadTailAsync(seal, token)).Value);
         Assert.Equal([new LedgerId(18)], await Cluster.Node(Callee).Store.ListReplicasAsync(token));
@@ -503,7 +507,7 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
         }
 
         var lane = Cluster.Transport(Caller).Budget(Cluster.Node(Callee).Node);
-        Assert.Equal((0, 0L, 0), (lane.OutstandingCalls, lane.OutstandingBytes, Cluster.Transport(Caller).SenderCopyCount));
+        Assert.Equal((0, 0L), (lane.OutstandingCalls, lane.OutstandingBytes));
 
         Cluster.CallerHold = null;
         Cluster.CalleeHold = null;

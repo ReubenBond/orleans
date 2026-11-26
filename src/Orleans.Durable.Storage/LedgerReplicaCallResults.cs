@@ -78,7 +78,7 @@ internal static class LedgerReplicaCallResults
 
     private static ReplicaRangeRead ReceivedRange(NodeId node, RemoteReplicaRangeRead.Batch batch, Slot expectedFrom, int maxSlots, int maxBytes)
     {
-        var received = batch.Bytes;
+        var received = batch.Bytes ?? WireArcBuffer.Empty;
         if (batch.FirstSlot != expectedFrom.Value || batch.Count < 0 || batch.Count > maxSlots || received.Length > maxBytes)
         {
             received.Dispose();
@@ -98,7 +98,7 @@ internal static class LedgerReplicaCallResults
             return new ReplicaRangeRead(ReplicaRangeBatch.Empty(expectedFrom));
         }
 
-        var packed = WireBuffers.MoveToArcBuffer(ref received);
+        var packed = received.TakeBuffer();
         if (ReplicaRangeBatch.ValidatePacked(batch.Count, packed) is { } rejection)
         {
             packed.Dispose();
@@ -198,18 +198,20 @@ internal static class LedgerReplicaCallResults
     }
 
     /// <summary>
-    /// Checks a read's DATA against the reply the read reserved and moves it into Durable Storage's page pool; releases
-    /// <paramref name="received"/>, which the caller owns, on every path.
+    /// Checks a read's DATA against the reply the read reserved and takes ownership of its pooled
+    /// <see cref="Engine.Buffers.ArcBuffer"/> directly (zero-copy; OR-I18); releases <paramref name="received"/> on every
+    /// rejection path.
     /// </summary>
-    private static ReplicaRead Received(NodeId node, OrleansBuffer received, int reserved, bool ranged)
+    private static ReplicaRead Received(NodeId node, WireArcBuffer? received, int reserved, bool ranged)
     {
-        if (DataRejection(node, received.Length, reserved, ranged) is { } rejection)
+        var buffer = received ?? WireArcBuffer.Empty;
+        if (DataRejection(node, buffer.Length, reserved, ranged) is { } rejection)
         {
-            received.Dispose();
+            buffer.Dispose();
             throw rejection;
         }
 
-        return new ReplicaRead(WireBuffers.MoveToArcBuffer(ref received));
+        return new ReplicaRead(buffer.TakeBuffer());
     }
 
     /// <summary>Returns the reply check a read's DATA of <paramref name="length"/> bytes fails, or null when it passes.</summary>

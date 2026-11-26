@@ -2778,16 +2778,8 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
     {
         using var payload = Payload(body);
         using var record = JournalEntryRecord.Append(JournalRowKey.Encode(key), expected, payload);
-        using var bytes = record.ToArcBuffer();
-        var sent = WireBuffers.CopyToOrleans(bytes);
-        try
-        {
-            return await grain.WriteAsync(new JournalForwardedEntry { Key = key, Record = sent }, Token);
-        }
-        finally
-        {
-            sent.Dispose();
-        }
+        using var sent = WireArcBuffer.FromRecord(record);
+        return await grain.WriteAsync(new JournalForwardedEntry { Key = key, Record = sent }, Token);
     }
 
     /// <summary>The answer a test gives a journal write the Journals do not take: <c>Moved</c> naming no owner, no effect.</summary>

@@ -77,12 +77,33 @@ internal sealed class CalleeFaults(TimeSpan delay, CalleeFaultsMutant mutant = C
         switch (fault)
         {
             case Fault.LostRequest when mutant == CalleeFaultsMutant.AnswersForTheStore:
+                if (request is LedgerReplicaWriteRequest answered)
+                {
+                    answered.Payload?.Dispose();
+                }
+
                 context.Result = EmptyReplicasAnswer(request);
                 return;
             case Fault.LostRequest:
+                if (request is LedgerReplicaWriteRequest lost)
+                {
+                    lost.Payload?.Dispose();
+                }
+
                 throw new TimeoutException("The request was lost.");
             case Fault.LostReply:
                 await context.Invoke();
+                if (context.Result is RemoteReplicaRead { Value: RemoteReplicaRead.Data lostData })
+                {
+                    lostData.Admission?.Dispose();
+                    lostData.Bytes?.Dispose();
+                }
+                else if (context.Result is RemoteReplicaRangeRead { Value: RemoteReplicaRangeRead.Batch lostBatch })
+                {
+                    lostBatch.Admission?.Dispose();
+                    lostBatch.Bytes?.Dispose();
+                }
+
                 throw new TimeoutException("The reply was lost.");
             case Fault.Duplicated:
                 var duplicate = Redecoded(request);
@@ -130,7 +151,7 @@ internal sealed class CalleeFaults(TimeSpan delay, CalleeFaultsMutant mutant = C
     /// own, which its callee releases.
     /// </summary>
     private static object Redecoded(object request) =>
-        request is LedgerReplicaWriteRequest write ? write with { Payload = WireBytes.Of(write.Payload.ToArray()) } : request;
+        request is LedgerReplicaWriteRequest write ? write with { Payload = WireBytes.Arc(write.Payload.ToArray()) } : request;
 
     private static object EmptyReplicasAnswer(object request) => request switch
     {

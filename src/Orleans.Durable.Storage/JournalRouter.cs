@@ -304,11 +304,24 @@ internal sealed partial class JournalRouter
 
             using (lease)
             {
-                // The sender copy lives only while its grant does, so a write waiting out a backoff or in a lane holds none.
-                using var wire = WireBuffers.CopyToOrleans(write.Record);
+                // Encode directly into Durable Storage's pooled ArcBuffer (zero GC byte[] allocation, zero receiver copy; OR-I18).
+                using var wire = WireArcBuffer.FromRecord(write.Record);
                 try
                 {
-                    outcome = await _grains(target).WriteAsync(new JournalForwardedEntry { Key = write.Key, Record = wire }, cancellationToken).ConfigureAwait(false);
+                    Task<JournalForwardedWriteOutcome> call;
+                    WireArcBuffer? proxyCopy = null;
+                    try
+                    {
+                        call = _grains(target).WriteAsync(new JournalForwardedEntry { Key = write.Key, Record = wire }, cancellationToken);
+                        proxyCopy = wire.DetachLastCopy();
+                    }
+                    catch
+                    {
+                        wire.DetachLastCopy()?.Dispose();
+                        throw;
+                    }
+
+                    outcome = await OrleansLedgerReplicaTransport.UntilCancelledAsync(call, abandoned: null, releaseOnEnd: proxyCopy, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception failure) when (!IsOwnCancellation(failure, cancellationToken) && !Has<JournalStoreCorruptException>(failure))
                 {

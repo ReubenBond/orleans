@@ -408,6 +408,45 @@ public sealed class JournalWarmStateTests : IDisposable
     }
 
     /// <summary>
+    /// Warm state and history reads also request a <c>Replace</c> once <see cref="JournalState.ReplaceRequestMaxAppends"/>
+    /// small appends accumulate since the base (journals.md §8.7), even well below the 64 KiB byte floor, and reset on
+    /// <c>Replace</c>.
+    /// </summary>
+    [Fact]
+    public async Task SnapshotRequestFlipsAtReplaceRequestMaxAppendsAndResetsOnReplace()
+    {
+        await using var env = new WarmTestEnvironment();
+        var storageA = new InMemoryJournalIndex();
+        await using var nodeA = await env.OpenNodeAsync(NodeA, storageA);
+        await env.BootstrapAsync(nodeA, [NodeA]);
+        await using var store = new JournalStore(nodeA.Registry, env.Store, new JournalStoreOptions(), env.Time, nodeA.StateDb);
+        await nodeA.Registry.ReconciledAsync(nodeA.Map.Current.Epoch, Token);
+
+        var version = JournalVersion.Origin;
+        for (var i = 1; i < JournalState.ReplaceRequestMaxAppends; i++)
+        {
+            var (next, rr) = await WriteAppendWithOutcomeAsync(store, "chain", version, "x");
+            Assert.False(rr);
+            version = next;
+        }
+
+        Assert.False(await ReadReplaceRequestedAsync(store, "chain"));
+
+        // The 32nd append flips ReplaceRequested on both Accepted and ReadAsync.
+        var (v32, rr32) = await WriteAppendWithOutcomeAsync(store, "chain", version, "x");
+        Assert.True(rr32);
+        Assert.True(await ReadReplaceRequestedAsync(store, "chain"));
+
+        // A Replace resets AppendsSinceBase to 0.
+        var (vReplaced, rrReplaced) = await WriteReplaceWithOutcomeAsync(store, "chain", v32, "snap");
+        Assert.False(rrReplaced);
+        Assert.False(await ReadReplaceRequestedAsync(store, "chain"));
+
+        var (_, rrAfter) = await WriteAppendWithOutcomeAsync(store, "chain", vReplaced, "y");
+        Assert.False(rrAfter);
+    }
+
+    /// <summary>
     /// An owner absence read through <see cref="JournalStore.ReadAsync"/> over a preloaded <see cref="LsmArchiveStore"/>
     /// and caught-up <see cref="JournalStateDatabase"/> makes zero object-store requests and zero replica slot reads
     /// (journals.md §8.2, §8.3, archive-lsm.md §8.3).

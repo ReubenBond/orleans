@@ -80,7 +80,7 @@ public sealed class JournalMessageTests : IDisposable
     public Task EveryAnswerCaseAndTheEntryHaveAPinnedWireEncoding()
     {
         var serializer = _services.GetRequiredService<Serializer>();
-        var entry = new JournalForwardedEntry { Key = "a journal key", Record = WireBytes.Of(7, 8, 9) };
+        var entry = new JournalForwardedEntry { Key = "a journal key", Record = WireBytes.Arc(7, 8, 9) };
         var pinned = Pinned(FullPage());
         try
         {
@@ -135,7 +135,7 @@ public sealed class JournalMessageTests : IDisposable
             (crossed.Value as JournalForwardedPage.Page)?.Bytes.Dispose();
         }
 
-        var sent = new JournalForwardedEntry { Key = "journal", Record = WireBytes.Of(7, 8, 9) };
+        var sent = new JournalForwardedEntry { Key = "journal", Record = WireBytes.Arc(7, 8, 9) };
         var entry = serializer.Deserialize<JournalForwardedEntry>(serializer.SerializeToArray(sent));
         Assert.Equal("journal", entry.Key);
         Assert.Equal([7, 8, 9], entry.Record.ToArray());

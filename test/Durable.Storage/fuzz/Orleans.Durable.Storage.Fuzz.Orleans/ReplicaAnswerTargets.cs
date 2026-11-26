@@ -67,7 +67,7 @@ internal abstract class ReplicaAnswerTarget<TAnswer, TSurrogate> : FuzzTarget
         catch (ReplicaReplyDecodingException)
         {
             Require(expected is null, "refused a surrogate which §7.2's rules accept.");
-            Require(carried.IsEmpty || IsReleased(carried), "refused a surrogate without releasing the bytes it carried.");
+            Require(carried is null || carried.IsConsumed, "refused a surrogate without releasing the bytes it carried.");
             return FuzzOutcome.Rejected;
         }
 
@@ -89,7 +89,7 @@ internal abstract class ReplicaAnswerTarget<TAnswer, TSurrogate> : FuzzTarget
     protected abstract TSurrogate ToSurrogate(in TAnswer value);
 
     /// <summary>Returns the bytes a surrogate carries, which its decoding owns.</summary>
-    protected virtual OrleansBuffer Bytes(in TSurrogate surrogate) => default;
+    protected virtual WireArcBuffer? Bytes(in TSurrogate surrogate) => null;
 
     /// <summary>Returns the value §7.2's rules give for <paramref name="surrogate"/>, or null when they refuse it.</summary>
     protected abstract TAnswer? Expected(in TSurrogate surrogate);
@@ -261,9 +261,9 @@ internal sealed class ReplicaReadAnswerTarget : ReplicaAnswerTarget<RemoteReplic
 
     protected override IEnumerable<RemoteReplicaRead> Cases() =>
     [
-        new RemoteReplicaRead.Data(JournalSeeds.Bytes(1, 2, 3)),
-        new RemoteReplicaRead.Data(JournalSeeds.Bytes(1, 2, 3, 4, 5, 6, 7, 8, 9)),
-        new RemoteReplicaRead.Data(default),
+        new RemoteReplicaRead.Data(WireBytes(1, 2, 3)),
+        new RemoteReplicaRead.Data(WireBytes(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+        new RemoteReplicaRead.Data(WireArcBuffer.Empty),
         new RemoteReplicaRead.TooLarge(32),
         new ReplicaRead.OutsideBatch(5),
         ReplicaRead.Missing.Instance,
@@ -280,13 +280,13 @@ internal sealed class ReplicaReadAnswerTarget : ReplicaAnswerTarget<RemoteReplic
         new() { Case = 10 },
         new() { Case = ReplicaReplyTag.OutsideBatch, Length = 0 },
         new() { Case = ReplicaReplyTag.OutsideBatch, Length = -1 },
-        new() { Case = ReplicaReplyTag.Second, Bytes = JournalSeeds.Bytes(1) },
-        new() { Case = ReplicaReplyTag.Refused, Refusal = 6, Message = "m", Bytes = JournalSeeds.Bytes(1, 2) },
+        new() { Case = ReplicaReplyTag.Second, Bytes = WireBytes(1) },
+        new() { Case = ReplicaReplyTag.Refused, Refusal = 6, Message = "m", Bytes = WireBytes(1, 2) },
         new() { Case = ReplicaReplyTag.TooLarge, Length = 0 },
         new() { Case = ReplicaReplyTag.TooLarge, Length = -1 },
         new() { Case = ReplicaReplyTag.Corrupt },
-        new() { Case = ReplicaReplyTag.First, Bytes = JournalSeeds.Bytes(1), Length = 1 },
-        new() { Case = ReplicaReplyTag.First, Bytes = JournalSeeds.Bytes(1), Message = "m" },
+        new() { Case = ReplicaReplyTag.First, Bytes = WireBytes(1), Length = 1 },
+        new() { Case = ReplicaReplyTag.First, Bytes = WireBytes(1), Message = "m" },
         new() { Case = ReplicaReplyTag.TooLarge, Length = 9, Slot = 1 },
         new() { Case = ReplicaReplyTag.Second, Length = 4 },
     ];
@@ -295,14 +295,14 @@ internal sealed class ReplicaReadAnswerTarget : ReplicaAnswerTarget<RemoteReplic
 
     protected override RemoteReplicaReadSurrogate ToSurrogate(in RemoteReplicaRead value) => Converter.ConvertToSurrogate(value);
 
-    protected override OrleansBuffer Bytes(in RemoteReplicaReadSurrogate surrogate) => surrogate.Bytes;
+    protected override WireArcBuffer? Bytes(in RemoteReplicaReadSurrogate surrogate) => surrogate.Bytes;
 
     protected override RemoteReplicaRead? Expected(in RemoteReplicaReadSurrogate surrogate) => surrogate.Case switch
     {
         _ when SetsUnownedShared(surrogate.Case, surrogate.Refusal, surrogate.Message, surrogate.Slot) => null,
         not (8 or 9) when surrogate.Length != 0 => null,
-        1 => new RemoteReplicaRead.Data(surrogate.Bytes),
-        _ when !surrogate.Bytes.IsEmpty => null,
+        1 => new RemoteReplicaRead.Data(surrogate.Bytes ?? WireArcBuffer.Empty),
+        _ when surrogate.Bytes is { IsEmpty: false } => null,
         2 => ReplicaRead.Missing.Instance,
         8 when surrogate.Length > 0 => new RemoteReplicaRead.TooLarge(surrogate.Length),
         9 when surrogate.Length > 0 => new ReplicaRead.OutsideBatch(surrogate.Length),
@@ -319,7 +319,7 @@ internal sealed class ReplicaReadAnswerTarget : ReplicaAnswerTarget<RemoteReplic
 
     protected override bool Same(in RemoteReplicaReadSurrogate decoded, in RemoteReplicaReadSurrogate encoded) =>
         (decoded.Case, decoded.Length, decoded.Refusal, decoded.Message, decoded.Slot) == (encoded.Case, encoded.Length, encoded.Refusal, encoded.Message, encoded.Slot)
-        && decoded.Bytes.ToArray().AsSpan().SequenceEqual(encoded.Bytes.ToArray());
+        && (decoded.Bytes ?? WireArcBuffer.Empty).ToArray().AsSpan().SequenceEqual((encoded.Bytes ?? WireArcBuffer.Empty).ToArray());
 
     protected override void CheckReply(in RemoteReplicaRead value)
     {
@@ -331,8 +331,11 @@ internal sealed class ReplicaReadAnswerTarget : ReplicaAnswerTarget<RemoteReplic
             () => LedgerReplicaCallResults.Read(Callee, answer, Reserved, ranged: false),
             result => Returned(answer, sent, result),
             "a whole read");
-        Require(data is not { } bytes || bytes.IsEmpty || IsReleased(bytes), "the reply check of a read kept the DATA's received bytes.");
+        Require(data is null || data.IsConsumed, "the reply check of a read kept the DATA's received bytes.");
     }
+
+    private static WireArcBuffer WireBytes(params byte[] bytes) =>
+        WireArcBuffer.Take(global::Orleans.Durable.Storage.Engine.Buffers.ArcBuffer.CopyFrom(bytes));
 
     /// <summary>
     /// Returns whether a read's check rightly returned <paramref name="result"/>: DATA of 1 to <see cref="Reserved"/> bytes,

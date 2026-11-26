@@ -31,23 +31,30 @@ public sealed class JournalState
     internal const long ReplaceRequestMinBytes = 64 * 1024;
 
     /// <summary>
+    /// The maximum number of appends after a journal's base before Journals asks for a <c>Replace</c> (journals.md §8.7),
+    /// bounding cold-read tail length even for small payloads.
+    /// </summary>
+    internal const int ReplaceRequestMaxAppends = 32;
+
+    /// <summary>
     /// The bytes a state holds, which a primary's warm-state budget counts (journals.md §8.8): the object's 16-byte
     /// header, its version (a 33-byte inline base and an 8-byte count, 48 bytes aligned), its tombstone's 16, its
-    /// content's length and base length (16), and its existence (8 aligned).
+    /// content's length and base length (16), and its existence and append count (8 aligned).
     /// </summary>
     internal const long EstimatedBytes = 104;
 
     private long? _deletionTicks;
 
-    private JournalState(JournalVersion version, bool exists, long? deletionTicks, long contentLength, long baseLength)
+    private JournalState(JournalVersion version, bool exists, long? deletionTicks, long contentLength, long baseLength, int appendsSinceBase = 0)
     {
-        Debug.Assert(deletionTicks is null || !exists && contentLength == 0 && baseLength == 0, "A deleted journal neither exists nor holds content.");
-        Debug.Assert(baseLength >= 0 && contentLength >= baseLength, "Content length is at least its base length.");
+        Debug.Assert(deletionTicks is null || !exists && contentLength == 0 && baseLength == 0 && appendsSinceBase == 0, "A deleted journal neither exists nor holds content.");
+        Debug.Assert(baseLength >= 0 && contentLength >= baseLength && appendsSinceBase >= 0, "Content length is at least its base length and append count is non-negative.");
         CurrentVersion = version;
         Exists = exists;
         _deletionTicks = deletionTicks;
         ContentLength = contentLength;
         BaseLength = baseLength;
+        AppendsSinceBase = appendsSinceBase;
     }
 
     /// <summary>Gets the journal's version, which every accepted entry advances.</summary>
@@ -77,12 +84,18 @@ public sealed class JournalState
     /// <summary>Gets the bytes appended after the journal's base (journals.md §8.7).</summary>
     internal long BytesSinceBase => ContentLength - BaseLength;
 
+    /// <summary>Gets the number of <c>Append</c> entries applied after the journal's base (journals.md §8.7).</summary>
+    internal int AppendsSinceBase { get; private set; }
+
     /// <summary>
-    /// Gets a value indicating whether the state's bytes appended since its base pass the snapshot-request bound
-    /// (<c>BytesSinceBase &gt; max(ReplaceRequestMinBytes, α × BaseLength)</c>, with <c>α = 1</c> and
-    /// <c>ReplaceRequestMinBytes = 64 KiB</c>; journals.md §8.7).
+    /// Gets a value indicating whether the state passes the snapshot-request bound
+    /// (<c>BytesSinceBase &gt; max(ReplaceRequestMinBytes, α × BaseLength)</c> or
+    /// <c>AppendsSinceBase &gt;= ReplaceRequestMaxAppends</c>, with <c>α = 1</c>,
+    /// <c>ReplaceRequestMinBytes = 64 KiB</c>, and <c>ReplaceRequestMaxAppends = 32</c>; journals.md §8.7).
     /// </summary>
-    internal bool IsReplaceRequested => BytesSinceBase > Math.Max(ReplaceRequestMinBytes, ReplaceRequestAlpha * BaseLength);
+    internal bool IsReplaceRequested =>
+        BytesSinceBase > Math.Max(ReplaceRequestMinBytes, ReplaceRequestAlpha * BaseLength)
+        || AppendsSinceBase >= ReplaceRequestMaxAppends;
 
     /// <summary>Folds a key's history read, its prefix and its live rows (journals.md §8.3).</summary>
     /// <returns>The state, or <see langword="null"/> when the key has no history: <c>Absent</c> and no live row.</returns>
@@ -123,7 +136,7 @@ public sealed class JournalState
         var state = new JournalState(version, exists, deletionTicks, prefixLength, prefixLength);
         for (var index = 0; index < rows.Length; index++)
         {
-            Debug.Assert(index == 0 || Follows(rows[index - 1].Version, rows[index].Version), "JS-I10 at load: each live row of a key takes the version after its predecessor's.");
+            Debug.Assert(index == 0 || Follows(rows[index - 1].Version, rows[index].Version, rows[index].SupersededBefore), "JS-I10 at load: each live row of a key takes the version after its predecessor's.");
             if (!rows[index].IsHeld || mutant == JournalLoadMutant.ReplayWithoutHolds)
             {
                 state.ApplyRow(rows[index]);
@@ -193,9 +206,12 @@ public sealed class JournalState
             CultureInfo.InvariantCulture,
             $"version {state.CurrentVersion}, {(state.Exists ? "existing" : state.DeletedAt is { } deleted ? $"deleted at {deleted:O}" : "absent")}, {state.ContentLength} bytes of content");
 
-    /// <summary>Returns whether <paramref name="after"/> is the version after <paramref name="before"/>: the same base, and the next count.</summary>
-    private static bool Follows(RowVersion before, RowVersion after) =>
-        after.Base == before.Base && after.Count != 0 && after.Count - 1 == before.Count;
+    /// <summary>Returns whether <paramref name="after"/> is the version after <paramref name="before"/>: the same base, and the next count (accounting for any rows superseded and omitted before an opener).</summary>
+    private static bool Follows(RowVersion before, RowVersion after, int supersededBefore = 0)
+    {
+        var skipped = (ulong)supersededBefore;
+        return after.Base == before.Base && after.Count > skipped && after.Count - 1 - skipped == before.Count;
+    }
 
     private static bool ContainsHeld(ReadOnlySpan<ArchiveRow> rows)
     {
@@ -283,10 +299,11 @@ public sealed class JournalState
         Exists = true;
         _deletionTicks = null;
         ContentLength += bodyLength;
+        AppendsSinceBase++;
     }
 
     /// <summary>Creates a shallow copy of this state, used only by test mutants that keep warm state across claims or apply on admit.</summary>
-    internal JournalState Clone() => new(CurrentVersion, Exists, _deletionTicks, ContentLength, BaseLength);
+    internal JournalState Clone() => new(CurrentVersion, Exists, _deletionTicks, ContentLength, BaseLength, AppendsSinceBase);
 
     private void Replace(long bodyLength)
     {
@@ -294,6 +311,7 @@ public sealed class JournalState
         _deletionTicks = null;
         ContentLength = bodyLength;
         BaseLength = bodyLength;
+        AppendsSinceBase = 0;
     }
 
     /// <summary>Ends the content and leaves a tombstone of <paramref name="deletionTicks"/>.</summary>
@@ -303,6 +321,7 @@ public sealed class JournalState
         _deletionTicks = deletionTicks;
         ContentLength = 0;
         BaseLength = 0;
+        AppendsSinceBase = 0;
     }
 
     /// <summary>Ends the content and any tombstone, leaving the journal absent.</summary>
@@ -312,5 +331,6 @@ public sealed class JournalState
         _deletionTicks = null;
         ContentLength = 0;
         BaseLength = 0;
+        AppendsSinceBase = 0;
     }
 }

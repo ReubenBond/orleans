@@ -5,9 +5,10 @@ namespace Orleans.Durable.Storage;
 /// <summary>
 /// A journal entry forwarded to the primary's node (orleans.md §5.5, §7.2): the journal's key, whose row key the owner
 /// encodes, and the writing silo's encoded entry record verbatim, its CRC-32C, kind, expected version, deletion time, and
-/// body, in an Orleans buffer (OR-I18). The owner verifies the record against the key's row key where it enters the process
-/// and proposes it unchanged (JS-I5). It is not <see cref="ImmutableAttribute"/>, so Orleans' proxy pins a copy of the
-/// record as each call is made, which the message holds; the callee releases the record it receives on every path.
+/// body, in a zero-copy consume-on-serialize <see cref="WireArcBuffer"/> (OR-I18). The owner verifies the record against
+/// the key's row key where it enters the process and proposes it unchanged (JS-I5). It is not
+/// <see cref="ImmutableAttribute"/>, so Orleans' proxy retains an independent zero-copy lease as each call is made,
+/// which <see cref="WireArcBufferCodec"/> consumes on remote serialization or the callee consumes on a local call.
 /// </summary>
 [GenerateSerializer]
 internal readonly struct JournalForwardedEntry
@@ -18,7 +19,7 @@ internal readonly struct JournalForwardedEntry
 
     /// <summary>Gets or initializes the encoded entry record.</summary>
     [Id(1)]
-    public OrleansBuffer Record { get; init; }
+    public WireArcBuffer Record { get; init; }
 }
 
 /// <summary>Why the owner's node refused a forwarded call before its Journals, with no effect (orleans.md §5.5, §7.2).</summary>

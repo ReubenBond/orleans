@@ -309,7 +309,8 @@ internal static class ArchiveMerge
                 return Broken(write, $"stores token {write.Token}, not {from}, which its key's chain gives");
             }
 
-            if (previous is { } before && (defining.Version.Count == 0 || new RowVersion(defining.Version.Base, defining.Version.Count - 1) != before))
+            var skipped = (ulong)defining.SupersededBefore;
+            if (previous is { } before && (defining.Version.Count <= skipped || new RowVersion(defining.Version.Base, defining.Version.Count - 1 - skipped) != before))
             {
                 return Broken(write, $"has its defining row at ({defining.Tag.Ledger}, {defining.Tag.Slot}, {defining.Tag.Index}) reach version {defining.Version}, which does not follow its key's previous row's {before}");
             }

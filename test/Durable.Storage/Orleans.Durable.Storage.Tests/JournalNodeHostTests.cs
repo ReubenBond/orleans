@@ -155,7 +155,7 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
             bytes[^1] ^= 0x01;
         }
 
-        var entry = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Of(defect == "truncated" ? bytes[..^1] : bytes)) };
+        var entry = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Arc(defect == "truncated" ? bytes[..^1] : bytes)) };
 
         var refused = Assert.IsType<JournalCallRefused>((await host.WriteAsync(Self, entry, Token)).Value);
 
@@ -259,7 +259,7 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
             payload,
             [new MessageRecord(channel, "wk"u8.ToArray())]);
         using var raw = record.ToArcBuffer();
-        var forwarded = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Of(raw.ToArray())) };
+        var forwarded = new JournalForwardedEntry { Key = "k", Record = _wire.Track(WireBytes.Arc(raw.ToArray())) };
 
         var outcome = await host.WriteAsync(Self, forwarded, Token);
 
@@ -276,7 +276,7 @@ public sealed class JournalNodeHostTests : IAsyncLifetime
     }
 
     /// <summary>Returns a forwarded <c>Delete</c> of <paramref name="key"/>, whose record the test's ledger tracks.</summary>
-    private JournalForwardedEntry Entry(string key) => new() { Key = key, Record = _wire.Track(WireBytes.Of(RecordBytes(key))) };
+    private JournalForwardedEntry Entry(string key) => new() { Key = key, Record = _wire.Track(WireBytes.Arc(RecordBytes(key))) };
 
     /// <summary>
     /// Returns a host over the node's Journals, serving over a map view of their own which lists one open ledger over every

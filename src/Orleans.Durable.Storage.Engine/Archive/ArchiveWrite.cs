@@ -82,7 +82,7 @@ public sealed class ArchiveWrite
         var builder = new ArchiveWriteBuilder(rows[0].Segment, rows[0].Token);
         foreach (var row in rows)
         {
-            _ = builder.Add(row.ToCommand());
+            _ = builder.Add(row.ToCommand(), row.SupersededBefore);
         }
 
         return builder.ToWrite();

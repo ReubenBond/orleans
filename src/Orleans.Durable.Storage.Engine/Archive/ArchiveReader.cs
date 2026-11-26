@@ -417,11 +417,22 @@ public sealed class ArchiveReader
             }
 
             // 4. The rows joined in ledger and slot order, each marked held by Holds, and the chain of the rows not held
-            // checked (HI-I4).
-            var totalRows = 0;
-            foreach (var scan in scans)
+            // checked (HI-I4). When a newer ledger's indexed read stopped at a verified tokenless opener (LSM), older
+            // ledgers cannot affect the key's state and are omitted so HI-I4 version continuity starts cleanly at the base.
+            var firstScan = 0;
+            for (var index = scans.Count - 1; index >= 0; index--)
             {
-                totalRows += scan.LiveCount;
+                if (scans[index].FoundCompleteBase)
+                {
+                    firstScan = index;
+                    break;
+                }
+            }
+
+            var totalRows = 0;
+            for (var index = firstScan; index < scans.Count; index++)
+            {
+                totalRows += scans[index].LiveCount;
             }
 
             if (totalRows == 0)
@@ -430,9 +441,9 @@ public sealed class ArchiveReader
             }
 
             var live = new List<ArchiveRow>(totalRows);
-            foreach (var scan in scans)
+            for (var index = firstScan; index < scans.Count; index++)
             {
-                scan.CopyLiveTo(live);
+                scans[index].CopyLiveTo(live);
             }
 
             return await SettleAsync(storeAnswer.MergeOwned(CollectionsMarshal.AsSpan(live), through, listed.Open.Id, tail.ServedHere), map, through, cancellationToken).ConfigureAwait(false);
@@ -935,6 +946,13 @@ public sealed class ArchiveReader
         /// <summary>Gets a value indicating whether this ledger tries the key index before scanning.</summary>
         public bool UseIndex { get; private set; } = useIndex;
 
+        /// <summary>
+        /// Gets a value indicating whether an indexed read in this ledger reached a verified tokenless opener
+        /// (<c>Replace</c> or <c>Delete</c> with empty <see cref="RowToken"/>), making all earlier segments and ledgers
+        /// superseded.
+        /// </summary>
+        public bool FoundCompleteBase { get; private set; }
+
         public ArcBufferWriter GetBodiesWriter() => _bodies ??= new ArcBufferWriter();
 
         public void AddLive(in ArchiveRow row) => (_live ??= []).Add(row);
@@ -1102,8 +1120,7 @@ public sealed class ArchiveReader
 
                 if (entry.Tag.Index != defRow.Index)
                 {
-                    var stepper = new BatchRowStepper(batch);
-                    if (!stepper.AdvanceTo(entry.Tag.Index, out var row))
+                    if (!TryFindRow(batch, entry.Tag.Index, out var row))
                     {
                         throw DecodeRejection.Create(
                             BatchView.ReasonUnknownOrdinal,
@@ -1134,7 +1151,11 @@ public sealed class ArchiveReader
                 var segment = new LedgerSegmentId(ledger.Id, new Slot(slot.Value - (long)batch.LedgerSegmentOffset));
                 var version = new RowVersion(versionBefore.Base.IsEmpty ? default : new RowToken(versionBefore.Base.ToArray()), versionBefore.Count + 1);
                 var token = defRow.Token.IsEmpty ? default : new RowToken(defRow.Token.ToArray());
-                AddIndexedRow(entry.Tag, defRow.Kind, version, segment, token, defRow.Body, defRow.BodyLength);
+                AddIndexedRow(entry.Tag, defRow.Kind, version, segment, token, defRow.Body, defRow.BodyLength, supersededBefore: 0);
+                if (defRow.Kind is RowKind.Replace or RowKind.Delete && token.IsEmpty)
+                {
+                    FoundCompleteBase = true;
+                }
             }
 
             return ScanPass.Reached;
@@ -1142,10 +1163,13 @@ public sealed class ArchiveReader
 
         private async ValueTask<ScanPass> FetchMultiSlotIndexedAsync(ImmutableArray<KeyIndexEntry> entries, CancellationToken cancellationToken)
         {
-
-            var distinctSlots = new SortedSet<Slot>();
-            var distinctDefinings = new SortedSet<(Slot DefiningSlot, ulong Ordinal)>();
-            for (var index = 0; index < entries.Length; index++)
+            // Validate entries and precompute each entry's 1-based offset within its (DefiningSlot, Ordinal) segment so
+            // descending waves compute exact RowVersion counts and SupersededBefore counts without reading older slots.
+            var entryCount = entries.Length;
+            var offsetInSegment = new ulong[entryCount];
+            var segmentHasDefiningEntry = new bool[entryCount];
+            var segmentCounts = new Dictionary<(Slot DefiningSlot, ulong Ordinal), (ulong Count, bool HasDefining)>();
+            for (var index = 0; index < entryCount; index++)
             {
                 var entry = entries[index];
                 if (entry.Tag.Ledger != ledger.Id || entry.Tag.Slot >= Below || entry.DefiningSlot > entry.Tag.Slot)
@@ -1162,20 +1186,203 @@ public sealed class ArchiveReader
                         string.Create(CultureInfo.InvariantCulture, $"Key-index entries for ledger {ledger.Id} are not in strictly increasing tag order at {entry.Tag}."));
                 }
 
-                _ = distinctSlots.Add(entry.DefiningSlot);
-                _ = distinctSlots.Add(entry.Tag.Slot);
-                _ = distinctDefinings.Add((entry.DefiningSlot, entry.Ordinal));
+                var segKey = (entry.DefiningSlot, entry.Ordinal);
+                ref var segInfo = ref CollectionsMarshal.GetValueRefOrAddDefault(segmentCounts, segKey, out var existed);
+                if (!existed)
+                {
+                    segInfo = (1UL, entry.Tag.Slot == entry.DefiningSlot);
+                }
+                else
+                {
+                    segInfo.Count++;
+                }
+
+                offsetInSegment[index] = segInfo.Count;
+                segmentHasDefiningEntry[index] = segInfo.HasDefining;
             }
 
-            Slot[] slots = [.. distinctSlots];
-            (Slot DefiningSlot, ulong Ordinal)[] neededDefinings = [.. distinctDefinings];
-            var defining = new Dictionary<(Slot DefiningSlot, ulong Ordinal), DefiningState>(neededDefinings.Length);
-            var maxInFlight = Math.Min(slots.Length, Math.Max(1, ledger.K));
+            var defining = new Dictionary<(Slot DefiningSlot, ulong Ordinal), DefiningState>(segmentCounts.Count);
+            HashSet<(Slot DefiningSlot, ulong Ordinal)>? stoppedSegments = null;
+            var descendingRows = new List<ArchiveRow>();
+            var waveSize = Math.Clamp(ledger.K, 16, 32);
+            var waveEntries = new List<int>(waveSize);
+            var waveSlots = new List<Slot>(waveSize * 2);
+            var waveSlotSet = new HashSet<Slot>(waveSize * 2);
+            var waveDefinings = new List<(Slot DefiningSlot, ulong Ordinal)>(waveSize);
+            var waveDefiningSet = new HashSet<(Slot DefiningSlot, ulong Ordinal)>(waveSize);
+            var waveBatches = new Dictionary<Slot, LedgerRead.Data>(waveSize * 2);
+            var cursor = entryCount - 1;
+            var stoppedAll = false;
+
+            try
+            {
+                while (cursor >= 0 && !stoppedAll)
+                {
+                    waveEntries.Clear();
+                    waveSlots.Clear();
+                    waveSlotSet.Clear();
+                    waveDefinings.Clear();
+                    waveDefiningSet.Clear();
+
+                    while (cursor >= 0 && waveEntries.Count < waveSize)
+                    {
+                        var idx = cursor--;
+                        var entry = entries[idx];
+                        var segKey = (entry.DefiningSlot, entry.Ordinal);
+                        if (stoppedSegments is not null && stoppedSegments.Contains(segKey))
+                        {
+                            continue;
+                        }
+
+                        waveEntries.Add(idx);
+                        if (waveSlotSet.Add(entry.Tag.Slot))
+                        {
+                            waveSlots.Add(entry.Tag.Slot);
+                        }
+
+                        if (!defining.ContainsKey(segKey) && waveDefiningSet.Add(segKey))
+                        {
+                            waveDefinings.Add(segKey);
+                            if (waveSlotSet.Add(entry.DefiningSlot))
+                            {
+                                waveSlots.Add(entry.DefiningSlot);
+                            }
+                        }
+                    }
+
+                    if (waveEntries.Count == 0)
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        var fetched = await FetchWaveSlotsAsync(waveSlots, waveBatches, cancellationToken).ConfigureAwait(false);
+                        if (fetched == ScanPass.Dropped)
+                        {
+                            return ScanPass.Dropped;
+                        }
+
+                        ResolveWaveDefinings(waveDefinings, waveBatches, defining);
+
+                        var keySpan = key.Span;
+                        foreach (var idx in waveEntries)
+                        {
+                            var entry = entries[idx];
+                            var segKey = (entry.DefiningSlot, entry.Ordinal);
+                            if (stoppedSegments is not null && stoppedSegments.Contains(segKey))
+                            {
+                                continue;
+                            }
+
+                            ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(defining, segKey);
+                            Debug.Assert(!System.Runtime.CompilerServices.Unsafe.IsNullRef(ref state), "Every wave entry's defining state was resolved.");
+                            if (!state.Matched)
+                            {
+                                continue;
+                            }
+
+                            var slot = entry.Tag.Slot;
+                            var batch = BatchView.OfVerified(waveBatches[slot].Batch);
+                            if (slot < state.Segment.Start || batch.LedgerSegmentOffset != (ulong)(slot - state.Segment.Start))
+                            {
+                                throw DecodeRejection.Create(
+                                    LedgerSegmentView.ReasonOffsetMismatch,
+                                    string.Create(CultureInfo.InvariantCulture, $"Batch at slot {slot} has segment offset {batch.LedgerSegmentOffset}, and its segment starts at slot {state.Segment.Start}."));
+                            }
+
+                            if (entry.Tag.Index >= batch.Count || !TryFindRow(batch, entry.Tag.Index, out var row))
+                            {
+                                throw DecodeRejection.Create(
+                                    BatchView.ReasonUnknownOrdinal,
+                                    string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} lies past batch count {batch.Count} at slot {slot}."));
+                            }
+
+                            var offset = offsetInSegment[idx];
+                            if (slot == entry.DefiningSlot && row.IsDefining)
+                            {
+                                if (offset != 1 || row.Index != state.DefiningRowIndex || !row.Key.SequenceEqual(keySpan))
+                                {
+                                    throw DecodeRejection.Create(
+                                        LedgerSegmentView.ReasonDuplicateKey,
+                                        string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} does not match the defining row of ordinal {entry.Ordinal} at slot {slot}."));
+                                }
+                            }
+                            else if (offset == 1 || !segmentHasDefiningEntry[idx] || row.IsDefining || row.Ordinal != entry.Ordinal)
+                            {
+                                throw DecodeRejection.Create(
+                                    BatchView.ReasonUnknownOrdinal,
+                                    string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} does not reference ordinal {entry.Ordinal} at slot {slot}."));
+                            }
+
+                            if (state.DefiningVersionBeforeCount > ulong.MaxValue - offset)
+                            {
+                                throw DecodeRejection.Create(
+                                    LedgerSegmentView.ReasonCountOverflow,
+                                    string.Create(CultureInfo.InvariantCulture, $"Row {row.Index} of the batch at slot {slot} would advance its key's count past the u64 maximum."));
+                            }
+
+                            if (row.Kind == RowKind.Message)
+                            {
+                                // LG-I15: message rows are excluded from ArchiveReader journal folds.
+                                continue;
+                            }
+
+                            var isOpener = row.Kind is RowKind.Replace or RowKind.Delete;
+                            var supersededBefore = isOpener ? checked((int)(offset - 1)) : 0;
+                            var version = new RowVersion(state.VersionBase is null ? default : new RowToken(state.VersionBase), state.DefiningVersionBeforeCount + offset);
+                            var token = state.Token is null ? default : new RowToken(state.Token);
+                            descendingRows.Add(CreateIndexedRow(entry.Tag, row.Kind, version, state.Segment, token, row.Body, row.BodyLength, supersededBefore));
+
+                            if (isOpener)
+                            {
+                                _ = (stoppedSegments ??= []).Add(segKey);
+                                if (token.IsEmpty)
+                                {
+                                    FoundCompleteBase = true;
+                                    stoppedAll = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var data in waveBatches.Values)
+                        {
+                            data.Dispose();
+                        }
+
+                        waveBatches.Clear();
+                    }
+                }
+
+                for (var index = descendingRows.Count - 1; index >= 0; index--)
+                {
+                    AddLive(descendingRows[index]);
+                }
+
+                descendingRows.Clear();
+                return ScanPass.Reached;
+            }
+            finally
+            {
+                if (descendingRows.Count > 0)
+                {
+                    ArchiveMerge.Release(CollectionsMarshal.AsSpan(descendingRows));
+                }
+            }
+        }
+
+        private async ValueTask<ScanPass> FetchWaveSlotsAsync(
+            List<Slot> slots,
+            Dictionary<Slot, LedgerRead.Data> results,
+            CancellationToken cancellationToken)
+        {
+            var maxInFlight = Math.Min(slots.Count, Math.Max(1, ledger.K));
             using var fetchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var inFlight = new Queue<(Slot Slot, Task<LedgerRead> Task)>(maxInFlight);
             var nextToLaunch = 0;
-            var defCursor = 0;
-            var entryCursor = 0;
             var dropped = false;
             Exception? failure = null;
             OperationCanceledException? unexpectedCancel = null;
@@ -1197,22 +1404,18 @@ public sealed class ArchiveReader
                     }
                     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {
-                        // A slot returned Dropped, faulted, or threw an unrelated cancellation and cancelled fetchCts; inspect drained tasks below.
                         break;
                     }
 
                     if (outcome.TryGetValue(out LedgerRead.Data data))
                     {
-                        if (nextToLaunch < slots.Length)
+                        if (nextToLaunch < slots.Count)
                         {
                             var nextSlot = slots[nextToLaunch++];
                             inFlight.Enqueue((nextSlot, FetchSlotAsync(nextSlot, fetchCts)));
                         }
 
-                        using (data)
-                        {
-                            ProcessSlot(current.Slot, data, entries, neededDefinings, defining, ref defCursor, ref entryCursor);
-                        }
+                        results[current.Slot] = data;
                     }
                     else if (outcome.TryGetValue(out ReplicaWriteOutcome.Dropped? _))
                     {
@@ -1276,7 +1479,6 @@ public sealed class ArchiveReader
                 ExceptionDispatchInfo.Throw(unexpectedCancel);
             }
 
-            Debug.Assert(defCursor == neededDefinings.Length && entryCursor == entries.Length, "Every defining state and index entry was processed.");
             return ScanPass.Reached;
 
             async Task<LedgerRead> FetchSlotAsync(Slot slot, CancellationTokenSource cts)
@@ -1303,21 +1505,16 @@ public sealed class ArchiveReader
             }
         }
 
-        private void ProcessSlot(
-            Slot slot,
-            in LedgerRead.Data data,
-            ImmutableArray<KeyIndexEntry> entries,
-            (Slot DefiningSlot, ulong Ordinal)[] neededDefinings,
-            Dictionary<(Slot DefiningSlot, ulong Ordinal), DefiningState> defining,
-            ref int defCursor,
-            ref int entryCursor)
+        private void ResolveWaveDefinings(
+            List<(Slot DefiningSlot, ulong Ordinal)> waveDefinings,
+            Dictionary<Slot, LedgerRead.Data> waveBatches,
+            Dictionary<(Slot DefiningSlot, ulong Ordinal), DefiningState> defining)
         {
-            var batch = BatchView.OfVerified(data.Batch);
             var keySpan = key.Span;
-
-            while (defCursor < neededDefinings.Length && neededDefinings[defCursor].DefiningSlot == slot)
+            foreach (var id in waveDefinings)
             {
-                var id = neededDefinings[defCursor++];
+                var slot = id.DefiningSlot;
+                var batch = BatchView.OfVerified(waveBatches[slot].Batch);
                 if (batch.FindDefining(id.Ordinal, out var defRow) is { } rejection)
                 {
                     throw rejection;
@@ -1345,75 +1542,8 @@ public sealed class ArchiveReader
                     Segment = new LedgerSegmentId(ledger.Id, start),
                     VersionBase = versionBefore.Base.IsEmpty ? null : versionBefore.Base.ToArray(),
                     Token = defRow.Token.IsEmpty ? null : defRow.Token.ToArray(),
-                    Count = versionBefore.Count,
+                    DefiningVersionBeforeCount = versionBefore.Count,
                 };
-            }
-
-            if (entryCursor >= entries.Length || entries[entryCursor].Tag.Slot != slot)
-            {
-                return;
-            }
-
-            var batchRows = new BatchRowStepper(batch);
-            while (entryCursor < entries.Length && entries[entryCursor].Tag.Slot == slot)
-            {
-                var entry = entries[entryCursor++];
-                ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(defining, (entry.DefiningSlot, entry.Ordinal));
-                Debug.Assert(!System.Runtime.CompilerServices.Unsafe.IsNullRef(ref state), "Every entry's defining state was resolved at or before its slot.");
-                if (!state.Matched)
-                {
-                    continue;
-                }
-
-                if (slot < state.Segment.Start || batch.LedgerSegmentOffset != (ulong)(slot - state.Segment.Start))
-                {
-                    throw DecodeRejection.Create(
-                        LedgerSegmentView.ReasonOffsetMismatch,
-                        string.Create(CultureInfo.InvariantCulture, $"Batch at slot {slot} has segment offset {batch.LedgerSegmentOffset}, and its segment starts at slot {state.Segment.Start}."));
-                }
-
-                if (entry.Tag.Index >= batch.Count || !batchRows.AdvanceTo(entry.Tag.Index, out var row))
-                {
-                    throw DecodeRejection.Create(
-                        BatchView.ReasonUnknownOrdinal,
-                        string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} lies past batch count {batch.Count} at slot {slot}."));
-                }
-
-                if (slot == entry.DefiningSlot && row.IsDefining)
-                {
-                    if (state.SeenDefining || row.Index != state.DefiningRowIndex || !row.Key.SequenceEqual(keySpan))
-                    {
-                        throw DecodeRejection.Create(
-                            LedgerSegmentView.ReasonDuplicateKey,
-                            string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} does not match the defining row of ordinal {entry.Ordinal} at slot {slot}."));
-                    }
-
-                    state.SeenDefining = true;
-                }
-                else if (!state.SeenDefining || row.IsDefining || row.Ordinal != entry.Ordinal)
-                {
-                    throw DecodeRejection.Create(
-                        BatchView.ReasonUnknownOrdinal,
-                        string.Create(CultureInfo.InvariantCulture, $"Key-index entry {entry.Tag} does not reference ordinal {entry.Ordinal} at slot {slot}."));
-                }
-
-                if (state.Count == ulong.MaxValue)
-                {
-                    throw DecodeRejection.Create(
-                        LedgerSegmentView.ReasonCountOverflow,
-                        string.Create(CultureInfo.InvariantCulture, $"Row {row.Index} of the batch at slot {slot} would advance its key's count past the u64 maximum."));
-                }
-
-                state.Count++;
-                if (row.Kind == RowKind.Message)
-                {
-                    // LG-I15: message rows are excluded from ArchiveReader journal folds.
-                    continue;
-                }
-
-                var version = new RowVersion(state.VersionBase is null ? default : new RowToken(state.VersionBase), state.Count);
-                var token = state.Token is null ? default : new RowToken(state.Token);
-                AddIndexedRow(entry.Tag, row.Kind, version, state.Segment, token, row.Body, row.BodyLength);
             }
         }
 
@@ -1424,53 +1554,55 @@ public sealed class ArchiveReader
             LedgerSegmentId segment,
             RowToken token,
             System.Buffers.ReadOnlySequence<byte> bodyBytes,
-            int bodyLength)
+            int bodyLength,
+            int supersededBefore) =>
+            AddLive(CreateIndexedRow(tag, kind, version, segment, token, bodyBytes, bodyLength, supersededBefore));
+
+        private ArchiveRow CreateIndexedRow(
+            Tag tag,
+            RowKind kind,
+            RowVersion version,
+            LedgerSegmentId segment,
+            RowToken token,
+            System.Buffers.ReadOnlySequence<byte> bodyBytes,
+            int bodyLength,
+            int supersededBefore)
         {
             if (!includeBodies && kind != RowKind.Delete)
             {
-                AddLive(ArchiveRow.LiveLengthOnly(tag, kind, version, segment, token, bodyLength));
+                return ArchiveRow.LiveLengthOnly(tag, kind, version, segment, token, bodyLength, supersededBefore);
             }
-            else
+
+            var bodies = GetBodiesWriter();
+            Debug.Assert(bodies.Length == 0, "Each body is consumed as it is copied.");
+            bodies.Write(bodyBytes);
+            using var body = bodyLength == 0 ? default : bodies.ConsumeSlice(bodyLength);
+            return ArchiveRow.LiveSuperseded(tag, kind, version, segment, token, body, supersededBefore);
+        }
+
+        private static bool TryFindRow(BatchView batch, int targetIndex, out BatchRow row)
+        {
+            foreach (var candidate in batch)
             {
-                var bodies = GetBodiesWriter();
-                Debug.Assert(bodies.Length == 0, "Each body is consumed as it is copied.");
-                bodies.Write(bodyBytes);
-                using var body = bodyLength == 0 ? default : bodies.ConsumeSlice(bodyLength);
-                AddLive(ArchiveRow.Live(tag, kind, version, segment, token, body));
+                if (candidate.Index == targetIndex)
+                {
+                    row = candidate;
+                    return true;
+                }
             }
+
+            row = default;
+            return false;
         }
 
         private struct DefiningState
         {
             public bool Matched;
-            public bool SeenDefining;
             public int DefiningRowIndex;
             public LedgerSegmentId Segment;
             public byte[]? VersionBase;
             public byte[]? Token;
-            public ulong Count;
-        }
-
-        private ref struct BatchRowStepper
-        {
-            private BatchView.Enumerator _enumerator;
-
-            public BatchRowStepper(BatchView batch) => _enumerator = batch.GetEnumerator();
-
-            public bool AdvanceTo(int targetIndex, out BatchRow row)
-            {
-                while (_enumerator.MoveNext())
-                {
-                    if (_enumerator.Current.Index == targetIndex)
-                    {
-                        row = _enumerator.Current;
-                        return true;
-                    }
-                }
-
-                row = default;
-                return false;
-            }
+            public ulong DefiningVersionBeforeCount;
         }
     }
 }

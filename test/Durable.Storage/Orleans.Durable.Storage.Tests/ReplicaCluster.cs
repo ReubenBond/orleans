@@ -160,13 +160,11 @@ internal sealed class ReplicaCluster : IAsyncDisposable
 
     /// <summary>
     /// Waits until every running silo is quiescent, failing after 30 seconds: its host holds no admitted call or byte, and
-    /// its transport no grant, waiting call, or sender copy.
+    /// its transport no grant or waiting call.
     /// </summary>
     public Task AssertQuiescentAsync() => EventuallyAsync(() => TestCluster.Silos.All(silo =>
         Host(silo.Name) is { Calls: 0, Bytes: 0 }
-        && Transport(silo.Name) is var transport
-        && transport.SenderCopyCount == 0
-        && transport.Lanes.All(static lane => lane is { OutstandingBytes: 0, OutstandingCalls: 0, Waiting: 0 })));
+        && Transport(silo.Name).Lanes.All(static lane => lane is { OutstandingBytes: 0, OutstandingCalls: 0, Waiting: 0 })));
 
     public async ValueTask DisposeAsync()
     {

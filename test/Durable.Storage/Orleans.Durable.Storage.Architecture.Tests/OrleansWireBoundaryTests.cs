@@ -22,25 +22,15 @@ public sealed class OrleansWireBoundaryTests
     /// </summary>
     private static readonly HashSet<string> WireBoundary =
     [
+        // Only ForwardedReads / RoutedRead / DurableJournalStorage still carry OrleansBuffer across the wire boundary;
+        // replica calls and forwarded journal writes carry zero-copy consume-on-serialize WireArcBuffer directly.
         "Orleans.Durable.Storage.WireBuffers",
-        "Orleans.Durable.Storage.LedgerReplicaWriteRequest",
-        "Orleans.Durable.Storage.RemoteReplicaRead",
-        "Orleans.Durable.Storage.RemoteReplicaReadSurrogate",
-        "Orleans.Durable.Storage.RemoteReplicaReadConverter",
-        "Orleans.Durable.Storage.RemoteReplicaRangeRead",
-        "Orleans.Durable.Storage.RemoteReplicaRangeReadSurrogate",
-        "Orleans.Durable.Storage.RemoteReplicaRangeReadConverter",
-        "Orleans.Durable.Storage.LedgerReplicaCallResults",
-        "Orleans.Durable.Storage.LedgerReplicaHost",
-        "Orleans.Durable.Storage.OrleansLedgerReplicaTransport",
-        "Orleans.Durable.Storage.JournalForwardedEntry",
         "Orleans.Durable.Storage.JournalForwardedRead",
         "Orleans.Durable.Storage.JournalForwardedReadSurrogate",
         "Orleans.Durable.Storage.JournalForwardedReadConverter",
         "Orleans.Durable.Storage.JournalForwardedPage",
         "Orleans.Durable.Storage.JournalForwardedPageSurrogate",
         "Orleans.Durable.Storage.JournalForwardedPageConverter",
-        "Orleans.Durable.Storage.JournalNodeHost",
         "Orleans.Durable.Storage.ForwardedReads",
         "Orleans.Durable.Storage.JournalRouter",
         "Orleans.Durable.Storage.RoutedRead",

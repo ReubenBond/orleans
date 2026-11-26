@@ -90,27 +90,26 @@ internal readonly union RemoteReplicaRead(
     public override string ToString() => Value?.ToString() ?? string.Empty;
 
     /// <summary>
-    /// The slot's DATA, or the range of it a ranged read asked for, in an Orleans buffer (OR-I18), which has at most one
-    /// releaser. At the callee it is a copy out of the store's buffer which the reply carries and the callee never
-    /// releases. At the caller it is the bytes Orleans decoded or, on a call within one silo, the callee's copy itself;
-    /// <see cref="LedgerReplicaCallResults.Read"/> moves them into Durable Storage's page pool and releases them, so the caller is
-    /// their one releaser and <see cref="Bytes"/> is inactive once it has run. Two are equal when their bytes are, which
-    /// tests compare. At the callee it holds the read's host admission, which Orleans' first conversion of the reply to
-    /// its surrogate releases (OR-I17); it is no part of the answer.
+    /// The slot's DATA, or the range of it a ranged read asked for, in a zero-copy consume-on-serialize
+    /// <see cref="WireArcBuffer"/> (OR-I18). At the callee it takes ownership of the store's pooled buffer directly: across
+    /// silos <see cref="WireArcBufferCodec"/> writes it to the socket and immediately releases the pages; on a call within
+    /// one silo <see cref="LedgerReplicaCallResults.Read"/> takes ownership of the buffer directly with zero copy. Two are
+    /// equal when their bytes are, which tests compare. At the callee it holds the read's host admission, which Orleans'
+    /// first conversion of the reply to its surrogate releases (OR-I17); it is no part of the answer.
     /// </summary>
-    public sealed record Data(OrleansBuffer Bytes)
+    public sealed record Data(WireArcBuffer Bytes)
     {
         /// <summary>Gets the host admission the reply holds until it is first converted or its deadline passes; <see langword="null"/> at the caller.</summary>
         internal LedgerReplicaHostAdmission? Admission { get; init; }
 
         /// <inheritdoc/>
-        public bool Equals(Data? other) => other is not null && Bytes.ToArray().AsSpan().SequenceEqual(other.Bytes.ToArray());
+        public bool Equals(Data? other) => other is not null && (Bytes ?? WireArcBuffer.Empty).ToArray().AsSpan().SequenceEqual((other.Bytes ?? WireArcBuffer.Empty).ToArray());
 
         /// <inheritdoc/>
-        public override int GetHashCode() => Bytes.Length;
+        public override int GetHashCode() => Bytes?.Length ?? 0;
 
         /// <inheritdoc/>
-        public override string ToString() => $"Data[{Bytes.Length} bytes]";
+        public override string ToString() => $"Data[{Bytes?.Length ?? 0} bytes]";
     }
 
     /// <summary>
@@ -150,20 +149,20 @@ internal readonly union RemoteReplicaRangeRead(
     public override string ToString() => Value?.ToString() ?? string.Empty;
 
     /// <summary>A contiguous range of <paramref name="Count"/> slots starting at <paramref name="FirstSlot"/> packed in <paramref name="Bytes"/>.</summary>
-    public sealed record Batch(long FirstSlot, int Count, OrleansBuffer Bytes)
+    public sealed record Batch(long FirstSlot, int Count, WireArcBuffer Bytes)
     {
         /// <summary>Gets the host admission held until first conversion or deadline; <see langword="null"/> at the caller.</summary>
         internal LedgerReplicaHostAdmission? Admission { get; init; }
 
         /// <inheritdoc/>
         public bool Equals(Batch? other) =>
-            other is not null && FirstSlot == other.FirstSlot && Count == other.Count && Bytes.ToArray().AsSpan().SequenceEqual(other.Bytes.ToArray());
+            other is not null && FirstSlot == other.FirstSlot && Count == other.Count && (Bytes ?? WireArcBuffer.Empty).ToArray().AsSpan().SequenceEqual((other.Bytes ?? WireArcBuffer.Empty).ToArray());
 
         /// <inheritdoc/>
-        public override int GetHashCode() => HashCode.Combine(FirstSlot, Count, Bytes.Length);
+        public override int GetHashCode() => HashCode.Combine(FirstSlot, Count, Bytes?.Length ?? 0);
 
         /// <inheritdoc/>
-        public override string ToString() => $"Batch(FirstSlot={FirstSlot}, Count={Count}, Bytes={Bytes.Length})";
+        public override string ToString() => $"Batch(FirstSlot={FirstSlot}, Count={Count}, Bytes={Bytes?.Length ?? 0})";
     }
 
     /// <summary>The first requested slot's single batch of <paramref name="Length"/> bytes exceeded the range read's byte budget.</summary>

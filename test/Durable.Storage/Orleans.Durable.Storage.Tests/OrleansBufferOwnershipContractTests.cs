@@ -9,18 +9,18 @@ using Orleans.Serialization.Invocation;
 namespace Orleans.Durable.Storage.Tests;
 
 /// <summary>
-/// The Orleans buffer ownership OR-I18 rests on, checked against Orleans' own generated proxy, copier, invokable, and
-/// response at the pinned build (orleans.md §3, §5.12), so a pin move which changes it fails here: the write request is
-/// not <see cref="ImmutableAttribute"/>, so Orleans' copier pins its payload and keeps the pin; the grain method owns the
-/// argument Orleans decoded and the caller the result, Orleans releasing neither; Orleans keeps a reply handed to it; and on
-/// a call within one silo the callee releases the proxy's pin and the caller the callee's reply, each the one releaser.
+/// The zero-copy consume-on-serialize buffer ownership OR-I18 rests on, checked against Orleans' own generated proxy,
+/// copier, invokable, and response at the pinned build (orleans.md §3, §5.12): the write request is not
+/// <see cref="ImmutableAttribute"/>, so Orleans' copier retains an independent zero-copy <see cref="WireArcBuffer"/>
+/// lease as each call is made; <see cref="WireArcBufferCodec"/> consumes and releases the lease immediately during
+/// remote serialization; the grain method alone owns a decoded payload and the caller alone owns a decoded reply; and on
+/// a call within one silo the callee consumes the proxy's retained lease and the caller consumes the callee's reply
+/// directly with zero copy.
 /// </summary>
 [Collection(TestingHostCollection.Name)]
-[NoPageLeakCheck("The checks count Orleans' pins, which Clog's page accounting does not see; the cluster's calls are leak-checked in OrleansReplicaTransportTests.")]
 public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
 {
-    private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(500);
-
+    private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
     private readonly ServiceProvider _services = new ServiceCollection()
         .AddSerializer(static serializer => serializer.AddAssembly(typeof(ILedgerStoreGrain).Assembly))
         .BuildServiceProvider();
@@ -33,37 +33,45 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        if (_cluster is not null)
+        try
         {
-            _cluster.CalleeScript = null;
-            await _cluster.DisposeAsync();
-        }
+            if (_cluster is not null)
+            {
+                _cluster.CalleeScript = null;
+                await _cluster.DisposeAsync();
+            }
 
-        await _services.DisposeAsync();
+            await _services.DisposeAsync();
+        }
+        finally
+        {
+            _leaks.Dispose();
+        }
     }
 
     /// <summary>
     /// The write request is not <see cref="ImmutableAttribute"/>: Orleans' generated copier, which its proxy runs as a call
-    /// is made, pins the payload, so the copy outlives its source's release, and its own release returns the pages.
+    /// is made, retains an independent zero-copy lease on the payload, so the copy outlives its source's release, and its
+    /// own release returns the pooled pages.
     /// </summary>
     [Fact]
     public void TheCopierPinsAWritesPayload()
     {
         Assert.Null(typeof(LedgerReplicaWriteRequest).GetCustomAttribute<ImmutableAttribute>());
-        var source = Request(WireBytes.Of(1, 2, 3));
+        var source = Request(WireBytes.Arc(1, 2, 3));
 
         var copy = _services.GetRequiredService<DeepCopier<LedgerReplicaWriteRequest>>().Copy(source);
         source.Payload.Dispose();
 
         Assert.Equal([1, 2, 3], copy.Payload.ToArray());
-        var pin = copy.Payload;
-        pin.Dispose();
+        Assert.True(WireBytes.IsReleased(source.Payload));
+        copy.Payload.Dispose();
         Assert.True(WireBytes.IsReleased(copy.Payload));
     }
 
     /// <summary>
-    /// OR-I18: <see cref="WireBuffers.CopyToOrleans(ArcBuffer)"/> wraps an exact-sized unpinned array rather than
-    /// renting a pooled page, including at <see cref="Orleans.Serialization.Buffers.ArcBufferPagePool.MinimumPageSize"/>,
+    /// OR-I18: <see cref="WireBuffers.CopyToOrleans(ArcBuffer)"/> (used by forwarded journal reads) wraps an exact-sized
+    /// unpinned array rather than renting a pooled page, including at <see cref="OrleansBufferWriter.MinimumPageSize"/>,
     /// so retained outbound copies do not leak 32 KiB <see cref="System.Buffers.ArrayPool{T}"/> arrays or pinned pages.
     /// </summary>
     [Theory]
@@ -88,29 +96,30 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
         Assert.False(page.IsMinimumSize);
         Assert.Equal(expected, copied.ToArray());
 
-        var deepCopy = _services.GetRequiredService<DeepCopier<LedgerReplicaWriteRequest>>().Copy(Request(copied));
+        var deepCopy = _services.GetRequiredService<DeepCopier<OrleansBuffer>>().Copy(copied);
         copied.Dispose();
-        Assert.Equal(expected, deepCopy.Payload.ToArray());
-        var pin = deepCopy.Payload;
+        Assert.Equal(expected, deepCopy.ToArray());
+        var pin = deepCopy;
         pin.Dispose();
-        Assert.True(WireBytes.IsReleased(deepCopy.Payload));
+        Assert.True(WireBytes.IsReleased(deepCopy));
         Assert.Empty(page.Array);
     }
 
     /// <summary>
-    /// The grain method owns the payload Orleans decoded into a write's invokable: disposing the invokable releases no pin,
-    /// so the decoded payload's release is its only one.
+    /// The grain method owns the payload Orleans decoded into a write's invokable: serializing consumes the sender's lease
+    /// immediately, and disposing the invokable releases no lease on the decoded payload, so the callee's consumption is
+    /// its only one.
     /// </summary>
     [Fact]
     public void TheCalleeAloneOwnsADecodedPayload()
     {
         var serializer = _services.GetRequiredService<Serializer>();
         var invokable = (IInvokable)Activator.CreateInstance(InvokableOf(nameof(ILedgerStoreGrain.WriteAsync)))!;
-        var sent = Request(WireBytes.Of(1, 2, 3));
+        var sent = Request(WireBytes.Arc(1, 2, 3));
         invokable.SetArgument(0, sent);
         invokable.SetArgument(1, CancellationToken.None);
         var input = WireBytes.Of(serializer.SerializeToArray<object>(invokable));
-        sent.Payload.Dispose();
+        Assert.True(WireBytes.IsReleased(sent.Payload));
 
         var received = Assert.IsAssignableFrom<IInvokable>(serializer.Deserialize<object>(input));
         var payload = ((LedgerReplicaWriteRequest)received.GetArgument(0)!).Payload;
@@ -118,8 +127,9 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The caller owns the DATA Orleans decoded into a read's response: disposing the response releases no pin, so the
-    /// caller's release is its only one.
+    /// The caller owns the DATA Orleans decoded into a read's response: serializing consumes the callee's lease
+    /// immediately, and disposing the response releases no lease on the decoded DATA, so the caller's consumption is its
+    /// only one.
     /// </summary>
     [Fact]
     public void TheCallerAloneOwnsADecodedReply()
@@ -127,7 +137,7 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
         var serializer = _services.GetRequiredService<Serializer>();
         var data = WireBytes.Data(4, 5, 6);
         var input = WireBytes.Of(serializer.SerializeToArray<object>(Response.FromResult(new RemoteReplicaRead(data))));
-        data.Bytes.Dispose();
+        Assert.True(WireBytes.IsReleased(data.Bytes));
 
         var response = Assert.IsAssignableFrom<Response>(serializer.Deserialize<object>(input));
         var bytes = Assert.IsType<RemoteReplicaRead.Data>(((RemoteReplicaRead)response.Result!).Value).Bytes;
@@ -135,21 +145,21 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Across silos, Orleans' proxy pins a write's payload as the call is made and never releases the pin, so the sender
-    /// releases its own copy as soon as its call ends; Orleans keeps a DATA reply its callee hands it.
+    /// Across silos, <see cref="WireArcBufferCodec"/> consumes both the proxy's retained write payload lease and the
+    /// callee's DATA reply lease immediately during serialization, returning all Durable Storage pages with zero leaks.
     /// </summary>
     [Fact(Timeout = 120_000)]
-    public async Task OrleansKeepsThePinsItTakesAndTheRepliesItIsHanded()
+    public async Task OrleansConsumesWritePayloadAndDataReplyOnRemoteSerialization()
     {
         var token = TestContext.Current.CancellationToken;
         var callee = Cluster.SiloNames[1];
         var grain = Cluster.TestCluster.Client.GetGrain<ILedgerStoreGrain>(Cluster.Node(callee).Node.Value);
-        var payload = WireBytes.Of(new byte[64 << 10]);
-        var held = payload;
+        using var payload = WireBytes.Arc(new byte[64 << 10]);
 
         _ = await grain.WriteAsync(Request(payload) with { Version = LedgerReplicaProtocol.Version + 1 }, token);
-        payload.Dispose();
-        await AssertKeptAsync(held);
+        var proxyCopy = payload.DetachLastCopy();
+        Assert.NotNull(proxyCopy);
+        Assert.True(WireBytes.IsReleased(proxyCopy));
 
         var data = WireBytes.Data(new byte[64 << 10]);
         Cluster.CalleeScript = _ => data;
@@ -159,12 +169,13 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
             batch.Dispose();
         }
 
-        await AssertKeptAsync(data.Bytes);
+        Assert.True(WireBytes.IsReleased(data.Bytes));
     }
 
     /// <summary>
-    /// A call to a node's grain from the node's own silo is not serialized: the callee receives the proxy's pin on the
-    /// sender's copy and releases it, and the caller receives the callee's reply and releases it, each the one releaser.
+    /// A call to a node's grain from the node's own silo is not serialized: the callee consumes the proxy's retained lease
+    /// on the sender's payload and releases it, and the caller consumes the callee's reply directly with zero copy and
+    /// releases it, each the one releaser.
     /// </summary>
     [Fact(Timeout = 120_000)]
     public async Task OnACallWithinOneSiloEachBufferHasOneReleaser()
@@ -173,12 +184,12 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
         var silo = Cluster.SiloNames[0];
         var node = Cluster.Node(silo).Node;
         var grain = Cluster.Services(silo).GetRequiredService<IGrainFactory>().GetGrain<ILedgerStoreGrain>(node.Value);
-        var payload = WireBytes.Of(7, 8, 9);
-        var held = payload;
+        using var payload = WireBytes.Arc(7, 8, 9);
 
         _ = Assert.IsType<ReplicaWriteOutcome.Written>((await grain.WriteAsync(Request(payload), token)).Value);
-        payload.Dispose();
-        Assert.True(WireBytes.IsReleased(held));
+        var proxyCopy = payload.DetachLastCopy();
+        Assert.NotNull(proxyCopy);
+        Assert.True(WireBytes.IsReleased(proxyCopy));
 
         var answer = await grain.ReadAsync(
             new LedgerReplicaReadRequest { Version = LedgerReplicaProtocol.Version, Ledger = 32, WindowSize = 4, MaxReplyBytes = 1024 },
@@ -194,37 +205,22 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
         await Cluster.AssertQuiescentAsync();
     }
 
-    private static LedgerReplicaWriteRequest Request(OrleansBuffer payload) =>
+    private static LedgerReplicaWriteRequest Request(WireArcBuffer payload) =>
         new() { Version = LedgerReplicaProtocol.Version, Ledger = 32, WindowSize = 4, Payload = payload };
 
     /// <summary>
-    /// Asserts that <paramref name="decoded"/> has one owner Orleans keeps no hold on: with a test's pin beside it,
-    /// releasing it and then disposing its carrier, as the receiver and Orleans do, leaves the test's pin readable, and
-    /// releasing the test's pin and the input it was decoded from returns its pages.
+    /// Asserts that <paramref name="decoded"/> has one owner Orleans keeps no hold on: taking its buffer and then
+    /// disposing its carrier, as the receiver and Orleans do, leaves the taken buffer readable, and releasing the taken
+    /// buffer and the input it was decoded from returns all pages.
     /// </summary>
-    private static void AssertOneOwner(OrleansBuffer decoded, Action disposeCarrier, OrleansBuffer input)
+    private static void AssertOneOwner(WireArcBuffer decoded, Action disposeCarrier, OrleansBuffer input)
     {
-        var held = decoded;
-        var pin = decoded.Slice(0);
-        decoded.Dispose();
+        using var taken = decoded.TakeBuffer();
+        Assert.True(WireBytes.IsReleased(decoded));
         disposeCarrier();
 
-        Assert.False(WireBytes.IsReleased(pin));
+        Assert.True(taken.Length > 0);
         input.Dispose();
-        pin.Dispose();
-        Assert.True(WireBytes.IsReleased(held));
-    }
-
-    /// <summary>Asserts that <paramref name="buffer"/>, released by its sender, stays readable: Orleans holds a pin on it.</summary>
-    private static async Task AssertKeptAsync(OrleansBuffer buffer)
-    {
-        var until = TimeProvider.System.GetTimestamp() + (long)(Settle.TotalSeconds * TimeProvider.System.TimestampFrequency);
-        do
-        {
-            Assert.False(WireBytes.IsReleased(buffer), "Orleans released a pin it took or a reply it was handed; OR-I18's one-releaser argument needs revisiting.");
-            await Task.Delay(TimeSpan.FromMilliseconds(50), TimeProvider.System, TestContext.Current.CancellationToken);
-        }
-        while (TimeProvider.System.GetTimestamp() < until);
     }
 
     /// <summary>Returns the invokable type Orleans generated for the <see cref="ILedgerStoreGrain"/> method <paramref name="method"/>.</summary>

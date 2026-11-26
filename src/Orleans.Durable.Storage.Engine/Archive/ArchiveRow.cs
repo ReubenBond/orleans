@@ -12,7 +12,7 @@ namespace Orleans.Durable.Storage.Engine.Archive;
 /// </summary>
 public readonly struct ArchiveRow : IDisposable
 {
-    private ArchiveRow(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, int bodyLength, bool isHeld, ArcBuffer body)
+    private ArchiveRow(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, int bodyLength, bool isHeld, ArcBuffer body, int supersededBefore = 0)
     {
         Tag = tag;
         Kind = kind;
@@ -22,6 +22,7 @@ public readonly struct ArchiveRow : IDisposable
         BodyLength = bodyLength;
         IsHeld = isHeld;
         Body = body;
+        SupersededBefore = supersededBefore;
     }
 
     /// <summary>Gets the row's tag.</summary>
@@ -48,6 +49,13 @@ public readonly struct ArchiveRow : IDisposable
     /// <summary>Gets the row's body, whose lease the row owns; the default for a held row.</summary>
     public ArcBuffer Body { get; }
 
+    /// <summary>
+    /// Gets the count of earlier rows of this key in the same segment superseded by this opener row and omitted from the
+    /// scan (0 when none were omitted). Preserves <see cref="ArchiveWrite.Superseded"/> and <c>HI-I4</c> version continuity
+    /// when descending indexed reads stop at a verified opener.
+    /// </summary>
+    public int SupersededBefore { get; }
+
     /// <summary>Makes a live row, not held, which retains its own lease on <paramref name="body"/>.</summary>
     /// <param name="tag">The row's tag.</param>
     /// <param name="kind">The row's kind.</param>
@@ -56,7 +64,10 @@ public readonly struct ArchiveRow : IDisposable
     /// <param name="token">The key's token in the segment.</param>
     /// <param name="body">The row's body, of which the row retains its own lease; the caller keeps its own.</param>
     /// <exception cref="ArgumentException">The kind is undefined, or the segment is not of the row's ledger at or below its slot.</exception>
-    public static ArchiveRow Live(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, ArcBuffer body)
+    public static ArchiveRow Live(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, ArcBuffer body) =>
+        LiveSuperseded(tag, kind, version, segment, token, body, supersededBefore: 0);
+
+    internal static ArchiveRow LiveSuperseded(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, ArcBuffer body, int supersededBefore)
     {
         if (!RowKinds.IsArchiveKind(kind))
         {
@@ -68,23 +79,25 @@ public readonly struct ArchiveRow : IDisposable
             throw new ArgumentException("A row's segment lies in its ledger, at or below its slot.", nameof(segment));
         }
 
-        return new ArchiveRow(tag, kind, version, segment, token, body.Length, isHeld: false, body.Retain());
+        Debug.Assert(supersededBefore == 0 || supersededBefore > 0 && kind is RowKind.Replace or RowKind.Delete, "Only an opener row may carry omitted superseded rows.");
+        return new ArchiveRow(tag, kind, version, segment, token, body.Length, isHeld: false, body.Retain(), supersededBefore);
     }
 
     /// <summary>
     /// Makes a live row, not held, carrying only its <paramref name="bodyLength"/> and no body buffer: used by metadata-only
     /// reads (<c>includeBodies: false</c>) for non-<c>Delete</c> rows whose callers inspect only <see cref="BodyLength"/>.
     /// </summary>
-    internal static ArchiveRow LiveLengthOnly(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, int bodyLength)
+    internal static ArchiveRow LiveLengthOnly(Tag tag, RowKind kind, RowVersion version, LedgerSegmentId segment, RowToken token, int bodyLength, int supersededBefore = 0)
     {
         Debug.Assert(kind is RowKind.Append or RowKind.Replace, "Only Append and Replace rows may omit their body.");
         Debug.Assert(bodyLength >= 0, "A row's body length is non-negative.");
+        Debug.Assert(supersededBefore == 0 || supersededBefore > 0 && kind == RowKind.Replace, "Only an opener row may carry omitted superseded rows.");
         if (segment.Ledger != tag.Ledger || segment.Start > tag.Slot)
         {
             throw new ArgumentException("A row's segment lies in its ledger, at or below its slot.", nameof(segment));
         }
 
-        return new ArchiveRow(tag, kind, version, segment, token, bodyLength, isHeld: false, default);
+        return new ArchiveRow(tag, kind, version, segment, token, bodyLength, isHeld: false, default, supersededBefore);
     }
 
     /// <summary>
@@ -128,10 +141,10 @@ public readonly struct ArchiveRow : IDisposable
     };
 
     /// <summary>Returns a row which holds its own lease on the body, which it retains without copying; the caller disposes it.</summary>
-    public ArchiveRow Retain() => new(Tag, Kind, Version, Segment, Token, BodyLength, IsHeld, Body.Retain());
+    public ArchiveRow Retain() => new(Tag, Kind, Version, Segment, Token, BodyLength, IsHeld, Body.Retain(), SupersededBefore);
 
     /// <summary>Returns the row as the prefix holds it: held, with its body's length and no body.</summary>
-    public ArchiveRow AsHeld() => new(Tag, Kind, Version, Segment, Token, BodyLength, isHeld: true, default);
+    public ArchiveRow AsHeld() => new(Tag, Kind, Version, Segment, Token, BodyLength, isHeld: true, default, SupersededBefore);
 
     /// <summary>Releases the row's lease on its body.</summary>
     public void Dispose() => Body.Dispose();

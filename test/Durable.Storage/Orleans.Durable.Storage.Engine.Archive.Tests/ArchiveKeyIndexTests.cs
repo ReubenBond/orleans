@@ -624,6 +624,84 @@ public sealed class ArchiveKeyIndexTests : IDisposable
         Assert.Equal(BatchView.ReasonUnknownOrdinal, DecodeRejection.ReasonOf(invalid));
     }
 
+    /// <summary>
+    /// Descending indexed reads stop as soon as a verified <c>Replace</c> opener is reached: a key with 200 older appends,
+    /// a <c>Replace</c>, and 5 newer appends reads only the defining slot, the <c>Replace</c>, and the 5 newer slots —
+    /// never reading the 200 pre-<c>Replace</c> appends — while preserving exact folded content, version, and token chain.
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task DescendingIndexedReadStopsAtVerifiedReplaceAndSkipsOlderAppends()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var cluster = await ArchiveCluster.StartAsync();
+
+        var entries = new List<KeyIndexEntry>(206);
+        var tDef = await cluster.AppendAsync(1, RowKind.Append, "old-0|");
+        entries.Add(new(tDef, tDef.Slot, 0));
+        for (var i = 1; i < 200; i++)
+        {
+            var tOld = await cluster.AppendAsync(1, RowKind.Append, $"old-{i}|");
+            entries.Add(new(tOld, tDef.Slot, 0));
+        }
+
+        var tReplace = await cluster.AppendAsync(1, RowKind.Replace, "base");
+        entries.Add(new(tReplace, tDef.Slot, 0));
+        for (var i = 1; i <= 5; i++)
+        {
+            var tNew = await cluster.AppendAsync(1, RowKind.Append, $"+{i}");
+            entries.Add(new(tNew, tDef.Slot, 0));
+        }
+
+        var closed = await cluster.ReplaceLedgerAsync(1);
+        var readSlots = new HashSet<long>();
+        var readerProcess = await cluster.StartProcessAsync(
+            cluster.Store,
+            reads: (ledger, slot) =>
+            {
+                if (ledger == closed)
+                {
+                    lock (readSlots)
+                    {
+                        _ = readSlots.Add(slot.Value);
+                    }
+                }
+
+                return null;
+            });
+
+        var index = new ArchiveKeyIndex((ledger, below, key, _) =>
+        {
+            if (ledger.Id == closed && key.Span.SequenceEqual([(byte)1]))
+            {
+                return ValueTask.FromResult<KeyIndexRead>(new KeyIndexRead.Indexed([.. entries.Where(e => e.Tag.Slot < below)]));
+            }
+
+            return ValueTask.FromResult<KeyIndexRead>(new KeyIndexRead.Indexed([]));
+        });
+
+        var indexedReader = new ArchiveReader(readerProcess.Reader, cluster.Store, TimeProvider.System, index);
+        var unindexedReader = new ArchiveReader(readerProcess.Reader, cluster.Store, TimeProvider.System);
+        using var indexed = await indexedReader.ReadAsync(new byte[] { 1 }, token);
+        HashSet<long> indexedReadSlots;
+        lock (readSlots)
+        {
+            indexedReadSlots = [.. readSlots];
+        }
+
+        using var oracle = await unindexedReader.ReadAsync(new byte[] { 1 }, token);
+
+        Assert.Equal("base+1+2+3+4+5", ReadText(indexed));
+        AssertMatchesOracle(indexed, oracle);
+
+        // Only the defining slot + the Replace + 5 newer appends + at most the rest of the single newest wave (waveSize <= 32)
+        // are read — the ~170+ older pre-Replace slots are never touched!
+        Assert.True(indexedReadSlots.Count <= 33, $"Expected descending wave scan to read <= 33 slots, but read {indexedReadSlots.Count}.");
+        Assert.Contains(tDef.Slot.Value, indexedReadSlots);
+        Assert.Contains(tReplace.Slot.Value, indexedReadSlots);
+        Assert.DoesNotContain(entries[1].Tag.Slot.Value, indexedReadSlots);
+        Assert.DoesNotContain(entries[100].Tag.Slot.Value, indexedReadSlots);
+    }
+
     private static void AssertMatchesOracle(ArchiveRead actual, ArchiveRead oracle)
     {
         Assert.Equal(oracle.Linearizable, actual.Linearizable);
@@ -639,10 +717,13 @@ public sealed class ArchiveKeyIndexTests : IDisposable
             Assert.Equal(expectedPrefix.Content.ToArray(), actualPrefix.Content.ToArray());
         }
 
-        Assert.Equal(oracle.Rows.Length, actual.Rows.Length);
-        for (var i = 0; i < oracle.Rows.Length; i++)
+        // Descending indexed reads may omit rows superseded by a later verified opener within their segment (or older
+        // segments/ledgers when tokenless); compare every surviving row against the matching segment-trimmed oracle!
+        var expectedRows = TrimSupersededWithinSegments(oracle.Rows);
+        Assert.Equal(expectedRows.Count, actual.Rows.Length);
+        for (var i = 0; i < expectedRows.Count; i++)
         {
-            var expected = oracle.Rows[i];
+            var expected = expectedRows[i];
             var got = actual.Rows[i];
             Assert.Equal(expected.Tag, got.Tag);
             Assert.Equal(expected.Kind, got.Kind);
@@ -652,6 +733,46 @@ public sealed class ArchiveKeyIndexTests : IDisposable
             Assert.Equal(expected.IsHeld, got.IsHeld);
             Assert.Equal(expected.Body.ToArray(), got.Body.ToArray());
         }
+
+        Assert.Equal(ReadText(oracle), ReadText(actual));
+    }
+
+    private static List<ArchiveRow> TrimSupersededWithinSegments(ReadOnlySpan<ArchiveRow> rows)
+    {
+        var result = new List<ArchiveRow>(rows.Length);
+        for (var start = 0; start < rows.Length;)
+        {
+            var end = start + 1;
+            while (end < rows.Length && rows[end].Segment == rows[start].Segment)
+            {
+                end++;
+            }
+
+            var lastOpener = -1;
+            for (var i = end - 1; i >= start; i--)
+            {
+                if (rows[i].Kind is RowKind.Replace or RowKind.Delete)
+                {
+                    lastOpener = i;
+                    break;
+                }
+            }
+
+            if (lastOpener >= 0 && rows[lastOpener].Token.IsEmpty)
+            {
+                result.Clear();
+            }
+
+            var keepFrom = lastOpener >= 0 ? lastOpener : start;
+            for (var i = keepFrom; i < end; i++)
+            {
+                result.Add(rows[i]);
+            }
+
+            start = end;
+        }
+
+        return result;
     }
 
     private static string ReadText(ArchiveRead read)
@@ -664,7 +785,22 @@ public sealed class ArchiveKeyIndexTests : IDisposable
 
         foreach (var row in read.Rows)
         {
-            if (!row.IsHeld && row.Body.Length > 0)
+            if (row.IsHeld)
+            {
+                continue;
+            }
+
+            if (row.Kind == RowKind.Replace)
+            {
+                _ = sb.Clear();
+            }
+            else if (row.Kind == RowKind.Delete)
+            {
+                _ = sb.Clear();
+                continue;
+            }
+
+            if (row.Body.Length > 0)
             {
                 _ = sb.Append(Encoding.UTF8.GetString(row.Body.ToArray()));
             }

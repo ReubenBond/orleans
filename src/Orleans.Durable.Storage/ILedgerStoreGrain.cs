@@ -40,16 +40,18 @@ internal static class LedgerReplicaProtocol
     /// Version 2 carries payloads and DATA in Orleans' <c>ArcBuffer</c>, whose empty field a version-1 silo cannot decode.
     /// Version 3 adds L2 quorum read-lease grants, remaining lease durations on sealed tails, and batched peer heartbeats.
     /// Version 4 adds batched multi-slot <c>ReadRangeAsync</c>.
+    /// Version 5 carries replica payloads and read replies in zero-copy consume-on-serialize <see cref="WireArcBuffer"/>.
     /// </summary>
-    public const int Version = 4;
+    public const int Version = 5;
 }
 
 /// <summary>
 /// A replica write as it crosses to the node (OR-I15): the protocol version, the ledger and the replica's window, the slot,
-/// the caller's known contiguous tail, the recovery flag, and the payload in an Orleans buffer (OR-I18). It is not
-/// <see cref="ImmutableAttribute"/>, so Orleans' proxy pins a copy of the payload as each call is made, which the
-/// message holds; the sender then releases its own copy once its calls end, and the callee releases the payload it
-/// receives on every path.
+/// the caller's known contiguous tail, the recovery flag, and the payload in a zero-copy consume-on-serialize
+/// <see cref="WireArcBuffer"/> (OR-I18). It is not <see cref="ImmutableAttribute"/>, so Orleans' proxy retains an
+/// independent zero-copy lease on the payload as each call is made, which <see cref="WireArcBufferCodec"/> consumes
+/// during remote serialization or the callee consumes on a local call, and the sender disposes if the call ends before
+/// serialization.
 /// </summary>
 [GenerateSerializer]
 internal readonly struct LedgerReplicaWriteRequest
@@ -80,7 +82,7 @@ internal readonly struct LedgerReplicaWriteRequest
 
     /// <summary>Gets or initializes the payload; a request which carries none is refused as an empty batch.</summary>
     [Id(6)]
-    public OrleansBuffer Payload { get; init; }
+    public WireArcBuffer Payload { get; init; }
 }
 
 /// <summary>

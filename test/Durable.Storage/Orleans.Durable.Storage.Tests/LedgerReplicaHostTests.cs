@@ -24,9 +24,15 @@ public sealed class LedgerReplicaHostTests : IDisposable
     private readonly ArcBufferLeakCheck _leaks = ArcBufferLeakCheck.Start();
     private readonly OrleansBufferLedger _wire = new();
     private readonly FakeTimeProvider _time = new();
+    private readonly List<LedgerReplicaHost> _hosts = [];
 
     public void Dispose()
     {
+        foreach (var host in _hosts)
+        {
+            host.Dispose();
+        }
+
         try
         {
             _wire.Dispose();
@@ -110,11 +116,11 @@ public sealed class LedgerReplicaHostTests : IDisposable
         var host = Host(scenario.Local);
         var node = scenario.Store.NodeId;
 
-        AssertRefused(ReplicaRefusal.Argument, (await host.WriteAsync(node, Write(slot: 0, WireBytes.Of(new byte[PayloadLimit + 1])), token)).Value);
+        AssertRefused(ReplicaRefusal.Argument, (await host.WriteAsync(node, Write(slot: 0, WireBytes.Arc(new byte[PayloadLimit + 1])), token)).Value);
         AssertRefused(ReplicaRefusal.Argument, (await host.ReadAsync(node, Read(slot: 0) with { MaxReplyBytes = PayloadLimit + 1 }, token)).Value);
         AssertRefused(ReplicaRefusal.Argument, (await host.ReadAsync(node, Read(slot: 0) with { MaxReplyBytes = 0 }, token)).Value);
         AssertRefused(ReplicaRefusal.Argument, (await host.ReadAsync(node, Read(slot: 0) with { Offset = 1, Length = 2, MaxReplyBytes = 3 }, token)).Value);
-        AssertRefused(ReplicaRefusal.Argument, (await host.WriteAsync(node, Write(slot: 0, default), token)).Value);
+        AssertRefused(ReplicaRefusal.Argument, (await host.WriteAsync(node, Write(slot: 0, WireArcBuffer.Empty), token)).Value);
         AssertRefused(ReplicaRefusal.ArgumentOutOfRange, (await host.WriteAsync(node, Write(slot: 0) with { WindowSize = 0 }, token)).Value);
 
         Assert.Empty(await scenario.Store.ListReplicasAsync(token));
@@ -146,7 +152,7 @@ public sealed class LedgerReplicaHostTests : IDisposable
 
         // The bytes are spent, so a write of one byte is refused; once the calls are spent too, so is a contiguous-tail
         // read, which holds no bytes.
-        Assert.Same(ReplicaWriteOutcome.Backpressure.Instance, (await host.WriteAsync(node, Write(slot: 1, WireBytes.Of(1)), token)).Value);
+        Assert.Same(ReplicaWriteOutcome.Backpressure.Instance, (await host.WriteAsync(node, Write(slot: 1, WireBytes.Arc(1)), token)).Value);
         using (var holding = host.TryAdmit(0))
         {
             Assert.NotNull(holding);
@@ -307,7 +313,7 @@ public sealed class LedgerReplicaHostTests : IDisposable
 
         async Task AssertReleasedAsync(Func<LedgerReplicaWriteRequest, Task> call, int payloadLength = 4)
         {
-            var payload = WireBytes.Of(new byte[payloadLength]);
+            var payload = WireBytes.Arc(new byte[payloadLength]);
             await call(Write(slot: 0, payload));
             Assert.True(WireBytes.IsReleased(payload));
         }
@@ -346,7 +352,7 @@ public sealed class LedgerReplicaHostTests : IDisposable
             new Engine.Ledgers.Objects.ObjectLedgerStoreId(new UInt128(0, 2)));
         var host = Host(local);
 
-        var payload = WireBytes.Of([1, 2, 3, 4]);
+        var payload = WireBytes.Arc([1, 2, 3, 4]);
         AssertRefused(ReplicaRefusal.Argument, (await host.WriteAsync(node, Write(slot: 0, payload), token)).Value);
         Assert.True(WireBytes.IsReleased(payload));
         AssertRefused(ReplicaRefusal.Argument, (await host.ReadAsync(node, Read(slot: 0), token)).Value);
@@ -363,10 +369,10 @@ public sealed class LedgerReplicaHostTests : IDisposable
         return read.TryGetValue(out LedgerReplicaTail tail) ? tail : throw new InvalidOperationException($"{read} holds no tail.");
     }
 
-    private LedgerReplicaWriteRequest Write(long slot) => Write(slot, WireBytes.Of(1, 2, 3, 4));
+    private LedgerReplicaWriteRequest Write(long slot) => Write(slot, WireBytes.Arc(1, 2, 3, 4));
 
     /// <summary>Returns a write of <paramref name="payload"/>, which the host receives and must release.</summary>
-    private LedgerReplicaWriteRequest Write(long slot, OrleansBuffer payload) => new()
+    private LedgerReplicaWriteRequest Write(long slot, WireArcBuffer payload) => new()
     {
         Version = LedgerReplicaProtocol.Version,
         Ledger = TransportScenario.Ledger.Value,
@@ -391,16 +397,21 @@ public sealed class LedgerReplicaHostTests : IDisposable
         WindowSize = TransportScenario.Options.WindowSize,
     };
 
-    private LedgerReplicaHost Host(LocalNode local, int maxCalls = 8) => new(
-        local,
-        TestReplicaLimits.Of(
-            options =>
-            {
-                options.MaxReplicaCalls = maxCalls;
-                options.MaxReplicaCallBytes = 4 * PayloadLimit;
-                options.MaxNodeCallBytes = 2 * PayloadLimit;
-                options.MaxReadReplyBytes = ReadReply;
-            },
-            ReplyDeadline),
-        _time);
+    private LedgerReplicaHost Host(LocalNode local, int maxCalls = 8)
+    {
+        var host = new LedgerReplicaHost(
+            local,
+            TestReplicaLimits.Of(
+                options =>
+                {
+                    options.MaxReplicaCalls = maxCalls;
+                    options.MaxReplicaCallBytes = 4 * PayloadLimit;
+                    options.MaxNodeCallBytes = 2 * PayloadLimit;
+                    options.MaxReadReplyBytes = ReadReply;
+                },
+                ReplyDeadline),
+            _time);
+        _hosts.Add(host);
+        return host;
+    }
 }

@@ -26,14 +26,22 @@ internal sealed class ArchiveWriteBuilder(LedgerSegmentId segment, RowToken toke
     public int Count => _commands.Count;
 
     /// <summary>Takes the key's next row's command, and returns how many commands it superseded, which the caller releases.</summary>
-    public int Add(ArchiveCommand command)
+    public int Add(ArchiveCommand command, int supersededBefore = 0)
     {
         var superseded = 0;
-        if (command.IsOpener && _commands.Count > 0)
+        if (command.IsOpener)
         {
-            superseded = _commands.Count;
-            Superseded = checked(Superseded + superseded);
-            _commands.Clear();
+            if (_commands.Count > 0)
+            {
+                superseded = _commands.Count;
+                Superseded = checked(Superseded + superseded);
+                _commands.Clear();
+            }
+
+            if (supersededBefore > 0)
+            {
+                Superseded = checked(Superseded + supersededBefore);
+            }
         }
 
         _commands.Add(command);

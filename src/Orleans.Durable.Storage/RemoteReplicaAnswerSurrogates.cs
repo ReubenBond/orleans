@@ -192,7 +192,7 @@ internal readonly struct RemoteReplicaReadSurrogate
 
     /// <summary>Gets or initializes the DATA's bytes; empty for the other cases.</summary>
     [Id(1)]
-    public OrleansBuffer Bytes { get; init; }
+    public WireArcBuffer Bytes { get; init; }
 
     /// <summary>Gets or initializes a <see cref="RemoteReplicaRead.TooLarge"/> or <see cref="ReplicaRead.OutsideBatch"/> answer's batch length; 0 for the other cases.</summary>
     [Id(2)]
@@ -226,7 +226,7 @@ internal sealed class RemoteReplicaReadConverter : IConverter<RemoteReplicaRead,
     /// <exception cref="ReplicaReplyDecodingException">The tag names no case, its case lacks a field, or it carries one it does not own: DATA bytes on any case but DATA among them.</exception>
     public RemoteReplicaRead ConvertFromSurrogate(in RemoteReplicaReadSurrogate surrogate)
     {
-        var bytes = surrogate.Bytes;
+        var bytes = surrogate.Bytes ?? WireArcBuffer.Empty;
         var kept = false;
         try
         {
@@ -283,12 +283,10 @@ internal sealed class RemoteReplicaReadConverter : IConverter<RemoteReplicaRead,
 
     private static RemoteReplicaReadSurrogate Serialized(RemoteReplicaRead.Data data)
     {
-        // The admission bounds the host's bytes until Orleans first converts the reply, which ends it here. Across silos
-        // the DATA buffer has no releaser: Orleans' codec writes it without taking ownership, and may write it after the
-        // grain method returns, so the GC reclaims its pages. On a call within one silo the converted reply reaches the
-        // caller, which is its one releaser (OR-I18).
-        data.Admission?.Dispose();
-        return new() { Case = ReplicaReplyTag.First, Bytes = data.Bytes };
+        // Release the host's call/byte admission on first conversion while keeping the payload's deadline safety net
+        // armed until WireArcBufferCodec.WriteField or a local caller consumes it (OR-I17, OR-I18).
+        data.Admission?.ReleaseAdmission();
+        return new() { Case = ReplicaReplyTag.First, Bytes = data.Bytes ?? WireArcBuffer.Empty };
     }
 }
 
@@ -311,7 +309,7 @@ internal readonly struct RemoteReplicaRangeReadSurrogate
 
     /// <summary>Gets or initializes the packed slot bytes; empty for other cases or empty batches.</summary>
     [Id(3)]
-    public OrleansBuffer Bytes { get; init; }
+    public WireArcBuffer Bytes { get; init; }
 
     /// <summary>Gets or initializes a <see cref="RemoteReplicaRangeRead.TooLarge"/> answer's batch length; 0 for other cases.</summary>
     [Id(4)]
@@ -342,7 +340,7 @@ internal sealed class RemoteReplicaRangeReadConverter : IConverter<RemoteReplica
     /// <inheritdoc/>
     public RemoteReplicaRangeRead ConvertFromSurrogate(in RemoteReplicaRangeReadSurrogate surrogate)
     {
-        var bytes = surrogate.Bytes;
+        var bytes = surrogate.Bytes ?? WireArcBuffer.Empty;
         var kept = false;
         try
         {
@@ -402,8 +400,8 @@ internal sealed class RemoteReplicaRangeReadConverter : IConverter<RemoteReplica
 
     private static RemoteReplicaRangeReadSurrogate Serialized(RemoteReplicaRangeRead.Batch batch)
     {
-        batch.Admission?.Dispose();
-        return new() { Case = ReplicaReplyTag.First, FirstSlot = batch.FirstSlot, Count = batch.Count, Bytes = batch.Bytes };
+        batch.Admission?.ReleaseAdmission();
+        return new() { Case = ReplicaReplyTag.First, FirstSlot = batch.FirstSlot, Count = batch.Count, Bytes = batch.Bytes ?? WireArcBuffer.Empty };
     }
 }
 

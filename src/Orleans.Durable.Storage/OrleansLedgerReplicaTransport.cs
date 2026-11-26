@@ -37,12 +37,10 @@ namespace Orleans.Durable.Storage;
 /// <para>
 /// A remote read reserves the reply it carries: a ranged read its length, and a whole read
 /// <see cref="ReplicaCallLimits.MaxReadReplyBytes"/>. A batch longer than that is answered <c>TooLarge</c> with its length,
-/// and the read enters its lane again reserving exactly that, within its deadline. A remote write, once granted, copies its
-/// payload into an Orleans buffer, which every granted remote call of the same payload shares and the last of them
-/// releases, so the copies a sender holds stay within its nodes' budgets; Orleans' proxy pins the copy for each message as
-/// the call is made, and the caller copies a read reply's DATA into Durable Storage's page pool and releases what Orleans decoded, so
-/// no Orleans message refers to a Durable Storage page (OR-I18). A remote call's caller's cancellation ends its wait at once, however
-/// Orleans ends the grain call, which it abandons: its request may still land (OR-I16). A
+/// and the read enters its lane again reserving exactly that, within its deadline. Remote writes and read replies carry
+/// payloads directly in zero-copy consume-on-serialize <see cref="WireArcBuffer"/> leases over Durable Storage's pooled
+/// pages, with no intermediate copy or shared sender-copy table (OR-I18). A remote call's caller's cancellation ends its
+/// wait at once, however Orleans ends the grain call, which it abandons: its request may still land (OR-I16). A
 /// remote call answered <c>Backpressure</c> returns its grant, waits a bounded, jittered backoff, and enters its lane again
 /// while its deadline allows; it is reported only once its attempts are spent. Each result reaches the caller as orleans.md
 /// §5.12's table states (<see cref="LedgerReplicaCallResults"/>); a <c>NotThisNode</c> answer and a placement refusal
@@ -63,7 +61,6 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     private readonly Action _invalidateIfStale;
     private readonly Func<NodeId, long, int, TimeProvider, CallBudget> _createBudget;
     private readonly ConcurrentDictionary<NodeId, NodeBudgets> _budgets = new();
-    private readonly SenderCopies _senderCopies = new();
     private readonly Lock _jitterLock = new();
     private readonly Random _jitter;
     private readonly TimeProvider _timeProvider;
@@ -134,8 +131,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
     /// <summary>
     /// Fast-fails calls targeting a remote node with no active registered silo in membership or whose resolved silo
-    /// incarnation has already reported stopping/unavailable, before entering <see cref="CallBudget"/>, acquiring
-    /// <see cref="SenderCopies"/>, or invoking Orleans grain placement (orleans.md §5.12).
+    /// incarnation has already reported stopping/unavailable, before entering <see cref="CallBudget"/> or invoking
+    /// Orleans grain placement (orleans.md §5.12).
     /// </summary>
     private SiloAddress? EnsureRemoteActive(NodeId node, NodeBudgets budgets)
     {
@@ -237,9 +234,6 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
     /// <summary>Gets the replica call limits.</summary>
     public ReplicaCallLimits Limits { get; }
-
-    /// <summary>Gets the number of payloads whose shared sender copies are held by outstanding calls.</summary>
-    internal int SenderCopyCount => _senderCopies.Count;
 
     /// <summary>Gets every lane of every node called so far.</summary>
     internal IEnumerable<CallBudget> Lanes => _budgets.Values.SelectMany(static budgets => new[] { budgets.Write, budgets.Read, budgets.Control });
@@ -566,33 +560,71 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     /// which releases what it holds; and a failure is observed.
     /// </summary>
     internal static Task<TAnswer> UntilCancelledAsync<TAnswer>(Task<TAnswer> call, Action<TAnswer>? abandoned, CancellationToken cancellationToken) =>
-        !cancellationToken.CanBeCanceled ? call : UntilCancelledSlowAsync(call, abandoned, cancellationToken);
+        UntilCancelledAsync(call, abandoned, releaseOnEnd: null, cancellationToken);
 
-    private static async Task<TAnswer> UntilCancelledSlowAsync<TAnswer>(Task<TAnswer> call, Action<TAnswer>? abandoned, CancellationToken cancellationToken)
+    internal static Task<TAnswer> UntilCancelledAsync<TAnswer>(
+        Task<TAnswer> call,
+        Action<TAnswer>? abandoned,
+        IDisposable? releaseOnEnd,
+        CancellationToken cancellationToken) =>
+        !cancellationToken.CanBeCanceled && releaseOnEnd is null
+            ? call
+            : UntilCancelledCoreAsync(call, abandoned, releaseOnEnd, cancellationToken);
+
+    private static async Task<TAnswer> UntilCancelledCoreAsync<TAnswer>(
+        Task<TAnswer> call,
+        Action<TAnswer>? abandoned,
+        IDisposable? releaseOnEnd,
+        CancellationToken cancellationToken)
     {
+        var completed = false;
         try
         {
-            return await call.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var answer = cancellationToken.CanBeCanceled
+                ? await call.WaitAsync(cancellationToken).ConfigureAwait(false)
+                : await call.ConfigureAwait(false);
+            completed = true;
+            return answer;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _ = call.ContinueWith(
                 static (ended, state) =>
                 {
-                    if (ended.IsCompletedSuccessfully)
+                    var (onAbandoned, toRelease) = ((Action<TAnswer>?, IDisposable?))state!;
+                    try
                     {
-                        ((Action<TAnswer>?)state)?.Invoke(ended.Result);
+                        if (ended.IsCompletedSuccessfully)
+                        {
+                            onAbandoned?.Invoke(ended.Result);
+                        }
+                        else
+                        {
+                            _ = ended.Exception;
+                        }
                     }
-                    else
+                    finally
                     {
-                        _ = ended.Exception;
+                        toRelease?.Dispose();
                     }
                 },
-                abandoned,
+                (abandoned, releaseOnEnd),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
             throw;
+        }
+        catch
+        {
+            completed = true;
+            throw;
+        }
+        finally
+        {
+            if (completed)
+            {
+                releaseOnEnd?.Dispose();
+            }
         }
     }
 
@@ -601,7 +633,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     {
         if (answer.Value is RemoteReplicaRead.Data data)
         {
-            data.Bytes.Dispose();
+            data.Bytes?.Dispose();
         }
     }
 
@@ -610,7 +642,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     {
         if (answer.Value is RemoteReplicaRangeRead.Batch batch)
         {
-            batch.Bytes.Dispose();
+            batch.Bytes?.Dispose();
         }
     }
 
@@ -998,7 +1030,6 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             ThrowIfDisposed();
             CheckWrite(slot, payload);
             var deadline = Transport.DeadlineFromNow();
-            var senders = Transport._senderCopies;
             var backoff = FirstBackoff;
             while (true)
             {
@@ -1009,10 +1040,11 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                     RemoteReplicaWriteOutcome answer;
                     try
                     {
-                        // Acquired once granted, so the copies a sender holds stay within its nodes' budgets, and released
-                        // once the caller's wait ends: the caller may then release its payload, whose pages key the copy
-                        // (OR-I18).
-                        using var sender = senders.Acquire(payload);
+                        // Retain a zero-copy WireArcBuffer lease over payload's pooled pages. Orleans' proxy calls
+                        // WireArcBufferCopier.DeepCopy synchronously to retain an independent lease for the outbound
+                        // message; WireArcBufferCodec consumes it on remote serialization (or the callee consumes it on
+                        // a local call), and releaseOnEnd disposes it if the message is dropped before serialization (OR-I18).
+                        using var wirePayload = WireArcBuffer.Retain(payload);
                         var request = new LedgerReplicaWriteRequest
                         {
                             Version = LedgerReplicaProtocol.Version,
@@ -1021,9 +1053,22 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                             Slot = slot.Value,
                             ContiguousTail = contiguousTail.Value,
                             Recovery = recovery,
-                            Payload = sender.Copy,
+                            Payload = wirePayload,
                         };
-                        answer = await UntilCancelledAsync(_grain.WriteAsync(request, cancellationToken), abandoned: null, cancellationToken).ConfigureAwait(false);
+                        Task<RemoteReplicaWriteOutcome> call;
+                        WireArcBuffer? proxyCopy = null;
+                        try
+                        {
+                            call = _grain.WriteAsync(request, cancellationToken);
+                            proxyCopy = wirePayload.DetachLastCopy();
+                        }
+                        catch
+                        {
+                            wirePayload.DetachLastCopy()?.Dispose();
+                            throw;
+                        }
+
+                        answer = await UntilCancelledAsync(call, abandoned: null, releaseOnEnd: proxyCopy, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception failure)
                     {
@@ -1255,115 +1300,5 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
         private static TimeSpan DoubleBackoff(TimeSpan backoff) =>
             TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, LongestBackoff.Ticks));
-    }
-
-    /// <summary>
-    /// The Orleans copies of the payloads which granted remote calls carry, one per payload while any of its calls holds it,
-    /// keyed by the payload's first page, its offset, and its length: a caller holds its payload, and so its pages,
-    /// throughout every call which carries it, so no other payload has the same key while the copy is held (OR-I18). The
-    /// last call to release a copy releases the shared pin; each message keeps the pin Orleans' proxy took as the call was
-    /// made, which Orleans never releases, so the GC reclaims the pages.
-    /// </summary>
-    private sealed class SenderCopies
-    {
-        private readonly Lock _lock = new();
-        private readonly Dictionary<Key, Entry> _entries = [];
-
-        public int Count
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return _entries.Count;
-                }
-            }
-        }
-
-        /// <summary>Returns the payload's copy, copying the payload into a new one when no call holds it.</summary>
-        public Lease Acquire(ArcBuffer payload)
-        {
-            var key = new Key(payload.First, payload.Offset, payload.Length);
-            Entry entry;
-            lock (_lock)
-            {
-                ref var held = ref CollectionsMarshal.GetValueRefOrAddDefault(_entries, key, out _);
-                held ??= new Entry();
-                held.References++;
-                entry = held;
-            }
-
-            try
-            {
-                return new Lease(this, key, entry, entry.GetOrCreate(payload));
-            }
-            catch
-            {
-                Release(key, entry);
-                throw;
-            }
-        }
-
-        private void Release(Key key, Entry entry)
-        {
-            lock (_lock)
-            {
-                if (--entry.References != 0)
-                {
-                    return;
-                }
-
-                _ = _entries.Remove(key);
-            }
-
-            entry.DisposeCopy();
-        }
-
-        public readonly record struct Key(ArcBufferPage Page, int Offset, int Length);
-
-        /// <summary>A payload's copy, made once by the first call which needs it, and the calls which hold it, under the owner's lock.</summary>
-        public sealed class Entry
-        {
-            private readonly Lock _initLock = new();
-            private bool _created;
-            private OrleansBuffer _copy;
-
-            public int References { get; set; }
-
-            public OrleansBuffer GetOrCreate(ArcBuffer payload)
-            {
-                if (Volatile.Read(ref _created))
-                {
-                    return _copy;
-                }
-
-                lock (_initLock)
-                {
-                    if (!_created)
-                    {
-                        _copy = WireBuffers.CopyToOrleans(payload);
-                        Volatile.Write(ref _created, true);
-                    }
-
-                    return _copy;
-                }
-            }
-
-            public void DisposeCopy()
-            {
-                if (Volatile.Read(ref _created))
-                {
-                    _copy.Dispose();
-                }
-            }
-        }
-
-        /// <summary>One call's hold on a payload's copy.</summary>
-        public readonly struct Lease(SenderCopies owner, Key key, Entry entry, OrleansBuffer copy) : IDisposable
-        {
-            public OrleansBuffer Copy { get; } = copy;
-
-            public void Dispose() => owner.Release(key, entry);
-        }
     }
 }

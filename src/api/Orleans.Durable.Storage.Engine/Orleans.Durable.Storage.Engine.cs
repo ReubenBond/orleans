@@ -211,6 +211,8 @@ namespace Orleans.Durable.Storage.Engine.Archive
 
         public Ledgers.LedgerSegmentId Segment { get { throw null; } }
 
+        public int SupersededBefore { get { throw null; } }
+
         public Ledgers.Tag Tag { get { throw null; } }
 
         public Ledgers.RowToken Token { get { throw null; } }

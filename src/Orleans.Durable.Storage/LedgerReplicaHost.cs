@@ -27,15 +27,12 @@ namespace Orleans.Durable.Storage;
 /// lasts as long as the store holds the call's bytes. A write or a contiguous-tail read holds its admission until its store
 /// operation ends; a read whose batch fits its reservation holds it until Orleans first converts its DATA reply to its
 /// surrogate (<see cref="RemoteReplicaReadConverter"/>), which Orleans' copy of the response does as the grain method
-/// returns, or, never converted, until the call's deadline passes. The host owns a write's payload, which Orleans decoded
-/// or, on a call within one silo, its proxy pinned: it moves the payload into Durable Storage's page pool for the store and releases
-/// it on every path. A read's DATA is copied out of the store's buffer, which the host releases, into an Orleans buffer
-/// the reply carries, which the host never releases: across silos Orleans' codec writes it without taking ownership and
-/// may write it after the grain method returns, so the GC reclaims its pages; on a call within one silo the reply reaches
-/// the caller as it is, and the caller is its one releaser (OR-I18).
+/// returns, or, never converted, until the call's deadline passes. Both a write's payload and a read's DATA cross in a
+/// zero-copy consume-on-serialize <see cref="WireArcBuffer"/> directly over Durable Storage's pooled
+/// <see cref="ArcBuffer"/> (OR-I18).
 /// </para>
 /// </remarks>
-internal sealed class LedgerReplicaHost
+internal sealed class LedgerReplicaHost : IDisposable
 {
     private static readonly ReplicaCallRefused StoppingRefusal = new(ReplicaRefusal.Stopping, "The callee's node is stopping and admits no new call.");
     private static readonly ReplicaCallRefused DisklessRefusal = new(ReplicaRefusal.Argument, "The callee's node is diskless and holds no LedgerStore.");
@@ -43,6 +40,7 @@ internal sealed class LedgerReplicaHost
     private readonly LocalNode _local;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
+    private readonly Queue<WireArcBuffer> _pendingUnconsumed = new();
     private int _calls;
     private long _bytes;
 
@@ -107,7 +105,7 @@ internal sealed class LedgerReplicaHost
 
     private async Task<RemoteReplicaWriteOutcome> WriteCoreAsync(IGrainBase? grain, TaskScheduler? scheduler, NodeId key, LedgerReplicaWriteRequest request, CancellationToken cancellationToken)
     {
-        var received = request.Payload;
+        var received = request.Payload ?? WireArcBuffer.Empty;
         try
         {
             if (scheduler is not null)
@@ -154,7 +152,7 @@ internal sealed class LedgerReplicaHost
 
             try
             {
-                using var payload = WireBuffers.MoveToArcBuffer(ref received);
+                using var payload = received.TakeBuffer();
                 var outcome = await store.WriteReplicaAsync(
                     new LedgerId(request.Ledger),
                     request.WindowSize,
@@ -248,6 +246,7 @@ internal sealed class LedgerReplicaHost
 
         // A read reserves the reply its caller reserved, so the bytes the host holds stay within its bound.
         LedgerReplicaHostAdmission? admission = null;
+        WireArcBuffer? wire = null;
         try
         {
             admission = TryAdmit(request.MaxReplyBytes);
@@ -286,10 +285,14 @@ internal sealed class LedgerReplicaHost
                     return new RemoteReplicaRead.TooLarge(length);
                 }
 
-                // The reply holds the admission until Orleans first copies it or its deadline passes.
-                var data = new RemoteReplicaRead.Data(CopyAndRelease(batch, request)) { Admission = admission };
-                admission.HoldUntil(_timeProvider, ReplyDeadline);
+                // Transfer ownership of the store's pooled buffer directly into WireArcBuffer (zero-copy; OR-I18).
+                // The admission holds host call/byte bounds until first surrogate conversion, and the deadline timer
+                // guards against drop-before-serialization until WireArcBufferCodec or a local caller consumes it.
+                wire = TakeReadBuffer(batch, request);
+                var data = new RemoteReplicaRead.Data(wire) { Admission = admission };
+                admission.HoldUntil(_timeProvider, ReplyDeadline, wire);
                 admission = null;
+                wire = null;
                 return data;
             }
 
@@ -305,6 +308,7 @@ internal sealed class LedgerReplicaHost
         }
         finally
         {
+            wire?.Dispose();
             admission?.Dispose();
         }
     }
@@ -363,6 +367,7 @@ internal sealed class LedgerReplicaHost
         }
 
         LedgerReplicaHostAdmission? admission = null;
+        WireArcBuffer? wire = null;
         try
         {
             admission = TryAdmit(request.MaxBytes);
@@ -404,18 +409,20 @@ internal sealed class LedgerReplicaHost
                 if (batch.Count == 0)
                 {
                     batch.Dispose();
-                    return new RemoteReplicaRangeRead.Batch(batch.FirstSlot.Value, 0, default);
+                    return new RemoteReplicaRangeRead.Batch(batch.FirstSlot.Value, 0, WireArcBuffer.Empty);
                 }
 
-                OrleansBuffer copied;
-                using (batch)
-                {
-                    copied = WireBuffers.CopyToOrleans(batch.Packed);
-                }
+                // Retain the packed pooled buffer before disposing the struct wrapper: zero copy!
+                var packed = batch.Packed.Retain();
+                var firstSlot = batch.FirstSlot.Value;
+                var count = batch.Count;
+                batch.Dispose();
 
-                var reply = new RemoteReplicaRangeRead.Batch(batch.FirstSlot.Value, batch.Count, copied) { Admission = admission };
-                admission.HoldUntil(_timeProvider, ReplyDeadline);
+                wire = WireArcBuffer.Take(packed);
+                var reply = new RemoteReplicaRangeRead.Batch(firstSlot, count, wire) { Admission = admission };
+                admission.HoldUntil(_timeProvider, ReplyDeadline, wire);
                 admission = null;
+                wire = null;
                 return reply;
             }
 
@@ -428,6 +435,7 @@ internal sealed class LedgerReplicaHost
         }
         finally
         {
+            wire?.Dispose();
             admission?.Dispose();
         }
     }
@@ -618,14 +626,45 @@ internal sealed class LedgerReplicaHost
     internal LedgerReplicaHostAdmission? TryAdmit(long bytes) =>
         TryAdmitDirect(bytes) ? new LedgerReplicaHostAdmission(this, bytes) : null;
 
-    /// <summary>Returns <paramref name="bytes"/> and a call to the host's bounds.</summary>
-    internal void Return(long bytes)
+    /// <summary>Returns <paramref name="bytes"/> and a call to the host's bounds, tracking any still-unconsumed reply payload for shutdown cleanup.</summary>
+    internal void Return(long bytes, WireArcBuffer? unconsumedPayload = null)
     {
         lock (_lock)
         {
             _calls--;
             _bytes -= bytes;
             Debug.Assert(_calls >= 0 && _bytes >= 0, "The host returns no more than it admitted.");
+            while (_pendingUnconsumed.TryPeek(out var head) && head.IsConsumed)
+            {
+                _ = _pendingUnconsumed.Dequeue();
+            }
+
+            if (unconsumedPayload is not null && !unconsumedPayload.IsConsumed)
+            {
+                _pendingUnconsumed.Enqueue(unconsumedPayload);
+            }
+        }
+    }
+
+    /// <summary>Releases any reply buffers whose responses were dropped before serialization when the silo stops.</summary>
+    public void Dispose()
+    {
+        WireArcBuffer[]? remaining = null;
+        lock (_lock)
+        {
+            if (_pendingUnconsumed.Count > 0)
+            {
+                remaining = [.. _pendingUnconsumed];
+                _pendingUnconsumed.Clear();
+            }
+        }
+
+        if (remaining is not null)
+        {
+            foreach (var wire in remaining)
+            {
+                wire.Dispose();
+            }
         }
     }
 
@@ -642,18 +681,12 @@ internal sealed class LedgerReplicaHost
 
     private static ReplicaCorrupt Corrupt(LedgerReplicaCorruptException corrupt) => new(corrupt.Slot?.Value, corrupt.Message);
 
-    /// <summary>
-    /// Copies a read's DATA out of the store's buffer into an Orleans buffer, and releases the store's buffer; the reply
-    /// carries the copy, which the host never releases; within one silo the caller releases it (OR-I18).
-    /// </summary>
-    private static OrleansBuffer CopyAndRelease(ArcBuffer batch, LedgerReplicaReadRequest request)
+    /// <summary>Wraps a read's pooled <see cref="ArcBuffer"/> directly in a zero-copy consume-on-serialize <see cref="WireArcBuffer"/> (OR-I18).</summary>
+    private static WireArcBuffer TakeReadBuffer(ArcBuffer batch, LedgerReplicaReadRequest request)
     {
-        using (batch)
-        {
-            Debug.Assert(batch.Length > 0, "DATA is never empty (OR-I15's reply check).");
-            Debug.Assert(!request.IsRange || batch.Length == request.Length, "A ranged read answers the length it asked for (OR-I15's reply check).");
-            return WireBuffers.CopyToOrleans(batch);
-        }
+        Debug.Assert(batch.Length > 0, "DATA is never empty (OR-I15's reply check).");
+        Debug.Assert(!request.IsRange || batch.Length == request.Length, "A ranged read answers the length it asked for (OR-I15's reply check).");
+        return WireArcBuffer.Take(batch);
     }
 
     private ReplicaCallRefused? AbovePayloadLimit(int length, string what) =>
@@ -664,12 +697,14 @@ internal sealed class LedgerReplicaHost
 
 /// <summary>
 /// One call's admission to a <see cref="LedgerReplicaHost"/>: a call and its bytes, which it returns once, when it is
-/// disposed: when its store operation ends, when its reply is serialized, or at its reply's deadline (OR-I17).
+/// released or disposed: when its store operation ends, when its reply is first converted to its surrogate, or at its
+/// reply's deadline (OR-I17).
 /// </summary>
 internal sealed class LedgerReplicaHostAdmission : IDisposable
 {
     private readonly LedgerReplicaHost _host;
     private readonly long _bytes;
+    private WireArcBuffer? _payload;
     private ITimer? _deadline;
     private int _released;
 
@@ -683,22 +718,74 @@ internal sealed class LedgerReplicaHostAdmission : IDisposable
     /// <summary>Gets a value indicating whether the admission was returned.</summary>
     internal bool IsReleased => Volatile.Read(ref _released) != 0;
 
-    /// <summary>Returns the call and its bytes to the host, once.</summary>
+    /// <summary>
+    /// Releases the host's call/byte admission on first surrogate conversion without disposing the reply's
+    /// <see cref="WireArcBuffer"/>, transferring any deadline safety timer to the buffer so it cancels immediately when
+    /// serialized or locally consumed and still releases pages if dropped before serialization.
+    /// </summary>
+    internal void ReleaseAdmission()
+    {
+        if (Interlocked.Exchange(ref _released, 1) == 0)
+        {
+            var timer = Interlocked.Exchange(ref _deadline, null);
+            var payload = _payload;
+            if (payload is not null)
+            {
+                if (timer is not null)
+                {
+                    payload.AttachDeadlineTimer(timer);
+                }
+            }
+            else
+            {
+                timer?.Dispose();
+            }
+
+            _host.Return(_bytes, payload);
+        }
+    }
+
+    /// <summary>Returns the call and its bytes to the host and disposes any unconsumed reply payload, once.</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _released, 1) == 0)
         {
-            _deadline?.Dispose();
+            Interlocked.Exchange(ref _deadline, null)?.Dispose();
+            _payload?.Dispose();
             _host.Return(_bytes);
         }
     }
 
-    /// <summary>Holds the admission past its call, until <see cref="Dispose"/> or until <paramref name="deadline"/> passes.</summary>
-    internal void HoldUntil(TimeProvider timeProvider, TimeSpan deadline)
+    /// <summary>Holds the admission past its call, until <see cref="ReleaseAdmission"/>, <see cref="Dispose"/>, or until <paramref name="deadline"/> passes.</summary>
+    internal void HoldUntil(TimeProvider timeProvider, TimeSpan deadline, WireArcBuffer? payload = null)
     {
+        _payload = payload;
         using (ExecutionContext.SuppressFlow())
         {
-            _deadline = timeProvider.CreateTimer(static state => ((LedgerReplicaHostAdmission)state!).Dispose(), this, deadline, Timeout.InfiniteTimeSpan);
+            var timer = timeProvider.CreateTimer(static state => ((LedgerReplicaHostAdmission)state!).OnDeadline(), this, deadline, Timeout.InfiniteTimeSpan);
+            var previous = Interlocked.Exchange(ref _deadline, timer);
+            previous?.Dispose();
+            if (Volatile.Read(ref _released) != 0)
+            {
+                var raced = Interlocked.Exchange(ref _deadline, null);
+                if (raced is not null)
+                {
+                    if (payload is not null)
+                    {
+                        payload.AttachDeadlineTimer(raced);
+                    }
+                    else
+                    {
+                        raced.Dispose();
+                    }
+                }
+            }
         }
+    }
+
+    private void OnDeadline()
+    {
+        _payload?.Dispose();
+        Dispose();
     }
 }

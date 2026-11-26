@@ -28,7 +28,7 @@ public sealed class ReplicaMessageTests : IDisposable
         new ReplicaCorrupt(null, "A damaged value."),
     ];
 
-    private static readonly RemoteReplicaRead[] ReadCases =
+    private static RemoteReplicaRead[] CreateReadCases() =>
     [
         WireBytes.Data(1, 2, 3),
         WireBytes.Data(),
@@ -69,7 +69,7 @@ public sealed class ReplicaMessageTests : IDisposable
         Ledgers = [9, 10],
     };
 
-    private static readonly LedgerReplicaWriteRequest Write = new()
+    private static LedgerReplicaWriteRequest CreateWrite() => new()
     {
         Version = LedgerReplicaProtocol.Version,
         Ledger = 9,
@@ -77,7 +77,7 @@ public sealed class ReplicaMessageTests : IDisposable
         Slot = 3,
         ContiguousTail = 2,
         Recovery = true,
-        Payload = WireBytes.Of(5, 6),
+        Payload = WireBytes.Arc(5, 6),
     };
 
     private static readonly LedgerReplicaReadRequest Read = new()
@@ -111,15 +111,17 @@ public sealed class ReplicaMessageTests : IDisposable
     public Task EveryAnswerCaseAndRequestHasAPinnedWireEncoding()
     {
         var serializer = _services.GetRequiredService<Serializer>();
+        var readCases = CreateReadCases();
+        var write = CreateWrite();
         return Verify(new
         {
             Writes = WriteCases.Select(outcome => new { Case = outcome.Value!.GetType().Name, Outcome = outcome.ToString(), Wire = Wire(serializer, outcome) }),
-            Reads = ReadCases.Select(read => new { Case = read.Value!.GetType().Name, Wire = Wire(serializer, read) }),
+            Reads = readCases.Select(read => new { Case = read.Value!.GetType().Name, Wire = Wire(serializer, read) }),
             Tails = TailCases.Select(read => new { Case = read.Value!.GetType().Name, Read = read.ToString(), Wire = Wire(serializer, read) }),
             Heartbeats = HeartbeatCases.Select(read => new { Case = read.Value!.GetType().Name, Read = read.ToString(), Wire = Wire(serializer, read) }),
             Requests = new
             {
-                Write = Wire(serializer, Write),
+                Write = Wire(serializer, write),
                 Read = Wire(serializer, Read),
                 Tail = Wire(serializer, Tail),
                 Heartbeat = Wire(serializer, Heartbeat),
@@ -136,9 +138,20 @@ public sealed class ReplicaMessageTests : IDisposable
             Assert.Equal(outcome, serializer.Deserialize<RemoteReplicaWriteOutcome>(serializer.SerializeToArray(outcome)));
         }
 
-        foreach (var read in ReadCases)
+        foreach (var read in CreateReadCases())
         {
-            Assert.Equal(read, serializer.Deserialize<RemoteReplicaRead>(serializer.SerializeToArray(read)));
+            var expectedBytes = (read.Value as RemoteReplicaRead.Data)?.Bytes.ToArray();
+            var decoded = serializer.Deserialize<RemoteReplicaRead>(serializer.SerializeToArray(read));
+            if (expectedBytes is not null)
+            {
+                var decodedData = Assert.IsType<RemoteReplicaRead.Data>(decoded.Value);
+                Assert.Equal(expectedBytes, decodedData.Bytes.ToArray());
+                decodedData.Bytes.Dispose();
+            }
+            else
+            {
+                Assert.Equal(read, decoded);
+            }
         }
 
         foreach (var read in TailCases)
@@ -151,9 +164,11 @@ public sealed class ReplicaMessageTests : IDisposable
             Assert.Equal(read, serializer.Deserialize<RemoteReplicaHeartbeatRead>(serializer.SerializeToArray(read)));
         }
 
-        var write = serializer.Deserialize<LedgerReplicaWriteRequest>(serializer.SerializeToArray(Write));
-        Assert.Equal((Write.Version, Write.Ledger, Write.WindowSize, Write.Slot, Write.ContiguousTail, Write.Recovery), (write.Version, write.Ledger, write.WindowSize, write.Slot, write.ContiguousTail, write.Recovery));
-        Assert.Equal(Write.Payload.ToArray(), write.Payload.ToArray());
+        var sentWrite = CreateWrite();
+        var expectedPayload = sentWrite.Payload.ToArray();
+        var write = serializer.Deserialize<LedgerReplicaWriteRequest>(serializer.SerializeToArray(sentWrite));
+        Assert.Equal((sentWrite.Version, sentWrite.Ledger, sentWrite.WindowSize, sentWrite.Slot, sentWrite.ContiguousTail, sentWrite.Recovery), (write.Version, write.Ledger, write.WindowSize, write.Slot, write.ContiguousTail, write.Recovery));
+        Assert.Equal(expectedPayload, write.Payload.ToArray());
         write.Payload.Dispose();
         Assert.Equal(Read, serializer.Deserialize<LedgerReplicaReadRequest>(serializer.SerializeToArray(Read)));
         Assert.Equal(Tail, serializer.Deserialize<LedgerReplicaTailRequest>(serializer.SerializeToArray(Tail)));
@@ -204,19 +219,19 @@ public sealed class ReplicaMessageTests : IDisposable
         var bytes = new byte[40 << 10];
         new Random(40).NextBytes(bytes);
 
-        var sent = Write with { Payload = WireBytes.Of(bytes) };
+        var sent = CreateWrite() with { Payload = WireBytes.Arc(bytes) };
         using var request = WireBytes.Of(serializer.SerializeToArray(sent));
+        Assert.True(sent.Payload.IsConsumed);
         var write = serializer.Deserialize<LedgerReplicaWriteRequest>(request);
         Assert.Equal(bytes, write.Payload.ToArray());
         write.Payload.Dispose();
-        sent.Payload.Dispose();
 
         var data = WireBytes.Data(bytes);
         using var reply = WireBytes.Of(serializer.SerializeToArray<RemoteReplicaRead>(data));
+        Assert.True(data.Bytes.IsConsumed);
         var read = Assert.IsType<RemoteReplicaRead.Data>(serializer.Deserialize<RemoteReplicaRead>(reply).Value);
         Assert.Equal(bytes, read.Bytes.ToArray());
         read.Bytes.Dispose();
-        data.Bytes.Dispose();
     }
 
     /// <summary>
@@ -226,11 +241,11 @@ public sealed class ReplicaMessageTests : IDisposable
     [Fact]
     public void AReadCaseOtherThanDataReleasesAndRefusesTheBytesItCarries()
     {
-        var missing = WireBytes.Of(1);
+        var missing = WireBytes.Arc(1);
         _ = Assert.Throws<ReplicaReplyDecodingException>(() => new RemoteReplicaReadConverter().ConvertFromSurrogate(new RemoteReplicaReadSurrogate { Case = ReplicaReplyTag.Second, Bytes = missing }));
         Assert.True(WireBytes.IsReleased(missing));
 
-        var tooLarge = WireBytes.Of(1, 2);
+        var tooLarge = WireBytes.Arc(1, 2);
         _ = Assert.Throws<ReplicaReplyDecodingException>(() => new RemoteReplicaReadConverter().ConvertFromSurrogate(new RemoteReplicaReadSurrogate { Case = ReplicaReplyTag.TooLarge, Bytes = tooLarge }));
         Assert.True(WireBytes.IsReleased(tooLarge));
     }
@@ -285,7 +300,7 @@ public sealed class ReplicaMessageTests : IDisposable
     [Fact]
     public void ADataReplyWhichCarriesAnotherFieldReleasesAndRefusesItsBytes()
     {
-        var data = WireBytes.Of(1, 2, 3);
+        var data = WireBytes.Arc(1, 2, 3);
         var refused = Assert.Throws<ReplicaReplyDecodingException>(() => new RemoteReplicaReadConverter().ConvertFromSurrogate(new RemoteReplicaReadSurrogate { Case = ReplicaReplyTag.First, Bytes = data, Length = 3 }));
         Assert.Contains("field Length", refused.Message, StringComparison.Ordinal);
         Assert.True(WireBytes.IsReleased(data));
@@ -300,7 +315,7 @@ public sealed class ReplicaMessageTests : IDisposable
     {
         var serializer = _services.GetRequiredService<Serializer>();
         var time = new FakeTimeProvider();
-        var host = new LedgerReplicaHost(new LocalNode(), TestReplicaLimits.Of(deadline: TimeSpan.FromSeconds(30)), time);
+        using var host = new LedgerReplicaHost(new LocalNode(), TestReplicaLimits.Of(deadline: TimeSpan.FromSeconds(30)), time);
         var serialized = host.TryAdmit(10)!;
         var dropped = host.TryAdmit(10)!;
         serialized.HoldUntil(time, host.ReplyDeadline);

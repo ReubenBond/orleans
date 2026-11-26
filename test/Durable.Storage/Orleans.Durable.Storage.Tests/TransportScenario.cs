@@ -148,8 +148,8 @@ internal sealed class TransportScenario : IAsyncDisposable
             await replica.DisposeAsync();
         }
 
-        // Quiescence: every call, an abandoned one included, returns its grant and its sender copy.
-        await ReplicaCluster.EventuallyAsync(() => Transport.Lanes.All(static lane => lane is { OutstandingBytes: 0, OutstandingCalls: 0, Waiting: 0 }) && Transport.SenderCopyCount == 0);
+        // Quiescence: every call, an abandoned one included, returns its grant.
+        await ReplicaCluster.EventuallyAsync(() => Transport.Lanes.All(static lane => lane is { OutstandingBytes: 0, OutstandingCalls: 0, Waiting: 0 }));
         Grain.Delivered.Dispose();
         await Store.DisposeAsync();
         if (System.IO.Directory.Exists(_root))
@@ -212,7 +212,7 @@ internal sealed class GrainDouble : ILedgerStoreGrain
         CallAsync(request, ReplicaRead.Missing.Instance, ReadOf, cancellationToken);
 
     public Task<RemoteReplicaRangeRead> ReadRangeAsync(LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
-        CallAsync(request, new RemoteReplicaRangeRead.Batch(request.From, 0, default), ReadRangeOf, cancellationToken);
+        CallAsync(request, new RemoteReplicaRangeRead.Batch(request.From, 0, WireArcBuffer.Empty), ReadRangeOf, cancellationToken);
 
     public Task<RemoteReplicaTailRead> ReadTailAsync(LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         CallAsync(request, new RemoteReplicaTailRead.Tail(request.ContiguousTail, IsSealed: false), TailOf, cancellationToken);
