@@ -655,6 +655,100 @@ internal sealed class LiveReplica
     }
 
     /// <summary>
+    /// Reads the strictly ascending list of published <paramref name="slots"/> whose framed payloads fit within
+    /// <paramref name="maxBytes"/>, skipping missing, faulty, or oversized slots so all other present slots return in
+    /// one call.
+    /// </summary>
+    internal async ValueTask<ReplicaSlotsRead> ReadSlotsAsync(
+        ReadOnlyMemory<Slot> slots, Slot contiguousTail, int windowSize, int maxBytes, CancellationToken cancellationToken)
+    {
+        if (!await TryEnterAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return ReplicaWriteOutcome.Dropped.Instance;
+        }
+
+        ArcBufferWriter? writer = null;
+        try
+        {
+            lock (_lock)
+            {
+                AdmitLocked(contiguousTail, windowSize);
+            }
+
+            if (slots.IsEmpty)
+            {
+                return ReplicaSlotsBatch.Empty;
+            }
+
+            var loadedLeaf = -1L;
+            var count = 0;
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var slot = slots.Span[i];
+                var leaf = SlotTable.LeafOf(slot.Value);
+                if (leaf != loadedLeaf)
+                {
+                    await EnsureLoadedAsync(leaf, cancellationToken).ConfigureAwait(false);
+                    loadedLeaf = leaf;
+                }
+
+                var state = Observe(slot.Value, out var entry);
+                if (state != State.Data)
+                {
+                    continue;
+                }
+
+                var read = await _store.Wal.ReadAsync(entry.Page, LedgerRecords.Key(Handle, slot.Value), cancellationToken).ConfigureAwait(false);
+                if (!read.TryGetValue(out ArcBuffer record))
+                {
+                    MarkFaulty(slot.Value, entry.Page);
+                    continue;
+                }
+
+                using (record)
+                {
+                    if (!LedgerRecords.IsDataRecord(record))
+                    {
+                        MarkFaulty(slot.Value, entry.Page);
+                        continue;
+                    }
+
+                    var batchLength = record.Length - LedgerRecords.KeyLength;
+                    var framedLength = checked(ReplicaSlotsBatch.FrameHeaderLength + batchLength);
+                    if (framedLength > maxBytes)
+                    {
+                        continue;
+                    }
+
+                    if (writer is not null && writer.Length + framedLength > maxBytes)
+                    {
+                        break;
+                    }
+
+                    writer ??= new ArcBufferWriter(Math.Min(maxBytes, Math.Max(framedLength, ArcBufferWriter.MinimumPageSize)));
+                    using var payload = record.UnsafeSlice(LedgerRecords.KeyLength, batchLength);
+                    ReplicaSlotsBatch.WriteFrame(writer, slot, payload);
+                    count++;
+                }
+            }
+
+            return count == 0
+                ? ReplicaSlotsBatch.Empty
+                : new ReplicaSlotsBatch(count, writer!.ConsumeSlice(writer.Length));
+        }
+        catch (Exception exception)
+        {
+            _store.StopIfReported(exception);
+            throw;
+        }
+        finally
+        {
+            writer?.Dispose();
+            Exit();
+        }
+    }
+
+    /// <summary>
     /// Reports the retained contiguous tail and the seal, sealing the replica first when <paramref name="seal"/> is set
     /// (ledgerstore.md §8.3). The seal is reported only once its record is durable: a read which meets a seal in flight
     /// waits for it (conventions.md §13).

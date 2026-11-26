@@ -305,6 +305,303 @@ internal sealed partial class LedgerQuorum
         }
     }
 
+    /// <inheritdoc/>
+    public bool SupportsReadSlots => _supportsReadSlots;
+
+    /// <inheritdoc/>
+    public async ValueTask<ReplicaSlotsRead> ReadSlotsAsync(
+        ReadOnlyMemory<Slot> slots,
+        Slot acknowledged,
+        CancellationToken cancellationToken = default)
+    {
+        LedgerReplicaOperations.ValidateReadSlots(slots.Span, ReadRangeMaxBytes);
+        if (slots.IsEmpty)
+        {
+            return ReplicaSlotsBatch.Empty;
+        }
+
+        if (!_supportsReadSlots || slots.Span[^1] >= acknowledged)
+        {
+            return await ReadSlotsFallbackAsync(slots, acknowledged, cancellationToken).ConfigureAwait(false);
+        }
+
+        Dictionary<Slot, ArcBuffer>? collected = null;
+        HashSet<Slot>? preferredMissed = null;
+        var remaining = slots.ToArray();
+        var remainingCount = remaining.Length;
+        var shouldRepair = _preferredReplica is not null && Volatile.Read(ref _suppressReadRepair) == 0;
+        var preferredAnsweredAnyMissing = false;
+
+        try
+        {
+            using (Admit())
+            {
+                ThrowIfReadsStopped();
+                using var scope = new CallScope(cancellationToken, _lifetime.Token);
+                var token = scope.Token;
+                var replica = FirstReplicaToRead();
+                for (var asked = 0; asked < _replicas.Length && remainingCount > 0; asked++)
+                {
+                    var asking = replica;
+                    var preferred = asking == _preferredReplica;
+                    replica = NextReplica(replica);
+                    var minSlot = -1L;
+
+                    while (remainingCount > 0)
+                    {
+                        var startIndex = 0;
+                        while (startIndex < remainingCount && remaining[startIndex].Value <= minSlot)
+                        {
+                            startIndex++;
+                        }
+
+                        if (startIndex >= remainingCount)
+                        {
+                            break;
+                        }
+
+                        var askMemory = remaining.AsMemory(startIndex, remainingCount - startIndex);
+                        ReplicaSlotsRead answer;
+                        try
+                        {
+                            var callToken = preferred ? _lifetime.Token : token;
+                            var reading = _replicas[asking].ReadSlotsAsync(askMemory, acknowledged, ReadRangeMaxBytes, callToken);
+                            if (reading.IsCompletedSuccessfully)
+                            {
+                                answer = await reading.ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                var task = reading.AsTask();
+                                if (preferred)
+                                {
+                                    await ((Task)task).WaitAsync(token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                                    if (!task.IsCompleted)
+                                    {
+                                        _ = TrackStragglers([task]);
+                                        token.ThrowIfCancellationRequested();
+                                    }
+                                }
+
+                                answer = await task.ConfigureAwait(false);
+                            }
+                        }
+                        catch (OperationCanceledException) when (ReadsStopped(cancellationToken))
+                        {
+                            throw ReadsStoppedException();
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (LedgerReplicaCorruptException)
+                        {
+                            if (preferred && shouldRepair)
+                            {
+                                preferredAnsweredAnyMissing = true;
+                            }
+
+                            break;
+                        }
+                        catch (Exception failure) when (failure is not OutOfMemoryException)
+                        {
+                            if (_lifetime.IsCancellationRequested)
+                            {
+                                throw ReadsStoppedException();
+                            }
+
+                            break;
+                        }
+
+                        if (answer.TryGetValue(out ReplicaWriteOutcome.Dropped? dropped))
+                        {
+                            return dropped;
+                        }
+
+                        if (!answer.TryGetValue(out ReplicaSlotsBatch batch))
+                        {
+                            // Backpressure: try the next replica (or single-slot fallback after all replicas).
+                            break;
+                        }
+
+                        if (batch.Count == 0)
+                        {
+                            batch.Dispose();
+                            if (preferred && shouldRepair)
+                            {
+                                preferredAnsweredAnyMissing = true;
+                            }
+
+                            break;
+                        }
+
+                        // Zero-copy fast path: one replica returned every requested slot in a single packed buffer.
+                        if (collected is null && batch.Count == slots.Length)
+                        {
+                            if (preferredAnsweredAnyMissing && shouldRepair)
+                            {
+                                var repairOffset = 0;
+                                for (var i = 0; i < batch.Count; i++)
+                                {
+                                    using var slice = ReplicaSlotsBatch.SliceNext(batch.Packed, ref repairOffset, out var repairSlot);
+                                    Repair(new ReadTarget(repairSlot, 0, 0), slice, acknowledged);
+                                }
+                            }
+
+                            return batch;
+                        }
+
+                        using (batch)
+                        {
+                            collected ??= [];
+                            var offset = 0;
+                            var lastReturned = -1L;
+                            for (var i = 0; i < batch.Count; i++)
+                            {
+                                var slice = ReplicaSlotsBatch.SliceNext(batch.Packed, ref offset, out var slot);
+                                if (!collected.TryAdd(slot, slice))
+                                {
+                                    slice.Dispose();
+                                }
+
+                                lastReturned = slot.Value;
+                            }
+
+                            var writeIndex = 0;
+                            for (var i = 0; i < remainingCount; i++)
+                            {
+                                var slot = remaining[i];
+                                if (collected.ContainsKey(slot))
+                                {
+                                    continue;
+                                }
+
+                                if (preferred && shouldRepair && slot.Value > minSlot && slot.Value < lastReturned)
+                                {
+                                    _ = (preferredMissed ??= []).Add(slot);
+                                }
+
+                                remaining[writeIndex++] = slot;
+                            }
+
+                            remainingCount = writeIndex;
+                            minSlot = lastReturned;
+                        }
+                    }
+
+                    if (preferred && shouldRepair && remainingCount > 0 && collected is not null)
+                    {
+                        for (var i = 0; i < remainingCount; i++)
+                        {
+                            _ = (preferredMissed ??= []).Add(remaining[i]);
+                        }
+                    }
+                }
+            }
+
+            // Single-slot fallback for any remaining slots (oversized > ReadRangeMaxBytes, backpressure, or all-corrupt edge cases).
+            for (var i = 0; i < remainingCount; i++)
+            {
+                var slot = remaining[i];
+                var single = await ReadAsync(slot, acknowledged, cancellationToken).ConfigureAwait(false);
+                if (single.TryGetValue(out ArcBuffer singleBatch))
+                {
+                    collected ??= [];
+                    if (!collected.TryAdd(slot, singleBatch))
+                    {
+                        singleBatch.Dispose();
+                    }
+                }
+                else if (single.TryGetValue(out ReplicaWriteOutcome.Dropped? dropped))
+                {
+                    return dropped;
+                }
+                else if (single.TryGetValue(out ReplicaWriteOutcome.Backpressure? backpressure))
+                {
+                    return backpressure;
+                }
+                else
+                {
+                    throw new UnreachableException("LP-I10: a decided read answers a batch, Dropped, Backpressure, or throws.");
+                }
+            }
+
+            if (collected is null || collected.Count == 0)
+            {
+                return ReplicaSlotsBatch.Empty;
+            }
+
+            if (shouldRepair && (preferredAnsweredAnyMissing || preferredMissed is not null))
+            {
+                foreach (var (slot, slice) in collected)
+                {
+                    if (preferredAnsweredAnyMissing || preferredMissed!.Contains(slot))
+                    {
+                        Repair(new ReadTarget(slot, 0, 0), slice, acknowledged);
+                    }
+                }
+            }
+
+            using var writer = new ArcBufferWriter();
+            var span = slots.Span;
+            for (var i = 0; i < span.Length; i++)
+            {
+                var slot = span[i];
+                ReplicaSlotsBatch.WriteFrame(writer, slot, collected[slot]);
+            }
+
+            return new ReplicaSlotsBatch(span.Length, writer.ConsumeSlice(writer.Length));
+        }
+        finally
+        {
+            if (collected is not null)
+            {
+                foreach (var slice in collected.Values)
+                {
+                    slice.Dispose();
+                }
+            }
+        }
+    }
+
+    private async ValueTask<ReplicaSlotsRead> ReadSlotsFallbackAsync(
+        ReadOnlyMemory<Slot> slots,
+        Slot acknowledged,
+        CancellationToken cancellationToken)
+    {
+        using var writer = new ArcBufferWriter();
+        var count = 0;
+        for (var i = 0; i < slots.Length; i++)
+        {
+            var slot = slots.Span[i];
+            var single = await ReadAsync(slot, acknowledged, cancellationToken).ConfigureAwait(false);
+            if (single.TryGetValue(out ArcBuffer batch))
+            {
+                using (batch)
+                {
+                    ReplicaSlotsBatch.WriteFrame(writer, slot, batch);
+                    count++;
+                }
+            }
+            else if (single.TryGetValue(out ReplicaWriteOutcome.Dropped? dropped))
+            {
+                return dropped;
+            }
+            else if (single.TryGetValue(out ReplicaWriteOutcome.Backpressure? backpressure))
+            {
+                return backpressure;
+            }
+            else
+            {
+                throw new UnreachableException("LP-I10: a decided read answers a batch, Dropped, Backpressure, or throws.");
+            }
+        }
+
+        return count == 0
+            ? ReplicaSlotsBatch.Empty
+            : new ReplicaSlotsBatch(count, writer.ConsumeSlice(writer.Length));
+    }
+
     private ValueTask<ReplicaRead> ReadAsync(ReadTarget target, Slot contiguousTail, CancellationToken cancellationToken) =>
         target.Slot < contiguousTail
             ? ReadDecidedAsync(target, contiguousTail, cancellationToken)

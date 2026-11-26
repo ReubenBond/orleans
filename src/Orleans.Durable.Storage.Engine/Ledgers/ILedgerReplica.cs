@@ -124,6 +124,28 @@ public interface ILedgerReplica : IAsyncDisposable
         LedgerReplicaOperations.ReadRangePointWiseAsync(this, from, below, contiguousTail, maxSlots, maxBytes, cancellationToken);
 
     /// <summary>
+    /// Gets a value indicating whether this replica provides a native batched <see cref="ReadSlotsAsync"/>
+    /// implementation rather than falling back to sequential point-wise <see cref="ReadAsync(Slot, Slot, CancellationToken)"/> calls.
+    /// </summary>
+    bool SupportsReadSlots => false;
+
+    /// <summary>
+    /// Reads the strictly ascending list of decided <paramref name="slots"/> whose framed payloads fit within
+    /// <paramref name="maxBytes"/>, skipping missing, faulty, or oversized slots so present slots return in one call
+    /// (ledger-replicas.md §2.1).
+    /// </summary>
+    /// <remarks>
+    /// Providers without a native batched scattered-slot path inherit the point-wise fallback in
+    /// <see cref="LedgerReplicaOperations.ReadSlotsPointWiseAsync"/>.
+    /// </remarks>
+    ValueTask<ReplicaSlotsRead> ReadSlotsAsync(
+        ReadOnlyMemory<Slot> slots,
+        Slot contiguousTail,
+        int maxBytes,
+        CancellationToken cancellationToken = default) =>
+        LedgerReplicaOperations.ReadSlotsPointWiseAsync(this, slots, contiguousTail, maxBytes, cancellationToken);
+
+    /// <summary>
     /// Reads the replica's contiguous tail and whether it is sealed, sealing it first when <paramref name="seal"/> is set.
     /// </summary>
     /// <param name="contiguousTail">The caller's known contiguous tail, which the replica retains (LR-I6).</param>

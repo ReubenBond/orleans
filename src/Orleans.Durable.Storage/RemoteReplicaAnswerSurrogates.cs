@@ -405,6 +405,109 @@ internal sealed class RemoteReplicaRangeReadConverter : IConverter<RemoteReplica
     }
 }
 
+/// <summary>A <see cref="RemoteReplicaSlotsRead"/> as a grain reply carries it: its case's tag and fields.</summary>
+[GenerateSerializer]
+[Immutable]
+internal readonly struct RemoteReplicaSlotsReadSurrogate
+{
+    /// <summary>Gets or initializes the case's tag (<see cref="ReplicaReplyTag"/>).</summary>
+    [Id(0)]
+    public byte Case { get; init; }
+
+    /// <summary>Gets or initializes the slot count of a <see cref="RemoteReplicaSlotsRead.Batch"/>; 0 for other cases.</summary>
+    [Id(1)]
+    public int Count { get; init; }
+
+    /// <summary>Gets or initializes the packed slot bytes; empty for other cases or empty batches.</summary>
+    [Id(2)]
+    public WireArcBuffer Bytes { get; init; }
+
+    /// <summary>Gets or initializes a refusal's kind; 0 for other cases.</summary>
+    [Id(3)]
+    public byte Refusal { get; init; }
+
+    /// <summary>Gets or initializes a refusal's or corruption's message.</summary>
+    [Id(4)]
+    public string? Message { get; init; }
+
+    /// <summary>Gets or initializes a corruption's slot, when the store named one.</summary>
+    [Id(5)]
+    public long? Slot { get; init; }
+}
+
+/// <summary>
+/// Converts a <see cref="RemoteReplicaSlotsRead"/> to its surrogate and back, releasing host admission on outbound
+/// conversion and releasing decoded <see cref="WireArcBuffer"/> bytes on every non-Batch or error path (OR-I17, OR-I18).
+/// </summary>
+[RegisterConverter]
+internal sealed class RemoteReplicaSlotsReadConverter : IConverter<RemoteReplicaSlotsRead, RemoteReplicaSlotsReadSurrogate>
+{
+    private const string Answer = "remote replica slots read";
+
+    /// <inheritdoc/>
+    public RemoteReplicaSlotsRead ConvertFromSurrogate(in RemoteReplicaSlotsReadSurrogate surrogate)
+    {
+        var bytes = surrogate.Bytes ?? WireArcBuffer.Empty;
+        var kept = false;
+        try
+        {
+            var unowned = surrogate.Case != ReplicaReplyTag.First && (!bytes.IsEmpty || surrogate.Count != 0) ? "Batch"
+                : ReplicaReplyTag.UnownedShared(surrogate.Case, surrogate.Refusal, surrogate.Message, surrogate.Slot);
+            ReplicaReplyTag.ThrowIfCarries(Answer, surrogate.Case, unowned);
+            if (surrogate.Case == ReplicaReplyTag.First)
+            {
+                if (surrogate.Count < 0)
+                {
+                    throw new ReplicaReplyDecodingException(string.Create(CultureInfo.InvariantCulture, $"A slots read batch has invalid Count {surrogate.Count}."));
+                }
+
+                if (surrogate.Count == 0 && !bytes.IsEmpty)
+                {
+                    throw new ReplicaReplyDecodingException(string.Create(CultureInfo.InvariantCulture, $"An empty slots read batch carried {bytes.Length} unexpected bytes."));
+                }
+
+                kept = true;
+                return new RemoteReplicaSlotsRead.Batch(surrogate.Count, bytes);
+            }
+
+            return surrogate.Case switch
+            {
+                ReplicaReplyTag.Dropped => ReplicaWriteOutcome.Dropped.Instance,
+                ReplicaReplyTag.Backpressure => ReplicaWriteOutcome.Backpressure.Instance,
+                ReplicaReplyTag.NotThisNode => NotThisNode.Instance,
+                ReplicaReplyTag.Refused => ReplicaReplyTag.Refusal(surrogate.Refusal, surrogate.Message),
+                ReplicaReplyTag.Corrupt => ReplicaReplyTag.Corruption(surrogate.Slot, surrogate.Message),
+                _ => throw ReplicaReplyTag.Unknown(Answer, surrogate.Case, 1, 3, 4, 5, 6, 7),
+            };
+        }
+        finally
+        {
+            if (!kept)
+            {
+                bytes.Dispose();
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public RemoteReplicaSlotsReadSurrogate ConvertToSurrogate(in RemoteReplicaSlotsRead value) => value switch
+    {
+        RemoteReplicaSlotsRead.Batch batch => Serialized(batch),
+        ReplicaWriteOutcome.Dropped => new() { Case = ReplicaReplyTag.Dropped },
+        ReplicaWriteOutcome.Backpressure => new() { Case = ReplicaReplyTag.Backpressure },
+        NotThisNode => new() { Case = ReplicaReplyTag.NotThisNode },
+        ReplicaCallRefused refused => new() { Case = ReplicaReplyTag.Refused, Refusal = (byte)refused.Kind, Message = refused.Message },
+        ReplicaCorrupt corrupt => new() { Case = ReplicaReplyTag.Corrupt, Slot = corrupt.Slot, Message = corrupt.Message },
+        null => throw new UnreachableException(),
+    };
+
+    private static RemoteReplicaSlotsReadSurrogate Serialized(RemoteReplicaSlotsRead.Batch batch)
+    {
+        batch.Admission?.ReleaseAdmission();
+        return new() { Case = ReplicaReplyTag.First, Count = batch.Count, Bytes = batch.Bytes ?? WireArcBuffer.Empty };
+    }
+}
+
 /// <summary>A <see cref="RemoteReplicaTailRead"/> as a grain reply carries it: its case's tag and fields.</summary>
 [GenerateSerializer]
 [Immutable]

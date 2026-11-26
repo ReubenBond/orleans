@@ -1341,7 +1341,8 @@ full-ledger scan ([archive §8.1](archive.md#81-history-reads)).
   `Closed(T)`, the rest below `T`. It reads through the node's `LedgerReader` under a shared node-wide in-flight scan
   window (default 32 reads across background deliveries, plus a dedicated 16-read priority window for deliveries woken by
   foreground catch-up waiters via `LedgerApplyLoop.Wake`), using batched multi-slot `ReadRangeAsync` calls (up to 128
-  slots / 1 MiB per RPC) so a batch its own replica lacks comes from another (LP-I10) without saturating peer read lanes
+  slots / 1 MiB per RPC) and batched scattered-slot `ReadSlotsAsync` calls (for indexed key recovery waves) so a batch its
+  own replica lacks comes from another (LP-I10) without saturating peer read lanes
   during catch-up; once the map records a ledger `Closed(T)`, `LedgerReader` suppresses read-repair recovery writes on
   the local replica because every slot below `T` is already durable on `Q` replicas (LP-I7) and the ledger is pending
   drain and drop. Each delivery starts from the applier's durable watermark

@@ -1374,11 +1374,82 @@ public sealed class ArchiveReader
             }
         }
 
+        private async ValueTask<ScanPass> FetchWaveSlotsBatchedAsync(
+            List<Slot> slots,
+            Dictionary<Slot, LedgerRead.Data> results,
+            CancellationToken cancellationToken)
+        {
+            slots.Sort();
+            var slotArray = slots.ToArray();
+            for (var i = 0; i < slotArray.Length; i++)
+            {
+                reader.Counts.PointReads.Increment();
+            }
+
+            var first = await TryReadSlotsOnceAsync(slotArray, results, cancellationToken).ConfigureAwait(false);
+            if (first != ScanPass.Backpressured)
+            {
+                return first;
+            }
+
+            var useFirst = true;
+            return await reader._scanRetry.ExecuteAsync(
+                (state, token) =>
+                {
+                    if (useFirst)
+                    {
+                        useFirst = false;
+                        return ValueTask.FromResult(first);
+                    }
+
+                    return state.Scan.TryReadSlotsOnceAsync(state.Slots, state.Results, token);
+                },
+                (Scan: this, Slots: slotArray, Results: results),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private async ValueTask<ScanPass> TryReadSlotsOnceAsync(
+            Slot[] slotArray,
+            Dictionary<Slot, LedgerRead.Data> results,
+            CancellationToken cancellationToken)
+        {
+            object? status;
+            if (window is null)
+            {
+                status = await reader._reader.ReadSlotsAsync(ledger, slotArray, results, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await window.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    status = await reader._reader.ReadSlotsAsync(ledger, slotArray, results, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _ = window.Release();
+                }
+            }
+
+            return status switch
+            {
+                null => ScanPass.Reached,
+                ReplicaWriteOutcome.Dropped => ScanPass.Dropped,
+                ReplicaWriteOutcome.Backpressure => ScanPass.Backpressured,
+                _ => throw new UnreachableException("ReadSlotsAsync returns null, Dropped, or Backpressure."),
+            };
+        }
+
         private async ValueTask<ScanPass> FetchWaveSlotsAsync(
             List<Slot> slots,
             Dictionary<Slot, LedgerRead.Data> results,
             CancellationToken cancellationToken)
         {
+            if (slots.Count > 1 && reader._reader.SupportsReadSlots(ledger))
+            {
+                return await FetchWaveSlotsBatchedAsync(slots, results, cancellationToken).ConfigureAwait(false);
+            }
+
             var maxInFlight = Math.Min(slots.Count, Math.Max(1, ledger.K));
             using var fetchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var inFlight = new Queue<(Slot Slot, Task<LedgerRead> Task)>(maxInFlight);

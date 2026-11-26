@@ -440,6 +440,145 @@ internal sealed class LedgerReplicaHost : IDisposable
         }
     }
 
+    /// <summary>Runs a batched scattered-slot read on the replica it names, as the grain keyed by <paramref name="key"/> received it.</summary>
+    public Task<RemoteReplicaSlotsRead> ReadSlotsAsync(NodeId key, LedgerReplicaReadSlotsRequest request, CancellationToken cancellationToken) =>
+        ReadSlotsCoreAsync(grain: null, scheduler: null, key, request, cancellationToken);
+
+    /// <summary>Runs a batched scattered-slot read called on <paramref name="grain"/> off its activation's <paramref name="scheduler"/>, deactivating it on <see cref="NotThisNode"/> (OR-I14).</summary>
+    internal Task<RemoteReplicaSlotsRead> ReadSlotsFromGrainAsync(IGrainBase grain, NodeId key, TaskScheduler scheduler, LedgerReplicaReadSlotsRequest request, CancellationToken cancellationToken) =>
+        ReadSlotsCoreAsync(grain, scheduler, key, request, cancellationToken);
+
+    private async Task<RemoteReplicaSlotsRead> ReadSlotsCoreAsync(IGrainBase? grain, TaskScheduler? scheduler, NodeId key, LedgerReplicaReadSlotsRequest request, CancellationToken cancellationToken)
+    {
+        if (scheduler is not null)
+        {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        }
+
+        if (Unsupported(request.Version) is { } unsupported)
+        {
+            return unsupported;
+        }
+
+        var serving = await _local.ServingAsync(key, cancellationToken).ConfigureAwait(false);
+        if (serving.Value is NotThisNode)
+        {
+            if (grain is not null)
+            {
+                await NotThisNode.DeactivateOnSchedulerAsync(grain, scheduler!).ConfigureAwait(false);
+            }
+
+            return NotThisNode.Instance;
+        }
+
+        if (serving.Value is LocalNodeServing.Diskless)
+        {
+            return DisklessRefusal;
+        }
+
+        if (serving.Value is not LedgerStore store)
+        {
+            return StoppingRefusal;
+        }
+
+        var rawSlots = request.Slots;
+        if (rawSlots is null || request.MaxBytes <= 0)
+        {
+            return new ReplicaCallRefused(
+                ReplicaRefusal.Argument,
+                string.Create(CultureInfo.InvariantCulture, $"Invalid slots read with slots={rawSlots?.Length ?? -1}, maxBytes={request.MaxBytes}."));
+        }
+
+        if (rawSlots.Length > PayloadLimit / sizeof(long))
+        {
+            return new ReplicaCallRefused(
+                ReplicaRefusal.Argument,
+                string.Create(CultureInfo.InvariantCulture, $"A slots read of {rawSlots.Length} slots passes the replica payload limit of {PayloadLimit}."));
+        }
+
+        if (AbovePayloadLimit(request.MaxBytes, "reply") is { } above)
+        {
+            return above;
+        }
+
+        var slots = new Slot[rawSlots.Length];
+        for (var i = 0; i < rawSlots.Length; i++)
+        {
+            if (rawSlots[i] < 0)
+            {
+                return new ReplicaCallRefused(
+                    ReplicaRefusal.ArgumentOutOfRange,
+                    string.Create(CultureInfo.InvariantCulture, $"Invalid negative slot {rawSlots[i]} in slots read."));
+            }
+
+            slots[i] = new Slot(rawSlots[i]);
+        }
+
+        LedgerReplicaHostAdmission? admission = null;
+        WireArcBuffer? wire = null;
+        try
+        {
+            admission = TryAdmit(request.MaxBytes);
+            if (admission is null)
+            {
+                return ReplicaWriteOutcome.Backpressure.Instance;
+            }
+
+            ReplicaSlotsRead read;
+            try
+            {
+                read = await store.ReadReplicaSlotsAsync(
+                    new LedgerId(request.Ledger),
+                    request.WindowSize,
+                    slots,
+                    new Slot(request.ContiguousTail),
+                    request.MaxBytes,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (ArgumentException refused)
+            {
+                return Refused(refused);
+            }
+            catch (LedgerReplicaCorruptException corrupt)
+            {
+                return Corrupt(corrupt);
+            }
+
+            if (read.TryGetValue(out ReplicaSlotsBatch batch))
+            {
+                if (batch.Count == 0)
+                {
+                    batch.Dispose();
+                    return new RemoteReplicaSlotsRead.Batch(0, WireArcBuffer.Empty);
+                }
+
+                // Retain the packed pooled buffer before disposing the struct wrapper: zero copy!
+                var packed = batch.Packed.Retain();
+                var count = batch.Count;
+                batch.Dispose();
+
+                wire = WireArcBuffer.Take(packed);
+                var reply = new RemoteReplicaSlotsRead.Batch(count, wire) { Admission = admission };
+                admission.HoldUntil(_timeProvider, ReplyDeadline, wire);
+                admission = null;
+                wire = null;
+                return reply;
+            }
+
+            return read switch
+            {
+                ReplicaWriteOutcome.Dropped dropped => dropped,
+                ReplicaWriteOutcome.Backpressure backpressure => backpressure,
+                _ => throw new UnreachableException(),
+            };
+        }
+        finally
+        {
+            wire?.Dispose();
+            admission?.Dispose();
+        }
+    }
+
     /// <summary>Runs a contiguous-tail read or a seal on the replica it names, as the grain keyed by <paramref name="key"/> received it.</summary>
     public Task<RemoteReplicaTailRead> ReadTailAsync(NodeId key, LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         ReadTailCoreAsync(grain: null, scheduler: null, key, request, cancellationToken);

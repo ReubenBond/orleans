@@ -702,6 +702,48 @@ public sealed class ArchiveKeyIndexTests : IDisposable
         Assert.DoesNotContain(entries[100].Tag.Slot.Value, indexedReadSlots);
     }
 
+    /// <summary>
+    /// When replicas natively support batched scattered-slot reads (<see cref="ILedgerReplica.SupportsReadSlots"/>),
+    /// <see cref="ArchiveReader"/> fetches each descending wave via a single batched <see cref="ILedgerReplica.ReadSlotsAsync"/>
+    /// RPC instead of per-slot point reads, matching the unindexed oracle identically and handling peer fallback for missing slots.
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task MultiSlotIndexedReadUsesBatchedReadSlotsAndMatchesOracle()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var cluster = await ArchiveCluster.StartAsync();
+
+        var entries = new List<KeyIndexEntry>(24);
+        var tDef = await cluster.AppendAsync(7, RowKind.Append, "v0");
+        entries.Add(new(tDef, tDef.Slot, 0));
+        for (var i = 1; i < 20; i++)
+        {
+            _ = await cluster.AppendAsync(99, RowKind.Append, $"noise-{i}");
+            var tNext = await cluster.AppendAsync(7, RowKind.Append, $"+{i}");
+            entries.Add(new(tNext, tDef.Slot, 0));
+        }
+
+        var closed = await cluster.ReplaceLedgerAsync(7);
+        var readerProcess = await cluster.StartProcessAsync(cluster.Store);
+
+        var index = new ArchiveKeyIndex((ledger, below, key, _) =>
+        {
+            if (ledger.Id == closed && key.Span.SequenceEqual([(byte)7]))
+            {
+                return ValueTask.FromResult<KeyIndexRead>(new KeyIndexRead.Indexed([.. entries.Where(e => e.Tag.Slot < below)]));
+            }
+
+            return ValueTask.FromResult<KeyIndexRead>(new KeyIndexRead.Indexed([]));
+        });
+
+        var indexedReader = new ArchiveReader(readerProcess.Reader, cluster.Store, TimeProvider.System, index);
+        var unindexedReader = new ArchiveReader(readerProcess.Reader, cluster.Store, TimeProvider.System);
+        using var indexed = await indexedReader.ReadAsync(new byte[] { 7 }, token);
+        using var oracle = await unindexedReader.ReadAsync(new byte[] { 7 }, token);
+        AssertMatchesOracle(indexed, oracle);
+        Assert.Equal(20, indexed.Rows.Length);
+    }
+
     private static void AssertMatchesOracle(ArchiveRead actual, ArchiveRead oracle)
     {
         Assert.Equal(oracle.Linearizable, actual.Linearizable);

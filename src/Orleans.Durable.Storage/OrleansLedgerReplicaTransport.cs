@@ -652,6 +652,15 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         }
     }
 
+    /// <summary>Releases the packed bytes of a scattered-slot read's answer which no caller takes.</summary>
+    internal static void ReleaseSlotsBatch(RemoteReplicaSlotsRead answer)
+    {
+        if (answer.Value is RemoteReplicaSlotsRead.Batch batch)
+        {
+            batch.Bytes?.Dispose();
+        }
+    }
+
     /// <summary>A node's three lanes (Write, Read, Control) plus its cached active/stopping silo incarnation state.</summary>
     private sealed class NodeBudgets(CallBudget write, CallBudget read, CallBudget control)
     {
@@ -698,6 +707,10 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
         public abstract ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default);
 
+        public bool SupportsReadSlots => true;
+
+        public abstract ValueTask<ReplicaSlotsRead> ReadSlotsAsync(ReadOnlyMemory<Slot> slots, Slot contiguousTail, int maxBytes, CancellationToken cancellationToken = default);
+
         public abstract ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default);
 
         public virtual ValueTask DisposeAsync()
@@ -740,6 +753,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         public override ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default) =>
             Closed<ReplicaRangeRead>();
 
+        public override ValueTask<ReplicaSlotsRead> ReadSlotsAsync(ReadOnlyMemory<Slot> slots, Slot contiguousTail, int maxBytes, CancellationToken cancellationToken = default) =>
+            Closed<ReplicaSlotsRead>();
+
         public override ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default) => Closed<ReplicaTailRead>();
 
         private ValueTask<T> Closed<T>()
@@ -761,6 +777,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         };
 
         private static readonly Action<ReplicaRangeRead> ReleaseRange = static read => read.Release();
+
+        private static readonly Action<ReplicaSlotsRead> ReleaseSlots = static read => read.Release();
 
         private readonly LedgerStoreReplica _replica;
         private readonly CallBudget _writeLane;
@@ -939,6 +957,46 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             }
 
             return await AwaitOperationAsync(operation, lease, held: default, ReleaseRange, cancellationToken).ConfigureAwait(false);
+        }
+
+        public override async ValueTask<ReplicaSlotsRead> ReadSlotsAsync(ReadOnlyMemory<Slot> slots, Slot contiguousTail, int maxBytes, CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            LedgerReplicaOperations.ValidateReadSlots(slots.Span, maxBytes);
+            if (slots.IsEmpty)
+            {
+                return ReplicaSlotsBatch.Empty;
+            }
+
+            if (slots.Length > Transport.Limits.PayloadLimit / sizeof(long))
+            {
+                throw new ArgumentException(
+                    string.Create(CultureInfo.InvariantCulture, $"A replica slots read of {slots.Length} slots passes the replica payload limit of {Transport.Limits.PayloadLimit}."),
+                    nameof(slots));
+            }
+
+            var clampedBytes = Math.Min(maxBytes, Transport.Limits.PayloadLimit);
+            var lease = default(CallBudget.Lease);
+            ValueTask<ReplicaSlotsRead> operation;
+            try
+            {
+                var deadline = Transport.DeadlineFromNow();
+                lease = await _readLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
+                await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
+                operation = _replica.ReadSlotsAsync(slots, contiguousTail, clampedBytes, CancellationToken.None);
+            }
+            catch (ObjectDisposedException closed) when (Transport._local.State == LocalNode.NodeState.Closed)
+            {
+                lease.Dispose();
+                throw new LedgerReplicaUnavailableException(Node, "this silo's node is closed.", closed);
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+
+            return await AwaitOperationAsync(operation, lease, held: default, ReleaseSlots, cancellationToken).ConfigureAwait(false);
         }
 
         public override async ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default)
@@ -1244,6 +1302,78 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                     if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
                     {
                         return LedgerReplicaCallResults.ReadRange(Node, answer, from, maxSlots, reserved);
+                    }
+                }
+
+                await Task.Delay(delay, Transport._timeProvider, cancellationToken).ConfigureAwait(false);
+                backoff = DoubleBackoff(backoff);
+            }
+        }
+
+        public override async ValueTask<ReplicaSlotsRead> ReadSlotsAsync(ReadOnlyMemory<Slot> slots, Slot contiguousTail, int maxBytes, CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            LedgerReplicaOperations.ValidateReadSlots(slots.Span, maxBytes);
+            if (slots.IsEmpty)
+            {
+                return ReplicaSlotsBatch.Empty;
+            }
+
+            if (slots.Length > Transport.Limits.PayloadLimit / sizeof(long))
+            {
+                throw new ArgumentException(
+                    string.Create(CultureInfo.InvariantCulture, $"A replica slots read of {slots.Length} slots passes the replica payload limit of {Transport.Limits.PayloadLimit}."),
+                    nameof(slots));
+            }
+
+            var reserved = Math.Min(maxBytes, Transport.Limits.PayloadLimit);
+            var deadline = Transport.DeadlineFromNow();
+            var rawSlots = new long[slots.Length];
+            var span = slots.Span;
+            for (var i = 0; i < span.Length; i++)
+            {
+                rawSlots[i] = span[i].Value;
+            }
+
+            var request = new LedgerReplicaReadSlotsRequest
+            {
+                Version = LedgerReplicaProtocol.Version,
+                Ledger = _ledger.Value,
+                WindowSize = _windowSize,
+                Slots = rawSlots,
+                ContiguousTail = contiguousTail.Value,
+                MaxBytes = reserved,
+            };
+            var backoff = FirstBackoff;
+            while (true)
+            {
+                var activeSilo = Transport.EnsureRemoteActive(Node, _budgets);
+                TimeSpan delay;
+                using (await _readLane.EnterLeaseAsync(reserved, deadline, cancellationToken).ConfigureAwait(false))
+                {
+                    RemoteReplicaSlotsRead answer;
+                    try
+                    {
+                        answer = await UntilCancelledAsync(_grain.ReadSlotsAsync(request, cancellationToken), ReleaseSlotsBatch, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception failure)
+                    {
+                        ThrowCallFailure(failure, activeSilo, cancellationToken);
+                        throw new UnreachableException();
+                    }
+
+                    if (answer.Value is NotThisNode)
+                    {
+                        Transport._invalidate();
+                    }
+                    else if (answer.Value is ReplicaCallRefused refused)
+                    {
+                        Transport.ObserveStoppingRefusal(_budgets, activeSilo, refused);
+                    }
+
+                    if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
+                    {
+                        return LedgerReplicaCallResults.ReadSlots(Node, answer, slots.Span, reserved);
                     }
                 }
 

@@ -214,6 +214,9 @@ internal sealed class GrainDouble : ILedgerStoreGrain
     public Task<RemoteReplicaRangeRead> ReadRangeAsync(LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
         CallAsync(request, new RemoteReplicaRangeRead.Batch(request.From, 0, WireArcBuffer.Empty), ReadRangeOf, cancellationToken);
 
+    public Task<RemoteReplicaSlotsRead> ReadSlotsAsync(LedgerReplicaReadSlotsRequest request, CancellationToken cancellationToken) =>
+        CallAsync(request, new RemoteReplicaSlotsRead.Batch(0, WireArcBuffer.Empty), ReadSlotsOf, cancellationToken);
+
     public Task<RemoteReplicaTailRead> ReadTailAsync(LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         CallAsync(request, new RemoteReplicaTailRead.Tail(request.ContiguousTail, IsSealed: false), TailOf, cancellationToken);
 
@@ -300,6 +303,18 @@ internal sealed class GrainDouble : ILedgerStoreGrain
         ReplicaCallRefused refused => refused,
         ReplicaCorrupt corrupt => corrupt,
         _ => throw new InvalidOperationException($"{value} is no range read answer."),
+    };
+
+    internal static RemoteReplicaSlotsRead ReadSlotsOf(object value) => value switch
+    {
+        RemoteReplicaSlotsRead read => read,
+        RemoteReplicaSlotsRead.Batch batch => batch,
+        ReplicaWriteOutcome.Dropped dropped => dropped,
+        ReplicaWriteOutcome.Backpressure backpressure => backpressure,
+        NotThisNode notThisNode => notThisNode,
+        ReplicaCallRefused refused => refused,
+        ReplicaCorrupt corrupt => corrupt,
+        _ => throw new InvalidOperationException($"{value} is no slots read answer."),
     };
 
     private async Task<T> CallAsync<T>(object request, T fallback, Func<object, T> answerOf, CancellationToken cancellationToken)

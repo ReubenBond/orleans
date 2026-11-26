@@ -337,6 +337,32 @@ public sealed partial class LedgerStore : ILedgerStore, IAsyncDisposable
     }
 
     /// <summary>
+    /// Reads the strictly ascending list of <paramref name="slots"/> directly from the replica of
+    /// <paramref name="ledger"/> without allocating a <see cref="LedgerStoreReplica"/> handle.
+    /// </summary>
+    public ValueTask<ReplicaSlotsRead> ReadReplicaSlotsAsync(
+        LedgerId ledger,
+        int windowSize,
+        ReadOnlyMemory<Slot> slots,
+        Slot contiguousTail,
+        int maxBytes,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDefault(ledger);
+        LedgerReplicaOperations.ValidateWindowSize(windowSize);
+        var found = FindForRead(ledger);
+        LedgerReplicaOperations.ValidateReadSlots(slots.Span, maxBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        return found switch
+        {
+            LiveReplica live => live.ReadSlotsAsync(slots, contiguousTail, windowSize, maxBytes, cancellationToken),
+            ReplicaWriteOutcome.Dropped dropped => new(new ReplicaSlotsRead(dropped)),
+            ReplicaLookup.Absent => new(new ReplicaSlotsRead(ReplicaSlotsBatch.Empty)),
+            null => throw new UnreachableException("A lookup holds a case."),
+        };
+    }
+
+    /// <summary>
     /// Reads a byte range of a batch directly from the replica of <paramref name="ledger"/> without allocating a
     /// <see cref="LedgerStoreReplica"/> handle, with the same contract as
     /// <see cref="LedgerStoreReplica.ReadAsync(Slot, int, int, Slot, CancellationToken)"/>.

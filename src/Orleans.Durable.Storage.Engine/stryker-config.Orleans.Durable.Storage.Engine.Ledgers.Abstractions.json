@@ -23,6 +23,7 @@
       "Ledgers/ReplicaHeartbeatStatus.cs",
       "Ledgers/ReplicaRangeRead.cs",
       "Ledgers/ReplicaRead.cs",
+      "Ledgers/ReplicaSlotsRead.cs",
       "Ledgers/ReplicaTailRead.cs",
       "Ledgers/ReplicaWriteOutcome.cs",
       "Ledgers/Slot.cs"

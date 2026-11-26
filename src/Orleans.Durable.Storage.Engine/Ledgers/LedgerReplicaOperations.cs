@@ -221,4 +221,118 @@ public static class LedgerReplicaOperations
             writer?.Dispose();
         }
     }
+
+    /// <summary>
+    /// Validates the arguments of a batched <see cref="ILedgerReplica.ReadSlotsAsync"/> call: strictly ascending valid
+    /// slots and a positive <paramref name="maxBytes"/> budget.
+    /// </summary>
+    public static void ValidateReadSlots(ReadOnlySpan<Slot> slots, int maxBytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
+        for (var i = 0; i < slots.Length; i++)
+        {
+            ValidateSlot(slots[i]);
+            if (i > 0 && slots[i] <= slots[i - 1])
+            {
+                throw new ArgumentException(
+                    string.Create(CultureInfo.InvariantCulture, $"ReadSlotsAsync requires strictly ascending distinct slots; slot {slots[i]} followed {slots[i - 1]}."),
+                    nameof(slots));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Implements <see cref="ILedgerReplica.ReadSlotsAsync"/> in terms of point-wise
+    /// <see cref="ILedgerReplica.ReadAsync(Slot, Slot, CancellationToken)"/> calls for providers without a native
+    /// batched scattered-slot reader.
+    /// </summary>
+    public static async ValueTask<ReplicaSlotsRead> ReadSlotsPointWiseAsync(
+        ILedgerReplica replica,
+        ReadOnlyMemory<Slot> slots,
+        Slot contiguousTail,
+        int maxBytes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(replica);
+        ValidateReadSlots(slots.Span, maxBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (slots.IsEmpty)
+        {
+            return ReplicaSlotsBatch.Empty;
+        }
+
+        ArcBufferWriter? writer = null;
+        var count = 0;
+        try
+        {
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var slot = slots.Span[i];
+                ReplicaRead read;
+                try
+                {
+                    read = await replica.ReadAsync(slot, contiguousTail, cancellationToken).ConfigureAwait(false);
+                }
+                catch (LedgerReplicaCorruptException)
+                {
+                    continue;
+                }
+
+                if (read.TryGetValue(out ArcBuffer batch))
+                {
+                    using (batch)
+                    {
+                        var framedLength = checked(ReplicaSlotsBatch.FrameHeaderLength + batch.Length);
+                        if (framedLength > maxBytes)
+                        {
+                            continue;
+                        }
+
+                        if (writer is not null && writer.Length + framedLength > maxBytes)
+                        {
+                            break;
+                        }
+
+                        writer ??= new ArcBufferWriter(Math.Min(maxBytes, Math.Max(framedLength, ArcBufferWriter.MinimumPageSize)));
+                        ReplicaSlotsBatch.WriteFrame(writer, slot, batch);
+                        count++;
+                    }
+                }
+                else if (read.Value is ReplicaRead.Missing)
+                {
+                    continue;
+                }
+                else if (read.Value is ReplicaWriteOutcome.Dropped dropped)
+                {
+                    if (count == 0)
+                    {
+                        return dropped;
+                    }
+
+                    break;
+                }
+                else if (read.Value is ReplicaWriteOutcome.Backpressure backpressure)
+                {
+                    if (count == 0)
+                    {
+                        return backpressure;
+                    }
+
+                    break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return count == 0
+                ? ReplicaSlotsBatch.Empty
+                : new ReplicaSlotsBatch(count, writer!.ConsumeSlice(writer.Length));
+        }
+        finally
+        {
+            writer?.Dispose();
+        }
+    }
 }

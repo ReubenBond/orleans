@@ -109,6 +109,53 @@ internal static class LedgerReplicaCallResults
     }
 
     /// <summary>
+    /// Returns the batched scattered-slot read's answer, validating every frame against <paramref name="requestedSlots"/>
+    /// and taking ownership of its pooled <see cref="Engine.Buffers.ArcBuffer"/> directly (zero-copy; OR-I15, OR-I18).
+    /// </summary>
+    public static ReplicaSlotsRead ReadSlots(NodeId node, RemoteReplicaSlotsRead answer, ReadOnlySpan<Slot> requestedSlots, int maxBytes) => answer switch
+    {
+        RemoteReplicaSlotsRead.Batch batch => ReceivedSlots(node, batch, requestedSlots, maxBytes),
+        ReplicaWriteOutcome.Dropped dropped => new ReplicaSlotsRead(dropped),
+        ReplicaWriteOutcome.Backpressure backpressure => new ReplicaSlotsRead(backpressure),
+        NotThisNode => throw NotThisNodeAnswered(node),
+        ReplicaCallRefused refused => throw Refusal(node, refused),
+        ReplicaCorrupt corrupt => throw Corruption(corrupt),
+        null => throw NoCase(node),
+    };
+
+    private static ReplicaSlotsRead ReceivedSlots(NodeId node, RemoteReplicaSlotsRead.Batch batch, ReadOnlySpan<Slot> requestedSlots, int maxBytes)
+    {
+        var received = batch.Bytes ?? WireArcBuffer.Empty;
+        if (batch.Count < 0 || batch.Count > requestedSlots.Length || received.Length > maxBytes)
+        {
+            received.Dispose();
+            throw new InvalidDataException(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Node {node} answered a slots read ({requestedSlots.Length} requested, maxBytes={maxBytes}) with Count={batch.Count}, Bytes={received.Length}."));
+        }
+
+        if (batch.Count == 0)
+        {
+            if (!received.IsEmpty)
+            {
+                received.Dispose();
+                throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture, $"Node {node} answered an empty slots read with {received.Length} unexpected bytes."));
+            }
+
+            return new ReplicaSlotsRead(ReplicaSlotsBatch.Empty);
+        }
+
+        var packed = received.TakeBuffer();
+        if (ReplicaSlotsBatch.ValidatePacked(batch.Count, packed, requestedSlots) is { } rejection)
+        {
+            packed.Dispose();
+            throw rejection;
+        }
+
+        return new ReplicaSlotsRead(new ReplicaSlotsBatch(batch.Count, packed));
+    }
+
+    /// <summary>
     /// Returns the contiguous-tail read's answer: the store's answer; a refusal or corruption as its exception;
     /// <c>NotThisNode</c> as <see cref="LedgerReplicaUnavailableException"/>; and a reply which fails its check, a
     /// contiguous tail below <paramref name="sent"/>, a negative remaining lease, a non-zero lease on an unsealed tail, or

@@ -46,6 +46,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
 
     private readonly ILedgerReplica[] _replicas;
     private readonly bool _supportsReadRange;
+    private readonly bool _supportsReadSlots;
     private readonly TimeProvider _timeProvider;
     private readonly Action<RecoveryStep>? _recoveryObserver;
     private readonly Func<ArcBuffer, bool>? _verifyBatch;
@@ -110,6 +111,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
         LedgerReplicaOperations.ValidateWindowSize(options.WindowSize);
         _replicas = [.. replicas];
         _supportsReadRange = _replicas.Length > 0 && _replicas.All(static r => r.SupportsReadRange);
+        _supportsReadSlots = _replicas.Length > 0 && _replicas.All(static r => r.SupportsReadSlots);
         if (_replicas.Length == 0)
         {
             throw new ArgumentException("A ledger has at least one replica.", nameof(replicas));

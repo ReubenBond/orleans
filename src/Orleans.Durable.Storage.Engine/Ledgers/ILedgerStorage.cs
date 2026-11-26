@@ -83,6 +83,23 @@ internal interface ILedgerStorage : IAsyncDisposable
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets a value indicating whether this storage supports native batched scattered-slot reads via
+    /// <see cref="ReadSlotsAsync"/>.
+    /// </summary>
+    bool SupportsReadSlots => false;
+
+    /// <summary>
+    /// Reads a strictly ascending set of decided <paramref name="slots"/> below <paramref name="acknowledged"/> in as
+    /// few batched replica calls as possible, returning all requested slots packed in a <see cref="ReplicaSlotsBatch"/>,
+    /// or <see cref="ReplicaWriteOutcome.Dropped"/> / <see cref="ReplicaWriteOutcome.Backpressure"/>.
+    /// </summary>
+    ValueTask<ReplicaSlotsRead> ReadSlotsAsync(
+        ReadOnlyMemory<Slot> slots,
+        Slot acknowledged,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This ledger storage does not support batched scattered-slot reads.");
+
+    /// <summary>
     /// Offers <paramref name="acknowledged"/> to the storage as a hint it may publish to readers in other processes, as
     /// BookKeeper's explicit last add confirmed is (ledger-protocol.md §8.2). It asserts nothing to the front, never throws,
     /// returns without waiting for what it sends, and sends nothing once the storage's reads stopped or it was disposed.

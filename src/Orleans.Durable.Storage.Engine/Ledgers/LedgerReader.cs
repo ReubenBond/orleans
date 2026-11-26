@@ -161,6 +161,77 @@ public sealed class LedgerReader : IAsyncDisposable
         return await ReadSlotAsync(lease.Ledger, slot, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Returns whether the ledger <paramref name="metadata"/> supports native batched scattered-slot reads.</summary>
+    internal bool SupportsReadSlots(LedgerMetadata metadata)
+    {
+        using var lease = LeaseLedger(metadata);
+        return lease.Ledger.SupportsReadSlots;
+    }
+
+    /// <summary>
+    /// Reads a strictly ascending set of decided <paramref name="slots"/> of the ledger <paramref name="metadata"/>
+    /// describes in batched replica RPCs, verifying every returned batch and populating <paramref name="results"/>.
+    /// Returns <see langword="null"/> when all slots were populated, or <see cref="ReplicaWriteOutcome.Dropped"/> /
+    /// <see cref="ReplicaWriteOutcome.Backpressure"/>.
+    /// </summary>
+    internal async ValueTask<object?> ReadSlotsAsync(
+        LedgerMetadata metadata,
+        ReadOnlyMemory<Slot> slots,
+        Dictionary<Slot, LedgerRead.Data> results,
+        CancellationToken cancellationToken = default)
+    {
+        if (slots.IsEmpty)
+        {
+            return null;
+        }
+
+        using var lease = LeaseLedger(metadata);
+        var decided = lease.Ledger.KnownContiguousTail;
+        var highest = slots.Span[^1];
+        if (highest >= decided)
+        {
+            var dropped = await DroppedPastTailAsync(metadata, decided, nameof(slots), highest).ConfigureAwait(false);
+            return dropped.Value;
+        }
+
+        var answer = await lease.Ledger.ReadSlotsAsync(slots, cancellationToken).ConfigureAwait(false);
+        if (answer.TryGetValue(out ReplicaWriteOutcome.Dropped? droppedOutcome))
+        {
+            await RereadMapAsync().ConfigureAwait(false);
+            return droppedOutcome;
+        }
+
+        if (answer.TryGetValue(out ReplicaWriteOutcome.Backpressure? backpressure))
+        {
+            return backpressure;
+        }
+
+        if (!answer.TryGetValue(out ReplicaSlotsBatch batch))
+        {
+            throw new UnreachableException("A ReadSlotsAsync answer holds a batch, Dropped, or Backpressure.");
+        }
+
+        using (batch)
+        {
+            var offset = 0;
+            for (var i = 0; i < batch.Count; i++)
+            {
+                var slice = ReplicaSlotsBatch.SliceNext(batch.Packed, ref offset, out var slot);
+                try
+                {
+                    results[slot] = new LedgerRead.Data(slot, slice, VerifiedRowCount(slice));
+                }
+                catch
+                {
+                    slice.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Reads the contiguous tail of the ledger <paramref name="metadata"/> describes and whether it is sealed.
     /// </summary>

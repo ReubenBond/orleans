@@ -353,6 +353,11 @@ internal sealed class Ledger : IAsyncDisposable
         CancellationToken cancellationToken) =>
         LedgerRangeReads.ReadPointWiseAsync(_storage, from, below, KnownContiguousTail, maxReadAheadBytes, window, onReadIssued, cancellationToken);
 
+    internal bool SupportsReadSlots => _storage.SupportsReadSlots;
+
+    internal ValueTask<ReplicaSlotsRead> ReadSlotsAsync(ReadOnlyMemory<Slot> slots, CancellationToken cancellationToken = default) =>
+        _storage.ReadSlotsAsync(slots, KnownContiguousTail, cancellationToken);
+
     /// <summary>
     /// Checks the seal through its storage, over <c>Q</c> replicas for a ledger on nodes, carrying the known contiguous
     /// tail, and raises it to the tail the check answers (LP-I9, LP-I11, LL-I5). When it finds the ledger sealed, it stops its writer's lifetime with

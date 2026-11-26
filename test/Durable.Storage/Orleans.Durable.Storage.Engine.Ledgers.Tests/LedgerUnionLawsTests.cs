@@ -28,6 +28,9 @@ public sealed class LedgerUnionLawsTests : IDisposable
     public void ReplicaRangeReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaRangeReadAdapter(), _leaks);
 
     [Fact]
+    public void ReplicaSlotsReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaSlotsReadAdapter(), _leaks);
+
+    [Fact]
     public void ReplicaTailReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaTailReadAdapter(), _leaks);
 
     [Fact]
@@ -105,6 +108,40 @@ public sealed class LedgerUnionLawsTests : IDisposable
         public int Switch(ReplicaRangeRead value) => value switch
         {
             ReplicaRangeBatch => 0,
+            ReplicaWriteOutcome.Dropped => 1,
+            ReplicaWriteOutcome.Backpressure => 2,
+            null => throw new UnreachableException(),
+        };
+    }
+
+    private sealed class ReplicaSlotsReadAdapter : IUnionLawsAdapter<ReplicaSlotsRead>
+    {
+        public IReadOnlyList<UnionCase<ReplicaSlotsRead>> Cases { get; } =
+        [
+            new(
+                nameof(ReplicaSlotsBatch),
+                Gen.Select(Slots, Gen.Byte.Array[1, 64]).Select(static (slot, bytes) => (Func<object>)(() =>
+                {
+                    using var writer = new ArcBufferWriter();
+                    using var payload = ArcBuffer.CopyFrom(bytes);
+                    ReplicaSlotsBatch.WriteFrame(writer, slot, payload);
+                    return new ReplicaSlotsBatch(1, writer.ConsumeSlice(writer.Length));
+                })),
+                static value => new ReplicaSlotsRead((ReplicaSlotsBatch)value),
+                static value => ((ReplicaSlotsBatch)value).Dispose()),
+            new(
+                nameof(ReplicaWriteOutcome.Dropped),
+                One(ReplicaWriteOutcome.Dropped.Instance),
+                static value => new ReplicaSlotsRead((ReplicaWriteOutcome.Dropped)value)),
+            new(
+                nameof(ReplicaWriteOutcome.Backpressure),
+                One(ReplicaWriteOutcome.Backpressure.Instance),
+                static value => new ReplicaSlotsRead((ReplicaWriteOutcome.Backpressure)value)),
+        ];
+
+        public int Switch(ReplicaSlotsRead value) => value switch
+        {
+            ReplicaSlotsBatch => 0,
             ReplicaWriteOutcome.Dropped => 1,
             ReplicaWriteOutcome.Backpressure => 2,
             null => throw new UnreachableException(),

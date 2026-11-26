@@ -40,6 +40,8 @@ Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaSlotsBatch
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaSlotsRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome
 Orleans.Durable.Storage.Engine.Ledgers.Slot

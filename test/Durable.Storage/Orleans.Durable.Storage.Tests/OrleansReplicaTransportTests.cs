@@ -535,6 +535,88 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
         });
     }
 
+    /// <summary>
+    /// Batched scattered-slot <see cref="ILedgerReplica.ReadSlotsAsync"/> crosses silos over <see cref="ILedgerStoreGrain"/>
+    /// in one zero-copy <see cref="WireArcBuffer"/> RPC, skipping missing slots, and <see cref="LedgerQuorum.ReadSlotsAsync"/>
+    /// fetches missing slots from a surviving peer replica without leaking any <see cref="ArcBuffer"/> pages.
+    /// </summary>
+    [Fact]
+    public async Task BatchedReadSlotsCrossesSilosAndFallsBackToPeerForMissingSlots()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var ledger = new LedgerId(77);
+        var local = Open(Caller, ledger);
+        var remote = Open(Callee, ledger);
+
+        // Write slots 0, 2, 4, 6 on remote; write only 0 and 6 on local (slots 2 and 4 missing on local).
+        var expected = new Dictionary<long, byte[]>
+        {
+            [0] = [10, 11, 12],
+            [2] = [20, 21, 22, 23],
+            [4] = [40, 41],
+            [6] = [60, 61, 62, 63, 64],
+        };
+        foreach (var (slot, bytes) in expected)
+        {
+            Assert.IsType<ReplicaWriteOutcome.Written>((await WriteAsync(remote, slot, bytes)).Value);
+        }
+
+        Assert.IsType<ReplicaWriteOutcome.Written>((await WriteAsync(local, 0, expected[0])).Value);
+        Assert.IsType<ReplicaWriteOutcome.Written>((await WriteAsync(local, 6, expected[6])).Value);
+
+        // Direct cross-silo ReadSlotsAsync returns all requested present slots in one packed batch and skips missing slot 3.
+        Slot[] request = [new(0), new(2), new(3), new(4), new(6)];
+        var remoteRead = await remote.ReadSlotsAsync(request, new Slot(7), 1 << 20, token);
+        Assert.True(remoteRead.TryGetValue(out ReplicaSlotsBatch remoteBatch));
+        using (remoteBatch)
+        {
+            Assert.Equal(4, remoteBatch.Count);
+            var offset = 0;
+            var got = new Dictionary<long, byte[]>();
+            for (var i = 0; i < remoteBatch.Count; i++)
+            {
+                using var slice = ReplicaSlotsBatch.SliceNext(remoteBatch.Packed, ref offset, out var slot);
+                got[slot.Value] = slice.ToArray();
+            }
+
+            Assert.Equal(expected.Keys.Order(), got.Keys.Order());
+            foreach (var (slot, bytes) in expected)
+            {
+                Assert.Equal(bytes, got[slot]);
+            }
+        }
+
+        // Quorum ReadSlotsAsync prefers local (gets 0 & 6) and fetches missing 2 & 4 from remote in one peer RPC.
+        var quorum = new LedgerQuorum(
+            [local, remote],
+            quorum: 2,
+            Window,
+            TimeProvider.System,
+            preferredReplica: 0);
+        quorum.SuppressReadRepair();
+        try
+        {
+            Slot[] decided = [new(0), new(2), new(4), new(6)];
+            var quorumRead = await quorum.ReadSlotsAsync(decided, new Slot(7), token);
+            Assert.True(quorumRead.TryGetValue(out ReplicaSlotsBatch quorumBatch));
+            using (quorumBatch)
+            {
+                Assert.Equal(4, quorumBatch.Count);
+                var offset = 0;
+                for (var i = 0; i < quorumBatch.Count; i++)
+                {
+                    using var slice = ReplicaSlotsBatch.SliceNext(quorumBatch.Packed, ref offset, out var slot);
+                    Assert.Equal(decided[i], slot);
+                    Assert.Equal(expected[slot.Value], slice.ToArray());
+                }
+            }
+        }
+        finally
+        {
+            await quorum.DisposeAsync();
+        }
+    }
+
     private static async Task EventuallyAsync(Func<Task<bool>> condition)
     {
         var deadline = TimeProvider.System.GetUtcNow() + TimeSpan.FromSeconds(30);

@@ -46,6 +46,7 @@ interface [GrainInterfaceType("Orleans.Durable.Storage.ILedgerStoreGrain")] Orle
   237AAAA3: HeartbeatAsync(Orleans.Durable.Storage.LedgerReplicaHeartbeatRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaHeartbeatRead>
   E95938FF: ReadAsync(Orleans.Durable.Storage.LedgerReplicaReadRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaRead>
   03C770E2: ReadRangeAsync(Orleans.Durable.Storage.LedgerReplicaReadRangeRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaRangeRead>
+  C1157609: ReadSlotsAsync(Orleans.Durable.Storage.LedgerReplicaReadSlotsRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaSlotsRead>
   370F7FC9: ReadTailAsync(Orleans.Durable.Storage.LedgerReplicaTailRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaTailRead>
   63A99179: WriteAsync(Orleans.Durable.Storage.LedgerReplicaWriteRequest, System.Threading.CancellationToken) -> Task<Orleans.Durable.Storage.RemoteReplicaWriteOutcome>
 

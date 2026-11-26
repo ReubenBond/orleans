@@ -696,6 +696,71 @@ public sealed class LedgerStoreTests : IDisposable
     }
 
     /// <summary>
+    /// Batched <see cref="LedgerStoreReplica.ReadSlotsAsync"/> returns scattered ascending slots in one packed
+    /// <see cref="ReplicaSlotsBatch"/>, skips missing and oversized slots while still returning present slots within
+    /// <c>maxBytes</c>, and answers <see cref="ReplicaWriteOutcome.Dropped"/> for a dropped ledger.
+    /// </summary>
+    [Fact]
+    public async Task ReadSlotsPacksPresentAscendingSlotsSkipsMissingAndRespectsMaxBytesAndDrop()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var root = NewRoot();
+        await using var store = await root.OpenAsync(create: true);
+        var ledger = new LedgerId(42);
+        var replica = await CreateAndOpenReplicaAsync(store, ledger);
+
+        // Write slots 0, 2, 5, 7 (leaving 1, 3, 4, 6 missing); slot 5 is 200 bytes to exercise maxBytes skipping.
+        await LedgerStoreReplicaTests.WriteAsync(replica, 0, [1, 2, 3]);
+        await LedgerStoreReplicaTests.WriteAsync(replica, 2, [4, 5, 6, 7]);
+        var large = new byte[200];
+        Array.Fill(large, (byte)0xAB);
+        await LedgerStoreReplicaTests.WriteAsync(replica, 5, large);
+        await LedgerStoreReplicaTests.WriteAsync(replica, 7, [8, 9]);
+
+        // Full budget: returns all 4 present slots in ascending order, skipping missing slots 1 and 4.
+        Slot[] requested = [new(0), new(1), new(2), new(4), new(5), new(7)];
+        var full = await replica.ReadSlotsAsync(requested, new Slot(8), 1024, token);
+        Assert.True(full.TryGetValue(out ReplicaSlotsBatch fullBatch));
+        using (fullBatch)
+        {
+            Assert.Equal(4, fullBatch.Count);
+            Assert.Null(ReplicaSlotsBatch.ValidatePacked(fullBatch.Count, fullBatch.Packed, requested));
+            var offset = 0;
+            using var s0 = ReplicaSlotsBatch.SliceNext(fullBatch.Packed, ref offset, out var slot0);
+            using var s2 = ReplicaSlotsBatch.SliceNext(fullBatch.Packed, ref offset, out var slot2);
+            using var s5 = ReplicaSlotsBatch.SliceNext(fullBatch.Packed, ref offset, out var slot5);
+            using var s7 = ReplicaSlotsBatch.SliceNext(fullBatch.Packed, ref offset, out var slot7);
+            Assert.Equal([new Slot(0), new Slot(2), new Slot(5), new Slot(7)], [slot0, slot2, slot5, slot7]);
+            Assert.Equal([1, 2, 3], s0.ToArray());
+            Assert.Equal([4, 5, 6, 7], s2.ToArray());
+            Assert.Equal(large, s5.ToArray());
+            Assert.Equal([8, 9], s7.ToArray());
+        }
+
+        // Tight budget (64 bytes): slot 5 alone (12 + 200 > 64) is skipped while slots 0, 2, and 7 still fit and return!
+        var tight = await replica.ReadSlotsAsync(requested, new Slot(8), 64, token);
+        Assert.True(tight.TryGetValue(out ReplicaSlotsBatch tightBatch));
+        using (tightBatch)
+        {
+            Assert.Equal(3, tightBatch.Count);
+            var offset = 0;
+            var gotSlots = new List<long>();
+            for (var i = 0; i < tightBatch.Count; i++)
+            {
+                using var slice = ReplicaSlotsBatch.SliceNext(tightBatch.Packed, ref offset, out var slot);
+                gotSlots.Add(slot.Value);
+            }
+
+            Assert.Equal([0L, 2L, 7L], gotSlots);
+        }
+
+        // Dropped ledger answers Dropped.
+        await store.DropReplicaAsync(ledger, token);
+        var afterDrop = await replica.ReadSlotsAsync(requested, new Slot(8), 1024, token);
+        Assert.True(afterDrop.TryGetValue(out ReplicaWriteOutcome.Dropped? _));
+    }
+
+    /// <summary>
     /// LS-I6: a replica's checkpoint directory follows its durable create record, so a directory whose handle the WAL
     /// never assigned shows the WAL lost a create; the open refuses and leaves it in place.
     /// </summary>

@@ -340,7 +340,10 @@ batch the caller owns: a view of bytes `[offset, offset + length)`, or `OutsideB
 which extends past it; it throws `ArgumentOutOfRangeException` for a negative offset or a length which is not positive.
 `ReadRangeOfValueAsync(replica, slot, offset, length, contiguousTail)` reads the whole value and answers so, for
 providers whose storage has no cheaper byte-range read; `ValidateReadRange` and `ReadRangePointWiseAsync` validate and
-provide the default point-wise fallback for `ILedgerReplica.ReadRangeAsync` when `SupportsReadRange` is false. The
+provide the default point-wise fallback for `ILedgerReplica.ReadRangeAsync` when `SupportsReadRange` is false, and
+`ValidateReadSlots` and `ReadSlotsPointWiseAsync` provide the corresponding validation and point-wise fallback for
+batched scattered-slot `ILedgerReplica.ReadSlotsAsync` (`ReplicaSlotsBatch` / `ReplicaSlotsRead`) when
+`SupportsReadSlots` is false. The
 ledger protocol forwards the range to its replicas, so only
 the range crosses the network ([ledger-protocol §8.3](ledger-protocol.md#83-quorum-operations)); the LedgerStore still
 reads the whole record from its WAL and answers the range from it ([ledgerstore §8.2](ledgerstore.md#82-reads)), so forwarding

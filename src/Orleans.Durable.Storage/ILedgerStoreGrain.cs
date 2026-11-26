@@ -22,6 +22,10 @@ internal interface ILedgerStoreGrain : IGrainWithGuidKey
     [AlwaysInterleave]
     Task<RemoteReplicaRangeRead> ReadRangeAsync(LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Reads a scattered set of ascending slots from the request's replica in one RPC.</summary>
+    [AlwaysInterleave]
+    Task<RemoteReplicaSlotsRead> ReadSlotsAsync(LedgerReplicaReadSlotsRequest request, CancellationToken cancellationToken);
+
     /// <summary>Reads the request's replica's contiguous tail and seal, sealing it first when the request seals.</summary>
     [AlwaysInterleave]
     Task<RemoteReplicaTailRead> ReadTailAsync(LedgerReplicaTailRequest request, CancellationToken cancellationToken);
@@ -41,8 +45,9 @@ internal static class LedgerReplicaProtocol
     /// Version 3 adds L2 quorum read-lease grants, remaining lease durations on sealed tails, and batched peer heartbeats.
     /// Version 4 adds batched multi-slot <c>ReadRangeAsync</c>.
     /// Version 5 carries replica payloads and read replies in zero-copy consume-on-serialize <see cref="WireArcBuffer"/>.
+    /// Version 6 adds batched scattered-slot <c>ReadSlotsAsync</c>.
     /// </summary>
-    public const int Version = 5;
+    public const int Version = 6;
 }
 
 /// <summary>
@@ -169,6 +174,39 @@ internal readonly struct LedgerReplicaReadRangeRequest
 
     /// <summary>Gets or initializes the maximum packed reply bytes reserved by the caller.</summary>
     [Id(7)]
+    public int MaxBytes { get; init; }
+}
+
+/// <summary>
+/// A batched scattered-slot replica read as it crosses to the node (OR-I15): reads the strictly ascending
+/// <see cref="Slots"/> whose framed payloads fit within <see cref="MaxBytes"/> in one RPC.
+/// </summary>
+[GenerateSerializer]
+[Immutable]
+internal readonly struct LedgerReplicaReadSlotsRequest
+{
+    /// <summary>Gets or initializes the replica protocol's version.</summary>
+    [Id(0)]
+    public int Version { get; init; }
+
+    /// <summary>Gets or initializes the ledger's ID.</summary>
+    [Id(1)]
+    public ulong Ledger { get; init; }
+
+    /// <summary>Gets or initializes the replica's window <c>K</c>.</summary>
+    [Id(2)]
+    public int WindowSize { get; init; }
+
+    /// <summary>Gets or initializes the strictly ascending slots to read.</summary>
+    [Id(3)]
+    public long[] Slots { get; init; }
+
+    /// <summary>Gets or initializes the caller's known contiguous tail.</summary>
+    [Id(4)]
+    public long ContiguousTail { get; init; }
+
+    /// <summary>Gets or initializes the maximum packed reply bytes reserved by the caller.</summary>
+    [Id(5)]
     public int MaxBytes { get; init; }
 }
 

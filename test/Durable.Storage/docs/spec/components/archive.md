@@ -524,9 +524,11 @@ prefix with the rows it does not hold is a prefix of the key's history.
 than scanning the whole ledger: after the ledger's end is known (`T` for a closed ledger, the seal check's tail for the
 open one), `ArchiveKeyIndex.ReadAsync(ledger, below, key)` waits for the index's catch-up through `below` (JS-I9) and
 returns the key's `KeyIndexEntry(Tag, DefiningSlot, Ordinal)` records in tag order. The reader precomputes each entry's
-1-based offset within its `(DefiningSlot, Ordinal)` segment and streams point reads in descending waves (bounded to
-`clamp(K, 16, 32)` entries per wave and sharing the read's `K`-place window, releasing the window across backpressure
-backoff), resolving each defining row by ordinal through `BatchView.FindDefining` (rejecting an out-of-range ordinal or
+1-based offset within its `(DefiningSlot, Ordinal)` segment and reads in descending waves (bounded to `clamp(K, 16, 32)`
+entries per wave and sharing the read's `K`-place window, releasing the window across backpressure backoff) — issuing
+one batched scattered-slot `ReadSlotsAsync` RPC per wave when the ledger's replicas support `SupportsReadSlots` (falling
+back to concurrent point reads otherwise) — resolving each defining row by ordinal through `BatchView.FindDefining`
+(rejecting an out-of-range ordinal or
 mismatched row with `InvalidDataException` carrying reason `unknown-ordinal`) and verifying the defining row's full key
 bytes against `key` so a hash collision is skipped silently. As soon as a verified matching row is an opener (`Replace`
 or `Delete`), the reader records `SupersededBefore = offset - 1` on the opener `ArchiveRow` (preserving exact

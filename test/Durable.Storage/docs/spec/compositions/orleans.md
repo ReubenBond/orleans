@@ -2222,8 +2222,11 @@ remaining lease durations (`LeaseRemainingTicks` on sealed `Tail`), and batched 
 (`LedgerReplicaHeartbeatRequest` → `RemoteReplicaHeartbeatRead`) over `ILedgerStoreGrain`
 ([LR-I10](../components/ledger-replicas.md#5-invariants)), while preserving version 2's Orleans `ArcBuffer` payloads.
 Version 4 adds batched multi-slot `ReadRangeAsync` (`LedgerReplicaReadRangeRequest` → `RemoteReplicaRangeRead`) over
-`ILedgerStoreGrain` so catch-up and drain scans fetch up to 128 consecutive slots / 1 MiB per RPC, and is a
-whole-cluster restart, never a mix of silos. [Version ranges for rolling
+`ILedgerStoreGrain` so catch-up and drain scans fetch up to 128 consecutive slots / 1 MiB per RPC, version 5 carries
+replica payloads and read replies in zero-copy consume-on-serialize `WireArcBuffer`, and version 6 adds batched
+scattered-slot `ReadSlotsAsync` (`LedgerReplicaReadSlotsRequest` → `RemoteReplicaSlotsRead`) so indexed cold reads
+fetch each descending wave's slots in one RPC; each version change is a whole-cluster restart, never a mix of silos.
+[Version ranges for rolling
 upgrades](../deferred.md#replica-protocol-version-ranges-for-rolling-upgrades) are deferred. The callee then runs
 exactly the called operation on its store, so the store's contract alone decides creation and refusal
 ([LR-I7](../components/ledger-replicas.md#5-invariants), [LS-I2](../components/ledgerstore.md#5-invariants)). The callee

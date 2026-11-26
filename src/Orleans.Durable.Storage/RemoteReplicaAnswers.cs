@@ -170,6 +170,50 @@ internal readonly union RemoteReplicaRangeRead(
 }
 
 /// <summary>
+/// The answer of <see cref="ILedgerStoreGrain.ReadSlotsAsync"/> (orleans.md §5.12, conventions.md §15): a packed
+/// <see cref="Batch"/> of the requested ascending slots present on the replica, <see cref="ReplicaWriteOutcome.Dropped"/>,
+/// <see cref="ReplicaWriteOutcome.Backpressure"/>, <see cref="NotThisNode"/>, the host's refusal, or the store's
+/// corruption.
+/// </summary>
+internal readonly union RemoteReplicaSlotsRead(
+    RemoteReplicaSlotsRead.Batch,
+    ReplicaWriteOutcome.Dropped,
+    ReplicaWriteOutcome.Backpressure,
+    NotThisNode,
+    ReplicaCallRefused,
+    ReplicaCorrupt) : IEquatable<RemoteReplicaSlotsRead>
+{
+    /// <inheritdoc/>
+    public bool Equals(RemoteReplicaSlotsRead other) => Equals(Value, other.Value);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is RemoteReplicaSlotsRead other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Value?.GetHashCode() ?? 0;
+
+    /// <inheritdoc/>
+    public override string ToString() => Value?.ToString() ?? string.Empty;
+
+    /// <summary>A packed subset of <paramref name="Count"/> requested slots in <paramref name="Bytes"/>.</summary>
+    public sealed record Batch(int Count, WireArcBuffer Bytes)
+    {
+        /// <summary>Gets the host admission held until first conversion or deadline; <see langword="null"/> at the caller.</summary>
+        internal LedgerReplicaHostAdmission? Admission { get; init; }
+
+        /// <inheritdoc/>
+        public bool Equals(Batch? other) =>
+            other is not null && Count == other.Count && (Bytes ?? WireArcBuffer.Empty).ToArray().AsSpan().SequenceEqual((other.Bytes ?? WireArcBuffer.Empty).ToArray());
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(Count, Bytes?.Length ?? 0);
+
+        /// <inheritdoc/>
+        public override string ToString() => $"SlotsBatch(Count={Count}, Bytes={Bytes?.Length ?? 0})";
+    }
+}
+
+/// <summary>
 /// The answer of <see cref="ILedgerStoreGrain.ReadTailAsync"/> (orleans.md §5.12, conventions.md §15): the replica's
 /// contiguous tail and seal as the callee reported them, <see cref="ReplicaWriteOutcome.Dropped"/>,
 /// <see cref="ReplicaWriteOutcome.Backpressure"/>, <see cref="NotThisNode"/>, the host's refusal, or the store's corruption.
