@@ -64,6 +64,22 @@ internal sealed class GeneratedTypeConstruction
         }
     }
 
+    public IEnumerable<TypeSyntax> GetServiceDependencies()
+    {
+        foreach (var parameter in Parameters)
+        {
+            if (!parameter.IsCodecProvider)
+                yield return parameter.Type;
+        }
+
+        foreach (var field in _fields)
+        {
+            if (!field.IsInjected && field is CodecFieldDescription or BaseCodecFieldDescription
+                or CopierGenerator.CopierFieldDescription or CopierGenerator.BaseCopierFieldDescription)
+                yield return field.FieldType;
+        }
+    }
+
     internal readonly record struct ConstructorParameter(TypeSyntax Type, string Name, bool IsCodecProvider = false)
     {
         public ParameterSyntax ToSyntax() => Parameter(Name.ToIdentifier()).WithType(Type);

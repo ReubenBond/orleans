@@ -36,7 +36,9 @@ internal sealed record InvokableEmissionPlan(
     string ReturnType,
     string InvokeTarget,
     string InvokeArguments,
-    bool OptOutOfGrainCancellationTokenScan)
+    bool OptOutOfGrainCancellationTokenScan,
+    string? RpcResponseType = null,
+    string? RpcResponseFactoryType = null)
 {
     /// <summary>The metadata name of the generated type within <paramref name="generatedNamespace"/>.</summary>
     public string GetMetadataName(string generatedNamespace)

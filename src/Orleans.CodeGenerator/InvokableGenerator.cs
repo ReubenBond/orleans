@@ -145,6 +145,18 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             .OrderBy(static p => p.ParameterOrdinal)
             .Select(static p => p.FieldName));
 
+        string? rpcResponseType = null;
+        string? rpcResponseFactoryType = null;
+        if (method.AllTypeParameters.Count == 0
+            && method.Method.ReturnType is INamedTypeSymbol { TypeArguments.Length: 1 } result
+            && baseClassType.OriginalDefinition.ToDisplayString() is "Orleans.Runtime.TaskRequest<TResult>" or "Orleans.Runtime.Request<TResult>"
+            && _generationContext.RpcResponseNames.TryGetValue(
+                result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), out var responseName))
+        {
+            rpcResponseType = result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            rpcResponseFactoryType = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{responseName}Factory";
+        }
+
         return new InvokableEmissionPlan(
             generatedClassName,
             isPublic,
@@ -175,7 +187,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             CodeText.Type(methodSymbol.ReturnType.ToTypeSyntax(substitutions)),
             invokeTarget,
             invokeArguments,
-            OptsOutOfGrainCancellationTokenScan(method, baseClassType));
+            OptsOutOfGrainCancellationTokenScan(method, baseClassType),
+            rpcResponseType,
+            rpcResponseFactoryType);
     }
 
     private string GetFieldDeclaration(InvokableMethodDescription method, InvokerFieldDescription description)
@@ -184,9 +198,14 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         {
             var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
             var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
-            return $"private static readonly {LibraryTypes.EmissionTypes.MethodInfo} {description.FieldName} = "
-                + $"OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof({CodeText.Type(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))}), "
-                + $"{CodeText.QuotedText(method.Method.Name)}, {methodTypeArguments}, {parameterTypes});";
+            var containingType = CodeText.Type(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions));
+            var methodLookup = method.AllTypeParameters.Count == 0
+                ? $"typeof({containingType}).GetMethod({CodeText.QuotedText(method.Method.Name)}, 0, "
+                    + "global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, "
+                    + $"null, {(method.Method.Parameters.Length == 0 ? "global::System.Type.EmptyTypes" : parameterTypes)}, null)"
+                : $"OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof({containingType}), "
+                    + $"{CodeText.QuotedText(method.Method.Name)}, {methodTypeArguments}, {parameterTypes})";
+            return $"private static readonly {LibraryTypes.EmissionTypes.MethodInfo} {description.FieldName} = {methodLookup};";
         }
 
         var declaration = $"{CodeText.Type(description.FieldType.ToTypeSyntax(method.TypeParameterSubstitutions))} {description.FieldName};";
@@ -267,6 +286,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         declaration.Append(plan.IsPublic ? "public" : "internal").Append(" sealed class ").Append(plan.ClassName);
         GenericParameterEmissionPlan.AppendParameterList(declaration, plan.TypeParameters);
         declaration.Append(" : ").Append(plan.BaseType);
+        if (plan.RpcResponseFactoryType is not null)
+        {
+            declaration.Append(", global::Orleans.Serialization.Invocation.IResponseInvokable");
+        }
+
         GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, plan.TypeParameters);
         writer.OpenBlock();
         foreach (var field in plan.Fields)
@@ -398,6 +422,39 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         if (plan.OptOutOfGrainCancellationTokenScan)
         {
             writer.WriteLine("public override bool MayHaveGrainCancellationToken => false;");
+        }
+
+        if (plan.RpcResponseFactoryType is { } factoryType && plan.RpcResponseType is { } responseType)
+        {
+            writer.WriteLine("async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)");
+            writer.OpenBlock();
+            writer.WriteLine("try");
+            writer.OpenBlock();
+            writer.WriteLine($"var factory = {factoryType}.Resolve(provider);");
+            writer.WriteLine("if (!factory.IsSupported)");
+            writer.OpenBlock();
+            writer.WriteLine("var original = await Invoke();");
+            writer.WriteLine("global::Orleans.Serialization.Invocation.Response copy = null;");
+            writer.WriteLine("try");
+            writer.OpenBlock();
+            writer.WriteLine("return copy = responseCopier.Copy(original);");
+            writer.CloseBlock();
+            writer.WriteLine("finally");
+            writer.OpenBlock();
+            writer.WriteLine("if (!global::System.Object.ReferenceEquals(original, copy))");
+            writer.Indent();
+            writer.WriteLine("original.Dispose();");
+            writer.Unindent();
+            writer.CloseBlock();
+            writer.CloseBlock();
+            writer.WriteLine($"{responseType} value = await InvokeInner();");
+            writer.WriteLine("return factory.RentCopied(value, contexts);");
+            writer.CloseBlock();
+            writer.WriteLine("catch (global::System.Exception exception)");
+            writer.OpenBlock();
+            writer.WriteLine("return global::Orleans.Serialization.Invocation.Response.FromException(exception);");
+            writer.CloseBlock();
+            writer.CloseBlock();
         }
 
         writer.CloseBlock();

@@ -91,7 +91,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     public static string GetSimpleClassName(string name)
         => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
 
-    private List<GeneratedFieldDescription> GetFieldDescriptions(
+    internal List<GeneratedFieldDescription> GetFieldDescriptions(
         ProxyInterfaceDescription interfaceDescription)
     {
         var fields = new List<GeneratedFieldDescription>();

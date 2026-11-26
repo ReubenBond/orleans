@@ -68,6 +68,37 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         return LibraryTypes.FieldCodec_1.ToTypeSyntax(type.ToTypeSyntax());
     }
 
+    public GeneratedTypeConstruction GetSerializerConstruction(ISerializableTypeDescription type, List<UnionCaseDescription> cases)
+    {
+        var codecs = GetCaseCodecs(cases);
+        var fields = new List<SerializerGenerator.GeneratedFieldDescription>
+        {
+            new SerializerGenerator.CodecFieldTypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, type.TypeSyntax),
+        };
+        fields.AddRange(codecs.Where(static codec => codec.CodecField is not null).Select(static codec => codec.CodecField!));
+        AddDependencies(type, fields);
+        return new(LibraryTypes, fields, hasBaseContract: false);
+    }
+
+    public GeneratedTypeConstruction GetCopierConstruction(ISerializableTypeDescription type, List<UnionCaseDescription> cases)
+    {
+        var fields = new List<SerializerGenerator.GeneratedFieldDescription>();
+        foreach (var unionCase in cases)
+        {
+            if (type.IsImmutable || LibraryTypes.IsShallowCopyable(unionCase.CaseType))
+            {
+                continue;
+            }
+
+            fields.Add(new CopierGenerator.CopierFieldDescription(
+                LibraryTypes.DeepCopier_1.ToTypeSyntax(unionCase.ValueType.ToTypeSyntax()),
+                $"_caseCopier{unionCase.Id}", unionCase.ValueType, HotReloadSafe));
+        }
+
+        AddDependencies(type, fields);
+        return new(LibraryTypes, fields, hasBaseContract: false);
+    }
+
     public SerializerEmissionPlan CreateSerializerPlan(ISerializableTypeDescription type, List<UnionCaseDescription> cases, SerializableTypeEmissionPlan? typePlan)
     {
         var codecs = GetCaseCodecs(cases);

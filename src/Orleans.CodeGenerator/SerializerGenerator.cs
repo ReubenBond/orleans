@@ -155,7 +155,19 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     }
 
     internal GeneratedTypeConstruction GetConstruction(ISerializableTypeDescription type)
-        => new(LibraryTypes, GetFieldDescriptions(type, []), HasBaseCodec(type));
+    {
+        if (type is SerializableTypeDescription { UnionCases: { } unionCases })
+            return new UnionCodecGenerator(_generatorServices).GetSerializerConstruction(type, unionCases);
+
+        var fields = GetFieldDescriptions(type, []);
+        if (type is SerializableTypeDescription { IsAbstractType: true } closedType && closedType.GetClosedTypeCases() is { } closedTypeCases)
+        {
+            var caseCodecs = new UnionCodecGenerator(_generatorServices).GetCaseCodecs(closedTypeCases);
+            fields.AddRange(caseCodecs.Where(static codec => codec.CodecField is not null).Select(static codec => codec.CodecField!));
+        }
+
+        return new(LibraryTypes, fields, HasBaseCodec(type));
+    }
 
     private static bool HasBaseCodec(ISerializableTypeDescription type)
         => !type.IsEnumType && !type.IsAbstractType && !type.IsValueType && !type.IsSealedType;

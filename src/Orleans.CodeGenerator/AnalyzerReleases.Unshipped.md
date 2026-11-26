@@ -14,3 +14,4 @@ ORLEANS0114 | Usage | Error | Invalid generated context declaration
 ORLEANS0115 | Usage | Error | Unsupported generated context dependency
 ORLEANS0116 | Usage | Error | Inaccessible compound type alias
 ORLEANS0117 | Usage | Error | Invalid union or closed type case
+ORLEANS0118 | Usage | Error | RPC response requires a closed serializer factory

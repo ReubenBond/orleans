@@ -182,7 +182,7 @@ internal static partial class Components
     public const string RocksDb = "Orleans.Durable.Storage.RocksDb";
 
     private static readonly Lazy<ComponentMap> ProductionMap = new(static () => new(
-        ["Orleans.Durable.Storage", "OrleansCodeGen"],
+        ["Orleans.Durable.Storage", "OrleansCodeGen.Orleans.Durable.Storage", "OrleansCodeGen.OrleansDurableStorage"],
         Table,
         ComponentMap.ReadMembers(Path.Combine(Repository.StorageRoot, "Orleans.Durable.Storage.Architecture.Tests", "ComponentMembers.txt"))));
 
@@ -362,7 +362,7 @@ internal static partial class Components
             ])
         {
             Assembly = Composition,
-            Roots = ["Orleans.Durable.Storage", "OrleansCodeGen"],
+            Roots = ["Orleans.Durable.Storage", "OrleansCodeGen.Orleans.Durable.Storage", "OrleansCodeGen.OrleansDurableStorage"],
             Technologies = ["Microsoft.Extensions.Configuration.Binder", "Orleans.", "Polly.Core", "System.IO.Hashing"],
         },
 

@@ -247,10 +247,10 @@ internal static class SerializableSourceOutputGenerator
                 typeDescription.GeneratedNamespace));
     }
 
-    internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)
-        => CreateSerializableTypeDescription(services.Compilation, services.LibraryTypes, services.Options, symbol);
+    internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol, bool inspectReferenceMetadata = false)
+        => CreateSerializableTypeDescription(services.Compilation, services.LibraryTypes, services.Options, symbol, inspectReferenceMetadata);
 
-    internal static ISerializableTypeDescription? CreateSerializableTypeDescription(Compilation compilation, LibraryTypes libraryTypes, CodeGeneratorOptions options, INamedTypeSymbol symbol)
+    internal static ISerializableTypeDescription? CreateSerializableTypeDescription(Compilation compilation, LibraryTypes libraryTypes, CodeGeneratorOptions options, INamedTypeSymbol symbol, bool inspectReferenceMetadata = false)
     {
 
         if (FSharpUtilities.IsUnionCase(libraryTypes, symbol, out var sumType) && sumType.HasAttribute(libraryTypes.GenerateSerializerAttribute))
@@ -268,7 +268,7 @@ internal static class SerializableSourceOutputGenerator
             return null;
         }
 
-        if (HasReferenceAssemblyAttribute(symbol.ContainingAssembly))
+        if (!inspectReferenceMetadata && HasReferenceAssemblyAttribute(symbol.ContainingAssembly))
         {
             throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
         }

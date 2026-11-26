@@ -166,6 +166,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         if (type.IsShallowCopyable)
             return new(LibraryTypes, [], hasBaseContract: false);
 
+        if (type is SerializableTypeDescription { UnionCases: { } unionCases })
+            return new UnionCodecGenerator(_generatorServices).GetCopierConstruction(type, unionCases);
+
         var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
         return new(LibraryTypes, GetFieldDescriptions(type, [], isExceptionType, out _),
             !isExceptionType && !type.IsSealedType, isExceptionType);
