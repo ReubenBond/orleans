@@ -654,6 +654,8 @@ namespace Orleans.Serialization.Buffers
 
         public readonly ArcBuffer UnsafeSlice(int offset, int length) { throw null; }
 
+        public static ArcBuffer Wrap(System.ReadOnlyMemory<byte> memory) { throw null; }
+
         public partial struct ArraySegmentEnumerator : System.Collections.Generic.IEnumerable<System.ArraySegment<byte>>, System.Collections.IEnumerable, System.Collections.Generic.IEnumerator<System.ArraySegment<byte>>, System.Collections.IEnumerator, System.IDisposable
         {
             public ArraySegmentEnumerator(ArcBuffer slice) { }

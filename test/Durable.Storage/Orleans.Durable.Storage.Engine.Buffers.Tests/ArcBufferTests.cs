@@ -65,6 +65,42 @@ public sealed class ArcBufferTests : IDisposable
     }
 
     [Fact]
+    public void CopyFromCopiesSpanAndSequenceWithoutLeakingPages()
+    {
+        Assert.True(ArcBuffer.CopyFrom([]).IsDefault);
+        Assert.True(ArcBuffer.CopyFrom(ReadOnlySequence<byte>.Empty).IsDefault);
+
+        var small = CreatePayload(619);
+        using (var fromSpan = ArcBuffer.CopyFrom(small))
+        {
+            Assert.Equal(small, fromSpan.ToArray());
+            Assert.Single(fromSpan.Pages);
+        }
+
+        var multi = CreatePayload(PageSize * 2 + 123);
+        using var writer = new ArcBufferWriter();
+        writer.Write(multi.AsSpan(0, PageSize + 17));
+        writer.Write(multi.AsSpan(PageSize + 17));
+        using var staged = writer.PeekSlice(writer.Length);
+        var sequence = staged.AsReadOnlySequence();
+        Assert.False(sequence.IsSingleSegment);
+        using (var fromSequence = ArcBuffer.CopyFrom(sequence))
+        {
+            Assert.Equal(multi, fromSequence.ToArray());
+            Assert.Single(fromSequence.Pages);
+        }
+
+        var huge = CreatePayload(ArcBufferPagePool.LargestPageSize + 512);
+        using (var fromHugeSpan = ArcBuffer.CopyFrom(huge))
+        {
+            Assert.Equal(huge, fromHugeSpan.ToArray());
+        }
+
+        using var fromHugeSeq = ArcBuffer.CopyFrom(new ReadOnlySequence<byte>(huge));
+        Assert.Equal(huge, fromHugeSeq.ToArray());
+    }
+
+    [Fact]
     public void TheDefaultValueReadsAsAnEmptyBuffer()
     {
         var empty = default(ArcBuffer);

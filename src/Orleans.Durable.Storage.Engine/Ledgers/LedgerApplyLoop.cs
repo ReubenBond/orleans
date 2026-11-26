@@ -340,6 +340,8 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         /// </summary>
         private async Task<(Slot Next, ScanEnd End)> ScanAsync(LedgerMetadata listed, Slot next, Slot below, LedgerSegmentView view, CancellationToken cancellationToken)
         {
+            var flush = _loop._applier.FlushAsync;
+            var buffered = false;
             await foreach (var item in _loop._reader.ScanAsync(listed, next, below, view, cancellationToken: cancellationToken).ConfigureAwait(false))
             {
                 var read = item.Read;
@@ -349,12 +351,23 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
                     {
                         await _loop._applier.ApplyAsync(_id, item, cancellationToken).ConfigureAwait(false);
                         next = data.Slot + 1;
+                        buffered = true;
                     }
                 }
                 else
                 {
+                    if (buffered && flush is not null && read.Value is not ReplicaWriteOutcome.Dropped)
+                    {
+                        await flush(_id, cancellationToken).ConfigureAwait(false);
+                    }
+
                     return (next, read.Value is ReplicaWriteOutcome.Dropped ? ScanEnd.Dropped : ScanEnd.Backpressure);
                 }
+            }
+
+            if (buffered && flush is not null)
+            {
+                await flush(_id, cancellationToken).ConfigureAwait(false);
             }
 
             return (next, ScanEnd.Reached);

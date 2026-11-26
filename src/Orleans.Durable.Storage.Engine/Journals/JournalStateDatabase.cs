@@ -37,6 +37,8 @@ public sealed class JournalStateDatabase : IAsyncDisposable
     private const int PredecessorMaxConcurrency = 8;
     private const int PredecessorCommitMaxRows = 1_024;
     private const int PredecessorCommitMaxBytes = 1024 * 1024;
+    private const int ReplicatedCommitMaxRows = 1_024;
+    private const int ReplicatedCommitMaxBytes = 1024 * 1024;
 
     private static readonly TimeSpan PredecessorBaseDelay = LedgerApplyLoop.LearnInterval;
     private static readonly TimeSpan PredecessorMaximumDelay = TimeSpan.FromSeconds(1);
@@ -53,6 +55,7 @@ public sealed class JournalStateDatabase : IAsyncDisposable
     private readonly Lock _lock = new();
     private readonly Dictionary<LedgerId, Slot> _appliedWatermarks;
     private readonly Dictionary<LedgerId, Slot> _durableWatermarks;
+    private readonly Dictionary<LedgerId, ReplicatedBuffer> _replicatedBuffers = [];
     private readonly Dictionary<LedgerId, PriorityQueue<CatchUpWaiter, long>> _waiters = [];
     private readonly Dictionary<LedgerId, PredecessorScan> _predecessorScans = [];
     private readonly HashSet<LedgerId> _nonReplicated = [];
@@ -88,6 +91,7 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         {
             NextSlotAsync = NextSlotAsync,
             ApplyAsync = ApplyAsync,
+            FlushAsync = FlushAppliedAsync,
             RemoveAsync = RemoveAsync,
         };
         KeyIndex = new ArchiveKeyIndex(LookupAsync);
@@ -466,6 +470,32 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         }
         finally
         {
+            List<PendingBatch>? remaining = null;
+            lock (_lock)
+            {
+                if (_replicatedBuffers.Count > 0)
+                {
+                    remaining = [];
+                    foreach (var buffer in _replicatedBuffers.Values)
+                    {
+                        for (var index = 0; index < buffer.Batches.Count; index++)
+                        {
+                            remaining.Add(buffer.Batches[index].Batch);
+                        }
+                    }
+
+                    _replicatedBuffers.Clear();
+                }
+            }
+
+            if (remaining is not null)
+            {
+                for (var index = 0; index < remaining.Count; index++)
+                {
+                    remaining[index].Dispose();
+                }
+            }
+
             _predecessorWindow.Dispose();
             _flushLock.Dispose();
             _writes.Dispose();
@@ -543,16 +573,109 @@ public sealed class JournalStateDatabase : IAsyncDisposable
             throw;
         }
 
-        return CommitAndReleaseAsync(ledger, data.Slot, batch, admission, cancellationToken);
-
-        async ValueTask CommitAndReleaseAsync(LedgerId id, Slot slot, PendingBatch pending, AdmissionGate.Admission token, CancellationToken ct)
+        bool flushNow;
+        var duplicate = false;
+        lock (_lock)
         {
-            using (token)
-            using (pending)
+            var applied = _appliedWatermarks.TryGetValue(ledger, out var current) ? current : Slot.Zero;
+            if (data.Slot < applied)
             {
-                await CommitBatchAsync(id, slot, pending, signalWaiters: true, ct).ConfigureAwait(false);
+                duplicate = true;
+                flushNow = false;
+            }
+            else
+            {
+                if (!_replicatedBuffers.TryGetValue(ledger, out var buffer))
+                {
+                    buffer = new ReplicatedBuffer();
+                    _replicatedBuffers[ledger] = buffer;
+                }
+
+                if (buffer.Batches.Count > 0 && data.Slot <= buffer.Batches[^1].Slot)
+                {
+                    duplicate = true;
+                    flushNow = HasSatisfiedWaiterLocked(ledger, buffer.Batches[^1].Slot + 1);
+                }
+                else
+                {
+                    buffer.Batches.Add((data.Slot, batch));
+                    buffer.Rows += batch.KeyCount;
+                    buffer.Bytes += batch.EstimatedBytes;
+                    flushNow = buffer.Rows >= ReplicatedCommitMaxRows
+                        || buffer.Bytes >= ReplicatedCommitMaxBytes
+                        || HasSatisfiedWaiterLocked(ledger, data.Slot + 1);
+                }
             }
         }
+
+        if (duplicate)
+        {
+            batch.Dispose();
+        }
+
+        if (!flushNow)
+        {
+            admission.Dispose();
+            return ValueTask.CompletedTask;
+        }
+
+        return FlushAndReleaseAsync(ledger, admission, cancellationToken);
+
+        async ValueTask FlushAndReleaseAsync(LedgerId id, AdmissionGate.Admission token, CancellationToken ct)
+        {
+            using (token)
+            {
+                await FlushReplicatedBufferAsync(id, waitToken: ct, commitToken: ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async ValueTask FlushAppliedAsync(LedgerId ledger, CancellationToken cancellationToken)
+    {
+        using var admission = _gate.TryEnter();
+        ObjectDisposedException.ThrowIf(!admission.Entered, this);
+        await FlushReplicatedBufferAsync(ledger, waitToken: cancellationToken, commitToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool HasSatisfiedWaiterLocked(LedgerId ledger, Slot watermark) =>
+        _waiters.TryGetValue(ledger, out var queue) && queue.TryPeek(out _, out var target) && target <= watermark.Value;
+
+    private async ValueTask FlushReplicatedBufferAsync(LedgerId ledger, CancellationToken waitToken, CancellationToken commitToken)
+    {
+        ThrowIfCorrupt();
+        await _writes.WaitAsync(waitToken).ConfigureAwait(false);
+        List<(Slot Slot, PendingBatch Batch)>? batches = null;
+        Slot lastWatermark = Slot.Zero;
+        try
+        {
+            ThrowIfCorrupt();
+            lock (_lock)
+            {
+                if (!_replicatedBuffers.TryGetValue(ledger, out var buffer) || buffer.Batches.Count == 0)
+                {
+                    return;
+                }
+
+                batches = buffer.Detach();
+                _ = _replicatedBuffers.Remove(ledger);
+            }
+
+            lastWatermark = batches[^1].Slot + 1;
+            await CommitBatchesLockedAsync(ledger, batches, commitToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _ = _writes.Release();
+            if (batches is not null)
+            {
+                for (var index = 0; index < batches.Count; index++)
+                {
+                    batches[index].Batch.Dispose();
+                }
+            }
+        }
+
+        SignalLedger(ledger, lastWatermark.Value);
     }
 
     private static void GrowArray<T>(ref T[] array, int used, int needed)
@@ -742,28 +865,85 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         }
     }
 
-    private async ValueTask CommitBatchAsync(LedgerId ledger, Slot slot, PendingBatch entries, bool signalWaiters, CancellationToken cancellationToken)
+    private async ValueTask CommitBatchesAsync(LedgerId ledger, List<(Slot Slot, PendingBatch Batch)> batches, CancellationToken cancellationToken)
     {
+        if (batches.Count == 0)
+        {
+            return;
+        }
+
         ThrowIfCorrupt();
-        var nextWatermark = slot + 1;
         await _writes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfCorrupt();
-            if (Watermark(ledger) >= nextWatermark)
+            await CommitBatchesLockedAsync(ledger, batches, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _ = _writes.Release();
+        }
+    }
+
+    private async ValueTask CommitBatchesLockedAsync(LedgerId ledger, List<(Slot Slot, PendingBatch Batch)> batches, CancellationToken cancellationToken)
+    {
+        var lastWatermark = batches[^1].Slot + 1;
+        var currentWatermark = Watermark(ledger);
+        if (currentWatermark >= lastWatermark)
+        {
+            return;
+        }
+
+        var totalKeys = 0;
+        var totalTombs = 0;
+        for (var index = 0; index < batches.Count; index++)
+        {
+            var (slot, batch) = batches[index];
+            if (slot < currentWatermark)
             {
-                return;
+                continue;
             }
 
-            var batch = new JournalIndexBatch(
+            totalKeys += batch.KeyCount;
+            totalTombs += batch.TombstoneCount;
+        }
+
+        JournalIndexKeyWrite[]? mergedKeys = totalKeys > 0 ? ArrayPool<JournalIndexKeyWrite>.Shared.Rent(totalKeys) : null;
+        JournalIndexTombstoneWrite[]? mergedTombs = totalTombs > 0 ? ArrayPool<JournalIndexTombstoneWrite>.Shared.Rent(totalTombs) : null;
+        try
+        {
+            var keyOffset = 0;
+            var tombOffset = 0;
+            for (var index = 0; index < batches.Count; index++)
+            {
+                var (slot, batch) = batches[index];
+                if (slot < currentWatermark)
+                {
+                    continue;
+                }
+
+                if (batch.KeyWrites is { } keys && batch.KeyCount > 0)
+                {
+                    keys.AsSpan(0, batch.KeyCount).CopyTo(mergedKeys.AsSpan(keyOffset, batch.KeyCount));
+                    keyOffset += batch.KeyCount;
+                }
+
+                if (batch.TombstoneWrites is { } tombs && batch.TombstoneCount > 0)
+                {
+                    tombs.AsSpan(0, batch.TombstoneCount).CopyTo(mergedTombs.AsSpan(tombOffset, batch.TombstoneCount));
+                    tombOffset += batch.TombstoneCount;
+                }
+            }
+
+            var combined = new JournalIndexBatch(
                 ledger,
-                nextWatermark,
-                entries.KeyWrites is { } keys ? keys.AsMemory(0, entries.KeyCount) : ReadOnlyMemory<JournalIndexKeyWrite>.Empty,
-                entries.TombstoneWrites is { } tombs ? tombs.AsMemory(0, entries.TombstoneCount) : ReadOnlyMemory<JournalIndexTombstoneWrite>.Empty);
+                lastWatermark,
+                mergedKeys is not null ? mergedKeys.AsMemory(0, keyOffset) : ReadOnlyMemory<JournalIndexKeyWrite>.Empty,
+                mergedTombs is not null ? mergedTombs.AsMemory(0, tombOffset) : ReadOnlyMemory<JournalIndexTombstoneWrite>.Empty);
 
             try
             {
-                await _index.ApplyBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+                await _index.ApplyBatchAsync(combined, cancellationToken).ConfigureAwait(false);
             }
             catch (JournalIndexCorruptException corrupt)
             {
@@ -773,121 +953,22 @@ public sealed class JournalStateDatabase : IAsyncDisposable
 
             lock (_lock)
             {
-                _appliedWatermarks[ledger] = nextWatermark;
+                _appliedWatermarks[ledger] = lastWatermark;
                 _writeVersion++;
                 _dirty = true;
             }
         }
         finally
         {
-            _ = _writes.Release();
-        }
-
-        if (signalWaiters)
-        {
-            SignalLedger(ledger, nextWatermark.Value);
-        }
-    }
-
-    private async ValueTask CommitBatchesAsync(LedgerId ledger, List<(Slot Slot, PendingBatch Batch)> batches, CancellationToken cancellationToken)
-    {
-        if (batches.Count == 0)
-        {
-            return;
-        }
-
-        ThrowIfCorrupt();
-        var lastWatermark = batches[^1].Slot + 1;
-        await _writes.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            ThrowIfCorrupt();
-            var currentWatermark = Watermark(ledger);
-            if (currentWatermark >= lastWatermark)
+            if (mergedKeys is not null)
             {
-                return;
+                ArrayPool<JournalIndexKeyWrite>.Shared.Return(mergedKeys);
             }
 
-            var totalKeys = 0;
-            var totalTombs = 0;
-            for (var index = 0; index < batches.Count; index++)
+            if (mergedTombs is not null)
             {
-                var (slot, batch) = batches[index];
-                if (slot < currentWatermark)
-                {
-                    continue;
-                }
-
-                totalKeys += batch.KeyCount;
-                totalTombs += batch.TombstoneCount;
+                ArrayPool<JournalIndexTombstoneWrite>.Shared.Return(mergedTombs, clearArray: true);
             }
-
-            JournalIndexKeyWrite[]? mergedKeys = totalKeys > 0 ? ArrayPool<JournalIndexKeyWrite>.Shared.Rent(totalKeys) : null;
-            JournalIndexTombstoneWrite[]? mergedTombs = totalTombs > 0 ? ArrayPool<JournalIndexTombstoneWrite>.Shared.Rent(totalTombs) : null;
-            try
-            {
-                var keyOffset = 0;
-                var tombOffset = 0;
-                for (var index = 0; index < batches.Count; index++)
-                {
-                    var (slot, batch) = batches[index];
-                    if (slot < currentWatermark)
-                    {
-                        continue;
-                    }
-
-                    if (batch.KeyWrites is { } keys && batch.KeyCount > 0)
-                    {
-                        keys.AsSpan(0, batch.KeyCount).CopyTo(mergedKeys.AsSpan(keyOffset, batch.KeyCount));
-                        keyOffset += batch.KeyCount;
-                    }
-
-                    if (batch.TombstoneWrites is { } tombs && batch.TombstoneCount > 0)
-                    {
-                        tombs.AsSpan(0, batch.TombstoneCount).CopyTo(mergedTombs.AsSpan(tombOffset, batch.TombstoneCount));
-                        tombOffset += batch.TombstoneCount;
-                    }
-                }
-
-                var combined = new JournalIndexBatch(
-                    ledger,
-                    lastWatermark,
-                    mergedKeys is not null ? mergedKeys.AsMemory(0, keyOffset) : ReadOnlyMemory<JournalIndexKeyWrite>.Empty,
-                    mergedTombs is not null ? mergedTombs.AsMemory(0, tombOffset) : ReadOnlyMemory<JournalIndexTombstoneWrite>.Empty);
-
-                try
-                {
-                    await _index.ApplyBatchAsync(combined, cancellationToken).ConfigureAwait(false);
-                }
-                catch (JournalIndexCorruptException corrupt)
-                {
-                    MarkCorrupt(corrupt);
-                    throw;
-                }
-
-                lock (_lock)
-                {
-                    _appliedWatermarks[ledger] = lastWatermark;
-                    _writeVersion++;
-                    _dirty = true;
-                }
-            }
-            finally
-            {
-                if (mergedKeys is not null)
-                {
-                    ArrayPool<JournalIndexKeyWrite>.Shared.Return(mergedKeys);
-                }
-
-                if (mergedTombs is not null)
-                {
-                    ArrayPool<JournalIndexTombstoneWrite>.Shared.Return(mergedTombs, clearArray: true);
-                }
-            }
-        }
-        finally
-        {
-            _ = _writes.Release();
         }
     }
 
@@ -920,15 +1001,32 @@ public sealed class JournalStateDatabase : IAsyncDisposable
                 throw;
             }
 
+            List<PendingBatch>? discarded = null;
             lock (_lock)
             {
                 for (var index = 0; index < ledgers.Length; index++)
                 {
                     _ = _appliedWatermarks.Remove(ledgers[index]);
+                    if (_replicatedBuffers.Remove(ledgers[index], out var buffer))
+                    {
+                        discarded ??= [];
+                        for (var batchIndex = 0; batchIndex < buffer.Batches.Count; batchIndex++)
+                        {
+                            discarded.Add(buffer.Batches[batchIndex].Batch);
+                        }
+                    }
                 }
 
                 _writeVersion++;
                 _dirty = true;
+            }
+
+            if (discarded is not null)
+            {
+                for (var index = 0; index < discarded.Count; index++)
+                {
+                    discarded[index].Dispose();
+                }
             }
         }
         finally
@@ -1002,6 +1100,7 @@ public sealed class JournalStateDatabase : IAsyncDisposable
 
             CatchUpWaiter waiter;
             LedgerApplyLoop? loop;
+            var bufferedReady = false;
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_gate.IsClosed, this);
@@ -1020,15 +1119,40 @@ public sealed class JournalStateDatabase : IAsyncDisposable
                     return false;
                 }
 
-                if (!_waiters.TryGetValue(ledger.Id, out var queue))
+                if (_replicatedBuffers.TryGetValue(ledger.Id, out var buffer)
+                    && buffer.Batches.Count > 0
+                    && buffer.Batches[^1].Slot + 1 >= below)
                 {
-                    queue = new PriorityQueue<CatchUpWaiter, long>();
-                    _waiters[ledger.Id] = queue;
+                    bufferedReady = true;
+                    waiter = null!;
+                    loop = null;
+                }
+                else
+                {
+                    if (!_waiters.TryGetValue(ledger.Id, out var queue))
+                    {
+                        queue = new PriorityQueue<CatchUpWaiter, long>();
+                        _waiters[ledger.Id] = queue;
+                    }
+
+                    waiter = new CatchUpWaiter();
+                    queue.Enqueue(waiter, below.Value);
+                    loop = _applyLoop;
+                }
+            }
+
+            if (bufferedReady)
+            {
+                try
+                {
+                    await FlushReplicatedBufferAsync(ledger.Id, waitToken: linked.Token, commitToken: _stop.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (_stop.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    throw new ObjectDisposedException(nameof(JournalStateDatabase));
                 }
 
-                waiter = new CatchUpWaiter();
-                queue.Enqueue(waiter, below.Value);
-                loop = _applyLoop;
+                continue;
             }
 
             if (!woken && ledger.Status.Value is LedgerStatus.Open)
@@ -1475,6 +1599,25 @@ public sealed class JournalStateDatabase : IAsyncDisposable
     private sealed class CatchUpWaiter
     {
         public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class ReplicatedBuffer
+    {
+        public List<(Slot Slot, PendingBatch Batch)> Batches { get; } = [];
+
+        public int Rows { get; set; }
+
+        public int Bytes { get; set; }
+
+        public List<(Slot Slot, PendingBatch Batch)> Detach()
+        {
+            var result = new List<(Slot Slot, PendingBatch Batch)>(Batches.Count);
+            result.AddRange(Batches);
+            Batches.Clear();
+            Rows = 0;
+            Bytes = 0;
+            return result;
+        }
     }
 
     private static List<LedgerMetadata> CollectDistinctClosedPredecessors(

@@ -838,6 +838,96 @@ public sealed class JournalStateDatabaseTests : IDisposable
     }
 
     /// <summary>
+    /// Replicated catch-up batches consecutive decided slots within a scan pass into one atomic
+    /// <see cref="IJournalIndex.ApplyBatchAsync"/> commit (up to 1,024 rows / 1 MiB), while waking a mid-scan waiter
+    /// immediately as soon as its target watermark is reached.
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task ReplicatedCatchUpBatchesConsecutiveSlotsIntoFewIndexCommitsAndWakesMidScanWaiters()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var env = new MultiNodeEnvironment();
+        var storageA = new InMemoryJournalIndex();
+        var countingStorageB = new CountingJournalIndex(new InMemoryJournalIndex());
+
+        await using var nodeA = await env.OpenNodeAsync(NodeA, storageA, ManualFlushOptions());
+        await env.BootstrapAsync(nodeA, [NodeA, NodeB, NodeC]);
+        await using var storeA = new JournalStore(nodeA.Registry, env.Store, new JournalStoreOptions(), TimeProvider.System, nodeA.StateDb);
+        await nodeA.Registry.ReconciledAsync(nodeA.Map.Current.Epoch, token);
+
+        const int TotalSlots = 50;
+        var ledger = nodeA.Map.Current.Find(JournalRowKey.Encode("batch-0").Span)!.Value.Open;
+        for (var i = 0; i < TotalSlots; i++)
+        {
+            _ = await AppendAsync(storeA, $"batch-{i}", JournalVersion.Origin, $"val-{i}");
+        }
+
+        // Open NodeB with its ApplyLoop catching up all 50 replicated slots from slot 0.
+        await using var nodeB = await env.OpenNodeAsync(NodeB, countingStorageB, ManualFlushOptions());
+        await WaitUntilAsync(() => nodeB.StateDb.Watermark(ledger.Id) >= new Slot(TotalSlots), Signal);
+
+        Assert.Equal(new Slot(TotalSlots), nodeB.StateDb.Watermark(ledger.Id));
+        Assert.InRange(countingStorageB.ApplyBatchCalls, 1, 5);
+
+        // Verify all 50 keys are indexed and readable on NodeB.
+        for (var i = 0; i < TotalSlots; i++)
+        {
+            var key = JournalRowKey.Encode($"batch-{i}");
+            var read = await nodeB.StateDb.KeyIndex.ReadAsync(ledger, new Slot(TotalSlots), key.Memory, token);
+            var indexed = Assert.IsType<KeyIndexRead.Indexed>(read.Value);
+            Assert.Single(indexed.Entries);
+        }
+
+        // Verify a waiter targeting slot 5 wakes immediately even if slot 6 is blocked mid-scan.
+        var storageC = new InMemoryJournalIndex();
+        var blockSlot5 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var nodeB2 = await env.OpenNodeAsync(
+            NodeB,
+            storageC,
+            ManualFlushOptions(),
+            onRead: (id, slot) => id == ledger.Id && slot == new Slot(5) ? blockSlot5.Task : Task.CompletedTask);
+        var earlyKey = JournalRowKey.Encode("batch-0");
+        var earlyRead = await nodeB2.StateDb.KeyIndex.ReadAsync(ledger, new Slot(5), earlyKey.Memory, token).AsTask().WaitAsync(Signal, token);
+        var earlyIndexed = Assert.IsType<KeyIndexRead.Indexed>(earlyRead.Value);
+        Assert.Single(earlyIndexed.Entries);
+        blockSlot5.SetResult();
+    }
+
+    private sealed class CountingJournalIndex(IJournalIndex inner) : IJournalIndex
+    {
+        private int _applyBatchCalls;
+
+        public int ApplyBatchCalls => Volatile.Read(ref _applyBatchCalls);
+
+        public ValueTask<SortedDictionary<LedgerId, Slot>> OpenAsync(CancellationToken cancellationToken = default) => inner.OpenAsync(cancellationToken);
+
+        public ValueTask ApplyBatchAsync(in JournalIndexBatch batch, CancellationToken cancellationToken = default)
+        {
+            _ = Interlocked.Increment(ref _applyBatchCalls);
+            return inner.ApplyBatchAsync(in batch, cancellationToken);
+        }
+
+        public ValueTask<List<JournalIndexKeyEntry>> GetKeyEntriesAsync(LedgerId ledger, JournalKeyHash keyHash, Slot startSlot, int startIndex, Slot below, CancellationToken cancellationToken = default) =>
+            inner.GetKeyEntriesAsync(ledger, keyHash, startSlot, startIndex, below, cancellationToken);
+
+        public ValueTask<bool> HasKeyEntryAsync(LedgerId ledger, JournalKeyHash keyHash, Slot startSlot, int startIndex, Slot below, CancellationToken cancellationToken = default) =>
+            inner.HasKeyEntryAsync(ledger, keyHash, startSlot, startIndex, below, cancellationToken);
+
+        public ValueTask<List<JournalIndexTombstone>> ScanTombstonesAsync(LedgerId ledger, CancellationToken cancellationToken = default) =>
+            inner.ScanTombstonesAsync(ledger, cancellationToken);
+
+        public ValueTask DropLedgersAsync(IReadOnlyList<LedgerId> ledgers, CancellationToken cancellationToken = default) => inner.DropLedgersAsync(ledgers, cancellationToken);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken = default) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask ResetAsync(CancellationToken cancellationToken = default) => inner.ResetAsync(cancellationToken);
+
+        public ValueTask CheckAsync(CancellationToken cancellationToken = default) => inner.CheckAsync(cancellationToken);
+
+        public ValueTask CloseAsync() => inner.CloseAsync();
+    }
+
+    /// <summary>
     /// Key-index keys sort big-endian by <c>(LedgerId, SHA256(key), Slot, Index)</c>.
     /// </summary>
     [Fact]
@@ -1045,7 +1135,7 @@ public sealed class JournalStateDatabaseTests : IDisposable
 
         public async Task<NodeProcess> OpenNodeAsync(
             NodeId node,
-            InMemoryJournalIndex storage,
+            IJournalIndex storage,
             JournalIndexOptions options,
             bool startApplyLoop = true,
             Func<LedgerId, Slot, Task>? onRead = null,
@@ -1156,7 +1246,7 @@ public sealed class JournalStateDatabaseTests : IDisposable
             NodeId node,
             InMemoryConditionalRegister register,
             ILedgerReplicaTransport transport,
-            InMemoryJournalIndex storage,
+            IJournalIndex storage,
             JournalIndexOptions options,
             bool startApplyLoop,
             Func<LedgerId, Slot, Task>? onRead,
@@ -1178,7 +1268,7 @@ public sealed class JournalStateDatabaseTests : IDisposable
         }
 
         private async Task InitializeAsync(
-            InMemoryJournalIndex storage,
+            IJournalIndex storage,
             JournalIndexOptions options,
             bool startApplyLoop,
             TimeProvider timeProvider)

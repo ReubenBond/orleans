@@ -1341,13 +1341,15 @@ full-ledger scan ([archive §8.1](archive.md#81-history-reads)).
   `Closed(T)`, the rest below `T`. It reads through the node's `LedgerReader`, so a batch its own replica lacks comes
   from another (LP-I10). Each delivery starts from the applier's durable watermark (`NextSlotAsync`): one in the middle
   of a segment makes the scan rewind to the segment's start and resolve from there, delivering the rows from the
-  watermark on, and the view then stays across the delivery's scans, which resume without rewinding. The applier
-  therefore reaches every closed ledger's `T`, and a wait for it ends. The loop follows the node's map view, which other
-  callers refresh: it starts a delivery for each ledger the view lists with the node, and once the view no longer lists
-  one, stops its delivery and tells the applier (`RemoveAsync`). Backpressure and failures repetition may change back
-  off, jittered, from `LearnInterval` to a second; a `Dropped` answer waits for the view's next listing; any other
-  failure, the applier's among them, faults the loop's `Completion` and stops what met it: the ledger's delivery, or,
-  for a removal the applier failed, the loop. The map's drop
+  watermark on, and the view then stays across the delivery's scans, which resume without rewinding. When
+  `LedgerApplier.FlushAsync` is provided, the loop invokes it at the end of each scan pass (when the scan reaches its
+  target or stops on backpressure), allowing an applier that buffers consecutive decided slots within a pass to commit
+  them together. The applier therefore reaches every closed ledger's `T`, and a wait for it ends. The loop follows the
+  node's map view, which other callers refresh: it starts a delivery for each ledger the view lists with the node, and
+  once the view no longer lists one, stops its delivery and tells the applier (`RemoveAsync`). Backpressure and
+  failures repetition may change back off, jittered, from `LearnInterval` to a second; a `Dropped` answer waits for the
+  view's next listing; any other failure, the applier's among them, faults the loop's `Completion` and stops what met
+  it: the ledger's delivery, or, for a removal the applier failed, the loop. The map's drop
   rule, the archive store's coverage of the ledger below `T` ([HI-I2](archive.md#5-invariants)), is a drop's whole
   precondition: an applier which had not reached `T` when its node's view revoked the ledger reads the rest from the
   archive store. An open ledger costs its replica nodes one local tail read each per `LearnInterval`, and

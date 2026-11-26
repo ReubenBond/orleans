@@ -2194,9 +2194,13 @@ the director places it as it places any new call; since the director never activ
 call reaches a misplaced activation in the first place. The journal node grains, `IJournalStoreGrain` and
 `INodeControlGrain`, use the same director and the same check ([§7.2](#72-grain-interfaces)).
 
-The caller re-reads the registry only on a membership change, on `NotThisNode`, and when the director refuses a
-call for want of a registered `Active` silo, which it treats as an invalidation; re-reads are single-flight, at most
-once per second, deferred rather than dropped when the rate limits them, and retried when they fail
+The caller checks its cached registry and membership views before entering the remote node's lane, acquiring a sender
+copy, or invoking `ILedgerStoreGrain`: when the remote node has no registered `Active` silo, the transport requests a
+stale-registry re-read (`RequestRereadIfStale`) and fails immediately with `LedgerReplicaUnavailableException` (with no
+effect, no placement attempt, and no placement-refusal log flood during degraded quorum writes). The caller also
+re-reads the registry on a membership change, on `NotThisNode`, and when the director refuses a call for want of a
+registered `Active` silo, which it treats as an invalidation; re-reads are single-flight, at most once per second,
+deferred rather than dropped when the rate limits them, and retried when they fail
 ([§5.3](#53-node-registry)). A node restarted at a new address registers there, so the membership change or the
 next refusal finds it, and its next call is placed there. A
 retired node keeps serving its replicas until its retirement gate opens ([§5.8](#58-node-retirement)). A wiped or
@@ -2233,7 +2237,7 @@ states:
 | `Refused`: an unknown protocol version | `NotSupportedException` with the callee's message | None |
 | `Refused`: the callee's node stops | `LedgerReplicaUnavailableException` | None |
 | `NotThisNode` | `LedgerReplicaUnavailableException` | None |
-| No registered `Active` silo for the node, so the director refuses | `LedgerReplicaUnavailableException` wrapping the refusal; the caller invalidates its registry mapping | None |
+| No registered `Active` silo for the node (pre-checked by the transport before invoking Orleans, or refused by the director) | `LedgerReplicaUnavailableException` (wrapping the refusal when the director ran); the caller requests a registry re-read | None |
 | Orleans rejects the call as overloaded (`LimitExceededException`), when a deployment sets `MaxEnqueuedRequestsHardLimit` | `LedgerReplicaUnavailableException` wrapping the rejection | None |
 | The call's deadline passes while it waits in its node's lane for the caller's budget, or, to the silo's own node, for the node's registration (below) | `LedgerReplicaQueueTimeoutException` ([ledger-replicas](../components/ledger-replicas.md)) | None: never sent |
 | A reply which fails a reply check, or which the caller cannot decode: its surrogate's refusal, or Orleans' codec's (a `SerializerException`, such as a version-1 reply's) | `InvalidDataException` | Unknown |
@@ -2379,10 +2383,13 @@ ledger writer repeats as transient forever. Admitting an oversized call while no
 was rejected: one call would then exceed the per-node bound which caps what a callee buffers. A `MaxProposalBytes` above
 `MaxNodeCallBytes` adds no throughput: the batches past the per-node budget only wait in its queue.
 
-**Payloads (OR-I18).** Remote payloads and replies cross in Orleans' own `ArcBuffer`, whose pages come from Orleans'
-page pool and which Orleans' `ArcBufferCodec` writes as a length-prefixed field, a varint length and the bytes; every
-Clog layer keeps Clog's `ArcBuffer`, and `WireBuffers` copies between the two once at each crossing, every pin with one
-releaser. A remote write or recovery write, once its lane grants it, copies its payload into an Orleans buffer, unless a
+**Payloads (OR-I18).** Remote payloads and replies cross in Orleans' own `ArcBuffer`, which Orleans' `ArcBufferCodec`
+writes as a length-prefixed field, a varint length and the bytes; every Clog layer keeps Clog's `ArcBuffer`, and
+`WireBuffers` copies between the two once at each crossing, every pin with one releaser. Outbound copies into Orleans
+(`WireBuffers.CopyToOrleans`) allocate an exact-sized unpinned `byte[]` and wrap it via `ArcBuffer.Wrap` as a single
+non-pooled external `ArcBufferPage`, so Orleans' codec writes one segment and the copies Orleans retains across silos
+are reclaimed as ordinary GC arrays without renting or leaking 32 KiB `ArrayPool` arrays or pinned POH pages. A remote
+write or recovery write, once its lane grants it, copies its payload into an Orleans buffer, unless a
 granted remote call of the same payload already holds one, which it then shares. The caller finds a payload's copy by
 the payload's first page, its offset, and its length: a caller holds its payload, and so its pages, throughout every
 call which carries it, so no other payload has that key while the copy is held. The copy is taken only once granted, so

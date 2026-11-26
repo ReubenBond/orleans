@@ -1889,6 +1889,61 @@ public readonly struct ArcBuffer : IDisposable
     }
 
     /// <summary>
+    /// Copies <paramref name="source"/> into an owned buffer from Durable Storage's page pool without allocating an
+    /// <see cref="ArcBufferWriter"/> when <paramref name="source"/> fits in one page.
+    /// </summary>
+    public static ArcBuffer CopyFrom(ReadOnlySpan<byte> source)
+    {
+        var length = source.Length;
+        if (length == 0)
+        {
+            return default;
+        }
+
+        if (length <= ArcBufferPagePool.LargestPageSize)
+        {
+            var page = ArcBufferPagePool.Shared.Rent(length);
+            source.CopyTo(page.WritableSpan);
+            page.Advance(length);
+            return new ArcBuffer(page, page.Version, 0, length);
+        }
+
+        using var writer = new ArcBufferWriter(length);
+        writer.Write(source);
+        return writer.ConsumeSlice(length);
+    }
+
+    /// <summary>
+    /// Copies <paramref name="source"/> into an owned buffer from Durable Storage's page pool without allocating an
+    /// <see cref="ArcBufferWriter"/> when <paramref name="source"/> fits in one page.
+    /// </summary>
+    public static ArcBuffer CopyFrom(ReadOnlySequence<byte> source)
+    {
+        if (source.IsEmpty)
+        {
+            return default;
+        }
+
+        if (source.IsSingleSegment)
+        {
+            return CopyFrom(source.FirstSpan);
+        }
+
+        var length = checked((int)source.Length);
+        if (length <= ArcBufferPagePool.LargestPageSize)
+        {
+            var page = ArcBufferPagePool.Shared.Rent(length);
+            source.CopyTo(page.WritableSpan);
+            page.Advance(length);
+            return new ArcBuffer(page, page.Version, 0, length);
+        }
+
+        using var writer = new ArcBufferWriter(length);
+        writer.Write(source);
+        return writer.ConsumeSlice(length);
+    }
+
+    /// <summary>
     /// Gets a value indicating whether this is the default value, which owns nothing.
     /// </summary>
     /// <remarks>

@@ -34,8 +34,16 @@ internal sealed class TransportScenario : IAsyncDisposable
     private readonly string _root;
     private readonly List<ILedgerReplica> _replicas = [];
     private int _invalidations;
+    private int _staleInvalidations;
 
-    private TransportScenario(string root, GatedWalStorage storage, LedgerStore store, CallBudgetMutant mutant, int seed, bool registered)
+    private TransportScenario(
+        string root,
+        GatedWalStorage storage,
+        LedgerStore store,
+        CallBudgetMutant mutant,
+        int seed,
+        bool registered,
+        Func<NodeId, bool>? isNodeActive)
     {
         _root = root;
         Storage = storage;
@@ -53,7 +61,9 @@ internal sealed class TransportScenario : IAsyncDisposable
             Limits,
             (node, bytes, calls, time) => new MutantCallBudget(bytes, calls, time, waited => new LedgerReplicaQueueTimeoutException(node, waited), mutant),
             new Random(seed),
-            Time);
+            Time,
+            isNodeActive,
+            () => Interlocked.Increment(ref _staleInvalidations));
     }
 
     public static ReplicaCallLimits Limits { get; } = TestReplicaLimits.Of(
@@ -82,7 +92,13 @@ internal sealed class TransportScenario : IAsyncDisposable
 
     public int Invalidations => Volatile.Read(ref _invalidations);
 
-    public static async Task<TransportScenario> CreateAsync(CallBudgetMutant mutant = CallBudgetMutant.None, int seed = 0, bool registered = true)
+    public int StaleInvalidations => Volatile.Read(ref _staleInvalidations);
+
+    public static async Task<TransportScenario> CreateAsync(
+        CallBudgetMutant mutant = CallBudgetMutant.None,
+        int seed = 0,
+        bool registered = true,
+        Func<NodeId, bool>? isNodeActive = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "clog-orleans-transport-tests", Guid.NewGuid().ToString("N"));
         _ = System.IO.Directory.CreateDirectory(root);
@@ -94,7 +110,7 @@ internal sealed class TransportScenario : IAsyncDisposable
             create: true,
             new LedgerStoreCheckpointOptions(),
             TimeProvider.System);
-        return new TransportScenario(root, storage, store, mutant, seed, registered);
+        return new TransportScenario(root, storage, store, mutant, seed, registered, isNodeActive);
     }
 
     /// <summary>Registers the scenario's node, so its serving gate admits calls.</summary>

@@ -208,7 +208,8 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
 
         var failure = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 0, [1]).WaitAsync(TestContext.Current.CancellationToken));
 
-        _ = Assert.IsType<NodePlacementRefusedException>(failure.InnerException);
+        Assert.Null(failure.InnerException);
+        Assert.Equal(0, Cluster.Transport(Caller).SenderCopyCount);
         Assert.False(await IsActiveAsync(Cluster.TestCluster.Client.GetGrain<IManagementGrain>(0), node));
     }
 

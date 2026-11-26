@@ -8,6 +8,7 @@ using Orleans.Durable.Storage.Engine.Buffers;
 using Orleans.Durable.Storage.Engine.Ledgers;
 using Orleans.Durable.Storage.Engine.Ledgers.Store;
 using Orleans.Durable.Storage.Engine.Threading;
+using Orleans.Runtime;
 
 namespace Orleans.Durable.Storage;
 
@@ -55,6 +56,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     private readonly LocalNode _local;
     private readonly Func<NodeId, ILedgerStoreGrain> _grain;
     private readonly Action _invalidate;
+    private readonly Func<NodeId, bool>? _isNodeActive;
+    private readonly Action _invalidateIfStale;
     private readonly Func<NodeId, long, int, TimeProvider, CallBudget> _createBudget;
     private readonly ConcurrentDictionary<NodeId, NodeBudgets> _budgets = new();
     private readonly SenderCopies _senderCopies = new();
@@ -63,7 +66,13 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes a new instance of the <see cref="OrleansLedgerReplicaTransport"/> class for a silo.</summary>
-    public OrleansLedgerReplicaTransport(LocalNode local, IGrainFactory grains, NodeRegistryResolver resolver, ReplicaCallLimits limits, TimeProvider timeProvider)
+    public OrleansLedgerReplicaTransport(
+        LocalNode local,
+        IGrainFactory grains,
+        NodeRegistryResolver resolver,
+        IClusterMembershipService membership,
+        ReplicaCallLimits limits,
+        TimeProvider timeProvider)
         : this(
             local,
             node => grains.GetGrain<ILedgerStoreGrain>(node.Value),
@@ -71,8 +80,11 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             limits,
             NodeCallBudget.Create,
             new Random(),
-            timeProvider)
+            timeProvider,
+            node => IsNodeActive(resolver, membership, node),
+            resolver.RequestRereadIfStale)
     {
+        ArgumentNullException.ThrowIfNull(membership);
     }
 
     /// <summary>Initializes a new instance of the <see cref="OrleansLedgerReplicaTransport"/> class over explicit seams.</summary>
@@ -83,6 +95,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
     /// <param name="createBudget">Creates one of a node's lanes, from the node, its bytes, its calls, and the clock.</param>
     /// <param name="jitter">Jitters the backoff.</param>
     /// <param name="timeProvider">Times the deadlines and the backoff.</param>
+    /// <param name="isNodeActive">Optional check returning whether a remote node currently has an active silo in membership.</param>
+    /// <param name="invalidateIfStale">Optional stale-registry re-read trigger invoked when <paramref name="isNodeActive"/> returns <see langword="false"/>.</param>
     internal OrleansLedgerReplicaTransport(
         LocalNode local,
         Func<NodeId, ILedgerStoreGrain> grain,
@@ -90,7 +104,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         ReplicaCallLimits limits,
         Func<NodeId, long, int, TimeProvider, CallBudget> createBudget,
         Random jitter,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        Func<NodeId, bool>? isNodeActive = null,
+        Action? invalidateIfStale = null)
     {
         ArgumentNullException.ThrowIfNull(local);
         ArgumentNullException.ThrowIfNull(grain);
@@ -102,10 +118,29 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         _local = local;
         _grain = grain;
         _invalidate = invalidate;
+        _isNodeActive = isNodeActive;
+        _invalidateIfStale = invalidateIfStale ?? invalidate;
         Limits = limits;
         _createBudget = createBudget;
         _jitter = jitter;
         _timeProvider = timeProvider;
+    }
+
+    private static bool IsNodeActive(NodeRegistryResolver resolver, IClusterMembershipService membership, NodeId node) =>
+        resolver.Resolve(node) is { } silo && membership.CurrentSnapshot.GetSiloStatus(silo) == SiloStatus.Active;
+
+    /// <summary>
+    /// Fast-fails calls targeting a remote node with no active registered silo in membership before entering
+    /// <see cref="CallBudget"/>, acquiring <see cref="SenderCopies"/>, or invoking Orleans grain placement
+    /// (avoiding <see cref="NodePlacementRefusedException"/> log storms during degraded quorum writes; orleans.md §5.12).
+    /// </summary>
+    private void EnsureRemoteActive(NodeId node)
+    {
+        if (_isNodeActive is not null && !_isNodeActive(node))
+        {
+            _invalidateIfStale();
+            throw new LedgerReplicaUnavailableException(node, "the node has no active registered silo in membership.");
+        }
     }
 
     /// <summary>Gets the replica call limits.</summary>
@@ -272,6 +307,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
     private async ValueTask<ReplicaHeartbeatRead> HeartbeatRemoteAsync(NodeId node, ReadOnlyMemory<LedgerId> ledgers, CancellationToken cancellationToken)
     {
+        EnsureRemoteActive(node);
         var deadline = DeadlineFromNow();
         var rawLedgers = new ulong[ledgers.Length];
         var span = ledgers.Span;
@@ -290,6 +326,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         var backoff = FirstBackoff;
         while (true)
         {
+            EnsureRemoteActive(node);
             TimeSpan delay;
             using (await controlLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false))
             {
@@ -793,6 +830,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             var backoff = FirstBackoff;
             while (true)
             {
+                Transport.EnsureRemoteActive(Node);
                 TimeSpan delay;
                 using (await _dataLane.EnterLeaseAsync(payload.Length, deadline, cancellationToken).ConfigureAwait(false))
                 {
@@ -866,6 +904,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             var backoff = FirstBackoff;
             while (true)
             {
+                Transport.EnsureRemoteActive(Node);
                 TimeSpan delay;
                 using (await _controlLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false))
                 {
@@ -920,6 +959,7 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 var backoff = FirstBackoff;
                 while (true)
                 {
+                    Transport.EnsureRemoteActive(Node);
                     TimeSpan delay;
                     using (await _dataLane.EnterLeaseAsync(reserved, deadline, cancellationToken).ConfigureAwait(false))
                     {

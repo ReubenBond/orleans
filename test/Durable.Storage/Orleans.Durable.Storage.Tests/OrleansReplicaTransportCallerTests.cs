@@ -628,6 +628,45 @@ public sealed class OrleansReplicaTransportCallerTests : IDisposable
     }
 
     /// <summary>
+    /// orleans.md §5.12: a remote node with no active registered silo in membership fails fast as unavailable across
+    /// write, read, tail read, and heartbeat without entering lanes, taking sender copies, or calling the grain, and
+    /// succeeds immediately once membership/registry show the node active again.
+    /// </summary>
+    [Fact]
+    public async Task AnInactiveRemoteNodeShortCircuitsWithoutCallingGrainOrCopyingPayload()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var active = false;
+        await using var scenario = await TransportScenario.CreateAsync(isNodeActive: _ => Volatile.Read(ref active));
+        scenario.Grain.Answer = request => request switch
+        {
+            LedgerReplicaWriteRequest => ReplicaWriteOutcome.Written.Instance,
+            LedgerReplicaReadRequest => ReplicaRead.Missing.Instance,
+            LedgerReplicaTailRequest => new RemoteReplicaTailRead.Tail(0, false, 0),
+            LedgerReplicaHeartbeatRequest => new RemoteReplicaHeartbeatRead.Reply(0, [0]),
+            _ => throw new InvalidOperationException(),
+        };
+        var replica = scenario.Open(local: false);
+
+        var writeFailure = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => WriteAsync(replica, 0, 12, token));
+        Assert.Null(writeFailure.InnerException);
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadAsync(new Slot(0), Slot.Zero, token).AsTask());
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => replica.ReadTailAsync(Slot.Zero, seal: false, token).AsTask());
+        _ = await Assert.ThrowsAsync<LedgerReplicaUnavailableException>(() => scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token).AsTask());
+
+        Assert.Equal(0, scenario.Grain.Sent);
+        Assert.Equal(0, scenario.Transport.SenderCopyCount);
+        Assert.Equal(4, scenario.StaleInvalidations);
+
+        Volatile.Write(ref active, true);
+        Assert.Equal(ReplicaWriteOutcome.Written.Instance, (await WriteAsync(replica, 0, 12, token)).Value);
+        Assert.True((await replica.ReadAsync(new Slot(0), Slot.Zero, token)).TryGetValue(out ReplicaRead.Missing? _));
+        Assert.True((await replica.ReadTailAsync(Slot.Zero, seal: false, token)).TryGetValue(out LedgerReplicaTail _));
+        Assert.True((await scenario.Transport.HeartbeatAsync(scenario.Remote, new[] { TransportScenario.Ledger }, token)).TryGetValue(out ReplicaHeartbeatReply _));
+        Assert.Equal(4, scenario.Grain.Sent);
+    }
+
+    /// <summary>
     /// orleans.md §5.12, OR-I15, OR-I16: one case per row of the result table, each produced at the callee or in Orleans
     /// through the grain double, or at the caller, and reported to the caller as the table states. The rows a callee's
     /// answer produces are those <see cref="OrleansReplicaTransportTests"/> runs across silos too.

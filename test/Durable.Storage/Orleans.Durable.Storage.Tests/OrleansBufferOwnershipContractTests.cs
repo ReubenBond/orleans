@@ -62,6 +62,42 @@ public sealed class OrleansBufferOwnershipContractTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// OR-I18: <see cref="WireBuffers.CopyToOrleans(ArcBuffer)"/> wraps an exact-sized unpinned array rather than
+    /// renting a pooled page, including at <see cref="Orleans.Serialization.Buffers.ArcBufferPagePool.MinimumPageSize"/>,
+    /// so retained outbound copies do not leak 32 KiB <see cref="System.Buffers.ArrayPool{T}"/> arrays or pinned pages.
+    /// </summary>
+    [Theory]
+    [InlineData(619)]
+    [InlineData(OrleansBufferWriter.MinimumPageSize)]
+    [InlineData(OrleansBufferWriter.MinimumPageSize + 17)]
+    public void CopyToOrleansWrapsExactSizedNonPooledArray(int length)
+    {
+        var expected = new byte[length];
+        for (var i = 0; i < expected.Length; i++)
+        {
+            expected[i] = unchecked((byte)(i * 31 + 7));
+        }
+
+        using var source = ArcBuffer.CopyFrom(expected);
+        var copied = WireBuffers.CopyToOrleans(source);
+        Assert.NotNull(copied.First);
+        var page = copied.First;
+
+        Assert.Equal(length, copied.Length);
+        Assert.Equal(length, page.Array.Length);
+        Assert.False(page.IsMinimumSize);
+        Assert.Equal(expected, copied.ToArray());
+
+        var deepCopy = _services.GetRequiredService<DeepCopier<LedgerReplicaWriteRequest>>().Copy(Request(copied));
+        copied.Dispose();
+        Assert.Equal(expected, deepCopy.Payload.ToArray());
+        var pin = deepCopy.Payload;
+        pin.Dispose();
+        Assert.True(WireBytes.IsReleased(deepCopy.Payload));
+        Assert.Empty(page.Array);
+    }
+
+    /// <summary>
     /// The grain method owns the payload Orleans decoded into a write's invokable: disposing the invokable releases no pin,
     /// so the decoded payload's release is its only one.
     /// </summary>

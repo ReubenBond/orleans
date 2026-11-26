@@ -1796,9 +1796,14 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
         await EventuallyAsync(async () => (await Controller(cluster).GetRetirementAsync(nodes[1])).IsReleasable, "the repeated retirement's gate to open");
         Assert.True((await Controller(cluster).GetRetirementAsync(nodes[0])).IsReleasable);
 
+        // Retiring the third non-primary node leaves only one other active node (< Q = 2), so no degraded hand-off can be
+        // placed for the stopping silo once its registry view catches up.
+        await Controller(cluster).RetireNodeAsync(nodes[2]);
+        await EventuallyAsync(async () => (await Controller(cluster).GetRetirementAsync(nodes[2])).Value is NodeStanding.Retired, "the third node to retire");
+
         // orleans.md §5.2 step 1: a stopping primary whose registry view predates the retirements, which changed no
-        // membership, re-reads it, so it counts two other active nodes, too few for a hand-off, and stops at once rather
-        // than waiting for a hand-off no one can place until the host's 30-second stop timeout. Until its reads are
+        // membership, re-reads it, so it counts one other active node, below quorum Q for a hand-off, and stops at once
+        // rather than waiting for a hand-off no one can place until the host's 30-second stop timeout. Until its reads are
         // released, its view counts the retired nodes as targets, so it waits, asking each control interval.
         await EventuallyAsync(
             async () => (await ReadMapAsync()).Ledgers.Any(ledger => ledger.IsOpen && ledger.Primary.Node == stoppingNode),
@@ -2800,16 +2805,23 @@ public sealed partial class OrleansControllerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Deploys three silos with <c>N = 3</c>, so a stopping silo can hand none of its ledgers off, and writes an
-    /// <c>Append</c> through the Journals of a silo other than the test cluster's primary, to a key of a ledger its node is
-    /// primary of, while that ledger's replica writes are held at their callees, so the batch waits for its quorum; answers
-    /// the silo, its Journals, and the write, once a replica write is held.
+    /// Deploys three silos with <c>N = 3</c> and retires one of the other silos so only one other active node
+    /// (<c>&lt; Q = 2</c>) remains and the stopping silo can hand none of its ledgers off, then writes an <c>Append</c>
+    /// through the Journals of a silo other than the test cluster's primary, to a key of a ledger its node is primary of,
+    /// while that ledger's replica writes are held at their callees, so the batch waits for its quorum; answers the silo,
+    /// its Journals, and the write, once a replica write is held.
     /// </summary>
     private async Task<(SiloHandle Handle, LocalJournals Journals, Task<LocalJournalWriteOutcome> Write)> HoldAJournalWriteAsync(CancellationToken cancellationToken)
     {
         var cluster = await DeployAsync(3, cancellationToken);
         var map = await ServedAsync(cluster, ranges: 3, done: value => Balanced(cluster, value));
         var (node, _, handle) = Nodes(cluster).First(entry => entry.Handle != cluster.Primary && map.Ledgers.Any(ledger => ledger.IsOpen && ledger.Primary.Node == entry.Node));
+        var retired = Nodes(cluster).First(entry => entry.Handle != cluster.Primary && entry.Handle != handle).Node;
+        await Controller(cluster).RetireNodeAsync(retired);
+        await EventuallyAsync(async () => (await Controller(cluster).GetRetirementAsync(retired)).Value is NodeStanding.Retired, "the third silo to retire so hand-off has fewer than Q targets");
+        var resolver = Services(handle).GetRequiredService<NodeRegistryResolver>();
+        resolver.RequestReread();
+        await EventuallyAsync(() => resolver.Current?.Find(retired) is { IsRetired: true }, $"{handle.Name}'s registry view to observe the retirement");
         var ledger = map.Ledgers.First(ledger => ledger.IsOpen && ledger.Primary.Node == node);
         var key = Enumerable.Range(0, int.MaxValue).Select(static index => JournalRowKey.Encode(string.Create(CultureInfo.InvariantCulture, $"journal-{index}"))).First(key => ledger.Range.Contains(key.Span));
         var journals = _state.Journals[handle.Name];

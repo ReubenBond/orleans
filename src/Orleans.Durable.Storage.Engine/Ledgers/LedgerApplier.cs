@@ -24,6 +24,13 @@ public sealed class LedgerApplier
     public required Func<LedgerId, LedgerScanItem, CancellationToken, ValueTask> ApplyAsync { get; init; }
 
     /// <summary>
+    /// Gets an optional callback invoked by <see cref="LedgerApplyLoop"/> when a scan pass finishes (reaching its target
+    /// or stopping on backpressure), allowing an applier that buffers consecutive decided slots within a pass to commit
+    /// them together.
+    /// </summary>
+    public Func<LedgerId, CancellationToken, ValueTask>? FlushAsync { get; init; }
+
+    /// <summary>
     /// Gets the callback which tells the applier the node's map view no longer lists a ledger, so the loop delivers no
     /// more of it: an applier which had not reached a closed ledger's <c>T</c> reads the rest from the archive store,
     /// which covers it below <c>T</c> (HI-I2, ledgers.md §8.5).

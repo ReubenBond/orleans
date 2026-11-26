@@ -2059,6 +2059,10 @@ namespace Orleans.Durable.Storage.Engine.Buffers
 
         public readonly System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence() { throw null; }
 
+        public static ArcBuffer CopyFrom(System.Buffers.ReadOnlySequence<byte> source) { throw null; }
+
+        public static ArcBuffer CopyFrom(System.ReadOnlySpan<byte> source) { throw null; }
+
         public readonly void CopyTo(ArcBufferWriter output) { }
 
         public readonly int CopyTo(System.Span<byte> output) { throw null; }
@@ -3401,6 +3405,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
     public sealed partial class LedgerApplier
     {
         public required System.Func<LedgerId, LedgerScanItem, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> ApplyAsync { get { throw null; } init { } }
+
+        public System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? FlushAsync { get { throw null; } init { } }
 
         public required System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Slot>> NextSlotAsync { get { throw null; } init { } }
 

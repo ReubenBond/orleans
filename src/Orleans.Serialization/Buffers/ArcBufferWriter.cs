@@ -695,6 +695,8 @@ internal sealed class ArcBufferPagePool
 /// </summary>
 public sealed class ArcBufferPage
 {
+    private readonly bool _isExternal;
+
     // The current version of the page. Each time the page is return to the pool, the version is incremented.
     // This helps to ensure that the page is not consumed after it has been returned to the pool.
     // This is a guard against certain programming bugs.
@@ -716,6 +718,13 @@ public sealed class ArcBufferPage
         InitializeArray(length);
     }
 
+    internal ArcBufferPage(byte[] array, int length)
+    {
+        Array = array;
+        Length = length;
+        _isExternal = true;
+    }
+
     /// <summary>
     /// Resizes the backing array to accommodate a large segment.
     /// </summary>
@@ -723,6 +732,11 @@ public sealed class ArcBufferPage
     public void ResizeLargeSegment(int length)
     {
         Debug.Assert(length > ArcBufferPagePool.MinimumPageSize);
+        if (_isExternal)
+        {
+            throw new InvalidOperationException("An externally backed page cannot be resized.");
+        }
+
         InitializeArray(length);
     }
 
@@ -821,7 +835,7 @@ public sealed class ArcBufferPage
     /// <summary>
     /// Gets a value indicating whether this page is equal to the minimum page size.
     /// </summary>
-    public bool IsMinimumSize => Array.Length == ArcBufferPagePool.MinimumPageSize;
+    public bool IsMinimumSize => !_isExternal && Array.Length == ArcBufferPagePool.MinimumPageSize;
 
     /// <summary>
     /// Gets the number of bytes in the page which are available for writing.
@@ -969,6 +983,12 @@ public sealed class ArcBufferPage
         Length = 0;
         Next = default;
         Interlocked.Increment(ref _version);
+        if (_isExternal)
+        {
+            Array = [];
+            return;
+        }
+
         ArcBufferPagePool.Shared.Return(this);
     }
 
@@ -1206,6 +1226,31 @@ public struct ArcBuffer : IDisposable
 
     /// <summary>Gets an empty buffer which owns no pages.</summary>
     public static ArcBuffer Empty => default;
+
+    /// <summary>
+    /// Creates an owned, zero-copy buffer over array-backed memory without renting from any page or array pool.
+    /// </summary>
+    /// <param name="memory">The array-backed memory to wrap.</param>
+    /// <returns>
+    /// A pinned buffer over <paramref name="memory"/> whose disposal releases its reference without returning the
+    /// backing array to any pool, or <see cref="Empty"/> when <paramref name="memory"/> is empty.
+    /// </returns>
+    public static ArcBuffer Wrap(ReadOnlyMemory<byte> memory)
+    {
+        if (memory.IsEmpty)
+        {
+            return default;
+        }
+
+        if (!MemoryMarshal.TryGetArray(memory, out var segment) || segment.Array is null)
+        {
+            throw new ArgumentException("The memory to wrap must be array-backed.", nameof(memory));
+        }
+
+        var page = new ArcBufferPage(segment.Array, checked(segment.Offset + segment.Count));
+        page.Pin(page.Version);
+        return new ArcBuffer(page, segment.Offset, segment.Count);
+    }
 
     /// <summary>Gets whether this buffer contains no bytes.</summary>
     public readonly bool IsEmpty => Length == 0;
