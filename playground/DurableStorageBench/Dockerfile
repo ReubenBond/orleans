@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         liblz4-1 \
         libzstd1 \
         libbz2-1.0 \
+        liburing2 \
         curl \
     && rm -rf /var/lib/apt/lists/*
 

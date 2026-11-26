@@ -64,10 +64,15 @@ if (inferredOrdinal is null && resolvedVoters is not null)
     }
 }
 
+var orleansUseIoUringEnv = Environment.GetEnvironmentVariable("ORLEANS_USE_IO_URING");
+var orleansUseIoUring = OperatingSystem.IsLinux()
+    && (string.Equals(orleansUseIoUringEnv, "1", StringComparison.Ordinal)
+        || (AppContext.TryGetSwitch("Orleans.Connections.Transport.Sockets.UseIoUring", out var ioUringSwitch) && ioUringSwitch));
+
 Console.WriteLine(
     $"[BenchStartup] Mode={mode} SiloName={siloName} Ordinal={inferredOrdinal?.ToString(CultureInfo.InvariantCulture) ?? "none"} " +
     $"AdvertisedIP={advertisedIp} SiloPort={benchOptions.SiloPort} GatewayPort={benchOptions.GatewayPort} HttpPort={benchOptions.HttpPort} " +
-    $"ClusterId={benchOptions.ClusterId}");
+    $"ClusterId={benchOptions.ClusterId} ORLEANS_USE_IO_URING={orleansUseIoUringEnv ?? "<unset>"} (active={orleansUseIoUring})");
 
 // Configure Kestrel HTTP port if ASPNETCORE_URLS was not set externally.
 if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
@@ -209,6 +214,7 @@ var runtimeInfo = new BenchRuntimeInfo(
     SiloName: siloName,
     HttpPort: benchOptions.HttpPort,
     WalStorageType: walStorageType,
+    OrleansUseIoUring: orleansUseIoUring,
     LsmContainer: storage.LsmContainer,
     JobsContainer: storage.JobsContainer,
     BaselineJournalsContainer: storage.BaselineJournalsContainer,

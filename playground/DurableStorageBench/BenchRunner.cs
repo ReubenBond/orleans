@@ -134,6 +134,7 @@ public sealed partial class BenchRunner(
             siloAddress = localSilo.SiloAddress.ToParsableString(),
             siloName = localSilo.Name,
             walStorageType = runtimeInfo.WalStorageType,
+            orleansUseIoUring = runtimeInfo.OrleansUseIoUring,
             clusterId = runtimeInfo.ClusterId,
             serviceId = runtimeInfo.ServiceId,
             ordinal = runtimeInfo.Ordinal,

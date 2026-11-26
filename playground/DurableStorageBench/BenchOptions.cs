@@ -89,6 +89,7 @@ public sealed record BenchRuntimeInfo(
     string SiloName,
     int HttpPort,
     string WalStorageType,
+    bool OrleansUseIoUring,
     string LsmContainer,
     string JobsContainer,
     string BaselineJournalsContainer,
