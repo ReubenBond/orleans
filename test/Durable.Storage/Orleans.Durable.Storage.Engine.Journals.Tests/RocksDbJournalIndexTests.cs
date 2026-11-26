@@ -355,6 +355,43 @@ public sealed class RocksDbJournalIndexTests : IDisposable
     }
 
     /// <summary>
+    /// Persisted <see cref="LedgerSegmentView"/> snapshots flush atomically with watermarks in the <c>default</c> column
+    /// family without interfering with watermark recovery, discard unflushed updates on crash, and delete when their
+    /// ledger is dropped.
+    /// </summary>
+    [Fact]
+    public async Task LedgerSegmentViewSnapshotsPersistAtomicallyWithWatermarksAndDeleteOnDrop()
+    {
+        var dir = NewDirectory("segment-snapshots");
+        var ledger = new LedgerId(77);
+        var snapshot = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+        await using (var index = new RocksDbJournalIndex(dir))
+        {
+            Assert.Empty(await index.OpenAsync(Token));
+            Assert.Null(await index.LoadSegmentViewAsync(ledger, Token));
+
+            await index.ApplyBatchAsync(new JournalIndexBatch(ledger, new Slot(10), ReadOnlyMemory<JournalIndexKeyWrite>.Empty, ReadOnlyMemory<JournalIndexTombstoneWrite>.Empty), Token);
+            await index.SaveSegmentViewAsync(ledger, snapshot, Token);
+            await index.FlushAsync(Token);
+
+            // Overwrite without flushing to model a crash before the next flush.
+            await index.SaveSegmentViewAsync(ledger, new byte[] { 0xFF, 0xFE, 0xFD }, Token);
+            await index.CloseAsync();
+        }
+
+        await using var reopened = new RocksDbJournalIndex(dir);
+        var watermarks = await reopened.OpenAsync(Token);
+        Assert.Equal(new Slot(10), Assert.Single(watermarks).Value);
+        Assert.Equal(snapshot, await reopened.LoadSegmentViewAsync(ledger, Token));
+
+        await reopened.DropLedgersAsync([ledger], Token);
+        await reopened.FlushAsync(Token);
+        Assert.Null(await reopened.LoadSegmentViewAsync(ledger, Token));
+        await reopened.CloseAsync();
+    }
+
+    /// <summary>
     /// Opening a second <see cref="RocksDbJournalIndex"/> over a directory locked by another instance throws
     /// <see cref="JournalIndexLockHeldException"/> without triggering <see cref="FatalErrorHandler"/>, while an I/O
     /// failure on open reports <see cref="FatalErrorSite.JournalIndexOpen"/> to <see cref="FatalErrorHandler"/>.

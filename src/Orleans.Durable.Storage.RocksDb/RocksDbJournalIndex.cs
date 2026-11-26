@@ -70,6 +70,8 @@ public sealed class RocksDbJournalIndex : IJournalIndex, IAsyncDisposable
     private const int ReaderThreads = 4;
     private const int WatermarkKeyLength = 8;
     private const int WatermarkValueLength = 8;
+    private const byte ViewSnapshotKeyPrefix = (byte)'S';
+    private const int ViewSnapshotKeyLength = 1 + 8;
     private const int BloomBitsPerKey = 10;
     private const double MemtablePrefixBloomRatio = 0.1;
     private const string IOErrorPrefix = "IO error: ";
@@ -255,6 +257,18 @@ public sealed class RocksDbJournalIndex : IJournalIndex, IAsyncDisposable
             }
         })).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <inheritdoc/>
+    public async ValueTask SaveSegmentViewAsync(LedgerId ledger, ReadOnlyMemory<byte> snapshot, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var copy = snapshot.ToArray();
+        await WriteOnWriterThreadAsync(() => SaveSegmentViewCore(ledger, copy)).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<byte[]?> LoadSegmentViewAsync(LedgerId ledger, CancellationToken cancellationToken = default) =>
+        LookupKeyIndexAsync(state => LoadSegmentViewCore(state, ledger), cancellationToken);
 
     /// <inheritdoc/>
     public async ValueTask FlushAsync(CancellationToken cancellationToken = default)
@@ -528,6 +542,11 @@ public sealed class RocksDbJournalIndex : IJournalIndex, IAsyncDisposable
         for (_ = iterator.SeekToFirst(); iterator.Valid(); _ = iterator.Next())
         {
             var key = iterator.GetKeySpan();
+            if (key.Length == ViewSnapshotKeyLength && key[0] == ViewSnapshotKeyPrefix)
+            {
+                continue;
+            }
+
             var value = iterator.GetValueSpan();
             if (key.Length != WatermarkKeyLength || value.Length != WatermarkValueLength)
             {
@@ -640,6 +659,7 @@ public sealed class RocksDbJournalIndex : IJournalIndex, IAsyncDisposable
     {
         var state = RequireOpen();
         using var writeBatch = new WriteBatch();
+        Span<byte> segKey = stackalloc byte[ViewSnapshotKeyLength];
         for (var index = 0; index < ledgers.Count; index++)
         {
             var ledger = ledgers[index];
@@ -666,10 +686,35 @@ public sealed class RocksDbJournalIndex : IJournalIndex, IAsyncDisposable
             _ = writeBatch.DeleteRange(start, (ulong)start.Length, endKeyIndex, (ulong)endKeyIndex.Length, state.KeyIndex);
             _ = writeBatch.DeleteRange(start, (ulong)start.Length, endTombstones, (ulong)endTombstones.Length, state.Tombstones);
             _ = writeBatch.Delete(start, state.Default);
+            EncodeSegmentViewKey(segKey, ledger);
+            _ = writeBatch.Delete(segKey, state.Default);
             _pendingFileDeletes.Add(new PendingFileDeleteRange(start, endKeyIndex, endTombstones));
         }
 
         state.Db.Write(writeBatch, WalDisabledWriteOptions);
+    }
+
+    private void SaveSegmentViewCore(LedgerId ledger, byte[] snapshot)
+    {
+        var state = RequireOpen();
+        Span<byte> key = stackalloc byte[ViewSnapshotKeyLength];
+        EncodeSegmentViewKey(key, ledger);
+        using var writeBatch = new WriteBatch();
+        _ = writeBatch.Put(key, snapshot, state.Default);
+        state.Db.Write(writeBatch, WalDisabledWriteOptions);
+    }
+
+    private static byte[]? LoadSegmentViewCore(OpenState state, LedgerId ledger)
+    {
+        var key = new byte[ViewSnapshotKeyLength];
+        EncodeSegmentViewKey(key, ledger);
+        return state.Db.Get(key, state.Default);
+    }
+
+    private static void EncodeSegmentViewKey(Span<byte> destination, LedgerId ledger)
+    {
+        destination[0] = ViewSnapshotKeyPrefix;
+        BinaryPrimitives.WriteUInt64BigEndian(destination.Slice(1, 8), ledger.Value);
     }
 
     private void FlushCore()

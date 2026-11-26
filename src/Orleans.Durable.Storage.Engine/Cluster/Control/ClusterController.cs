@@ -78,6 +78,9 @@ internal sealed partial class ClusterController
     // replaced, is ignored even while the registry view lags the restart.
     private readonly Dictionary<NodeId, int> _generations = [];
 
+    // Whether each node's latest report indicates initial apply-loop catch-up is complete (gates routine BalancePrimaries).
+    private readonly Dictionary<NodeId, bool> _catchUpReady = [];
+
     // The number of each node's last report applied, of its generation in _generations.
     private readonly Dictionary<NodeId, long> _sequences = [];
     private readonly Dictionary<LedgerId, long> _load = [];
@@ -537,6 +540,16 @@ internal sealed partial class ClusterController
         _changed |= !hasReported || report.Generation > reported;
         _generations[report.Node] = report.Generation;
         _sequences[report.Node] = report.Sequence;
+        var wasCatchUpReady = _catchUpReady.GetValueOrDefault(report.Node, true);
+        _catchUpReady[report.Node] = report.CatchUpReady;
+        if (wasCatchUpReady != report.CatchUpReady)
+        {
+            _changed = true;
+            if (report.CatchUpReady)
+            {
+                PassDue = true;
+            }
+        }
         if (report.HandingOff)
         {
             // The report carries the node's hand-off request, so a new activation knows it pending from its first report.
@@ -1823,6 +1836,7 @@ internal sealed partial class ClusterController
             var fewest = nodes.FindIndex(node =>
                 (TargetIsObjectStore || !state.IsUnderPressure(node))
                 && state.IsBalanceTarget(node)
+                && _catchUpReady.GetValueOrDefault(node, true)
                 && !IsCooperativeBalanceBackedOff(node, state.Now));
             if (fewest < 0)
             {

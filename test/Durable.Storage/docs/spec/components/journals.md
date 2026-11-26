@@ -775,7 +775,9 @@ Each node keeps, in its state database:
     `JournalIndexLockHeldException`; RocksDB `Corruption` statuses and malformed stored rows throw
     `JournalIndexCorruptException`, on which `JournalStateDatabase.OpenAsync` resets and rebuilds the derived index from
     the live ledgers.
-  - **Wiring.** `JournalStateDatabase.Applier` implements `LedgerApplier` (including `FlushAsync`),
+  - **Wiring.** `JournalStateDatabase.Applier` implements `LedgerApplier` (including `FlushAsync`,
+    `LoadSegmentViewAsync`, and `SaveSegmentViewAsync`, persisting optional rebuildable `LedgerSegmentView` snapshots
+    alongside watermarks in `default` under key `0x53 || LedgerId` and deleting them on ledger drop),
     `JournalStateDatabase.KeyIndex` implements `ArchiveKeyIndex` (wired into `ArchiveReader` when `JournalStore` is
     constructed with a `JournalStateDatabase`), and `Attach(LedgerApplyLoop)` lets catch-up waits wake a replicated
     ledger's delivery (`LedgerApplyLoop.Wake`) and observe loop completion or faults. Within a replicated scan pass,

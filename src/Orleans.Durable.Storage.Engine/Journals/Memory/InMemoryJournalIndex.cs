@@ -17,10 +17,12 @@ public sealed class InMemoryJournalIndex : IJournalIndex
     private readonly Dictionary<(LedgerId Ledger, JournalKeyHash KeyHash), SortedDictionary<(Slot Slot, int Index), (Slot DefiningSlot, ulong Ordinal)>> _durableKeyIndex = [];
     private readonly Dictionary<LedgerId, Dictionary<JournalKeyHash, JournalIndexTombstone>> _durableTombstones = [];
     private readonly SortedDictionary<LedgerId, Slot> _durableWatermarks = [];
+    private readonly Dictionary<LedgerId, byte[]> _durableSegmentViews = [];
 
     private Dictionary<(LedgerId Ledger, JournalKeyHash KeyHash), SortedDictionary<(Slot Slot, int Index), (Slot DefiningSlot, ulong Ordinal)>> _liveKeyIndex = [];
     private Dictionary<LedgerId, Dictionary<JournalKeyHash, JournalIndexTombstone>> _liveTombstones = [];
     private SortedDictionary<LedgerId, Slot> _liveWatermarks = [];
+    private Dictionary<LedgerId, byte[]> _liveSegmentViews = [];
     private bool _open;
     private bool _corrupt;
     private TaskCompletionSource? _paused;
@@ -87,6 +89,12 @@ public sealed class InMemoryJournalIndex : IJournalIndex
 
             // Discard any stale memtable state and initialize live view from the last atomic flush's durable state.
             CloneInto(_durableKeyIndex, _durableTombstones, _durableWatermarks, out _liveKeyIndex, out _liveTombstones, out _liveWatermarks);
+            _liveSegmentViews = [];
+            foreach (var (ledger, snapshot) in _durableSegmentViews)
+            {
+                _liveSegmentViews[ledger] = [.. snapshot];
+            }
+
             _open = true;
             return ValueTask.FromResult(new SortedDictionary<LedgerId, Slot>(_durableWatermarks));
         }
@@ -202,6 +210,7 @@ public sealed class InMemoryJournalIndex : IJournalIndex
                 var ledger = ledgers[index];
                 _ = _liveTombstones.Remove(ledger);
                 _ = _liveWatermarks.Remove(ledger);
+                _ = _liveSegmentViews.Remove(ledger);
             }
 
             return ValueTask.CompletedTask;
@@ -362,7 +371,46 @@ public sealed class InMemoryJournalIndex : IJournalIndex
                 _durableWatermarks.Add(key, value);
             }
 
+            _durableSegmentViews.Clear();
+            foreach (var (ledger, snapshot) in _liveSegmentViews)
+            {
+                _durableSegmentViews[ledger] = [.. snapshot];
+            }
+
             Flushes++;
+        }
+    }
+
+    /// <inheritdoc/>
+    public ValueTask SaveSegmentViewAsync(LedgerId ledger, ReadOnlyMemory<byte> snapshot, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            if (_corrupt)
+            {
+                return ValueTask.FromException(Corruption());
+            }
+
+            EnsureOpen();
+            _liveSegmentViews[ledger] = snapshot.ToArray();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<byte[]?> LoadSegmentViewAsync(LedgerId ledger, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            if (_corrupt)
+            {
+                return ValueTask.FromException<byte[]?>(Corruption());
+            }
+
+            EnsureOpen();
+            return ValueTask.FromResult(_liveSegmentViews.TryGetValue(ledger, out var snapshot) ? (byte[]?)[.. snapshot] : null);
         }
     }
 
@@ -375,9 +423,11 @@ public sealed class InMemoryJournalIndex : IJournalIndex
             _durableKeyIndex.Clear();
             _durableTombstones.Clear();
             _durableWatermarks.Clear();
+            _durableSegmentViews.Clear();
             _liveKeyIndex.Clear();
             _liveTombstones.Clear();
             _liveWatermarks.Clear();
+            _liveSegmentViews.Clear();
             _corrupt = false;
             _open = true;
             return ValueTask.CompletedTask;

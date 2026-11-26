@@ -624,8 +624,9 @@ public sealed class LedgerReader : IAsyncDisposable
                 }
                 else if (from + 1 == below)
                 {
-                    // Single-slot scan with rewind: scan [start, from) then yield firstData without re-reading from.
-                    await foreach (var rewindItem in ScanRangeAsync(ledger, start, from, yieldFrom: from, view, window, cancellationToken).ConfigureAwait(false))
+                    // Single-slot scan with rewind: scan [rewindFrom, from) then yield firstData without re-reading from.
+                    var rewindFrom = view.CanResumeSegment(start, from) ? view.LastSlot + 1 : start;
+                    await foreach (var rewindItem in ScanRangeAsync(ledger, rewindFrom, from, yieldFrom: from, view, window, cancellationToken).ConfigureAwait(false))
                     {
                         yield return rewindItem;
                         yield break;
@@ -642,9 +643,9 @@ public sealed class LedgerReader : IAsyncDisposable
                 }
                 else
                 {
-                    // Dispose firstData and issue a single [start, below) range read so extent-backed storages
-                    // do not perform two overlapping 8 MiB reads for [start, from) and [from + 1, below).
-                    scanFrom = start;
+                    // Dispose firstData and issue a single [scanFrom, below) range read so extent-backed storages
+                    // do not perform two overlapping 8 MiB reads for [scanFrom, from) and [from + 1, below).
+                    scanFrom = view.CanResumeSegment(start, from) ? view.LastSlot + 1 : start;
                 }
             }
             finally

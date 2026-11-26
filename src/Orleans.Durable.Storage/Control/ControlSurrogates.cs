@@ -687,6 +687,10 @@ internal readonly struct NodeReportSurrogate
     /// <summary>Gets or initializes open ledgers the node cooperatively drained via <c>PrepareRelease</c>, mapped to each ledger's contiguous tail.</summary>
     [Id(16)]
     public Dictionary<LedgerId, Slot>? ReleasedLedgers { get; init; }
+
+    /// <summary>Gets or initializes whether the node's initial apply-loop catch-up is still pending (inverted so default <see langword="false"/> means ready).</summary>
+    [Id(17)]
+    public bool CatchUpPending { get; init; }
 }
 
 /// <summary>Converts a <see cref="NodeReport"/> to its surrogate and back, refusing a report which names no node or silo generation.</summary>
@@ -737,7 +741,7 @@ internal sealed class NodeReportConverter : IConverter<NodeReport, NodeReportSur
 
         CheckRate(surrogate.ArchiveLogRequestsPerSecond, "A node report's archive-log rate");
         CheckRate(surrogate.ObjectStoreRequestsPerSecond, "A node report's object-store rate");
-        return new NodeReport(surrogate.Node, surrogate.Generation, surrogate.Sequence, unserved, load, surrogate.DiskPressure, progress, lost, surrogate.UndrainedKeys, surrogate.ArchiveLogRequestsPerSecond, surrogate.HandingOff, surrogate.ArchiveGatePassed, surrogate.Draining, surrogate.ObjectStoreDemand, surrogate.ObjectStoreRequestsPerSecond, surrogate.ObjectLedgersReady, released);
+        return new NodeReport(surrogate.Node, surrogate.Generation, surrogate.Sequence, unserved, load, surrogate.DiskPressure, progress, lost, surrogate.UndrainedKeys, surrogate.ArchiveLogRequestsPerSecond, surrogate.HandingOff, surrogate.ArchiveGatePassed, surrogate.Draining, surrogate.ObjectStoreDemand, surrogate.ObjectStoreRequestsPerSecond, surrogate.ObjectLedgersReady, released, !surrogate.CatchUpPending);
     }
 
     /// <inheritdoc/>
@@ -760,6 +764,7 @@ internal sealed class NodeReportConverter : IConverter<NodeReport, NodeReportSur
         ObjectStoreRequestsPerSecond = value.ObjectStoreRequestsPerSecond,
         ObjectLedgersReady = value.ObjectLedgersReady,
         ReleasedLedgers = value.ReleasedLedgersOrEmpty.ToDictionary(),
+        CatchUpPending = !value.CatchUpReady,
     };
 
     /// <summary>Refuses a rate which is present and not one a node's drains can run at (<see cref="ArchiveLogRequestShare.IsRate"/>).</summary>

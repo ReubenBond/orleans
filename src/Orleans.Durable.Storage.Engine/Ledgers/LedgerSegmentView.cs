@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Globalization;
+using System.IO.Hashing;
 using System.Numerics;
 using Orleans.Durable.Storage.Engine.Buffers;
 
@@ -111,8 +113,276 @@ public sealed class LedgerSegmentView : IDisposable
     /// <summary>Gets the number of batches the view has taken, which stamps the rows each lends.</summary>
     internal long Advances { get; private set; }
 
+    /// <summary>Gets a value indicating whether the view is started, usable, and holds an active segment state.</summary>
+    internal bool IsStarted => _started && !_broken && !_disposed;
+
+    /// <summary>Gets the slot the view last advanced past.</summary>
+    internal Slot LastSlot => _last;
+
     /// <summary>Returns whether the view, usable, last advanced past the slot before <paramref name="slot"/>.</summary>
     internal bool ResumesAt(Slot slot) => _started && !_broken && !_disposed && _last.Value + 1 == slot.Value;
+
+    /// <summary>
+    /// Returns whether the view already holds an earlier prefix of the segment starting at <paramref name="segmentStart"/>
+    /// strictly before <paramref name="from"/>, so scanning can resume at <c>LastSlot + 1</c> instead of rewinding to
+    /// <paramref name="segmentStart"/>.
+    /// </summary>
+    internal bool CanResumeSegment(Slot segmentStart, Slot from) =>
+        _started && !_broken && !_disposed && _start == segmentStart && _last.Value + 1 < from.Value;
+
+    /// <summary>
+    /// Encodes the view's active segment key-ordinal table into a self-checked binary snapshot so a restarted process
+    /// can restore the view at <see cref="LastSlot"/> without rewinding to the segment's start (ledgers.md §8.5).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The view is filtered, broken, or has not advanced past any batch.</exception>
+    /// <exception cref="ObjectDisposedException">The view was disposed.</exception>
+    public byte[] EncodeSnapshot()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_filter is not null)
+        {
+            throw new InvalidOperationException("Filtered segment views do not support snapshots.");
+        }
+
+        if (_broken || !_started)
+        {
+            throw new InvalidOperationException("The view has no valid active segment state to snapshot.");
+        }
+
+        const int HeaderLength = 1 + sizeof(long) + sizeof(long) + sizeof(int);
+        const int PerKeyFixedLength = sizeof(long) + sizeof(ulong) + sizeof(int) + sizeof(int) + sizeof(int);
+        const int TrailerLength = sizeof(uint);
+
+        var totalBytes = HeaderLength + TrailerLength;
+        for (var i = 0; i < _keyCount; i++)
+        {
+            ref readonly var entry = ref _keys[i];
+            totalBytes = checked(totalBytes + PerKeyFixedLength + entry.KeyLength + (entry.Base?.Length ?? 0) + (entry.Token?.Length ?? 0));
+        }
+
+        var buffer = new byte[totalBytes];
+        var span = buffer.AsSpan();
+        var pos = 0;
+        span[pos++] = 1; // Snapshot format version
+        BinaryPrimitives.WriteInt64LittleEndian(span.Slice(pos, sizeof(long)), _start.Value);
+        pos += sizeof(long);
+        BinaryPrimitives.WriteInt64LittleEndian(span.Slice(pos, sizeof(long)), _last.Value);
+        pos += sizeof(long);
+        BinaryPrimitives.WriteInt32LittleEndian(span.Slice(pos, sizeof(int)), _keyCount);
+        pos += sizeof(int);
+
+        for (var i = 0; i < _keyCount; i++)
+        {
+            ref readonly var entry = ref _keys[i];
+            BinaryPrimitives.WriteInt64LittleEndian(span.Slice(pos, sizeof(long)), entry.DefiningSlot.Value);
+            pos += sizeof(long);
+            BinaryPrimitives.WriteUInt64LittleEndian(span.Slice(pos, sizeof(ulong)), entry.Count);
+            pos += sizeof(ulong);
+
+            BinaryPrimitives.WriteInt32LittleEndian(span.Slice(pos, sizeof(int)), entry.KeyLength);
+            pos += sizeof(int);
+            _keyArena.AsSpan(entry.KeyOffset, entry.KeyLength).CopyTo(span.Slice(pos, entry.KeyLength));
+            pos += entry.KeyLength;
+
+            var baseLen = entry.Base?.Length ?? 0;
+            BinaryPrimitives.WriteInt32LittleEndian(span.Slice(pos, sizeof(int)), baseLen);
+            pos += sizeof(int);
+            if (entry.Base is { Length: > 0 } baseBytes)
+            {
+                baseBytes.CopyTo(span.Slice(pos, baseLen));
+                pos += baseLen;
+            }
+
+            var tokenLen = entry.Token?.Length ?? 0;
+            BinaryPrimitives.WriteInt32LittleEndian(span.Slice(pos, sizeof(int)), tokenLen);
+            pos += sizeof(int);
+            if (entry.Token is { Length: > 0 } tokenBytes)
+            {
+                tokenBytes.CopyTo(span.Slice(pos, tokenLen));
+                pos += tokenLen;
+            }
+        }
+
+        var crc = Crc32.HashToUInt32(Crc32ParameterSet.Crc32C, span[..pos]);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(pos, TrailerLength), crc);
+        return buffer;
+    }
+
+    /// <summary>
+    /// Restores an unfiltered view from a binary snapshot produced by <see cref="EncodeSnapshot"/>. Returns
+    /// <see langword="false"/> and leaves the view cleanly reset if the snapshot is truncated, malformed, corrupt, or
+    /// incompatible so the caller can fall back to full-segment replay.
+    /// </summary>
+    public bool TryRestoreSnapshot(ReadOnlySpan<byte> snapshot)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_filter is not null || _broken)
+        {
+            return false;
+        }
+
+        const int HeaderLength = 1 + sizeof(long) + sizeof(long) + sizeof(int);
+        const int TrailerLength = sizeof(uint);
+        if (snapshot.Length < HeaderLength + TrailerLength)
+        {
+            return false;
+        }
+
+        var bodyLength = snapshot.Length - TrailerLength;
+        var expectedCrc = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[bodyLength..]);
+        if (Crc32.HashToUInt32(Crc32ParameterSet.Crc32C, snapshot[..bodyLength]) != expectedCrc)
+        {
+            return false;
+        }
+
+        var pos = 0;
+        var version = snapshot[pos++];
+        if (version != 1)
+        {
+            return false;
+        }
+
+        var rawStart = BinaryPrimitives.ReadInt64LittleEndian(snapshot.Slice(pos, sizeof(long)));
+        pos += sizeof(long);
+        var rawLast = BinaryPrimitives.ReadInt64LittleEndian(snapshot.Slice(pos, sizeof(long)));
+        pos += sizeof(long);
+        var keyCount = BinaryPrimitives.ReadInt32LittleEndian(snapshot.Slice(pos, sizeof(int)));
+        pos += sizeof(int);
+
+        if (rawStart < 0 || rawLast < rawStart || keyCount < 0)
+        {
+            return false;
+        }
+
+        // Reset cleanly before populating; any failure below calls ResetToEmpty().
+        ResetToEmpty();
+        try
+        {
+            for (var i = 0; i < keyCount; i++)
+            {
+                if (bodyLength - pos < sizeof(long) + sizeof(ulong) + sizeof(int))
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var rawDefSlot = BinaryPrimitives.ReadInt64LittleEndian(snapshot.Slice(pos, sizeof(long)));
+                pos += sizeof(long);
+                var count = BinaryPrimitives.ReadUInt64LittleEndian(snapshot.Slice(pos, sizeof(ulong)));
+                pos += sizeof(ulong);
+                var keyLen = BinaryPrimitives.ReadInt32LittleEndian(snapshot.Slice(pos, sizeof(int)));
+                pos += sizeof(int);
+
+                if (rawDefSlot < rawStart || rawDefSlot > rawLast || keyLen <= 0 || keyLen > bodyLength - pos)
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var keySpan = snapshot.Slice(pos, keyLen);
+                pos += keyLen;
+
+                if (bodyLength - pos < sizeof(int))
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var baseLen = BinaryPrimitives.ReadInt32LittleEndian(snapshot.Slice(pos, sizeof(int)));
+                pos += sizeof(int);
+                if (baseLen < 0 || baseLen > bodyLength - pos)
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var versionBase = baseLen == 0 ? null : snapshot.Slice(pos, baseLen).ToArray();
+                pos += baseLen;
+
+                if (bodyLength - pos < sizeof(int))
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var tokenLen = BinaryPrimitives.ReadInt32LittleEndian(snapshot.Slice(pos, sizeof(int)));
+                pos += sizeof(int);
+                if (tokenLen < 0 || tokenLen > bodyLength - pos)
+                {
+                    ResetToEmpty();
+                    return false;
+                }
+
+                var token = tokenLen == 0 ? null : snapshot.Slice(pos, tokenLen).ToArray();
+                pos += tokenLen;
+
+                var hash = LedgerSegmentDictionary.KeyComparer.Instance.GetHashCode(keySpan);
+                if (_bucketCapacity == 0 || (_keyCount + 1) * 10L > _bucketCapacity * 7L)
+                {
+                    GrowBuckets();
+                }
+
+                var mask = _bucketCapacity - 1;
+                var bucket = hash & mask;
+                while (true)
+                {
+                    var stored = _buckets[bucket];
+                    if (stored == 0)
+                    {
+                        break;
+                    }
+
+                    ref readonly var existing = ref _keys[stored - 1];
+                    if (existing.HashCode == hash && _keyArena.AsSpan(existing.KeyOffset, existing.KeyLength).SequenceEqual(keySpan))
+                    {
+                        ResetToEmpty();
+                        return false;
+                    }
+
+                    bucket = (bucket + 1) & mask;
+                }
+
+                var keyOffset = AppendKeyBytes(keySpan);
+                if (_keyCount == _keys.Length)
+                {
+                    GrowKeys();
+                }
+
+                var entryIndex = _keyCount++;
+                _keys[entryIndex] = new KeyEntry(keyOffset, keyLen, hash, versionBase, token, count, new Slot(rawDefSlot));
+                _buckets[bucket] = entryIndex + 1;
+            }
+
+            if (pos != bodyLength)
+            {
+                ResetToEmpty();
+                return false;
+            }
+
+            _start = new Slot(rawStart);
+            _last = new Slot(rawLast);
+            _started = true;
+            DefinedKeys = (ulong)keyCount;
+            _batch = default;
+            return true;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            ResetToEmpty();
+            return false;
+        }
+    }
+
+    /// <summary>Resets the view to its unstarted state, releasing pooled buffers.</summary>
+    internal void ResetToEmpty()
+    {
+        ReleaseKeyTable();
+        _start = Slot.Zero;
+        _last = Slot.Zero;
+        _started = false;
+        DefinedKeys = 0;
+        _batch = default;
+    }
 
     /// <summary>
     /// Checks the decoded batch at <paramref name="slot"/> against its predecessors (ledgers.md §7's segment rules) and,

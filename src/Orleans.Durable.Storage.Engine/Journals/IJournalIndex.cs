@@ -75,6 +75,18 @@ public interface IJournalIndex
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Persists a rebuildable <see cref="LedgerSegmentView"/> snapshot for <paramref name="ledger"/> in the index's
+    /// write buffers so a restart resumes scanning at its watermark without rewinding to the segment's start.
+    /// </summary>
+    ValueTask SaveSegmentViewAsync(LedgerId ledger, ReadOnlyMemory<byte> snapshot, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Reads the persisted <see cref="LedgerSegmentView"/> snapshot for <paramref name="ledger"/>, or
+    /// <see langword="null"/> when absent.
+    /// </summary>
+    ValueTask<byte[]?> LoadSegmentViewAsync(LedgerId ledger, CancellationToken cancellationToken = default) => ValueTask.FromResult<byte[]?>(null);
+
+    /// <summary>
     /// Atomically flushes <c>key_index</c>, <c>tombstones</c>, and watermarks to durable storage so a subsequent crash
     /// recovers at least every batch applied before this flush began.
     /// </summary>

@@ -49,6 +49,9 @@ namespace Orleans.Durable.Storage.Engine.Cluster.Control;
 /// <param name="ReleasedLedgers">Open ledgers whose writers this node cooperatively drained and stopped admitting via
 /// <c>PrepareRelease</c>, mapped to their final contiguous tail, so a replacement or a new controller activation after
 /// failover observes their released state idempotently (orleans.md §5.6, OR-I24).</param>
+/// <param name="CatchUpReady">Whether the node's local apply loop has finished initial catch-up for the ledgers present
+/// when it started (orleans.md §5.6): routine primary balancing waits until this is <see langword="true"/>, while urgent
+/// departures, takeovers, splits, rolls, and repairs remain immediately eligible.</param>
 internal sealed record NodeReport(
     NodeId Node,
     int Generation,
@@ -66,7 +69,8 @@ internal sealed record NodeReport(
     long ObjectStoreDemand = 0,
     double? ObjectStoreRequestsPerSecond = null,
     bool ObjectLedgersReady = false,
-    ImmutableDictionary<LedgerId, Slot>? ReleasedLedgers = null)
+    ImmutableDictionary<LedgerId, Slot>? ReleasedLedgers = null,
+    bool CatchUpReady = true)
 {
     /// <summary>Gets the released ledgers map, never <see langword="null"/>.</summary>
     public ImmutableDictionary<LedgerId, Slot> ReleasedLedgersOrEmpty => ReleasedLedgers ?? [];

@@ -1528,6 +1528,39 @@ public sealed class ClusterControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// orleans.md §5.6: routine primary balance skips a rejoined node whose latest report sets
+    /// <see cref="NodeReport.CatchUpReady"/> to <see langword="false"/> until it reports
+    /// <see cref="NodeReport.CatchUpReady"/> <see langword="true"/> (which marks a pass due at once), while urgent
+    /// <see cref="TransitionPurpose.Departure"/> hand-offs remain immediately eligible.
+    /// </summary>
+    [Fact]
+    public async Task PrimaryBalanceWaitsForCatchUpReadyWhileUrgentDepartureRemainsImmediate()
+    {
+        Register(1, 2, 3);
+        var quarters = await QuartersAsync([Node(1), Node(2), Node(3)], [Node(1), Node(2), Node(3)], [Node(1), Node(3), Node(2)], [Node(2), Node(1), Node(3)]);
+        _ = _controller.Report(Idle(Node(1), Generation));
+        _ = _controller.Report(Idle(Node(2), Generation));
+        _ = _controller.Report(Idle(Node(3), Generation) with { CatchUpReady = false });
+        Warm(quarters);
+
+        // Node(1) has 3 primaries and Node(3) has 0, but Node(3) is still catching up so routine BalancePrimaries skips it.
+        var whileCatchingUp = RunPassCompletingPrepareReleases().Transitions;
+        Assert.DoesNotContain(whileCatchingUp, t => t.Executor == Node(3));
+
+        // Flipping CatchUpReady to true marks a pass due immediately and unlocks routine primary balance onto Node(3).
+        _ = _controller.Report(Idle(Node(3), Generation) with { CatchUpReady = true });
+        Assert.True(_controller.PassDue);
+        var balanced = Assert.Single(RunPassCompletingPrepareReleases().Transitions);
+        Assert.Equal((TransitionPurpose.Handoff, Node(3)), (balanced.Purpose, balanced.Executor));
+
+        // Urgent Departure remains immediately eligible even when the target reports CatchUpReady = false.
+        _ = _controller.Report(Idle(Node(3), Generation) with { CatchUpReady = false });
+        _controller.RequestHandOff(Node(1), Generation);
+        var departure = RunPassCompletingPrepareReleases().Transitions;
+        Assert.Contains(departure, t => t.Purpose == TransitionPurpose.Departure && t.Executor == Node(3));
+    }
+
+    /// <summary>
     /// orleans.md §5.6: balancing rolls a replica off the node with the most replicas, the ledger's primary executing, to a
     /// node with two fewer, until every count is within one of the others; a pass after the rolls applied sends none.
     /// </summary>

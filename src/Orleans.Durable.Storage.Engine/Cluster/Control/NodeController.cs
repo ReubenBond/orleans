@@ -1198,7 +1198,8 @@ internal sealed partial class NodeController
     /// <param name="refused">Whether the node's silo refused its archive store or its Journals.</param>
     /// <param name="archiveGatePassed">Whether the node's silo passed its archive gate.</param>
     /// <param name="draining">Whether the node drains: it serves and its silo's archive gate passed.</param>
-    public NodeReport Report(bool diskPressure, ImmutableArray<LedgerId> lostReplicas, bool handingOff, bool refused, bool archiveGatePassed, bool draining)
+    /// <param name="catchUpReady">Whether the node's local apply loop has finished initial catch-up.</param>
+    public NodeReport Report(bool diskPressure, ImmutableArray<LedgerId> lostReplicas, bool handingOff, bool refused, bool archiveGatePassed, bool draining, bool catchUpReady = true)
     {
         var map = _map.Current;
         var objectStoreDemand = 0L;
@@ -1274,7 +1275,8 @@ internal sealed partial class NodeController
             objectStoreDemand,
             objectStoreRequestsPerSecond,
             objectLedgersReady,
-            _releasedLedgers.ToImmutableDictionary());
+            _releasedLedgers.ToImmutableDictionary(),
+            catchUpReady);
     }
 
     /// <summary>

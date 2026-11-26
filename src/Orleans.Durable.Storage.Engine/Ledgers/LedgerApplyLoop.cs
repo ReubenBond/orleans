@@ -44,6 +44,9 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     /// </summary>
     private const int PriorityMaxConcurrentScanReads = 16;
 
+    /// <summary>Minimum elapsed interval between periodic <see cref="LedgerSegmentView"/> snapshots per delivery.</summary>
+    private static readonly TimeSpan ViewSnapshotInterval = TimeSpan.FromSeconds(15);
+
     private static readonly TimeSpan MaximumDelay = TimeSpan.FromSeconds(1);
 
     private readonly LedgerReader _reader;
@@ -57,6 +60,9 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
 
     // Mutated only by the loop's run; ConcurrentDictionary allows lock-free Wake lookups.
     private readonly ConcurrentDictionary<LedgerId, Delivery> _deliveries = [];
+
+    // Ledgers on this node present in the map when the loop started whose first catch-up pass has not finished yet.
+    private readonly ConcurrentDictionary<LedgerId, byte> _initialPending = [];
     private readonly Task _run;
     private int _disposed;
 
@@ -86,6 +92,14 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         _scanWindow = new SemaphoreSlim(maxConcurrentScanReads, maxConcurrentScanReads);
         _priorityScanWindow = new SemaphoreSlim(PriorityMaxConcurrentScanReads, PriorityMaxConcurrentScanReads);
 
+        foreach (var listed in reader.Map.Current.Ledgers)
+        {
+            if (listed.IsOnNode(_node))
+            {
+                _ = _initialPending.TryAdd(listed.Id, 0);
+            }
+        }
+
         // The loop serves no caller, so it runs in none's execution context (conventions.md §12).
         using (ExecutionContext.SuppressFlow())
         {
@@ -98,6 +112,14 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     /// delivery: corruption, a failure repetition cannot change, or the applier's.
     /// </summary>
     public Task Completion => _completion.Task;
+
+    /// <summary>
+    /// Gets a value indicating whether every ledger on this node present in the map when the apply loop started has
+    /// completed its initial catch-up pass (or been dropped/removed).
+    /// </summary>
+    public bool IsInitialCatchUpComplete => _initialPending.IsEmpty;
+
+    private void MarkInitialCaughtUp(LedgerId ledger) => _ = _initialPending.TryRemove(ledger, out _);
 
     /// <summary>
     /// Wakes <paramref name="ledger"/>'s delivery, when the loop runs one, so an open ledger learns its contiguous tail
@@ -173,7 +195,16 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
 
             await delivery.StopAsync().ConfigureAwait(false);
             _ = _deliveries.TryRemove(id, out _);
+            MarkInitialCaughtUp(id);
             await _applier.RemoveAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var pendingId in _initialPending.Keys)
+        {
+            if (view.Get(pendingId) is null)
+            {
+                MarkInitialCaughtUp(pendingId);
+            }
         }
 
         foreach (var listed in view.Ledgers)
@@ -310,56 +341,136 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         {
             var next = await _loop._applier.NextSlotAsync(_id, cancellationToken).ConfigureAwait(false);
             using var view = new LedgerSegmentView(_id);
-            var attempt = 0;
-            while (true)
+            var lastSnapshotSlot = Slot.Zero;
+            var lastSnapshotAt = _loop._timeProvider.GetTimestamp();
+            if (next > Slot.Zero && _loop._applier.LoadSegmentViewAsync is { } loadSnapshot)
             {
-                var (listed, changed, priority) = Listing();
-                var end = listed.Status.Value is LedgerStatus.Closed closed ? closed.T : (Slot?)null;
-                ScanEnd reached;
-                try
+                var snapshot = await loadSnapshot(_id, cancellationToken).ConfigureAwait(false);
+                if (snapshot is { Length: > 0 } && view.TryRestoreSnapshot(snapshot))
                 {
-                    var target = end ?? await _loop._reader.LearnTailAsync(listed, cancellationToken).ConfigureAwait(false);
-                    var window = priority ? _loop._priorityScanWindow : _loop._scanWindow;
-                    (next, reached) = next < target
-                        ? await ScanAsync(listed, next, target, view, window, cancellationToken).ConfigureAwait(false)
-                        : (next, ScanEnd.Reached);
+                    if (view.LastSlot < next)
+                    {
+                        lastSnapshotSlot = view.LastSlot + 1;
+                    }
+                    else
+                    {
+                        // Snapshot lies at or past next watermark (cannot be reused safely); discard and rewind cleanly.
+                        view.ResetToEmpty();
+                    }
                 }
-                catch (Exception failure) when (IsTransient(failure) && !cancellationToken.IsCancellationRequested)
+            }
+
+            var attempt = 0;
+            var initialMarked = false;
+            try
+            {
+                while (true)
                 {
-                    reached = ScanEnd.Backpressure;
+                    var (listed, changed, priority) = Listing();
+                    var end = listed.Status.Value is LedgerStatus.Closed closed ? closed.T : (Slot?)null;
+                    ScanEnd reached;
+                    try
+                    {
+                        var target = end ?? await _loop._reader.LearnTailAsync(listed, cancellationToken).ConfigureAwait(false);
+                        var window = priority ? _loop._priorityScanWindow : _loop._scanWindow;
+                        (next, reached) = next < target
+                            ? await ScanAsync(listed, next, target, view, window, cancellationToken).ConfigureAwait(false)
+                            : (next, ScanEnd.Reached);
+                    }
+                    catch (Exception failure) when (IsTransient(failure) && !cancellationToken.IsCancellationRequested)
+                    {
+                        reached = ScanEnd.Backpressure;
+                    }
+
+                    switch (reached)
+                    {
+                        case ScanEnd.Reached when end is { } t:
+                            Debug.Assert(next == t, "A closed ledger's delivery ends at its T.");
+                            if (!initialMarked)
+                            {
+                                initialMarked = true;
+                                _loop.MarkInitialCaughtUp(_id);
+                            }
+
+                            return;
+                        case ScanEnd.Reached:
+                            attempt = 0;
+                            if (!initialMarked)
+                            {
+                                initialMarked = true;
+                                _loop.MarkInitialCaughtUp(_id);
+                            }
+
+                            if (_loop._applier.SaveSegmentViewAsync is { } savePeriodic
+                                && view.IsStarted
+                                && next > lastSnapshotSlot
+                                && _loop._timeProvider.GetElapsedTime(lastSnapshotAt) >= ViewSnapshotInterval)
+                            {
+                                await savePeriodic(_id, view.EncodeSnapshot(), cancellationToken).ConfigureAwait(false);
+                                lastSnapshotSlot = view.LastSlot + 1;
+                                lastSnapshotAt = _loop._timeProvider.GetTimestamp();
+                            }
+
+                            if (!changed.IsCompleted)
+                            {
+                                using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                                var delay = Task.Delay(LearnInterval, _loop._timeProvider, delayCts.Token);
+                                _ = await Task.WhenAny(changed, delay).ConfigureAwait(false);
+                                if (!delay.IsCompleted)
+                                {
+                                    await delayCts.CancelAsync().ConfigureAwait(false);
+                                }
+                            }
+
+                            break;
+                        case ScanEnd.Dropped:
+                            if (!initialMarked)
+                            {
+                                initialMarked = true;
+                                _loop.MarkInitialCaughtUp(_id);
+                            }
+
+                            // The reader re-read the map, which revokes the ledger; the loop stops the delivery on its listing.
+                            await changed.WaitAsync(cancellationToken).ConfigureAwait(false);
+                            break;
+                        case ScanEnd.Backpressure:
+                            await Task.Delay(Backoff.Delay(attempt++, LearnInterval, MaximumDelay, Random.Shared.NextDouble()), _loop._timeProvider, cancellationToken).ConfigureAwait(false);
+                            break;
+                        default:
+                            throw new UnreachableException("A scan ends in one of its cases.");
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            finally
+            {
+                if (!initialMarked)
+                {
+                    _loop.MarkInitialCaughtUp(_id);
                 }
 
-                switch (reached)
+                // Persist the active segment view snapshot on clean stop so the next restart resumes at its watermark
+                // without rewinding to slot 0 (ledgers.md §8.5).
+                if (_loop._applier.SaveSegmentViewAsync is { } saveFinal
+                    && view.IsStarted
+                    && next > lastSnapshotSlot
+                    && !_loop._reader.IsDisposed)
                 {
-                    case ScanEnd.Reached when end is { } t:
-                        Debug.Assert(next == t, "A closed ledger's delivery ends at its T.");
-                        return;
-                    case ScanEnd.Reached:
-                        attempt = 0;
-                        if (!changed.IsCompleted)
+                    try
+                    {
+                        if (_loop._applier.FlushAsync is { } flushFinal)
                         {
-                            using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                            var delay = Task.Delay(LearnInterval, _loop._timeProvider, delayCts.Token);
-                            _ = await Task.WhenAny(changed, delay).ConfigureAwait(false);
-                            if (!delay.IsCompleted)
-                            {
-                                await delayCts.CancelAsync().ConfigureAwait(false);
-                            }
+                            await flushFinal(_id, CancellationToken.None).ConfigureAwait(false);
                         }
 
-                        break;
-                    case ScanEnd.Dropped:
-                        // The reader re-read the map, which revokes the ledger; the loop stops the delivery on its listing.
-                        await changed.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        break;
-                    case ScanEnd.Backpressure:
-                        await Task.Delay(Backoff.Delay(attempt++, LearnInterval, MaximumDelay, Random.Shared.NextDouble()), _loop._timeProvider, cancellationToken).ConfigureAwait(false);
-                        break;
-                    default:
-                        throw new UnreachableException("A scan ends in one of its cases.");
+                        await saveFinal(_id, view.EncodeSnapshot(), CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
+                    {
+                        // Segment snapshots are purely rebuildable; a stop-time persistence failure never fails disposal.
+                    }
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 

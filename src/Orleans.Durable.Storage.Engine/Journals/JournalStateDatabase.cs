@@ -92,6 +92,8 @@ public sealed class JournalStateDatabase : IAsyncDisposable
             NextSlotAsync = NextSlotAsync,
             ApplyAsync = ApplyAsync,
             FlushAsync = FlushAppliedAsync,
+            LoadSegmentViewAsync = LoadSegmentViewAsync,
+            SaveSegmentViewAsync = SaveSegmentViewAsync,
             RemoveAsync = RemoveAsync,
         };
         KeyIndex = new ArchiveKeyIndex(LookupAsync);
@@ -566,6 +568,49 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         ObjectDisposedException.ThrowIf(!admission.Entered, this);
         ThrowIfCorrupt();
         return ValueTask.FromResult(Watermark(ledger));
+    }
+
+    private async ValueTask<byte[]?> LoadSegmentViewAsync(LedgerId ledger, CancellationToken cancellationToken)
+    {
+        using var admission = _gate.TryEnter();
+        ObjectDisposedException.ThrowIf(!admission.Entered, this);
+        ThrowIfCorrupt();
+        try
+        {
+            return await _index.LoadSegmentViewAsync(ledger, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JournalIndexCorruptException corrupt)
+        {
+            MarkCorrupt(corrupt);
+            throw;
+        }
+    }
+
+    private async ValueTask SaveSegmentViewAsync(LedgerId ledger, ReadOnlyMemory<byte> snapshot, CancellationToken cancellationToken)
+    {
+        using var admission = _gate.TryEnter();
+        ObjectDisposedException.ThrowIf(!admission.Entered, this);
+        ThrowIfCorrupt();
+        await _writes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfCorrupt();
+            await _index.SaveSegmentViewAsync(ledger, snapshot, cancellationToken).ConfigureAwait(false);
+            lock (_lock)
+            {
+                _writeVersion++;
+                _dirty = true;
+            }
+        }
+        catch (JournalIndexCorruptException corrupt)
+        {
+            MarkCorrupt(corrupt);
+            throw;
+        }
+        finally
+        {
+            _ = _writes.Release();
+        }
     }
 
     private ValueTask ApplyAsync(LedgerId ledger, LedgerScanItem item, CancellationToken cancellationToken)

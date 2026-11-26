@@ -2590,8 +2590,10 @@ namespace Orleans.Durable.Storage.Engine.Journals
         System.Threading.Tasks.ValueTask FlushAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<System.Collections.Generic.List<JournalIndexKeyEntry>> GetKeyEntriesAsync(Ledgers.LedgerId ledger, JournalKeyHash keyHash, Ledgers.Slot startSlot, int startIndex, Ledgers.Slot exclusiveEndSlot, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<bool> HasKeyEntryAsync(Ledgers.LedgerId ledger, JournalKeyHash keyHash, Ledgers.Slot startSlot, int startIndex, Ledgers.Slot exclusiveEndSlot, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<byte[]?> LoadSegmentViewAsync(Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<System.Collections.Generic.SortedDictionary<Ledgers.LedgerId, Ledgers.Slot>> OpenAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask ResetAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask SaveSegmentViewAsync(Ledgers.LedgerId ledger, System.ReadOnlyMemory<byte> snapshot, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<System.Collections.Generic.List<JournalIndexTombstone>> ScanTombstonesAsync(Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default);
     }
 
@@ -3274,6 +3276,8 @@ namespace Orleans.Durable.Storage.Engine.Journals.Memory
 
         public System.Threading.Tasks.ValueTask<bool> HasKeyEntryAsync(Ledgers.LedgerId ledger, JournalKeyHash keyHash, Ledgers.Slot startSlot, int startIndex, Ledgers.Slot exclusiveEndSlot, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.ValueTask<byte[]?> LoadSegmentViewAsync(Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask<System.Collections.Generic.SortedDictionary<Ledgers.LedgerId, Ledgers.Slot>> OpenAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         System.Threading.Tasks.ValueTask IJournalIndex.ApplyBatchAsync(in JournalIndexBatch batch, System.Threading.CancellationToken cancellationToken) { throw null; }
@@ -3283,6 +3287,8 @@ namespace Orleans.Durable.Storage.Engine.Journals.Memory
         public System.Threading.Tasks.ValueTask ResetAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public void ResumeFlushes() { }
+
+        public System.Threading.Tasks.ValueTask SaveSegmentViewAsync(Ledgers.LedgerId ledger, System.ReadOnlyMemory<byte> snapshot, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<System.Collections.Generic.List<JournalIndexTombstone>> ScanTombstonesAsync(Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
@@ -3420,9 +3426,13 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? FlushAsync { get { throw null; } init { } }
 
+        public System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<byte[]?>>? LoadSegmentViewAsync { get { throw null; } init { } }
+
         public required System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Slot>> NextSlotAsync { get { throw null; } init { } }
 
         public required System.Func<LedgerId, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> RemoveAsync { get { throw null; } init { } }
+
+        public System.Func<LedgerId, System.ReadOnlyMemory<byte>, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? SaveSegmentViewAsync { get { throw null; } init { } }
     }
 
     public sealed partial class LedgerApplyLoop : System.IAsyncDisposable
@@ -3430,6 +3440,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         public LedgerApplyLoop(LedgerReader reader, LedgerApplier applier, System.TimeProvider timeProvider) { }
 
         public System.Threading.Tasks.Task Completion { get { throw null; } }
+
+        public bool IsInitialCatchUpComplete { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
@@ -3988,6 +4000,10 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         public System.IO.InvalidDataException? Advance(Slot slot, BatchView view) { throw null; }
 
         public void Dispose() { }
+
+        public byte[] EncodeSnapshot() { throw null; }
+
+        public bool TryRestoreSnapshot(System.ReadOnlySpan<byte> snapshot) { throw null; }
 
         public readonly ref partial struct RowEnumerable
         {

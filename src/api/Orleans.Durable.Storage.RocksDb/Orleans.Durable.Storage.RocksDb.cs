@@ -44,11 +44,15 @@ namespace Orleans.Durable.Storage.RocksDb
 
         public System.Threading.Tasks.ValueTask<bool> HasKeyEntryAsync(Engine.Ledgers.LedgerId ledger, Engine.Journals.JournalKeyHash keyHash, Engine.Ledgers.Slot startSlot, int startIndex, Engine.Ledgers.Slot exclusiveEndSlot, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.ValueTask<byte[]?> LoadSegmentViewAsync(Engine.Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask<System.Collections.Generic.SortedDictionary<Engine.Ledgers.LedgerId, Engine.Ledgers.Slot>> OpenAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         System.Threading.Tasks.ValueTask Engine.Journals.IJournalIndex.ApplyBatchAsync(in Engine.Journals.JournalIndexBatch batch, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask ResetAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask SaveSegmentViewAsync(Engine.Ledgers.LedgerId ledger, System.ReadOnlyMemory<byte> snapshot, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<System.Collections.Generic.List<Engine.Journals.JournalIndexTombstone>> ScanTombstonesAsync(Engine.Ledgers.LedgerId ledger, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }

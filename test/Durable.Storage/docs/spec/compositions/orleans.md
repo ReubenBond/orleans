@@ -1373,6 +1373,8 @@ activation balances no ledger onto a stopping or refused node it has not heard f
 transitions' executors wait for no report: until a pending node's first report or request reaches a new activation, at
 most one control interval, a takeover or a repair may still name it, and the ledger is handed off again once it does.
 That costs liveness only, for a bounded time. In code (row 4.5's A): `NodeReport.HandingOff`,
+`NodeReport.CatchUpReady` (gating routine primary balancing until `LedgerApplyLoop.IsInitialCatchUpComplete` is true
+while keeping urgent departures, takeovers, splits, rolls, and repairs immediately eligible), and
 `ClusterState.IsBalanceTarget`. The controller grain hands off each open ledger whose primary is pending or departing by
 a *departure* (`TransitionPurpose.Departure`), within `MaxConcurrentHandOffs`. A departure differs from a balancing
 hand-off in three ways: its node asked for it, or membership shows the node departing; it has its own budget, so

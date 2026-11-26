@@ -183,6 +183,96 @@ public sealed class LedgerApplyLoopTests : IDisposable
     }
 
     /// <summary>
+    /// Saving a <see cref="LedgerSegmentView"/> snapshot at a mid-segment watermark lets a restarted
+    /// <see cref="LedgerApplyLoop"/> resume directly at its watermark without rewinding to the segment's start, while a
+    /// corrupted snapshot safely falls back to a full segment rewind and produces identical resolved rows (ledgers.md §8.5).
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task PersistedSegmentViewSnapshotResumesMidSegmentWithoutRewindingToSlotZero()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var transport = new InMemoryLedgerReplicaTransport();
+        var (map, open, expected) = await LedgerSegmentScript.WriteAsync(transport, token);
+
+        // First run: apply slots 0..7 (mid-segment of the second segment starting at slot 5) and stop cleanly, saving the snapshot.
+        const long SplitWatermark = 8;
+        var partialClosed = new LedgerMetadata(open.Id, open.Range, open.Replicas, open.K, open.Primary, new LedgerStatus.Closed(new Slot(SplitWatermark)));
+        await map.PublishAsync(new LedgerMapValue(2, new LedgerId(LedgerSegmentScript.Id.Value + 1), 0, [partialClosed]), token);
+
+        byte[]? savedSnapshot = null;
+        await using (var reader1 = new LedgerReader(map.View, transport, new FakeTimeProvider(), Node))
+        {
+            var firstApplier = new RecordingApplier(Slot.Zero);
+            var callbacks1 = new LedgerApplier
+            {
+                NextSlotAsync = firstApplier.Callbacks.NextSlotAsync,
+                ApplyAsync = firstApplier.Callbacks.ApplyAsync,
+                RemoveAsync = firstApplier.Callbacks.RemoveAsync,
+                SaveSegmentViewAsync = (_, bytes, _) =>
+                {
+                    savedSnapshot = bytes.ToArray();
+                    return ValueTask.CompletedTask;
+                },
+            };
+
+            await using var loop1 = new LedgerApplyLoop(reader1, callbacks1, new FakeTimeProvider());
+            await firstApplier.Until(applied => applied.Next == SplitWatermark).WaitAsync(Signal, TimeProvider.System, token);
+            Assert.True(loop1.IsInitialCatchUpComplete);
+        }
+
+        Assert.NotNull(savedSnapshot);
+
+        // Second run: publish full closed ledger (0..End), restart at watermark = SplitWatermark with the saved snapshot,
+        // and verify slots 0..7 are NEVER re-read!
+        var fullClosed = await LedgerSegmentScript.RecoverAsync(map, transport, open, token);
+        await map.PublishAsync(new LedgerMapValue(3, new LedgerId(LedgerSegmentScript.Id.Value + 1), 0, [fullClosed]), token);
+
+        var counting = new LackingTransport(transport, Node, []);
+        await using (var reader2 = new LedgerReader(map.View, counting, new FakeTimeProvider(), Node))
+        {
+            var secondApplier = new RecordingApplier(new Slot(SplitWatermark));
+            var callbacks2 = new LedgerApplier
+            {
+                NextSlotAsync = secondApplier.Callbacks.NextSlotAsync,
+                ApplyAsync = secondApplier.Callbacks.ApplyAsync,
+                RemoveAsync = secondApplier.Callbacks.RemoveAsync,
+                LoadSegmentViewAsync = (_, _) => ValueTask.FromResult<byte[]?>(savedSnapshot),
+            };
+
+            await using var loop2 = new LedgerApplyLoop(reader2, callbacks2, new FakeTimeProvider());
+            await secondApplier.Until(applied => applied.Next == End).WaitAsync(Signal, TimeProvider.System, token);
+            Assert.True(loop2.IsInitialCatchUpComplete);
+
+            Assert.Equal(Enumerable.Range((int)SplitWatermark, (int)(End - SplitWatermark)).Select(static slot => (long)slot), secondApplier.Slots);
+            Assert.Equal(expected.Where(row => row.Slot >= SplitWatermark), secondApplier.Rows);
+            for (var s = 0L; s < SplitWatermark; s++)
+            {
+                Assert.Equal(0, counting.ReadsOf(s));
+            }
+        }
+
+        // Third run: corrupt the snapshot's CRC and verify safe fallback to full segment rewind produces identical rows.
+        var corruptSnapshot = savedSnapshot.ToArray();
+        corruptSnapshot[^1] ^= 0xFF;
+        await using var reader3 = new LedgerReader(map.View, transport, new FakeTimeProvider(), Node);
+        var fallbackApplier = new RecordingApplier(new Slot(SplitWatermark));
+        var callbacks3 = new LedgerApplier
+        {
+            NextSlotAsync = fallbackApplier.Callbacks.NextSlotAsync,
+            ApplyAsync = fallbackApplier.Callbacks.ApplyAsync,
+            RemoveAsync = fallbackApplier.Callbacks.RemoveAsync,
+            LoadSegmentViewAsync = (_, _) => ValueTask.FromResult<byte[]?>(corruptSnapshot),
+        };
+
+        await using (new LedgerApplyLoop(reader3, callbacks3, new FakeTimeProvider()))
+        {
+            await fallbackApplier.Until(applied => applied.Next == End).WaitAsync(Signal, TimeProvider.System, token);
+        }
+
+        Assert.Equal(expected.Where(row => row.Slot >= SplitWatermark), fallbackApplier.Rows);
+    }
+
+    /// <summary>
     /// A ledger the node's map view no longer lists, one the map revoked, leaves the applier: the loop delivers no more of
     /// it and tells the applier, which reads the rest from the archive store.
     /// </summary>

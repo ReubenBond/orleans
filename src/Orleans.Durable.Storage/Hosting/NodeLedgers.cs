@@ -1023,7 +1023,8 @@ internal sealed partial class NodeLedgers(
             // it pending from its first report (orleans.md §5.6).
             var refused = journals.State == LocalJournals.JournalsState.Refused || archive.Gate.Passed.IsFaulted || objectLedgers.Gate.Passed.IsFaulted;
             var handingOff = nodeControl.State == LocalNodeControl.ControlState.HandingOff || refused;
-            var report = await nodeControl.RunAsync(controller => Task.FromResult(controller.Report(pressure.UnderPressure, lost, handingOff, refused, archive.Gate.IsPassed, Drains))).ConfigureAwait(false);
+            var catchUpReady = _runtime?.IsCatchUpReady ?? true;
+            var report = await nodeControl.RunAsync(controller => Task.FromResult(controller.Report(pressure.UnderPressure, lost, handingOff, refused, archive.Gate.IsPassed, Drains, catchUpReady))).ConfigureAwait(false);
             // Bounded below the control intervals after which a node's archive-log share falls to its floor, so a hung call
             // never holds the next report past them (orleans.md §5.6, OR-I22); a reply which arrives later is discarded.
             var reply = await ClusterController.ReportAsync(report).WaitAsync(control.ControlInterval * (ArchiveLogRequestShare.ReplyIntervals - 1), timeProvider, cancellationToken).ConfigureAwait(false);
@@ -1575,6 +1576,9 @@ internal sealed class NodeRuntime : IAsyncDisposable
 
     /// <summary>Gets the node's journal state database when configured with local state storage, or <see langword="null"/>; for tests.</summary>
     internal JournalStateDatabase? StateDatabase => _stateDatabase;
+
+    /// <summary>Gets a value indicating whether the node's apply loop has finished initial catch-up (or none is attached).</summary>
+    internal bool IsCatchUpReady => _applyLoop?.IsInitialCatchUpComplete ?? true;
 
     /// <summary>
     /// Gets the caller parameters the silo records with the archive store, and checks before its Journals serve (OR-I8,

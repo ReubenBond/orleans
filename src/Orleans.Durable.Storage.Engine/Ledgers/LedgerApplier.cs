@@ -31,6 +31,19 @@ public sealed class LedgerApplier
     public Func<LedgerId, CancellationToken, ValueTask>? FlushAsync { get; init; }
 
     /// <summary>
+    /// Gets an optional callback invoked by <see cref="LedgerApplyLoop"/> when a delivery starts at a non-zero
+    /// watermark to restore a previously persisted <see cref="LedgerSegmentView"/> snapshot and avoid rewinding to the
+    /// segment's start.
+    /// </summary>
+    public Func<LedgerId, CancellationToken, ValueTask<byte[]?>>? LoadSegmentViewAsync { get; init; }
+
+    /// <summary>
+    /// Gets an optional callback invoked by <see cref="LedgerApplyLoop"/> periodically and on clean stop to persist the
+    /// active <see cref="LedgerSegmentView"/> snapshot alongside the applier's watermark.
+    /// </summary>
+    public Func<LedgerId, ReadOnlyMemory<byte>, CancellationToken, ValueTask>? SaveSegmentViewAsync { get; init; }
+
+    /// <summary>
     /// Gets the callback which tells the applier the node's map view no longer lists a ledger, so the loop delivers no
     /// more of it: an applier which had not reached a closed ledger's <c>T</c> reads the rest from the archive store,
     /// which covers it below <c>T</c> (HI-I2, ledgers.md §8.5).
