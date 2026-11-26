@@ -350,7 +350,6 @@ builder.UseOrleans(silo =>
             ds.Control.Replicas = resolvedVoters!.Count;
             ds.Control.LedgersPerNode = 21; // 63 open ledgers across 3 nodes (~32.8% / 32.8% / 34.4% dyadic keyspace balance)
             ds.Control.SequencerWindow = 64;
-            ds.Control.MaxConcurrentDrains = 8;
 
             builder.Configuration.GetSection("DurableStorage").Bind(ds);
             if (ds.Node.Cluster == Guid.Empty)
@@ -378,7 +377,7 @@ builder.UseOrleans(silo =>
         }));
 
         var rocksDbWriteBufferBytes = Math.Max(16L << 20, benchOptions.RocksDbWriteBufferBytes);
-        Console.WriteLine($"[BenchStartup] RocksDB derived index write buffer budget: {rocksDbWriteBufferBytes / (1024 * 1024)} MiB (FlushInterval=Infinite, size-based flushing).");
+        Console.WriteLine($"[BenchStartup] RocksDB derived index write buffer budget: {rocksDbWriteBufferBytes / (1024 * 1024)} MiB (JournalIndexOptions.FlushInterval default=30s).");
         silo.AddDurableJournalIndex(root => new RocksDbJournalIndex(Path.Combine(root, "index"), rocksDbWriteBufferBytes));
     }
     else
