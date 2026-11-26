@@ -309,6 +309,129 @@ internal sealed class LedgerReplicaHost
         }
     }
 
+    /// <summary>Runs a batched range read on the replica it names, as the grain keyed by <paramref name="key"/> received it.</summary>
+    public Task<RemoteReplicaRangeRead> ReadRangeAsync(NodeId key, LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
+        ReadRangeCoreAsync(grain: null, scheduler: null, key, request, cancellationToken);
+
+    /// <summary>Runs a batched range read called on <paramref name="grain"/> off its activation's <paramref name="scheduler"/>, deactivating it on <see cref="NotThisNode"/> (OR-I14).</summary>
+    internal Task<RemoteReplicaRangeRead> ReadRangeFromGrainAsync(IGrainBase grain, NodeId key, TaskScheduler scheduler, LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
+        ReadRangeCoreAsync(grain, scheduler, key, request, cancellationToken);
+
+    private async Task<RemoteReplicaRangeRead> ReadRangeCoreAsync(IGrainBase? grain, TaskScheduler? scheduler, NodeId key, LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken)
+    {
+        if (scheduler is not null)
+        {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        }
+
+        if (Unsupported(request.Version) is { } unsupported)
+        {
+            return unsupported;
+        }
+
+        var serving = await _local.ServingAsync(key, cancellationToken).ConfigureAwait(false);
+        if (serving.Value is NotThisNode)
+        {
+            if (grain is not null)
+            {
+                await NotThisNode.DeactivateOnSchedulerAsync(grain, scheduler!).ConfigureAwait(false);
+            }
+
+            return NotThisNode.Instance;
+        }
+
+        if (serving.Value is LocalNodeServing.Diskless)
+        {
+            return DisklessRefusal;
+        }
+
+        if (serving.Value is not LedgerStore store)
+        {
+            return StoppingRefusal;
+        }
+
+        if (request.MaxSlots <= 0 || request.MaxBytes <= 0 || request.From < 0 || request.Below < request.From)
+        {
+            return new ReplicaCallRefused(
+                ReplicaRefusal.Argument,
+                string.Create(CultureInfo.InvariantCulture, $"Invalid range read [{request.From}, {request.Below}) with maxSlots={request.MaxSlots}, maxBytes={request.MaxBytes}."));
+        }
+
+        if (AbovePayloadLimit(request.MaxBytes, "reply") is { } above)
+        {
+            return above;
+        }
+
+        LedgerReplicaHostAdmission? admission = null;
+        try
+        {
+            admission = TryAdmit(request.MaxBytes);
+            if (admission is null)
+            {
+                return ReplicaWriteOutcome.Backpressure.Instance;
+            }
+
+            ReplicaRangeRead read;
+            try
+            {
+                read = await store.ReadReplicaRangeAsync(
+                    new LedgerId(request.Ledger),
+                    request.WindowSize,
+                    new Slot(request.From),
+                    new Slot(request.Below),
+                    new Slot(request.ContiguousTail),
+                    request.MaxSlots,
+                    request.MaxBytes,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (ArgumentException refused)
+            {
+                return Refused(refused);
+            }
+            catch (LedgerReplicaCorruptException corrupt)
+            {
+                return Corrupt(corrupt);
+            }
+
+            if (read.TryGetValue(out ReplicaRangeBatch batch))
+            {
+                if (batch.FirstSlotTooLargeLength > 0)
+                {
+                    batch.Dispose();
+                    return new RemoteReplicaRangeRead.TooLarge(batch.FirstSlotTooLargeLength);
+                }
+
+                if (batch.Count == 0)
+                {
+                    batch.Dispose();
+                    return new RemoteReplicaRangeRead.Batch(batch.FirstSlot.Value, 0, default);
+                }
+
+                OrleansBuffer copied;
+                using (batch)
+                {
+                    copied = WireBuffers.CopyToOrleans(batch.Packed);
+                }
+
+                var reply = new RemoteReplicaRangeRead.Batch(batch.FirstSlot.Value, batch.Count, copied) { Admission = admission };
+                admission.HoldUntil(_timeProvider, ReplyDeadline);
+                admission = null;
+                return reply;
+            }
+
+            return read switch
+            {
+                ReplicaWriteOutcome.Dropped dropped => dropped,
+                ReplicaWriteOutcome.Backpressure backpressure => backpressure,
+                _ => throw new UnreachableException(),
+            };
+        }
+        finally
+        {
+            admission?.Dispose();
+        }
+    }
+
     /// <summary>Runs a contiguous-tail read or a seal on the replica it names, as the grain keyed by <paramref name="key"/> received it.</summary>
     public Task<RemoteReplicaTailRead> ReadTailAsync(NodeId key, LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         ReadTailCoreAsync(grain: null, scheduler: null, key, request, cancellationToken);

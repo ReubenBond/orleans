@@ -2227,4 +2227,71 @@ public sealed class LedgerStoreTests : IDisposable
         public override ValueTask<WalDirectoryUsage> MeasureDirectoryAsync(string path, CancellationToken cancellationToken) =>
             inner.MeasureDirectoryAsync(path, cancellationToken);
     }
+
+    [Fact]
+    public async Task ReadRangeAsyncMatchesPointWiseReadsAcrossGapsAndByteCaps()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var root = NewRoot(new SimulatedWalStorage(seed: 19));
+        await using var store = await root.OpenAsync(create: true);
+        var ledger = new LedgerId(42);
+        await using var replica = await CreateAndOpenReplicaAsync(store, ledger);
+
+        // Write slots 0..9 and 12..15 (leaving a gap at 10..11).
+        var payloads = new Dictionary<long, byte[]>();
+        foreach (var slot in Enumerable.Range(0, 10).Concat(Enumerable.Range(12, 4)))
+        {
+            var data = Enumerable.Range(0, 32 + slot * 13).Select(i => unchecked((byte)(slot * 17 + i))).ToArray();
+            payloads[slot] = data;
+            _ = Assert.IsType<ReplicaWriteOutcome.Written>((await LedgerStoreReplicaTests.WriteAsync(replica, slot, data)).Value);
+        }
+
+        // Uncapped range from 0..16 stops at gap slot 10 and matches point-wise reads exactly.
+        var firstRange = await replica.ReadRangeAsync(Slot.Zero, new Slot(16), new Slot(10), maxSlots: 128, maxBytes: 1 << 20, token);
+        Assert.True(firstRange.TryGetValue(out ReplicaRangeBatch batch));
+        using (batch)
+        {
+            Assert.Equal(Slot.Zero, batch.FirstSlot);
+            Assert.Equal(10, batch.Count);
+            Assert.Null(ReplicaRangeBatch.ValidatePacked(batch.Count, batch.Packed));
+            var offset = 0;
+            for (var s = 0; s < 10; s++)
+            {
+                using var slice = ReplicaRangeBatch.SliceNext(batch.Packed, ref offset);
+                Assert.Equal(payloads[s], slice.ToArray());
+            }
+
+            Assert.Equal(batch.Packed.Length, offset);
+        }
+
+        // Range starting at gap slot 10 returns empty.
+        var atGap = await replica.ReadRangeAsync(new Slot(10), new Slot(16), new Slot(10), maxSlots: 128, maxBytes: 1 << 20, token);
+        Assert.True(atGap.TryGetValue(out ReplicaRangeBatch gapBatch));
+        using (gapBatch)
+        {
+            Assert.Equal(0, gapBatch.Count);
+            Assert.Equal(0, gapBatch.FirstSlotTooLargeLength);
+        }
+
+        // Byte-capped iteration from 0..10 yields all 10 slots with exact parity.
+        var cursor = Slot.Zero;
+        while (cursor < new Slot(10))
+        {
+            var chunk = await replica.ReadRangeAsync(cursor, new Slot(10), new Slot(10), maxSlots: 3, maxBytes: 256, token);
+            Assert.True(chunk.TryGetValue(out ReplicaRangeBatch part));
+            using (part)
+            {
+                Assert.InRange(part.Count, 1, 3);
+                Assert.True(part.Packed.Length <= 256);
+                var offset = 0;
+                for (var i = 0; i < part.Count; i++)
+                {
+                    using var slice = ReplicaRangeBatch.SliceNext(part.Packed, ref offset);
+                    Assert.Equal(payloads[cursor.Value + i], slice.ToArray());
+                }
+
+                cursor += part.Count;
+            }
+        }
+    }
 }

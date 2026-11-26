@@ -25,6 +25,9 @@ public sealed class LedgerUnionLawsTests : IDisposable
     public void ReplicaReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaReadAdapter(), _leaks);
 
     [Fact]
+    public void ReplicaRangeReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaRangeReadAdapter(), _leaks);
+
+    [Fact]
     public void ReplicaTailReadKeepsTheUnionLaws() => UnionLaws.Check(new ReplicaTailReadAdapter(), _leaks);
 
     [Fact]
@@ -72,6 +75,40 @@ public sealed class LedgerUnionLawsTests : IDisposable
             writer.Write(bytes);
             return writer.ConsumeSlice(writer.Length);
         }
+    }
+
+    private sealed class ReplicaRangeReadAdapter : IUnionLawsAdapter<ReplicaRangeRead>
+    {
+        public IReadOnlyList<UnionCase<ReplicaRangeRead>> Cases { get; } =
+        [
+            new(
+                nameof(ReplicaRangeBatch),
+                Gen.Select(Slots, Gen.Byte.Array[1, 64]).Select(static (slot, bytes) => (Func<object>)(() =>
+                {
+                    using var writer = new ArcBufferWriter();
+                    using var payload = ArcBuffer.CopyFrom(bytes);
+                    ReplicaRangeBatch.WriteFrame(writer, payload);
+                    return new ReplicaRangeBatch(slot, 1, writer.ConsumeSlice(writer.Length));
+                })),
+                static value => new ReplicaRangeRead((ReplicaRangeBatch)value),
+                static value => ((ReplicaRangeBatch)value).Dispose()),
+            new(
+                nameof(ReplicaWriteOutcome.Dropped),
+                One(ReplicaWriteOutcome.Dropped.Instance),
+                static value => new ReplicaRangeRead((ReplicaWriteOutcome.Dropped)value)),
+            new(
+                nameof(ReplicaWriteOutcome.Backpressure),
+                One(ReplicaWriteOutcome.Backpressure.Instance),
+                static value => new ReplicaRangeRead((ReplicaWriteOutcome.Backpressure)value)),
+        ];
+
+        public int Switch(ReplicaRangeRead value) => value switch
+        {
+            ReplicaRangeBatch => 0,
+            ReplicaWriteOutcome.Dropped => 1,
+            ReplicaWriteOutcome.Backpressure => 2,
+            null => throw new UnreachableException(),
+        };
     }
 
     private sealed class ProposalOutcomeAdapter : IUnionLawsAdapter<ProposalOutcome>

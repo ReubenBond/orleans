@@ -1,7 +1,9 @@
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica (interface : System.IAsyncDisposable)
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.Int32 offset, System.Int32 length, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadRangeAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot from, Orleans.Durable.Storage.Engine.Ledgers.Slot below, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Int32 maxSlots, System.Int32 maxBytes, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead>
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.ReadTailAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Boolean seal, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead>
+Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.SupportsReadRange: System.Boolean { get; }
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica.WriteAsync(Orleans.Durable.Storage.Engine.Ledgers.Slot slot, Orleans.Durable.Storage.Engine.Buffers.ArcBuffer payload, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Boolean recovery, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome>
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport (interface)
 Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplicaTransport.HeartbeatAsync(Orleans.Durable.Storage.Engine.Ledgers.NodeId node, System.ReadOnlyMemory<Orleans.Durable.Storage.Engine.Ledgers.LedgerId> ledgers, System.Threading.CancellationToken cancellationToken = default): System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead>
@@ -35,7 +37,9 @@ Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaFailures.IsTransient(System.
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations (static class)
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.RangeOf(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer value, System.Int32 offset, System.Int32 length): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ReadRangeOfValueAsync(Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica replica, Orleans.Durable.Storage.Engine.Ledgers.Slot slot, System.Int32 offset, System.Int32 length, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Threading.CancellationToken cancellationToken): static System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead>
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ReadRangePointWiseAsync(Orleans.Durable.Storage.Engine.Ledgers.ILedgerReplica replica, Orleans.Durable.Storage.Engine.Ledgers.Slot from, Orleans.Durable.Storage.Engine.Ledgers.Slot below, Orleans.Durable.Storage.Engine.Ledgers.Slot contiguousTail, System.Int32 maxSlots, System.Int32 maxBytes, System.Threading.CancellationToken cancellationToken): static System.Threading.Tasks.ValueTask<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead>
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateBatch(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer payload): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateReadRange(Orleans.Durable.Storage.Engine.Ledgers.Slot from, Orleans.Durable.Storage.Engine.Ledgers.Slot below, System.Int32 maxSlots, System.Int32 maxBytes): static System.Void
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateReplicaWindow(System.Int32 replicaWindow, System.Int32 windowSize): static System.Void
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateSlot(Orleans.Durable.Storage.Engine.Ledgers.Slot slot): static System.Void
 Orleans.Durable.Storage.Engine.Ledgers.LedgerReplicaOperations.ValidateWindowSize(System.Int32 windowSize): static System.Void
@@ -117,6 +121,32 @@ Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Absent = 3
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Dropped = 2
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Granted = 0
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus.Sealed = 1
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch (readonly struct : System.IDisposable)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch..ctor(Orleans.Durable.Storage.Engine.Ledgers.Slot firstSlot, System.Int32 count, Orleans.Durable.Storage.Engine.Buffers.ArcBuffer packed, System.Int32 firstSlotTooLargeLength = 0)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.Count: System.Int32 { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.Dispose(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.Empty(Orleans.Durable.Storage.Engine.Ledgers.Slot firstSlot): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.FirstSlot: Orleans.Durable.Storage.Engine.Ledgers.Slot { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.FirstSlotTooLargeLength: System.Int32 { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.FrameHeaderLength: const System.Int32 = 4
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.Packed: Orleans.Durable.Storage.Engine.Buffers.ArcBuffer { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.SliceNext(Orleans.Durable.Storage.Engine.Buffers.ArcBuffer packed, ref System.Int32 offset): static Orleans.Durable.Storage.Engine.Buffers.ArcBuffer
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.TooLarge(Orleans.Durable.Storage.Engine.Ledgers.Slot firstSlot, System.Int32 batchLength): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.ValidatePacked(System.Int32 count, Orleans.Durable.Storage.Engine.Buffers.ArcBuffer packed): static System.IO.InvalidDataException?
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch.WriteFrame(Orleans.Durable.Storage.Engine.Buffers.ArcBufferWriter writer, Orleans.Durable.Storage.Engine.Buffers.ArcBuffer batch): static System.Void
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead (readonly struct : System.Runtime.CompilerServices.IUnion)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead..ctor(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped value)
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.HasValue: System.Boolean { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.Release(): System.Void
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.TryGetValue(out Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped? value): System.Boolean
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.Value: System.Object? { get; }
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.op_Implicit(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch value): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.op_Implicit(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Backpressure value): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead.op_Implicit(Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome+Dropped value): static Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead (readonly struct : System.Runtime.CompilerServices.IUnion)
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing (sealed class : System.IEquatable<Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing>)
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing.Equals(Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead+Missing? other): System.Boolean

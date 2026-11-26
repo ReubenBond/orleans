@@ -541,6 +541,120 @@ internal sealed class LiveReplica
     }
 
     /// <summary>
+    /// Reads up to <paramref name="maxSlots"/> consecutive published slots starting at <paramref name="from"/> below
+    /// <paramref name="below"/> whose length-prefixed payloads fit within <paramref name="maxBytes"/>, stopping at the
+    /// first missing, faulty, or oversized slot after <paramref name="from"/>.
+    /// </summary>
+    internal async ValueTask<ReplicaRangeRead> ReadRangeAsync(
+        Slot from, Slot below, Slot contiguousTail, int windowSize, int maxSlots, int maxBytes, CancellationToken cancellationToken)
+    {
+        if (!await TryEnterAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return ReplicaWriteOutcome.Dropped.Instance;
+        }
+
+        ArcBufferWriter? writer = null;
+        try
+        {
+            lock (_lock)
+            {
+                AdmitLocked(contiguousTail, windowSize);
+            }
+
+            if (from == below)
+            {
+                return ReplicaRangeBatch.Empty(from);
+            }
+
+            var end = Math.Min(below.Value, from.Value + maxSlots);
+            var loadedLeaf = -1L;
+            var count = 0;
+            for (var slot = from.Value; slot < end; slot++)
+            {
+                var leaf = SlotTable.LeafOf(slot);
+                if (leaf != loadedLeaf)
+                {
+                    await EnsureLoadedAsync(leaf, cancellationToken).ConfigureAwait(false);
+                    loadedLeaf = leaf;
+                }
+
+                var state = Observe(slot, out var entry);
+                if (state == State.Missing)
+                {
+                    break;
+                }
+
+                if (state == State.Faulty)
+                {
+                    if (count == 0)
+                    {
+                        throw RecordCorruption(new Slot(slot));
+                    }
+
+                    break;
+                }
+
+                var read = await _store.Wal.ReadAsync(entry.Page, LedgerRecords.Key(Handle, slot), cancellationToken).ConfigureAwait(false);
+                if (!read.TryGetValue(out ArcBuffer record))
+                {
+                    MarkFaulty(slot, entry.Page);
+                    if (count == 0)
+                    {
+                        throw RecordCorruption(new Slot(slot));
+                    }
+
+                    break;
+                }
+
+                using (record)
+                {
+                    if (!LedgerRecords.IsDataRecord(record))
+                    {
+                        MarkFaulty(slot, entry.Page);
+                        if (count == 0)
+                        {
+                            throw RecordCorruption(new Slot(slot));
+                        }
+
+                        break;
+                    }
+
+                    var batchLength = record.Length - LedgerRecords.KeyLength;
+                    var framedLength = checked(ReplicaRangeBatch.FrameHeaderLength + batchLength);
+                    if (count == 0 && framedLength > maxBytes)
+                    {
+                        return ReplicaRangeBatch.TooLarge(from, batchLength);
+                    }
+
+                    if (count > 0 && writer!.Length + framedLength > maxBytes)
+                    {
+                        break;
+                    }
+
+                    writer ??= new ArcBufferWriter(Math.Min(maxBytes, Math.Max(framedLength, ArcBufferWriter.MinimumPageSize)));
+                    using var payload = record.UnsafeSlice(LedgerRecords.KeyLength, batchLength);
+                    ReplicaRangeBatch.WriteFrame(writer, payload);
+                    count++;
+                }
+            }
+
+            return count == 0
+                ? ReplicaRangeBatch.Empty(from)
+                : new ReplicaRangeBatch(from, count, writer!.ConsumeSlice(writer.Length));
+        }
+        catch (Exception exception)
+        {
+            _store.StopIfReported(exception);
+            throw;
+        }
+        finally
+        {
+            writer?.Dispose();
+            Exit();
+        }
+    }
+
+    /// <summary>
     /// Reports the retained contiguous tail and the seal, sealing the replica first when <paramref name="seal"/> is set
     /// (ledgerstore.md §8.3). The seal is reported only once its record is durable: a read which meets a seal in flight
     /// waits for it (conventions.md §13).

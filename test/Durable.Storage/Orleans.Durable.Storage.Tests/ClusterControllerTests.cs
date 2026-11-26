@@ -621,6 +621,50 @@ public sealed class ClusterControllerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// OR-I5: when a primary departs on a 3-node cluster holding 20 open ledgers, its departing ledgers split evenly
+    /// (10 / 10) across the 2 surviving nodes rather than piling onto one node in fixed replica-array order.
+    /// </summary>
+    [Fact]
+    public async Task TwentyDepartingLedgersOnAThreeNodeClusterSplitEvenlyAcrossTheTwoSurvivingNodes()
+    {
+        Register(1, 2, 3);
+        const int DepartingCount = 20;
+        var ranges = new List<KeyRange> { Root };
+        while (ranges.Count < DepartingCount)
+        {
+            var next = new List<KeyRange>(ranges.Count * 2);
+            for (var i = 0; i < ranges.Count; i++)
+            {
+                var remaining = ranges.Count - i;
+                if (next.Count + remaining < DepartingCount)
+                {
+                    var (left, right) = ranges[i].Children;
+                    next.Add(left);
+                    next.Add(right);
+                }
+                else
+                {
+                    next.Add(ranges[i]);
+                }
+            }
+
+            ranges = next;
+        }
+
+        // Put Node(2) before Node(3) in every ledger's replica list so fixed-order selection would dump all 20 onto Node(2).
+        var openings = ranges.Select(r => Opening(r, [Node(1), Node(2), Node(3)])).ToArray();
+        await CommitAsync(new LedgerMapChange.Install([], [.. openings], _revision));
+        _controller.RequestHandOff(Node(1), Generation);
+
+        var transitions = RunPassCompletingPrepareReleases().Transitions;
+        Assert.Equal(DepartingCount, transitions.Length);
+        var byNode = transitions.GroupBy(static t => t.Executor).ToDictionary(static g => g.Key, static g => g.Count());
+        Assert.Equal(2, byNode.Count);
+        Assert.Equal(10, byNode[Node(2)]);
+        Assert.Equal(10, byNode[Node(3)]);
+    }
+
+    /// <summary>
     /// OR-I5: only a takeover or a leaving primary's hand-off may keep a dead replica. With node 3 dead inside its grace and
     /// fewer than <c>N</c> nodes which may hold its ledgers, no other purpose sends a transition naming it: primary balance,
     /// a split toward the target, a merge of cold siblings, a roll for the window or for failure domains, the repair of a

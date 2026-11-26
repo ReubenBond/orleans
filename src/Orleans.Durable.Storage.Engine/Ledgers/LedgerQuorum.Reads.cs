@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Orleans.Durable.Storage.Engine.Buffers;
 
 namespace Orleans.Durable.Storage.Engine.Ledgers;
@@ -102,14 +103,207 @@ internal sealed partial class LedgerQuorum
         return ReadAsync(new ReadTarget(slot, offset, length), contiguousTail, cancellationToken);
     }
 
+    /// <summary>Maximum consecutive slots fetched in one batched <see cref="ILedgerReplica.ReadRangeAsync"/> RPC.</summary>
+    internal const int ReadRangeMaxSlots = 128;
+
+    /// <summary>Maximum packed payload bytes fetched in one batched <see cref="ILedgerReplica.ReadRangeAsync"/> RPC.</summary>
+    internal const int ReadRangeMaxBytes = 1 << 20;
+
     /// <inheritdoc/>
     public IAsyncEnumerable<ReplicaRead> ReadRangeAsync(
         Slot from,
         Slot below,
         Slot acknowledged,
         SemaphoreSlim? window = null,
-        CancellationToken cancellationToken = default) =>
-        LedgerRangeReads.ReadPointWiseAsync(this, from, below, acknowledged, LedgerReader.DefaultMaxReadAheadBytes, window, onReadIssued: null, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(below, from);
+        if (!_supportsReadRange || from == below || below > acknowledged)
+        {
+            return LedgerRangeReads.ReadPointWiseAsync(this, from, below, acknowledged, LedgerReader.DefaultMaxReadAheadBytes, window, onReadIssued: null, cancellationToken);
+        }
+
+        return ReadDecidedRangeBatchedAsync(from, below, acknowledged, window, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads decided slots <c>[from, below)</c> using batched <see cref="ILedgerReplica.ReadRangeAsync"/> calls (up to
+    /// <see cref="ReadRangeMaxSlots"/> slots / <see cref="ReadRangeMaxBytes"/> per RPC), unpacking each slot as a
+    /// zero-copy <see cref="ArcBuffer.Slice(int, int)"/> over the returned packed buffer. Asks the preferred replica
+    /// first without firing bogus remote hedges against local NVMe, switches to surviving replicas when the preferred
+    /// replica lacks the range, and falls back to single-slot <see cref="ReadAsync(Slot, Slot, CancellationToken)"/> for
+    /// oversized single batches or error/precedence edge cases.
+    /// </summary>
+    private async IAsyncEnumerable<ReplicaRead> ReadDecidedRangeBatchedAsync(
+        Slot from,
+        Slot below,
+        Slot acknowledged,
+        SemaphoreSlim? window,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var next = from;
+        while (next < below)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (window is not null)
+            {
+                await window.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            ReplicaRangeBatch fetched = default;
+            var preferredLacks = false;
+            var dropped = false;
+            var fallbackSingle = false;
+            try
+            {
+                using var admission = Admit();
+                ThrowIfReadsStopped();
+                using var scope = new CallScope(cancellationToken, _lifetime.Token);
+                var token = scope.Token;
+                var replica = FirstReplicaToRead();
+                for (var asked = 0; asked < _replicas.Length; asked++)
+                {
+                    var asking = replica;
+                    var preferred = asking == _preferredReplica;
+                    replica = NextReplica(replica);
+                    ReplicaRangeRead answer;
+                    try
+                    {
+                        var callToken = preferred ? _lifetime.Token : token;
+                        var reading = _replicas[asking].ReadRangeAsync(next, below, acknowledged, ReadRangeMaxSlots, ReadRangeMaxBytes, callToken);
+                        if (reading.IsCompletedSuccessfully)
+                        {
+                            answer = await reading.ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            var task = reading.AsTask();
+                            if (preferred)
+                            {
+                                await ((Task)task).WaitAsync(token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                                if (!task.IsCompleted)
+                                {
+                                    _ = TrackStragglers([task]);
+                                    token.ThrowIfCancellationRequested();
+                                }
+                            }
+
+                            answer = await task.ConfigureAwait(false);
+                        }
+                    }
+                    catch (OperationCanceledException) when (ReadsStopped(cancellationToken))
+                    {
+                        throw ReadsStoppedException();
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (LedgerReplicaCorruptException)
+                    {
+                        preferredLacks |= preferred;
+                        continue;
+                    }
+                    catch (Exception failure) when (failure is not OutOfMemoryException)
+                    {
+                        if (_lifetime.IsCancellationRequested)
+                        {
+                            throw ReadsStoppedException();
+                        }
+
+                        continue;
+                    }
+
+                    if (answer.TryGetValue(out ReplicaRangeBatch batch))
+                    {
+                        if (batch.Count > 0)
+                        {
+                            fetched = batch;
+                            break;
+                        }
+
+                        batch.Dispose();
+                        if (batch.FirstSlotTooLargeLength > 0)
+                        {
+                            // Single batch exceeds ReadRangeMaxBytes: fall back to point read for this slot.
+                            fallbackSingle = true;
+                            break;
+                        }
+
+                        preferredLacks |= preferred;
+                        continue;
+                    }
+
+                    if (answer.Value is ReplicaWriteOutcome.Dropped)
+                    {
+                        dropped = true;
+                        break;
+                    }
+
+                    // Backpressure: try the next replica, or fall back to single-slot ReadAsync for exact precedence.
+                }
+
+                if (fetched.Count == 0 && !dropped)
+                {
+                    fallbackSingle = true;
+                }
+            }
+            finally
+            {
+                _ = window?.Release();
+            }
+
+            if (dropped)
+            {
+                yield return ReplicaWriteOutcome.Dropped.Instance;
+                yield break;
+            }
+
+            if (fallbackSingle)
+            {
+                if (window is not null)
+                {
+                    await window.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                ReplicaRead single;
+                try
+                {
+                    single = await ReadAsync(next, acknowledged, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _ = window?.Release();
+                }
+
+                yield return single;
+                if (!single.TryGetValue(out ArcBuffer _))
+                {
+                    yield break;
+                }
+
+                next += 1;
+                continue;
+            }
+
+            using (fetched)
+            {
+                var offset = 0;
+                for (var i = 0; i < fetched.Count; i++)
+                {
+                    var slot = fetched.FirstSlot + i;
+                    var slice = ReplicaRangeBatch.SliceNext(fetched.Packed, ref offset);
+                    if (preferredLacks && Volatile.Read(ref _suppressReadRepair) == 0)
+                    {
+                        Repair(new ReadTarget(slot, 0, 0), slice, acknowledged);
+                    }
+
+                    next = slot + 1;
+                    yield return new ReplicaRead(slice);
+                }
+            }
+        }
+    }
 
     private ValueTask<ReplicaRead> ReadAsync(ReadTarget target, Slot contiguousTail, CancellationToken cancellationToken) =>
         target.Slot < contiguousTail

@@ -122,6 +122,55 @@ internal readonly union RemoteReplicaRead(
 }
 
 /// <summary>
+/// The answer of <see cref="ILedgerStoreGrain.ReadRangeAsync"/> (orleans.md §5.12, conventions.md §15): a packed
+/// <see cref="Batch"/> of consecutive slots (or empty when the first slot is missing), <see cref="TooLarge"/> when the
+/// first slot alone exceeded the caller's <c>MaxBytes</c>, <see cref="ReplicaWriteOutcome.Dropped"/>,
+/// <see cref="ReplicaWriteOutcome.Backpressure"/>, <see cref="NotThisNode"/>, the host's refusal, or the store's
+/// corruption.
+/// </summary>
+internal readonly union RemoteReplicaRangeRead(
+    RemoteReplicaRangeRead.Batch,
+    RemoteReplicaRangeRead.TooLarge,
+    ReplicaWriteOutcome.Dropped,
+    ReplicaWriteOutcome.Backpressure,
+    NotThisNode,
+    ReplicaCallRefused,
+    ReplicaCorrupt) : IEquatable<RemoteReplicaRangeRead>
+{
+    /// <inheritdoc/>
+    public bool Equals(RemoteReplicaRangeRead other) => Equals(Value, other.Value);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is RemoteReplicaRangeRead other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Value?.GetHashCode() ?? 0;
+
+    /// <inheritdoc/>
+    public override string ToString() => Value?.ToString() ?? string.Empty;
+
+    /// <summary>A contiguous range of <paramref name="Count"/> slots starting at <paramref name="FirstSlot"/> packed in <paramref name="Bytes"/>.</summary>
+    public sealed record Batch(long FirstSlot, int Count, OrleansBuffer Bytes)
+    {
+        /// <summary>Gets the host admission held until first conversion or deadline; <see langword="null"/> at the caller.</summary>
+        internal LedgerReplicaHostAdmission? Admission { get; init; }
+
+        /// <inheritdoc/>
+        public bool Equals(Batch? other) =>
+            other is not null && FirstSlot == other.FirstSlot && Count == other.Count && Bytes.ToArray().AsSpan().SequenceEqual(other.Bytes.ToArray());
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(FirstSlot, Count, Bytes.Length);
+
+        /// <inheritdoc/>
+        public override string ToString() => $"Batch(FirstSlot={FirstSlot}, Count={Count}, Bytes={Bytes.Length})";
+    }
+
+    /// <summary>The first requested slot's single batch of <paramref name="Length"/> bytes exceeded the range read's byte budget.</summary>
+    public sealed record TooLarge(int Length);
+}
+
+/// <summary>
 /// The answer of <see cref="ILedgerStoreGrain.ReadTailAsync"/> (orleans.md §5.12, conventions.md §15): the replica's
 /// contiguous tail and seal as the callee reported them, <see cref="ReplicaWriteOutcome.Dropped"/>,
 /// <see cref="ReplicaWriteOutcome.Backpressure"/>, <see cref="NotThisNode"/>, the host's refusal, or the store's corruption.

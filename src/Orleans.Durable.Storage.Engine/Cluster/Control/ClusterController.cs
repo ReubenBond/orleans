@@ -1316,7 +1316,10 @@ internal sealed partial class ClusterController
 
         var currentReplicas = ReplicasOf(ledger);
         var replicas = currentReplicas.Where(replica => replica != from && (!disklessOnly || state.IsDiskless(replica)) && CanExecuteFor(state, replica, placeInObjectStore, needsObjectLedgers));
-        foreach (var replica in placeInObjectStore ? replicas : replicas.OrderBy(state.IsUnderPressure))
+        var orderedReplicas = placeInObjectStore
+            ? replicas.OrderBy(state.Primaries).ThenBy(static node => node, NodeOrder.Instance)
+            : replicas.OrderBy(state.IsUnderPressure).ThenBy(state.Primaries).ThenBy(static node => node, NodeOrder.Instance);
+        foreach (var replica in orderedReplicas)
         {
             yield return replica;
         }

@@ -781,7 +781,9 @@ Each node keeps, in its state database:
     `ApplyAsync` buffers consecutive slots up to 1,024 rows or 1 MiB—flushing immediately when either bound is reached,
     when a waiting catch-up reader's target watermark is satisfied, or when `LedgerApplyLoop` invokes `FlushAsync` at
     the end of the pass—so catch-up commits hundreds of slots per `WriteBatch` while steady-state and waiting reads
-    proceed without added delay. `MaterializeBatch` (shared by `ApplyAsync` and `PredecessorScan`) skips non-archive rows
+    proceed without added delay; `JournalStateDatabase.FlushAsync` drains any remaining buffered replicated slots into
+    the index before flushing SSTs on clean shutdown. `MaterializeBatch` (shared by `ApplyAsync` and `PredecessorScan`)
+    skips non-archive rows
     (`!RowKinds.IsArchiveKind(row.Kind)`), so `RowKind.Message` rows produce zero RocksDB `key_index` or `tombstones`
     writes (LG-I15). A background map-watcher drops indexes for non-replicated predecessors once the map drops them.
 - **Warm state**: on a primary, `JournalWarmState` holds `JournalState` and `JournalPlanning` per touched key, owned

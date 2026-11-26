@@ -292,6 +292,121 @@ internal sealed class RemoteReplicaReadConverter : IConverter<RemoteReplicaRead,
     }
 }
 
+/// <summary>A <see cref="RemoteReplicaRangeRead"/> as a grain reply carries it: its case's tag and fields.</summary>
+[GenerateSerializer]
+[Immutable]
+internal readonly struct RemoteReplicaRangeReadSurrogate
+{
+    /// <summary>Gets or initializes the case's tag (<see cref="ReplicaReplyTag"/>).</summary>
+    [Id(0)]
+    public byte Case { get; init; }
+
+    /// <summary>Gets or initializes the first slot of a <see cref="RemoteReplicaRangeRead.Batch"/>; 0 for other cases.</summary>
+    [Id(1)]
+    public long FirstSlot { get; init; }
+
+    /// <summary>Gets or initializes the slot count of a <see cref="RemoteReplicaRangeRead.Batch"/>; 0 for other cases.</summary>
+    [Id(2)]
+    public int Count { get; init; }
+
+    /// <summary>Gets or initializes the packed slot bytes; empty for other cases or empty batches.</summary>
+    [Id(3)]
+    public OrleansBuffer Bytes { get; init; }
+
+    /// <summary>Gets or initializes a <see cref="RemoteReplicaRangeRead.TooLarge"/> answer's batch length; 0 for other cases.</summary>
+    [Id(4)]
+    public int Length { get; init; }
+
+    /// <summary>Gets or initializes a refusal's kind; 0 for other cases.</summary>
+    [Id(5)]
+    public byte Refusal { get; init; }
+
+    /// <summary>Gets or initializes a refusal's or corruption's message.</summary>
+    [Id(6)]
+    public string? Message { get; init; }
+
+    /// <summary>Gets or initializes a corruption's slot, when the store named one.</summary>
+    [Id(7)]
+    public long? Slot { get; init; }
+}
+
+/// <summary>
+/// Converts a <see cref="RemoteReplicaRangeRead"/> to its surrogate and back, releasing host admission on outbound
+/// conversion and releasing decoded <see cref="OrleansBuffer"/> bytes on every non-Batch or error path (OR-I17, OR-I18).
+/// </summary>
+[RegisterConverter]
+internal sealed class RemoteReplicaRangeReadConverter : IConverter<RemoteReplicaRangeRead, RemoteReplicaRangeReadSurrogate>
+{
+    private const string Answer = "remote replica range read";
+
+    /// <inheritdoc/>
+    public RemoteReplicaRangeRead ConvertFromSurrogate(in RemoteReplicaRangeReadSurrogate surrogate)
+    {
+        var bytes = surrogate.Bytes;
+        var kept = false;
+        try
+        {
+            var unowned = surrogate.Case != ReplicaReplyTag.First && (!bytes.IsEmpty || surrogate.FirstSlot != 0 || surrogate.Count != 0) ? "Batch"
+                : surrogate.Case != ReplicaReplyTag.TooLarge && surrogate.Length != 0 ? "Length"
+                : ReplicaReplyTag.UnownedShared(surrogate.Case, surrogate.Refusal, surrogate.Message, surrogate.Slot);
+            ReplicaReplyTag.ThrowIfCarries(Answer, surrogate.Case, unowned);
+            if (surrogate.Case == ReplicaReplyTag.First)
+            {
+                if (surrogate.FirstSlot < 0 || surrogate.Count < 0)
+                {
+                    throw new ReplicaReplyDecodingException(string.Create(CultureInfo.InvariantCulture, $"A range read batch has invalid FirstSlot {surrogate.FirstSlot} or Count {surrogate.Count}."));
+                }
+
+                if (surrogate.Count == 0 && !bytes.IsEmpty)
+                {
+                    throw new ReplicaReplyDecodingException(string.Create(CultureInfo.InvariantCulture, $"An empty range read batch carried {bytes.Length} unexpected bytes."));
+                }
+
+                kept = true;
+                return new RemoteReplicaRangeRead.Batch(surrogate.FirstSlot, surrogate.Count, bytes);
+            }
+
+            return surrogate.Case switch
+            {
+                ReplicaReplyTag.Dropped => ReplicaWriteOutcome.Dropped.Instance,
+                ReplicaReplyTag.Backpressure => ReplicaWriteOutcome.Backpressure.Instance,
+                ReplicaReplyTag.NotThisNode => NotThisNode.Instance,
+                ReplicaReplyTag.Refused => ReplicaReplyTag.Refusal(surrogate.Refusal, surrogate.Message),
+                ReplicaReplyTag.Corrupt => ReplicaReplyTag.Corruption(surrogate.Slot, surrogate.Message),
+                ReplicaReplyTag.TooLarge when surrogate.Length > 0 => new RemoteReplicaRangeRead.TooLarge(surrogate.Length),
+                ReplicaReplyTag.TooLarge => throw new ReplicaReplyDecodingException(string.Create(CultureInfo.InvariantCulture, $"A too-large answer names a positive length, not {surrogate.Length}.")),
+                _ => throw ReplicaReplyTag.Unknown(Answer, surrogate.Case, 1, 3, 4, 5, 6, 7, 8),
+            };
+        }
+        finally
+        {
+            if (!kept)
+            {
+                bytes.Dispose();
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public RemoteReplicaRangeReadSurrogate ConvertToSurrogate(in RemoteReplicaRangeRead value) => value switch
+    {
+        RemoteReplicaRangeRead.Batch batch => Serialized(batch),
+        RemoteReplicaRangeRead.TooLarge tooLarge => new() { Case = ReplicaReplyTag.TooLarge, Length = tooLarge.Length },
+        ReplicaWriteOutcome.Dropped => new() { Case = ReplicaReplyTag.Dropped },
+        ReplicaWriteOutcome.Backpressure => new() { Case = ReplicaReplyTag.Backpressure },
+        NotThisNode => new() { Case = ReplicaReplyTag.NotThisNode },
+        ReplicaCallRefused refused => new() { Case = ReplicaReplyTag.Refused, Refusal = (byte)refused.Kind, Message = refused.Message },
+        ReplicaCorrupt corrupt => new() { Case = ReplicaReplyTag.Corrupt, Slot = corrupt.Slot, Message = corrupt.Message },
+        null => throw new UnreachableException(),
+    };
+
+    private static RemoteReplicaRangeReadSurrogate Serialized(RemoteReplicaRangeRead.Batch batch)
+    {
+        batch.Admission?.Dispose();
+        return new() { Case = ReplicaReplyTag.First, FirstSlot = batch.FirstSlot, Count = batch.Count, Bytes = batch.Bytes };
+    }
+}
+
 /// <summary>A <see cref="RemoteReplicaTailRead"/> as a grain reply carries it: its case's tag and fields.</summary>
 [GenerateSerializer]
 [Immutable]

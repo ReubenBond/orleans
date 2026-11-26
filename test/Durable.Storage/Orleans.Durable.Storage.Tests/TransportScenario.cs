@@ -211,6 +211,9 @@ internal sealed class GrainDouble : ILedgerStoreGrain
     public Task<RemoteReplicaRead> ReadAsync(LedgerReplicaReadRequest request, CancellationToken cancellationToken) =>
         CallAsync(request, ReplicaRead.Missing.Instance, ReadOf, cancellationToken);
 
+    public Task<RemoteReplicaRangeRead> ReadRangeAsync(LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
+        CallAsync(request, new RemoteReplicaRangeRead.Batch(request.From, 0, default), ReadRangeOf, cancellationToken);
+
     public Task<RemoteReplicaTailRead> ReadTailAsync(LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         CallAsync(request, new RemoteReplicaTailRead.Tail(request.ContiguousTail, IsSealed: false), TailOf, cancellationToken);
 
@@ -284,6 +287,19 @@ internal sealed class GrainDouble : ILedgerStoreGrain
         NotThisNode notThisNode => notThisNode,
         ReplicaCallRefused refused => refused,
         _ => throw new InvalidOperationException($"{value} is no heartbeat answer."),
+    };
+
+    internal static RemoteReplicaRangeRead ReadRangeOf(object value) => value switch
+    {
+        RemoteReplicaRangeRead read => read,
+        RemoteReplicaRangeRead.Batch batch => batch,
+        RemoteReplicaRangeRead.TooLarge tooLarge => tooLarge,
+        ReplicaWriteOutcome.Dropped dropped => dropped,
+        ReplicaWriteOutcome.Backpressure backpressure => backpressure,
+        NotThisNode notThisNode => notThisNode,
+        ReplicaCallRefused refused => refused,
+        ReplicaCorrupt corrupt => corrupt,
+        _ => throw new InvalidOperationException($"{value} is no range read answer."),
     };
 
     private async Task<T> CallAsync<T>(object request, T fallback, Func<object, T> answerOf, CancellationToken cancellationToken)

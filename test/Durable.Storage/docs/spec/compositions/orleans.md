@@ -2218,8 +2218,10 @@ must not ignore, or a field's meaning or encoding changes, and a callee refuses 
 change restarts every silo onto it. Version 3 carries L2 quorum read-lease grants (`LeaseGrantTicks` on `Written`),
 remaining lease durations (`LeaseRemainingTicks` on sealed `Tail`), and batched per-node `HeartbeatAsync`
 (`LedgerReplicaHeartbeatRequest` → `RemoteReplicaHeartbeatRead`) over `ILedgerStoreGrain`
-([LR-I10](../components/ledger-replicas.md#5-invariants)), while preserving version 2's Orleans `ArcBuffer` payloads and
-is a whole-cluster restart, never a mix of silos. [Version ranges for rolling
+([LR-I10](../components/ledger-replicas.md#5-invariants)), while preserving version 2's Orleans `ArcBuffer` payloads.
+Version 4 adds batched multi-slot `ReadRangeAsync` (`LedgerReplicaReadRangeRequest` → `RemoteReplicaRangeRead`) over
+`ILedgerStoreGrain` so catch-up and drain scans fetch up to 128 consecutive slots / 1 MiB per RPC, and is a
+whole-cluster restart, never a mix of silos. [Version ranges for rolling
 upgrades](../deferred.md#replica-protocol-version-ranges-for-rolling-upgrades) are deferred. The callee then runs
 exactly the called operation on its store, so the store's contract alone decides creation and refusal
 ([LR-I7](../components/ledger-replicas.md#5-invariants), [LS-I2](../components/ledgerstore.md#5-invariants)). The callee

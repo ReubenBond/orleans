@@ -45,6 +45,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
     private const int StragglersClosed = int.MinValue;
 
     private readonly ILedgerReplica[] _replicas;
+    private readonly bool _supportsReadRange;
     private readonly TimeProvider _timeProvider;
     private readonly Action<RecoveryStep>? _recoveryObserver;
     private readonly Func<ArcBuffer, bool>? _verifyBatch;
@@ -108,6 +109,7 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
         ArgumentNullException.ThrowIfNull(timeProvider);
         LedgerReplicaOperations.ValidateWindowSize(options.WindowSize);
         _replicas = [.. replicas];
+        _supportsReadRange = _replicas.Length > 0 && _replicas.All(static r => r.SupportsReadRange);
         if (_replicas.Length == 0)
         {
             throw new ArgumentException("A ledger has at least one replica.", nameof(replicas));
@@ -1248,6 +1250,10 @@ internal sealed partial class LedgerQuorum : ILedgerStorage
                     else if (completed.Result is ReplicaRead read && read.TryGetValue(out ArcBuffer batch))
                     {
                         batch.Dispose();
+                    }
+                    else if (completed.Result is ReplicaRangeRead rangeRead)
+                    {
+                        rangeRead.Release();
                     }
                 },
                 CancellationToken.None,

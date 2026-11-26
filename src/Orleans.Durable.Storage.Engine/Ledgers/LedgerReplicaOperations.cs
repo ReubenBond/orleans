@@ -109,4 +109,116 @@ public static class LedgerReplicaOperations
             ? new ReplicaRead(new ReplicaRead.OutsideBatch(value.Length))
             : new ReplicaRead(value.Slice(offset, length));
     }
+
+    /// <summary>
+    /// Validates the bounds of a batched <see cref="ILedgerReplica.ReadRangeAsync"/> call.
+    /// </summary>
+    public static void ValidateReadRange(Slot from, Slot below, int maxSlots, int maxBytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(below, from);
+        if (from < below)
+        {
+            ValidateSlot(from);
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxSlots);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
+    }
+
+    /// <summary>
+    /// Implements <see cref="ILedgerReplica.ReadRangeAsync"/> in terms of point-wise
+    /// <see cref="ILedgerReplica.ReadAsync(Slot, Slot, CancellationToken)"/> calls for providers without a native
+    /// batched range reader.
+    /// </summary>
+    public static async ValueTask<ReplicaRangeRead> ReadRangePointWiseAsync(
+        ILedgerReplica replica,
+        Slot from,
+        Slot below,
+        Slot contiguousTail,
+        int maxSlots,
+        int maxBytes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(replica);
+        ValidateReadRange(from, below, maxSlots, maxBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (from == below)
+        {
+            return ReplicaRangeBatch.Empty(from);
+        }
+
+        var end = Math.Min(below.Value, from.Value + maxSlots);
+        ArcBufferWriter? writer = null;
+        var count = 0;
+        try
+        {
+            for (var slot = from.Value; slot < end; slot++)
+            {
+                ReplicaRead read;
+                try
+                {
+                    read = await replica.ReadAsync(new Slot(slot), contiguousTail, cancellationToken).ConfigureAwait(false);
+                }
+                catch (LedgerReplicaCorruptException) when (count > 0)
+                {
+                    break;
+                }
+
+                if (read.TryGetValue(out ArcBuffer batch))
+                {
+                    using (batch)
+                    {
+                        var framedLength = checked(ReplicaRangeBatch.FrameHeaderLength + batch.Length);
+                        if (count == 0 && framedLength > maxBytes)
+                        {
+                            return ReplicaRangeBatch.TooLarge(from, batch.Length);
+                        }
+
+                        if (count > 0 && writer!.Length + framedLength > maxBytes)
+                        {
+                            break;
+                        }
+
+                        writer ??= new ArcBufferWriter(Math.Min(maxBytes, Math.Max(framedLength, ArcBufferWriter.MinimumPageSize)));
+                        ReplicaRangeBatch.WriteFrame(writer, batch);
+                        count++;
+                    }
+                }
+                else if (read.Value is ReplicaRead.Missing)
+                {
+                    break;
+                }
+                else if (read.Value is ReplicaWriteOutcome.Dropped dropped)
+                {
+                    if (count == 0)
+                    {
+                        return dropped;
+                    }
+
+                    break;
+                }
+                else if (read.Value is ReplicaWriteOutcome.Backpressure backpressure)
+                {
+                    if (count == 0)
+                    {
+                        return backpressure;
+                    }
+
+                    break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return count == 0
+                ? ReplicaRangeBatch.Empty(from)
+                : new ReplicaRangeBatch(from, count, writer!.ConsumeSlice(writer.Length));
+        }
+        finally
+        {
+            writer?.Dispose();
+        }
+    }
 }

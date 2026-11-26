@@ -22,6 +22,7 @@
       "!Ledgers/ReplicaHeartbeatRead.cs",
       "!Ledgers/ReplicaHeartbeatReply.cs",
       "!Ledgers/ReplicaHeartbeatStatus.cs",
+      "!Ledgers/ReplicaRangeRead.cs",
       "!Ledgers/ReplicaRead.cs",
       "!Ledgers/ReplicaTailRead.cs",
       "!Ledgers/ReplicaWriteOutcome.cs",

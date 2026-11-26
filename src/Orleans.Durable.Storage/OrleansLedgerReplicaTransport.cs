@@ -605,6 +605,15 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         }
     }
 
+    /// <summary>Releases the packed bytes of a range read's answer which no caller takes.</summary>
+    internal static void ReleaseRangeBatch(RemoteReplicaRangeRead answer)
+    {
+        if (answer.Value is RemoteReplicaRangeRead.Batch batch)
+        {
+            batch.Bytes.Dispose();
+        }
+    }
+
     /// <summary>A node's three lanes (Write, Read, Control) plus its cached active/stopping silo incarnation state.</summary>
     private sealed class NodeBudgets(CallBudget write, CallBudget read, CallBudget control)
     {
@@ -647,6 +656,10 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
 
         public abstract ValueTask<ReplicaRead> ReadAsync(Slot slot, int offset, int length, Slot contiguousTail, CancellationToken cancellationToken = default);
 
+        public bool SupportsReadRange => true;
+
+        public abstract ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default);
+
         public abstract ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default);
 
         public virtual ValueTask DisposeAsync()
@@ -686,6 +699,9 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
         public override ValueTask<ReplicaRead> ReadAsync(Slot slot, int offset, int length, Slot contiguousTail, CancellationToken cancellationToken = default) =>
             Closed<ReplicaRead>();
 
+        public override ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default) =>
+            Closed<ReplicaRangeRead>();
+
         public override ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default) => Closed<ReplicaTailRead>();
 
         private ValueTask<T> Closed<T>()
@@ -705,6 +721,8 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
                 batch.Dispose();
             }
         };
+
+        private static readonly Action<ReplicaRangeRead> ReleaseRange = static read => read.Release();
 
         private readonly LedgerStoreReplica _replica;
         private readonly CallBudget _writeLane;
@@ -803,6 +821,34 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             }
 
             return await AwaitOperationAsync(operation, lease, held: default, ReleaseRead, cancellationToken).ConfigureAwait(false);
+        }
+
+        public override async ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            LedgerReplicaOperations.ValidateReadRange(from, below, maxSlots, maxBytes);
+            var clampedBytes = Math.Min(maxBytes, Transport.Limits.PayloadLimit);
+            var lease = default(CallBudget.Lease);
+            ValueTask<ReplicaRangeRead> operation;
+            try
+            {
+                var deadline = Transport.DeadlineFromNow();
+                lease = await _readLane.EnterLeaseAsync(0, deadline, cancellationToken).ConfigureAwait(false);
+                await Transport.ServingLocallyAsync(Node, deadline, cancellationToken).ConfigureAwait(false);
+                operation = _replica.ReadRangeAsync(from, below, contiguousTail, maxSlots, clampedBytes, CancellationToken.None);
+            }
+            catch (ObjectDisposedException closed) when (Transport._local.State == LocalNode.NodeState.Closed)
+            {
+                lease.Dispose();
+                throw new LedgerReplicaUnavailableException(Node, "this silo's node is closed.", closed);
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+
+            return await AwaitOperationAsync(operation, lease, held: default, ReleaseRange, cancellationToken).ConfigureAwait(false);
         }
 
         public override async ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default)
@@ -1017,6 +1063,66 @@ internal sealed class OrleansLedgerReplicaTransport : ILedgerReplicaTransport
             ThrowIfDisposed();
             CheckRange(slot, offset, length);
             return ReadCoreAsync(slot, contiguousTail, offset, length, cancellationToken);
+        }
+
+        public override async ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            LedgerReplicaOperations.ValidateReadRange(from, below, maxSlots, maxBytes);
+            if (from == below)
+            {
+                return ReplicaRangeBatch.Empty(from);
+            }
+
+            var reserved = Math.Min(maxBytes, Transport.Limits.PayloadLimit);
+            var deadline = Transport.DeadlineFromNow();
+            var request = new LedgerReplicaReadRangeRequest
+            {
+                Version = LedgerReplicaProtocol.Version,
+                Ledger = _ledger.Value,
+                WindowSize = _windowSize,
+                From = from.Value,
+                Below = below.Value,
+                ContiguousTail = contiguousTail.Value,
+                MaxSlots = maxSlots,
+                MaxBytes = reserved,
+            };
+            var backoff = FirstBackoff;
+            while (true)
+            {
+                var activeSilo = Transport.EnsureRemoteActive(Node, _budgets);
+                TimeSpan delay;
+                using (await _readLane.EnterLeaseAsync(reserved, deadline, cancellationToken).ConfigureAwait(false))
+                {
+                    RemoteReplicaRangeRead answer;
+                    try
+                    {
+                        answer = await UntilCancelledAsync(_grain.ReadRangeAsync(request, cancellationToken), ReleaseRangeBatch, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception failure)
+                    {
+                        ThrowCallFailure(failure, activeSilo, cancellationToken);
+                        throw new UnreachableException();
+                    }
+
+                    if (answer.Value is NotThisNode)
+                    {
+                        Transport._invalidate();
+                    }
+                    else if (answer.Value is ReplicaCallRefused refused)
+                    {
+                        Transport.ObserveStoppingRefusal(_budgets, activeSilo, refused);
+                    }
+
+                    if (answer.Value is not ReplicaWriteOutcome.Backpressure || !TryNextBackoff(deadline, backoff, out delay))
+                    {
+                        return LedgerReplicaCallResults.ReadRange(Node, answer, from, maxSlots, reserved);
+                    }
+                }
+
+                await Task.Delay(delay, Transport._timeProvider, cancellationToken).ConfigureAwait(false);
+                backoff = DoubleBackoff(backoff);
+            }
         }
 
         public override async ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, CancellationToken cancellationToken = default)

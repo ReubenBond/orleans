@@ -3345,8 +3345,11 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
     public partial interface ILedgerReplica : System.IAsyncDisposable
     {
+        bool SupportsReadRange { get; }
+
         System.Threading.Tasks.ValueTask<ReplicaRead> ReadAsync(Slot slot, Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<ReplicaRead> ReadAsync(Slot slot, int offset, int length, Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<ReplicaWriteOutcome> WriteAsync(Slot slot, Buffers.ArcBuffer payload, Slot contiguousTail, bool recovery, System.Threading.CancellationToken cancellationToken = default);
     }
@@ -3826,7 +3829,11 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
 
         public static System.Threading.Tasks.ValueTask<ReplicaRead> ReadRangeOfValueAsync(ILedgerReplica replica, Slot slot, int offset, int length, Slot contiguousTail, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        public static System.Threading.Tasks.ValueTask<ReplicaRangeRead> ReadRangePointWiseAsync(ILedgerReplica replica, Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public static void ValidateBatch(Buffers.ArcBuffer payload) { }
+
+        public static void ValidateReadRange(Slot from, Slot below, int maxSlots, int maxBytes) { }
 
         public static void ValidateReplicaWindow(int replicaWindow, int windowSize) { }
 
@@ -4512,6 +4519,63 @@ namespace Orleans.Durable.Storage.Engine.Ledgers
         Sealed = 1,
         Dropped = 2,
         Absent = 3
+    }
+
+    public readonly partial struct ReplicaRangeBatch : System.IDisposable
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public const int FrameHeaderLength = 4;
+        public ReplicaRangeBatch(Slot firstSlot, int count, Buffers.ArcBuffer packed, int firstSlotTooLargeLength = 0) { }
+
+        public int Count { get { throw null; } }
+
+        public Slot FirstSlot { get { throw null; } }
+
+        public int FirstSlotTooLargeLength { get { throw null; } }
+
+        public Buffers.ArcBuffer Packed { get { throw null; } }
+
+        public readonly void Dispose() { }
+
+        public static ReplicaRangeBatch Empty(Slot firstSlot) { throw null; }
+
+        public static Buffers.ArcBuffer SliceNext(Buffers.ArcBuffer packed, ref int offset) { throw null; }
+
+        public static ReplicaRangeBatch TooLarge(Slot firstSlot, int batchLength) { throw null; }
+
+        public static System.IO.InvalidDataException? ValidatePacked(int count, Buffers.ArcBuffer packed) { throw null; }
+
+        public static void WriteFrame(Buffers.ArcBufferWriter writer, Buffers.ArcBuffer batch) { }
+    }
+
+    [System.Runtime.CompilerServices.Union]
+    public readonly partial struct ReplicaRangeRead : System.Runtime.CompilerServices.IUnion
+    {
+        private readonly int _dummyPrimitive;
+        public ReplicaRangeRead(ReplicaRangeBatch value) { }
+
+        public ReplicaRangeRead(ReplicaWriteOutcome.Backpressure value) { }
+
+        public ReplicaRangeRead(ReplicaWriteOutcome.Dropped value) { }
+
+        public bool HasValue { get { throw null; } }
+
+        public object? Value { get { throw null; } }
+
+        public static implicit operator ReplicaRangeRead(ReplicaRangeBatch value) { throw null; }
+
+        public static implicit operator ReplicaRangeRead(ReplicaWriteOutcome.Backpressure value) { throw null; }
+
+        public static implicit operator ReplicaRangeRead(ReplicaWriteOutcome.Dropped value) { throw null; }
+
+        public readonly void Release() { }
+
+        public readonly bool TryGetValue(out ReplicaRangeBatch value) { throw null; }
+
+        public readonly bool TryGetValue(out ReplicaWriteOutcome.Backpressure? value) { throw null; }
+
+        public readonly bool TryGetValue(out ReplicaWriteOutcome.Dropped? value) { throw null; }
     }
 
     [System.Runtime.CompilerServices.Union]
@@ -5373,6 +5437,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers.Store
 
         public System.Threading.Tasks.ValueTask<ReplicaRead> ReadReplicaAsync(LedgerId ledger, int windowSize, Slot slot, int offset, int length, Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.ValueTask<ReplicaRangeRead> ReadReplicaRangeAsync(LedgerId ledger, int windowSize, Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask<ReplicaTailRead> ReadReplicaTailAsync(LedgerId ledger, int windowSize, Slot contiguousTail, bool seal, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<ReplicaWriteOutcome> WriteReplicaAsync(LedgerId ledger, int windowSize, Slot slot, Buffers.ArcBuffer payload, Slot contiguousTail, bool recovery, System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -5449,6 +5515,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers.Store
     {
         internal LedgerStoreReplica() { }
 
+        public bool SupportsReadRange { get { throw null; } }
+
         public System.Threading.Tasks.ValueTask CheckpointAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
@@ -5456,6 +5524,8 @@ namespace Orleans.Durable.Storage.Engine.Ledgers.Store
         public System.Threading.Tasks.ValueTask<ReplicaRead> ReadAsync(Slot slot, Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<ReplicaRead> ReadAsync(Slot slot, int offset, int length, Slot contiguousTail, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<ReplicaRangeRead> ReadRangeAsync(Slot from, Slot below, Slot contiguousTail, int maxSlots, int maxBytes, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask<ReplicaTailRead> ReadTailAsync(Slot contiguousTail, bool seal, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 

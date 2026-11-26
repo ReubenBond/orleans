@@ -296,8 +296,75 @@ public sealed class OrleansReplicaTransportTests : IAsyncLifetime
         await Cluster.Node(Callee).Store.DropReplicaAsync(ledger, token);
         Assert.Same(ReplicaWriteOutcome.Dropped.Instance, (await WriteAsync(replica, 0, [1])).Value);
         Assert.True((await replica.ReadAsync(new Slot(0), Slot.Zero, token)).TryGetValue(out ReplicaWriteOutcome.Dropped? _));
+        Assert.True((await replica.ReadRangeAsync(new Slot(0), new Slot(4), Slot.Zero, maxSlots: 4, maxBytes: 4096, token)).TryGetValue(out ReplicaWriteOutcome.Dropped? _));
         Assert.True((await replica.ReadTailAsync(Slot.Zero, seal: true, token)).TryGetValue(out ReplicaWriteOutcome.Dropped? _));
         Assert.Empty(await Cluster.Node(Callee).Store.ListReplicasAsync(token));
+    }
+
+    /// <summary>
+    /// OR-I15, OR-I18: batched <see cref="ILedgerReplica.ReadRangeAsync"/> across silos returns consecutive slots packed
+    /// into one reply, honors <c>maxSlots</c> and <c>maxBytes</c>, stops at missing slots, reports <c>TooLarge</c> when
+    /// the first slot exceeds <c>maxBytes</c>, and releases every buffer cleanly.
+    /// </summary>
+    [Fact(Timeout = 120_000)]
+    public async Task BatchedReadRangeAcrossSilosFetchesConsecutiveSlotsInOneRpc()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var ledger = new LedgerId(18);
+        var replica = Open(Callee, ledger);
+        const int SlotCount = 40;
+        var expected = new byte[SlotCount][];
+        for (var i = 0; i < SlotCount; i++)
+        {
+            expected[i] = [.. Enumerable.Range(0, 64 + i * 7).Select(b => unchecked((byte)(i * 31 + b)))];
+            _ = Assert.IsType<ReplicaWriteOutcome.Written>((await WriteAsync(replica, i, expected[i])).Value);
+        }
+
+        // Fetch all 40 slots in one batched RPC.
+        var all = await replica.ReadRangeAsync(Slot.Zero, new Slot(SlotCount + 5), new Slot(SlotCount), maxSlots: 128, maxBytes: 1 << 20, token);
+        Assert.True(all.TryGetValue(out ReplicaRangeBatch fullBatch));
+        using (fullBatch)
+        {
+            Assert.Equal(Slot.Zero, fullBatch.FirstSlot);
+            Assert.Equal(SlotCount, fullBatch.Count);
+            Assert.Equal(0, fullBatch.FirstSlotTooLargeLength);
+            Assert.Null(ReplicaRangeBatch.ValidatePacked(fullBatch.Count, fullBatch.Packed));
+            var offset = 0;
+            for (var i = 0; i < SlotCount; i++)
+            {
+                using var slice = ReplicaRangeBatch.SliceNext(fullBatch.Packed, ref offset);
+                Assert.Equal(expected[i], slice.ToArray());
+            }
+
+            Assert.Equal(fullBatch.Packed.Length, offset);
+        }
+
+        // Cap by maxBytes so only a prefix fits, then resume from FirstSlot + Count.
+        var capped = await replica.ReadRangeAsync(Slot.Zero, new Slot(SlotCount), new Slot(SlotCount), maxSlots: 128, maxBytes: 512, token);
+        Assert.True(capped.TryGetValue(out ReplicaRangeBatch prefixBatch));
+        using (prefixBatch)
+        {
+            Assert.InRange(prefixBatch.Count, 1, SlotCount - 1);
+            Assert.True(prefixBatch.Packed.Length <= 512);
+        }
+
+        // First slot alone exceeding maxBytes reports FirstSlotTooLargeLength.
+        var tooLarge = await replica.ReadRangeAsync(Slot.Zero, new Slot(SlotCount), new Slot(SlotCount), maxSlots: 128, maxBytes: 10, token);
+        Assert.True(tooLarge.TryGetValue(out ReplicaRangeBatch tooLargeBatch));
+        using (tooLargeBatch)
+        {
+            Assert.Equal(0, tooLargeBatch.Count);
+            Assert.Equal(expected[0].Length, tooLargeBatch.FirstSlotTooLargeLength);
+        }
+
+        // Reading at a missing slot returns Count == 0 and FirstSlotTooLargeLength == 0.
+        var missing = await replica.ReadRangeAsync(new Slot(SlotCount + 2), new Slot(SlotCount + 5), new Slot(SlotCount), maxSlots: 128, maxBytes: 4096, token);
+        Assert.True(missing.TryGetValue(out ReplicaRangeBatch emptyBatch));
+        using (emptyBatch)
+        {
+            Assert.Equal(0, emptyBatch.Count);
+            Assert.Equal(0, emptyBatch.FirstSlotTooLargeLength);
+        }
     }
 
     /// <summary>

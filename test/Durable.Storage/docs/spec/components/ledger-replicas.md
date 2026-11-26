@@ -339,7 +339,9 @@ which every provider runs before an operation has any effect: `ValidateSlot`, `V
 batch the caller owns: a view of bytes `[offset, offset + length)`, or `OutsideBatch` with the batch's length for a range
 which extends past it; it throws `ArgumentOutOfRangeException` for a negative offset or a length which is not positive.
 `ReadRangeOfValueAsync(replica, slot, offset, length, contiguousTail)` reads the whole value and answers so, for
-providers whose storage has no cheaper byte-range read. The ledger protocol forwards the range to its replicas, so only
+providers whose storage has no cheaper byte-range read; `ValidateReadRange` and `ReadRangePointWiseAsync` validate and
+provide the default point-wise fallback for `ILedgerReplica.ReadRangeAsync` when `SupportsReadRange` is false. The
+ledger protocol forwards the range to its replicas, so only
 the range crosses the network ([ledger-protocol §8.3](ledger-protocol.md#83-quorum-operations)); the LedgerStore still
 reads the whole record from its WAL and answers the range from it ([ledgerstore §8.2](ledgerstore.md#82-reads)), so forwarding
 saves the network, not the disk, until the WAL reads ranges
@@ -390,6 +392,8 @@ which names them; ledger replica, the lowest such layer, holds their code types.
 | `LedgerReplicaOptions` | Sealed record with required `WindowSize` (`K`), positive. A replica records the `K` of the request which creates it durably and refuses a request of another window (LR-I6). |
 | `ReplicaWriteOutcome` | Union declaration of `Written(TimeSpan LeaseGrant)` (with `Written.Instance` at `TimeSpan.Zero` and a cached per-store instance for configured `LeaseDuration`), `Sealed`, `Dropped`, and `Backpressure`, equal by case and grant. |
 | `ReplicaRead` | Hand-written non-boxing union of the owned batch (`ArcBuffer`) and the singleton records `Missing`, `Dropped`, and `Backpressure`. It declares no equality: the caller owns the batch. |
+| `ReplicaRangeBatch` | Readonly disposable struct `(Slot FirstSlot, int Count, ArcBuffer Packed, int FirstSlotTooLargeLength = 0)`: up to `maxSlots` consecutive slots packed as repeated `[u32 LE length][bytes]` frames (`FrameHeaderLength`, `ValidatePacked`, `WriteFrame`, `SliceNext`), or `Count == 0` for missing / first-slot `TooLarge`. |
+| `ReplicaRangeRead` | Hand-written non-boxing union of `ReplicaRangeBatch`, `ReplicaWriteOutcome.Dropped`, and `ReplicaWriteOutcome.Backpressure`. |
 | `ReplicaTailRead` | Hand-written non-boxing union of a `LedgerReplicaTail` and the singleton records `Dropped` and `Backpressure`, equal by case and tail. |
 | `LedgerReplicaTail` | Readonly record struct `(Slot ContiguousTail, bool IsSealed, TimeSpan LeaseRemaining = default)`: a retained contiguous tail, a sealed flag, and, on a sealing read (`seal: true`), the remaining duration of any granted or boot lease horizon in the replica's monotonic clock (LR-I10). |
 | `ReplicaHeartbeatStatus` | Byte enum: `Granted`, `Sealed`, `Dropped`, `Absent`. |

@@ -309,6 +309,26 @@ public sealed class JournalStateDatabase : IAsyncDisposable
         try
         {
             ThrowIfCorrupt();
+
+            // Commit any buffered replicated slots into the index memtables before flushing SSTs so clean shutdown
+            // persists every already-applied slot without rescanning them after restart (journals.md §8.3).
+            LedgerId[]? bufferedLedgers = null;
+            lock (_lock)
+            {
+                if (_replicatedBuffers.Count > 0)
+                {
+                    bufferedLedgers = [.. _replicatedBuffers.Keys];
+                }
+            }
+
+            if (bufferedLedgers is not null)
+            {
+                for (var i = 0; i < bufferedLedgers.Length; i++)
+                {
+                    await FlushReplicatedBufferAsync(bufferedLedgers[i], waitToken: cancellationToken, commitToken: cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             Dictionary<LedgerId, Slot> snapshot;
             long versionBefore;
             lock (_lock)
@@ -1155,7 +1175,7 @@ public sealed class JournalStateDatabase : IAsyncDisposable
                 continue;
             }
 
-            if (!woken && ledger.Status.Value is LedgerStatus.Open)
+            if (!woken)
             {
                 woken = true;
                 loop?.Wake(ledger.Id);

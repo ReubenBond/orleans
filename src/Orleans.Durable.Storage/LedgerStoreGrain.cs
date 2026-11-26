@@ -22,6 +22,10 @@ internal sealed class LedgerStoreGrain(LedgerReplicaHost host) : Grain, ILedgerS
         host.ReadFromGrainAsync(this, Node, TaskScheduler.Current, request, cancellationToken);
 
     /// <inheritdoc/>
+    public Task<RemoteReplicaRangeRead> ReadRangeAsync(LedgerReplicaReadRangeRequest request, CancellationToken cancellationToken) =>
+        host.ReadRangeFromGrainAsync(this, Node, TaskScheduler.Current, request, cancellationToken);
+
+    /// <inheritdoc/>
     public Task<RemoteReplicaTailRead> ReadTailAsync(LedgerReplicaTailRequest request, CancellationToken cancellationToken) =>
         host.ReadTailFromGrainAsync(this, Node, TaskScheduler.Current, request, cancellationToken);
 

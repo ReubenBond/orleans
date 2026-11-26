@@ -61,6 +61,54 @@ internal static class LedgerReplicaCallResults
     };
 
     /// <summary>
+    /// Returns the batched range read's answer, its packed bytes moved into Durable Storage's page pool and validated
+    /// (OR-I15, OR-I18), releasing the received <see cref="OrleansBuffer"/> on every path.
+    /// </summary>
+    public static ReplicaRangeRead ReadRange(NodeId node, RemoteReplicaRangeRead answer, Slot expectedFrom, int maxSlots, int maxBytes) => answer switch
+    {
+        RemoteReplicaRangeRead.Batch batch => ReceivedRange(node, batch, expectedFrom, maxSlots, maxBytes),
+        RemoteReplicaRangeRead.TooLarge tooLarge => new ReplicaRangeRead(ReplicaRangeBatch.TooLarge(expectedFrom, tooLarge.Length)),
+        ReplicaWriteOutcome.Dropped dropped => new ReplicaRangeRead(dropped),
+        ReplicaWriteOutcome.Backpressure backpressure => new ReplicaRangeRead(backpressure),
+        NotThisNode => throw NotThisNodeAnswered(node),
+        ReplicaCallRefused refused => throw Refusal(node, refused),
+        ReplicaCorrupt corrupt => throw Corruption(corrupt),
+        null => throw NoCase(node),
+    };
+
+    private static ReplicaRangeRead ReceivedRange(NodeId node, RemoteReplicaRangeRead.Batch batch, Slot expectedFrom, int maxSlots, int maxBytes)
+    {
+        var received = batch.Bytes;
+        if (batch.FirstSlot != expectedFrom.Value || batch.Count < 0 || batch.Count > maxSlots || received.Length > maxBytes)
+        {
+            received.Dispose();
+            throw new InvalidDataException(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Node {node} answered a range read from {expectedFrom} (maxSlots={maxSlots}, maxBytes={maxBytes}) with FirstSlot={batch.FirstSlot}, Count={batch.Count}, Bytes={received.Length}."));
+        }
+
+        if (batch.Count == 0)
+        {
+            if (!received.IsEmpty)
+            {
+                received.Dispose();
+                throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture, $"Node {node} answered an empty range read with {received.Length} unexpected bytes."));
+            }
+
+            return new ReplicaRangeRead(ReplicaRangeBatch.Empty(expectedFrom));
+        }
+
+        var packed = WireBuffers.MoveToArcBuffer(ref received);
+        if (ReplicaRangeBatch.ValidatePacked(batch.Count, packed) is { } rejection)
+        {
+            packed.Dispose();
+            throw rejection;
+        }
+
+        return new ReplicaRangeRead(new ReplicaRangeBatch(expectedFrom, batch.Count, packed));
+    }
+
+    /// <summary>
     /// Returns the contiguous-tail read's answer: the store's answer; a refusal or corruption as its exception;
     /// <c>NotThisNode</c> as <see cref="LedgerReplicaUnavailableException"/>; and a reply which fails its check, a
     /// contiguous tail below <paramref name="sent"/>, a negative remaining lease, a non-zero lease on an unsealed tail, or

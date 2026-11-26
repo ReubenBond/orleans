@@ -38,6 +38,12 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     /// </summary>
     internal const int DefaultMaxConcurrentScanReads = 32;
 
+    /// <summary>
+    /// Dedicated scan read window reserved for deliveries woken by foreground catch-up waiters
+    /// (<see cref="Wake"/>), so foreground grain reads/writes never wait behind background open-ledger indexing.
+    /// </summary>
+    private const int PriorityMaxConcurrentScanReads = 16;
+
     private static readonly TimeSpan MaximumDelay = TimeSpan.FromSeconds(1);
 
     private readonly LedgerReader _reader;
@@ -45,6 +51,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly NodeId _node;
     private readonly SemaphoreSlim _scanWindow;
+    private readonly SemaphoreSlim _priorityScanWindow;
     private readonly CancellationTokenSource _stop = new();
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -77,6 +84,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         _applier = applier;
         _timeProvider = timeProvider;
         _scanWindow = new SemaphoreSlim(maxConcurrentScanReads, maxConcurrentScanReads);
+        _priorityScanWindow = new SemaphoreSlim(PriorityMaxConcurrentScanReads, PriorityMaxConcurrentScanReads);
 
         // The loop serves no caller, so it runs in none's execution context (conventions.md §12).
         using (ExecutionContext.SuppressFlow())
@@ -117,6 +125,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
 
         await _stop.CancelAsync().ConfigureAwait(false);
         await _run.ConfigureAwait(false);
+        _priorityScanWindow.Dispose();
         _scanWindow.Dispose();
         _stop.Dispose();
         _ = _completion.TrySetResult();
@@ -201,6 +210,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         private LedgerMetadata _listed;
         private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _signaled;
+        private bool _priority;
 
         public Delivery(LedgerApplyLoop loop, LedgerMetadata listed, CancellationToken loopToken)
         {
@@ -229,12 +239,13 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
             _ = changed?.TrySetResult();
         }
 
-        /// <summary>Wakes the delivery at once so an open ledger checks its contiguous tail without waiting.</summary>
+        /// <summary>Wakes the delivery at once and marks it priority so foreground catch-up skips background scan queueing.</summary>
         public void Wake()
         {
             TaskCompletionSource? changed;
             lock (_lock)
             {
+                _priority = true;
                 changed = SignalLocked();
             }
 
@@ -259,7 +270,7 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
             return _changed;
         }
 
-        private (LedgerMetadata Listed, Task Changed) Listing()
+        private (LedgerMetadata Listed, Task Changed, bool Priority) Listing()
         {
             lock (_lock)
             {
@@ -269,7 +280,9 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
                     _changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 }
 
-                return (_listed, _changed.Task);
+                var priority = _priority;
+                _priority = false;
+                return (_listed, _changed.Task, priority);
             }
         }
 
@@ -300,14 +313,15 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
             var attempt = 0;
             while (true)
             {
-                var (listed, changed) = Listing();
+                var (listed, changed, priority) = Listing();
                 var end = listed.Status.Value is LedgerStatus.Closed closed ? closed.T : (Slot?)null;
                 ScanEnd reached;
                 try
                 {
                     var target = end ?? await _loop._reader.LearnTailAsync(listed, cancellationToken).ConfigureAwait(false);
+                    var window = priority ? _loop._priorityScanWindow : _loop._scanWindow;
                     (next, reached) = next < target
-                        ? await ScanAsync(listed, next, target, view, cancellationToken).ConfigureAwait(false)
+                        ? await ScanAsync(listed, next, target, view, window, cancellationToken).ConfigureAwait(false)
                         : (next, ScanEnd.Reached);
                 }
                 catch (Exception failure) when (IsTransient(failure) && !cancellationToken.IsCancellationRequested)
@@ -353,11 +367,11 @@ public sealed class LedgerApplyLoop : IAsyncDisposable
         /// Delivers the batches from <paramref name="next"/> below <paramref name="below"/> in slot order, returning the
         /// slot it reached and why it stopped there.
         /// </summary>
-        private async Task<(Slot Next, ScanEnd End)> ScanAsync(LedgerMetadata listed, Slot next, Slot below, LedgerSegmentView view, CancellationToken cancellationToken)
+        private async Task<(Slot Next, ScanEnd End)> ScanAsync(LedgerMetadata listed, Slot next, Slot below, LedgerSegmentView view, SemaphoreSlim window, CancellationToken cancellationToken)
         {
             var flush = _loop._applier.FlushAsync;
             var buffered = false;
-            await foreach (var item in _loop._reader.ScanAsync(listed, next, below, view, window: _loop._scanWindow, cancellationToken: cancellationToken).ConfigureAwait(false))
+            await foreach (var item in _loop._reader.ScanAsync(listed, next, below, view, window: window, cancellationToken: cancellationToken).ConfigureAwait(false))
             {
                 var read = item.Read;
                 if (read.TryGetValue(out LedgerRead.Data data))

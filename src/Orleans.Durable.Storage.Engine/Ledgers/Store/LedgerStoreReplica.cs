@@ -113,6 +113,30 @@ public sealed class LedgerStoreReplica : ILedgerReplica
     }
 
     /// <inheritdoc/>
+    public bool SupportsReadRange => true;
+
+    /// <inheritdoc/>
+    public ValueTask<ReplicaRangeRead> ReadRangeAsync(
+        Slot from,
+        Slot below,
+        Slot contiguousTail,
+        int maxSlots,
+        int maxBytes,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        LedgerReplicaOperations.ValidateReadRange(from, below, maxSlots, maxBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        return FindForRead() switch
+        {
+            LiveReplica live => live.ReadRangeAsync(from, below, contiguousTail, _windowSize, maxSlots, maxBytes, cancellationToken),
+            ReplicaWriteOutcome.Dropped dropped => new(new ReplicaRangeRead(dropped)),
+            ReplicaLookup.Absent => new(new ReplicaRangeRead(ReplicaRangeBatch.Empty(from))),
+            null => throw new UnreachableException("A lookup holds a case."),
+        };
+    }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// A seal creates the replica it reaches, sealed (ledgerstore.md §8.3). A replica the catalog does not list, read
     /// without sealing, answers as an empty one: its contiguous tail is the argument, unsealed, and it retains nothing. An

@@ -37,6 +37,8 @@ Orleans.Durable.Storage.Engine.Ledgers.NodeId
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatReply
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaHeartbeatStatus
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeBatch
+Orleans.Durable.Storage.Engine.Ledgers.ReplicaRangeRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaTailRead
 Orleans.Durable.Storage.Engine.Ledgers.ReplicaWriteOutcome
