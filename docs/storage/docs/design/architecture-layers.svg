@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <style>
+    .t { font-size: 17px; font-weight: 700; fill: #ffffff; }
+    .s { font-size: 12.5px; fill: #ffffff; }
+    .n { font-size: 12px; font-weight: 700; fill: #ffffff; opacity: 0.85; }
+    .side-t { font-size: 15px; font-weight: 700; fill: #1f2937; }
+    .side-s { font-size: 12px; fill: #374151; }
+    .cap { font-size: 22px; font-weight: 700; fill: #111827; }
+    .sub { font-size: 13px; fill: #4b5563; }
+  </style>
+  <rect x="0" y="0" width="1100" height="720" fill="#ffffff"/>
+  <text x="30" y="40" class="cap">Roux on Clog: layer cake</text>
+  <text x="30" y="62" class="sub">Roux builds on top of standalone Clog crates (clog-*). Thread-per-core Tokio (current_thread + LocalSet), Linux io-uring in clog-wal.</text>
+
+  <!-- Application -->
+  <rect x="30" y="80" width="760" height="62" rx="8" fill="#334155"/>
+  <text x="48" y="104" class="t">Application</text>
+  <text x="48" y="126" class="s">Grain interfaces and grain implementations (source-generated proxies and invokers · explicit NodeBuilder registration)</text>
+
+  <!-- L4 -->
+  <rect x="30" y="152" width="760" height="82" rx="8" fill="#7c3aed"/>
+  <text x="48" y="176" class="t">Grain runtime</text><text x="740" y="176" class="n" text-anchor="end">L4</text>
+  <text x="48" y="196" class="s">Durable owner-placed activations · reentrant single-threaded turns · at-most-once calls · Drop-only volatile cleanup</text>
+  <text x="48" y="213" class="s">Nil-externality: messages release only after Clog journal durability · ledger-replica lease checks · timers · Value/Map/List/Queue/Set/Inbox/Outbox</text>
+  <text x="48" y="230" class="s">Durable jobs: partitioned scheduler grains backed by ordinary Clog journals</text>
+
+  <!-- L3 -->
+  <rect x="30" y="244" width="760" height="76" rx="8" fill="#059669"/>
+  <text x="48" y="268" class="t">Membership</text><text x="740" y="268" class="n" text-anchor="end">L3</text>
+  <text x="48" y="288" class="s">Rapid cut detection (Probe) and Fast Paxos · durable views in clog-metastore · 0 defunct retained · stall-only LocalHealth</text>
+  <text x="48" y="305" class="s">Ephemeral MemberId liveness, endpoints, and failure-drain hints to clog-ledgers (no leases; leases live in L2 Clog)</text>
+
+  <!-- L2 -->
+  <rect x="30" y="330" width="760" height="122" rx="8" fill="#2563eb"/>
+  <text x="48" y="354" class="t">Storage: Clog (clog-*) + roux-storage</text><text x="740" y="354" class="n" text-anchor="end">L2</text>
+  <text x="48" y="375" class="s">clog-journals: per-key Append/Replace, JournalVersion CAS, CRC-32C, pluggable RoutingKey || JournalKey, WAL-less lsm-tree</text>
+  <text x="48" y="392" class="s">clog-ledgers: dyadic KeyRange ledger-map, zero-copy splits/merges/rolls, LedgerQuorum (N=3/Q=2), ClusterController</text>
+  <text x="48" y="409" class="s">clog-archive (concrete SlateDB LSM, single instance) · clog-wal (CLFL io_uring/std::fs + LedgerStore CLSC/CLSI)</text>
+  <text x="48" y="426" class="s">clog-metastore (ObjectStoreMetaStore + InMemory) &amp; clog-caspaxos (Target 96) · minimal NodeRegistry (CLNR)</text>
+  <text x="48" y="443" class="s">roux-storage: Roux Messaging adapters (CASPaxos, Replica, Forward, Cluster/NodeControl) · per-thread JournalClient</text>
+
+  <!-- L1 -->
+  <rect x="30" y="462" width="760" height="78" rx="8" fill="#ea580c"/>
+  <text x="48" y="486" class="t">Messaging</text><text x="740" y="486" class="n" text-anchor="end">L1</text>
+  <text x="48" y="506" class="s">Membership-free RPC between processes (InstanceId + TCP/rustls) · one connection per peer per direction</text>
+  <text x="48" y="523" class="s">Single Frame enum · Service | Object targets · standard bytes::Bytes · High/Normal priority lanes</text>
+
+  <!-- L0 -->
+  <rect x="30" y="550" width="760" height="66" rx="8" fill="#6b7280"/>
+  <text x="48" y="574" class="t">Substrates</text><text x="740" y="574" class="n" text-anchor="end">L0</text>
+  <text x="48" y="596" class="s">Cloud object storage (object_store) · local NVMe (Linux io-uring WAL + lsm-tree; std::fs dev) · tokio::net TCP/rustls</text>
+
+  <!-- Cross-cutting column -->
+  <rect x="810" y="80" width="260" height="536" rx="8" fill="#f3f4f6" stroke="#d1d5db"/>
+  <text x="826" y="106" class="side-t">Shared foundations</text>
+
+  <text x="826" y="138" class="side-t">bytes &amp; roux-id</text>
+  <text x="826" y="156" class="side-s">Standard bytes::Bytes; AlignedBuf</text>
+  <text x="826" y="172" class="side-s">ClusterId, NodeId (UUID), InstanceId,</text>
+  <text x="826" y="188" class="side-s">MemberId, LedgerId, KeyRange</text>
+
+  <text x="826" y="220" class="side-t">prost + protox</text>
+  <text x="826" y="238" class="side-s">Standard Protobuf (no protoc)</text>
+  <text x="826" y="254" class="side-s">TryFrom domain types; closed enums</text>
+  <text x="826" y="270" class="side-s">Unknown fields dropped (M7 fail-stop)</text>
+
+  <text x="826" y="302" class="side-t">Execution</text>
+  <text x="826" y="320" class="side-s">Tokio current_thread + LocalSet</text>
+  <text x="826" y="336" class="side-s">RPITIT + Send + dedicated I/O for Clog</text>
+
+  <text x="826" y="368" class="side-t">Verification</text>
+  <text x="826" y="386" class="side-s">turmoil + slatedb-dst whole-cluster</text>
+  <text x="826" y="402" class="side-s">stateright + Bug mutants + proptest</text>
+  <text x="826" y="418" class="side-s">miri + LazyFS/SIGKILL/Elle soak</text>
+
+  <text x="826" y="450" class="side-t">System targets (L1)</text>
+  <text x="826" y="468" class="side-s">16–17 Membership, Join (18 deferred)</text>
+  <text x="826" y="484" class="side-s">96–100 Clog Storage (CASPaxos,</text>
+  <text x="826" y="500" class="side-s">Replica, Forward, Cluster/NodeCtrl)</text>
+  <text x="826" y="516" class="side-s">≥ 1,024 grain interfaces</text>
+
+  <text x="826" y="564" class="side-t">Deployment profile (v1)</text>
+  <text x="826" y="582" class="side-s">NVMe quorum ledgers + SlateDB LSM</text>
+  <text x="826" y="598" class="side-s">ObjectStoreMetaStore or clog-caspaxos</text>
+
+  <text x="30" y="652" class="sub">Safety split: Clog guarantees durable safety unconditionally (ledger seals, MetaStore CAS, JournalVersion admission).</text>
+  <text x="30" y="672" class="sub">Each open ledger also carries a quorum-intersecting replica lease (ST8) to bound dual activations for non-durable effects, plus cooperative drain on handoffs.</text>
+  <text x="30" y="692" class="sub">Crate DAG: clog-* depends on nothing in Roux; roux-storage wires Clog onto roux-net and feeds roux-membership liveness hints.</text>
+</svg>
+
